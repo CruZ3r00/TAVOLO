@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "preferences",
+  "info": {
+    "singularName": "preference",
+    "pluralName": "preferences",
+    "displayName": "Preferences"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "primary_color": {
+      "type": "string",
+      "required": true,
+      "maxLength": 7,
+      "minLength": 7,
+      "default": "#0d6efd"
+    },
+    "second_color": {
+      "type": "string",
+      "maxLength": 7,
+      "minLength": 7,
+      "required": true,
+      "default": "#ffffff"
+    },
+    "layout": {
+      "type": "integer",
+      "max": 1,
+      "min": 1,
+      "default": 1,
+      "required": true
+    }
+  }
+}
