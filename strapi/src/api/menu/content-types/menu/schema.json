@@ -4,7 +4,8 @@
   "info": {
     "singularName": "menu",
     "pluralName": "menus",
-    "displayName": "Menu"
+    "displayName": "Menu",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -23,15 +24,22 @@
       "required": true
     },
     "img": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
       "allowedTypes": [
         "images"
-      ],
-      "type": "media",
-      "multiple": false
+      ]
     },
     "allergens": {
       "type": "text",
       "required": true
+    },
+    "site_id": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::site.site",
+      "inversedBy": "menus"
     }
   }
 }

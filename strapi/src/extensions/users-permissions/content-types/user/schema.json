@@ -73,14 +73,14 @@
       "type": "string",
       "required": true
     },
+    "payment_method": {
+      "type": "json",
+      "required": false
+    },
     "fk_prefs": {
       "type": "relation",
       "relation": "oneToOne",
       "target": "api::preference.preference"
-    },
-    "payment_method": {
-      "type": "json",
-      "required": false
     }
   }
 }
