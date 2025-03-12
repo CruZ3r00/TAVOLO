@@ -1,12 +1,11 @@
-import { createApp } from 'vue';
-import App from '@/Pages/App.vue';
-import router from './router';    
-import { createHead } from '@vueuse/head';
+import './assets/main.css'
 
-import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap';
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
 
-const app = createApp(App);
-app.use(router); // Pair the router with the Vue app
-app.use(createHead())
-app.mount('#app'); // Mount the app in the element with id "app"
+const app = createApp(App)
+
+app.use(router)
+
+app.mount('#app')
