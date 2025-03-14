@@ -1,5 +1,5 @@
 <template>
-    <section style="background-color: #f5eee1;">
+    <section style="background-color: #ffffff;">
         <div class="container border-top">
             <footer class="d-flex flex-wrap justify-content-between align-items-center py-5">
             <p class="col-7 col-md-4 mb-0 text-body-secondary">&copy; 2025 AI Cards Gaming</p>

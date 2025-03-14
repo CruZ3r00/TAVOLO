@@ -115,21 +115,21 @@ onMounted(() => {
         
             <!-- Content -->
             <div class="container text-center text-light" style="z-index: 2;">
-                <h1 class="display-3">AI CARDS GAMING</h1>
-                <p class="p-2 lead">Benvenuto, leggi le regole per giocare</p>
+                <h1 class="display-3">VUOI CREARE IL TUO MENU?</h1>
+                <p class="p-2 lead">Benvenuto</p>
             </div>
         </section>
 
-        <section class="py-5">
+        <section class="py-5 bg-white">
             <div class="container text-center">
-                <h1 class="display-5 fw-bold text-body-emphasis pb-5">Cosa offre <span style="text-decoration: underline; text-decoration-color: rgb(27, 27, 255);">AI Cards Gaming?</span></h1>
+                <h1 class="display-5 fw-bold text-body-emphasis pb-5">Cosa <span style="text-decoration: underline; text-decoration-color: rgb(27, 27, 255);">offriamo</span>?</h1>
 
                 
             </div>
         </section>
 
         
-        <section class="py-5">
+        <section class="py-5 bg-white">
             
         </section>
     </AppLayout>

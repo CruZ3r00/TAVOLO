@@ -15,6 +15,16 @@ const router = createRouter({
       component: () => import('../Pages/Auth/Login.vue'),
   },
   {
+    path: '/', // Path to the dash
+    name: 'Dashboard',
+    component: () => import('../Pages/Dashboard.vue'),
+  },
+  {
+    path: '/home', // Path to the dash
+    name: 'home',
+    component: () => import('../Pages/Dashboard.vue'),
+  },
+  {
       path: '/dashboard', // Path to the dash
       name: 'dashboard',
       component: () => import('../Pages/Dashboard.vue'),
