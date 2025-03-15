@@ -25,18 +25,17 @@ const submit = async () => {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-        const response = await fetch('http://localhost:8000/login/', {
+        const response = await fetch('http://localhost:1337/api/auth/local', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username.value, password: password.value }),
+            body: JSON.stringify({ identifier: username.value, password: password.value }),
         });
 
         if (response.ok) {
             const data = await response.json();
             // Saving in the SessionStorage
-            sessionStorage.setItem('authToken', data.access);
-            sessionStorage.setItem('refreshToken', data.refresh);
-            sessionStorage.setItem('username', data.username);
+            sessionStorage.setItem('authToken', data.jwt);
+            sessionStorage.setItem('username', data.user);
             router.push('/dashboard'); // Redirects to dashboard
         } else {
             const errorData = await response.json();
@@ -53,15 +52,12 @@ const submit = async () => {
 </script>
 
 <template>
-  <div class="login-container" :style="{ backgroundImage: 'url(' + backgroundImage + ')' }">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <div class="login-container">
     <AuthenticationCard class="auth-card">
       <h1 class="welcome-message">
-        Welcome back!
+        Bentornato!
       </h1>
-
-      <h2 class="secondary-message">
-        <span class="highlight-text">Let’s get started!</span>
-      </h2>
       
       <div v-if="isError" class="error-message fade-in">
         {{ errorMessage }}
@@ -69,28 +65,25 @@ const submit = async () => {
       
       <form @submit.prevent="submit" class="login-form">
         <div class="form-field">
-          <InputLabel for="username" value="Username" />
-          <TextInput id="username" v-model="username" type="text" class="input-field" required />
+          <InputLabel for="username" value="Username" class="form-label"/>
+          <TextInput id="username" v-model="username" type="text" class="form-control" required placeholder="Email o Username"/>
         </div>
-        
-        <div class="form-field">
-          <InputLabel for="password" value="Password" />
+
+        <InputLabel for="password" value="Password" class="form-label" />
           <div class="password-container">
             <TextInput 
               id="password" 
               v-model="password" 
               :type="showPassword ? 'text' : 'password'" 
-              class="input-field" 
+              class="form-control" 
+              placeholder="password"
               required 
             />
-            <span 
-              @click="showPassword = !showPassword" 
-              class="toggle-password-text"
-            >
-              {{ showPassword ? 'Hide' : 'Show' }}
+            <span @click="showPassword = !showPassword" class="icon">
+              <i v-if="showPassword" class="bi bi-eye"></i>
+              <i v-else class="bi bi-eye-slash"></i>
             </span>
           </div>
-        </div>
         
         <div class="actions">
           <router-link to="/forgot-password" class="text-sm link">Forgot your password?</router-link>
@@ -155,22 +148,6 @@ const submit = async () => {
     text-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.6);
   }
 
-  .secondary-message {
-    font-size: 1.5rem;
-    text-align: center;
-    color: #f39c12;
-    margin-bottom: 1.5rem;
-    text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.6);
-  }
-
-  .highlight-text {
-    font-size: 1.4rem;
-    text-align: center;
-    color: #f39c12;
-    margin-bottom: 2.5rem;
-    text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.6);
-  }
-
   .error-message {
     color: #e74c3c;
     font-size: 14px;
@@ -184,7 +161,23 @@ const submit = async () => {
 
   .password-container {
     position: relative;
+    display: inline-block;
   }
+
+  .password-container input {
+    padding-right: 30px; /* Spazio per l'icona */
+    height: 35px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+
+  .password-container .icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
 
   .toggle-password-text {
     position: absolute;

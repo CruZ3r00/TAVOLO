@@ -34,7 +34,7 @@ const router = useRouter();
 // Management of the submit
 const submit = async () => {
     try {
-        const response = await fetch('http://localhost:8000/register/', {
+        const response = await fetch('http://localhost:1337/api/auth/local/register/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -57,12 +57,12 @@ const submit = async () => {
 </script>
 
 <template>
-  <div class="register-page" :style="{ backgroundImage: 'url(' + backgroundImage + ')' }">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <div class="register-page">
     <AuthenticationCard class="auth-card">
       <!-- Welcome message remains static -->
       <div class="welcome-message">
-        <span class="welcome-text">Nice to see you!</span>
-        <span class="step-text">One last step and then you can play</span>
+        <span class="welcome-text">Registrati!</span>
       </div>
       
       <div v-if="isError" class="error-message fade-in">
@@ -70,78 +70,74 @@ const submit = async () => {
       </div>
 
       <form @submit.prevent="submit" class="register-form">
-        <div class="form-field">
-          <InputLabel for="username" value="Username" />
-          <TextInput
-            id="username"
-            v-model="form.username"
-            type="text"
-            class="input-field"
-            required
+
+        <InputLabel for="username" value="Username" class="form-label"/>
+        <TextInput
+          id="username"
+          v-model="form.username"
+          type="text"
+          class="form-control"
+          placeholder="Username"
+          required
+        />
+
+        <InputLabel for="email" value="Email" class="form-label"/>
+        <TextInput
+          id="email"
+          v-model="form.email"
+          type="email"
+          class="form-control"
+          placeholder="Email"
+          required
+        />
+        <InputLabel for="birth_date" value="Birth date" class="form-label"/>
+        <TextInput
+          id="birth_date"
+          v-model="form.birth_date"
+          type="date"
+          class="form-control"
+          required
           />
-        </div>
 
-        <div class="form-field">
-          <InputLabel for="email" value="Email" />
-          <TextInput
-            id="email"
-            v-model="form.email"
-            type="email"
-            class="input-field"
-            required
+        <InputLabel for="password" value="Password" class="form-label" />
+        <div class="password-container">
+          <TextInput 
+            id="password" 
+            v-model="password" 
+            :type="showPassword ? 'text' : 'password'" 
+            class="form-control" 
+            placeholder="password"
+            required 
           />
+          <span @click="showPassword = !showPassword" class="icon">
+            <i v-if="showPassword" class="bi bi-eye"></i>
+            <i v-else class="bi bi-eye-slash"></i>
+          </span>
         </div>
 
-        <div class="form-field">
-          <InputLabel for="birth_date" value="Birth date" />
-          <TextInput
-            id="birth_date"
-            v-model="form.birth_date"
-            type="date"
-            class="input-field"
-            required
+        <InputLabel for="password" value="Conferma password" class="form-label" />
+        <div class="password-container">
+          <TextInput 
+            id="password" 
+            v-model="password" 
+            :type="showPassword ? 'text' : 'password'" 
+            class="form-control" 
+            placeholder="Ripeti password"
+            required 
           />
-        </div>
-
-        <div class="form-field">
-          <InputLabel for="password" value="Password" />
-          <div class="password-field">
-            <TextInput
-              id="password"
-              v-model="form.password"
-              :type="passwordVisible ? 'text' : 'password'"
-              class="input-field"
-              required
-            />
-            <button type="button" class="password-toggle" @click="passwordVisible = !passwordVisible">
-              {{ passwordVisible ? 'Hide' : 'Show' }}
-            </button>
-          </div>
-        </div>
-
-        <div class="form-field">
-          <InputLabel for="password_confirmation" value="Conferma Password" />
-          <div class="password-field">
-            <TextInput
-              id="password_confirmation"
-              v-model="form.password_confirmation"
-              :type="passwordConfirmationVisible ? 'text' : 'password'"
-              class="input-field"
-              required
-            />
-            <button type="button" class="password-toggle" @click="passwordConfirmationVisible = !passwordConfirmationVisible">
-              {{ passwordConfirmationVisible ? 'Hide' : 'Show' }}
-            </button>
-          </div>
+          <span @click="showPassword = !showPassword" class="icon">
+            <i v-if="showPassword" class="bi bi-eye"></i>
+            <i v-else class="bi bi-eye-slash"></i>
+          </span>
         </div>
 
         <div class="form-field terms-field">
           <label class="checkbox-label">
             <Checkbox id="terms" v-model:checked="form.terms" name="terms" required />
             <span class="terms-text">
-              I agree to the
-              <router-link to="/terms" class="link">Terms of Service</router-link> and
-              <router-link to="/privacy-policy" class="link">Privacy Policy</router-link>
+              Ho letto e accetto i
+              <router-link to="/terms" class="link">termini del servizio</router-link> e la 
+              <router-link to="/privacy-policy" class="link">Politica di privacy</router-link>
             </span>
           </label>
         </div>
@@ -168,7 +164,7 @@ const submit = async () => {
     font-family: 'Arial', sans-serif;
   }
 
-  .register-page {
+  .register-page  {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -177,15 +173,15 @@ const submit = async () => {
     background-position: center;
   }
 
-  .auth-card {
+  .auth-card{
     background-color: #f5eee1;
     border-radius: 15px;
-    padding: 1.5rem;
+    padding: 2rem;
     box-shadow: 0 8px 20px rgba(255, 255, 255, 0.3);
-    width: 400px;
+    width: 450px;
     max-width: 90%;
     position: relative;
-    margin: 0 auto;
+    margin: 0 auto; /* Center the form */
   }
 
   .welcome-message {
@@ -202,16 +198,25 @@ const submit = async () => {
     font-weight: bold;
     text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
   }
-
-  .step-text {
-    color: #f39c12;
-    font-size: 18px;
-    font-weight: 500;
-    text-shadow: 4px 4px 10px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 255, 255, 0.8);
-    display: block;
-    margin-top: 5px;
-    transition: none;
+  .password-container {
+    position: relative;
+    display: inline-block;
   }
+
+  .password-container input {
+    padding-right: 30px; /* Spazio per l'icona */
+    height: 35px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+
+  .password-container .icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
   .error-message {
     color: #e74c3c;
     font-size: 14px;
@@ -219,17 +224,15 @@ const submit = async () => {
     margin-bottom: 1rem;
   }
   .register-form {
-    background-color: #fff;
-    border-radius: 8px;
-    padding: 1.2rem;
-    width: 100%;
-    max-width: 400px;
-    height: auto;
-    box-sizing: border-box;
-    margin-top: 20px;
-    box-shadow: none;
+    width: 350px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+    background-color: #ffffff;
+    border-radius: 12px;
   }
-
   .input-field {
     width: 100%;
     padding: 8px;

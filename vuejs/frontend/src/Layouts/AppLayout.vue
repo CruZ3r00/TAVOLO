@@ -1,9 +1,31 @@
 <script setup>
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Footer from '@/components/Footer.vue';
 
-const router = useRouter();
+const username = ref('')
 
+const router = useRouter();
+const checkLog = async () => {
+  const token = sessionStorage.getItem('authToken');
+  if(token){
+    try {
+    const response = await fetch('http://localhost:1337/api/users/me', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const userData = await response.json();
+    username.value = userData.username;
+    } catch (error) {
+        console.error('Errore nel recupero dati utente:', error.message);
+    }
+  }
+  
+}
+onMounted(() => {
+  checkLog();
+});
 
 </script>
 
@@ -36,7 +58,7 @@ const router = useRouter();
             </li>
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                Profile
+                {{ username ? username : 'profile' }}
               </a>
                 <ul class="dropdown-menu">
                   <li>
