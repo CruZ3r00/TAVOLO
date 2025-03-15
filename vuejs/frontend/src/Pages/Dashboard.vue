@@ -120,7 +120,7 @@ onMounted(() => {
             </div>
         </section>
 
-        <section class="py-5 bg-white">
+        <section class="py-5">
             <div class="container text-center">
                 <h1 class="display-5 fw-bold text-body-emphasis pb-5">Cosa <span style="text-decoration: underline; text-decoration-color: rgb(27, 27, 255);">offriamo</span>?</h1>
 
@@ -129,7 +129,7 @@ onMounted(() => {
         </section>
 
         
-        <section class="py-5 bg-white">
+        <section class="py-5">
             
         </section>
     </AppLayout>

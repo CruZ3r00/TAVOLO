@@ -12,7 +12,7 @@ const router = useRouter();
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-    <nav class="navbar navbar-expand-lg sticky-top shadow border-bottom bg-white">
+    <nav class="navbar navbar-expand-md sticky-top shadow border-bottom bg-white">
       <div class="container">
         <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
           <span class="bi bi-filter" style="font-size:1.8em"></span>
@@ -25,13 +25,13 @@ const router = useRouter();
               </button>
             </li>
             <li class="nav-item">
-              <button @click="router.push('/trionfo')" class="nav-link">
-                Trionfo
+              <button @click="router.push('/menu-handler')" class="nav-link">
+                Menu
               </button>
             </li>
             <li class="nav-item">
-              <button @click="router.push('/tresette')" class="nav-link">
-                Tresette
+              <button @click="router.push('/prefs-handler')" class="nav-link">
+                Preferenze
               </button>
             </li>
             <li class="nav-item dropdown">
@@ -65,7 +65,7 @@ const router = useRouter();
 
         <div class="min-h-screen bg-gray-100">
             <!-- Page Content -->
-            <main style="background-color: #f5eee1;">
+            <main>
                 <slot />
             </main>
         </div>
