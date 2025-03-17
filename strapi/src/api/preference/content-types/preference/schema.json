@@ -4,7 +4,8 @@
   "info": {
     "singularName": "preference",
     "pluralName": "preferences",
-    "displayName": "Preferences"
+    "displayName": "Preferences",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -29,6 +30,11 @@
       "max": 1,
       "min": 1,
       "default": 1,
+      "required": true
+    },
+    "theme": {
+      "type": "string",
+      "default": "standard",
       "required": true
     }
   }

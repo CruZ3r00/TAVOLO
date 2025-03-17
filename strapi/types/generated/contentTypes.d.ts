@@ -403,6 +403,7 @@ export interface ApiMenuMenu extends Struct.CollectionTypeSchema {
 export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
   collectionName: 'preferences';
   info: {
+    description: '';
     displayName: 'Preferences';
     pluralName: 'preferences';
     singularName: 'preference';
@@ -445,6 +446,9 @@ export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
         minLength: 7;
       }> &
       Schema.Attribute.DefaultTo<'#ffffff'>;
+    theme: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'standard'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

@@ -16,7 +16,7 @@ defineProps({
 
 <template>
 
-    <AppLayout title="Profilo - Disability Future">
+    <AppLayout>
 
         <section class=" py-5"> 
             

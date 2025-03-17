@@ -15,31 +15,72 @@ useHead({
   ],
 });
 
-const form = ref({
-  username: '',
-  email: '',
-  birth_date: '',
-  password: '',
-  password_confirmation: '',
-  terms: false,
-});
+const username = ref('');
+const name = ref('');
+const surname = ref('');
+const email = ref('');
+const birth_date = ref('');
+const password = ref('');
+const password_confirmation= ref('');
+const terms = ref(false);
+const preferenceID = ref('');
+
 
 const isError = ref(false);
+const isLoading = ref(false);
 const errorMessage = ref('');
-const passwordVisible = ref(false);
-const passwordConfirmationVisible = ref(false);
+const showPassword = ref(false);
+
 
 const router = useRouter();
 
+const CreatePreferences = async () => {
+  try{
+    const response = await fetch('http://localhost:1337/api/preferences/', {
+      method: "POST",
+      headers: {
+        'Content-Type' : 'application/json',
+      },
+      body: JSON.stringify({ data: {
+        primary_color: "#0d6efd",
+        second_color: "#ffffff",
+        theme: "standard",
+        layout: 1,
+      } }), //using default value
+    });
+    if( response.ok ){
+      const data = await response.json();
+      preferenceID.value = data.data.id-1;
+    }
+  }catch(error){
+    console.error('Errore di rete:', error.message);
+  }
+
+};
+
 // Management of the submit
 const submit = async () => {
+  isLoading.value = true;
     try {
+      await CreatePreferences();
+      console.log(preferenceID.value);
         const response = await fetch('http://localhost:1337/api/auth/local/register/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(form.value),
+            body: JSON.stringify({
+              data: {
+                "username": username.value,
+                "email": email.value,
+                "password": password.value,
+                "passwordConfirmation" : password_confirmation.value,
+                "bith_date": birth_date.value,
+                "name": name.value,
+                "surname": surname.value,
+                "fk_prefs": preferenceID.value,
+              }
+            }),
         });
 
         if (response.ok) {
@@ -53,6 +94,8 @@ const submit = async () => {
     } catch (error) {
         console.error('Errore di rete:', error.message);
     }
+  isLoading.value = false;
+
 };
 </script>
 
@@ -74,7 +117,7 @@ const submit = async () => {
         <InputLabel for="username" value="Username" class="form-label"/>
         <TextInput
           id="username"
-          v-model="form.username"
+          v-model="username"
           type="text"
           class="form-control"
           placeholder="Username"
@@ -84,20 +127,41 @@ const submit = async () => {
         <InputLabel for="email" value="Email" class="form-label"/>
         <TextInput
           id="email"
-          v-model="form.email"
+          v-model="email"
           type="email"
           class="form-control"
           placeholder="Email"
           required
         />
+
         <InputLabel for="birth_date" value="Birth date" class="form-label"/>
         <TextInput
           id="birth_date"
-          v-model="form.birth_date"
+          v-model="birth_date"
           type="date"
           class="form-control"
           required
           />
+
+        <InputLabel for="name" value="Nome" class="form-label"/>
+        <TextInput
+          id="name"
+          v-model="name"
+          type="text"
+          class="form-control"
+          placeholder="Nome"
+          required
+        />
+
+        <InputLabel for="surname" value="Cognome" class="form-label"/>
+        <TextInput
+          id="surname"
+          v-model="surname"
+          type="text"
+          class="form-control"
+          placeholder="Cognome"
+          required
+        />
 
         <InputLabel for="password" value="Password" class="form-label" />
         <div class="password-container">
@@ -115,11 +179,11 @@ const submit = async () => {
           </span>
         </div>
 
-        <InputLabel for="password" value="Conferma password" class="form-label" />
+        <InputLabel for="password_confirm" value="Conferma password" class="form-label" />
         <div class="password-container">
           <TextInput 
-            id="password" 
-            v-model="password" 
+            id="password_confirm" 
+            v-model="password_confirmation" 
             :type="showPassword ? 'text' : 'password'" 
             class="form-control" 
             placeholder="Ripeti password"
@@ -133,7 +197,7 @@ const submit = async () => {
 
         <div class="form-field terms-field">
           <label class="checkbox-label">
-            <Checkbox id="terms" v-model:checked="form.terms" name="terms" required />
+            <Checkbox id="terms" v-model:checked="terms" name="terms" required />
             <span class="terms-text">
               Ho letto e accetto i
               <router-link to="/terms" class="link">termini del servizio</router-link> e la 

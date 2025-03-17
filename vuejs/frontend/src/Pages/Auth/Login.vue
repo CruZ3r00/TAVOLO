@@ -19,6 +19,10 @@ const isLoading = ref(false);
 const isError = ref(false);
 const showPassword = ref(false);
 
+const passwordError = ref("");
+const confirmPasswordError = ref("");
+
+
 const router = useRouter();
 
 const submit = async () => {
