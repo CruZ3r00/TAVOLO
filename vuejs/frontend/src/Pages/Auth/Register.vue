@@ -24,6 +24,7 @@ const password = ref('');
 const password_confirmation= ref('');
 const terms = ref(false);
 const preferenceID = ref('');
+const registerData = ref();
 
 
 const isError = ref(false);
@@ -36,7 +37,7 @@ const router = useRouter();
 
 const CreatePreferences = async () => {
   try{
-    const response = await fetch('http://localhost:1337/api/preferences/', {
+    const response = await fetch('http://localhost:1337/api/preferences', {
       method: "POST",
       headers: {
         'Content-Type' : 'application/json',
@@ -59,32 +60,22 @@ const CreatePreferences = async () => {
 };
 
 // Management of the submit
-const submit = async () => {
-  isLoading.value = true;
+const CreateUSer= async () => {
     try {
-      await CreatePreferences();
-      console.log(preferenceID.value);
-        const response = await fetch('http://localhost:1337/api/auth/local/register/', {
+        const response = await fetch('http://localhost:1337/api/auth/local/register', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              data: {
                 "username": username.value,
                 "email": email.value,
                 "password": password.value,
-                "passwordConfirmation" : password_confirmation.value,
-                "bith_date": birth_date.value,
-                "name": name.value,
-                "surname": surname.value,
-                "fk_prefs": preferenceID.value,
-              }
             }),
         });
 
         if (response.ok) {
-            router.push('/login');
+            registerData.value = await response.json();
         } else {
             const errorData = await response.json();
             errorMessage.value = errorData.email + errorData.username;
@@ -94,7 +85,46 @@ const submit = async () => {
     } catch (error) {
         console.error('Errore di rete:', error.message);
     }
-  isLoading.value = false;
+};
+
+const submit = async () => {
+  if( password.value === password_confirmation.value ){
+    isLoading.value = true;
+    await CreatePreferences();
+    await CreateUSer();
+    const tokjwt = registerData.value.jwt;
+    const id = registerData.value.user.id;
+    try {
+      const response = await fetch(`http://localhost:1337/api/users/${id}`,{
+        method: 'PUT',
+        headers:{
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tokjwt}`,
+        },
+        body: JSON.stringify({
+            "birth_date": birth_date.value,
+            "name": name.value,
+            "surname": surname.value,
+            "fk_prefs": preferenceID.value,
+        }),
+      });
+
+      if( response.ok ){
+          router.push('/login');
+      }else{
+          const errorData = await response.json();
+          errorMessage.value = errorData.email + errorData.username;
+          isError.value = true;
+      }
+    } catch (error) {
+      console.error('Errore di rete:', error.message);
+    } finally{
+      isLoading.value = false;
+    } 
+  }else{
+    errorMessage.value = 'Le due password devono coincidere';
+    isError.value = true;
+  }
 
 };
 </script>

@@ -1,7 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-
-
-
+import { store } from '@/store';
 const routes = [
     { //non protetta
       path: '/register',
@@ -82,12 +80,12 @@ const router = createRouter({
 
 // Protected route management (auth)
 router.beforeEach((to, from, next) => {
-  const loggedIn = sessionStorage.getItem('authToken');
-  if (to.matched.some(record => record.meta.requiresAuth) && !loggedIn) {
-      next({ name: 'login' }); // Redirects if not logged in
-  } else {
-      next(); // Otherwise go on
-  }
-});
+    const isAuthenticated = store.getters.isAuthenticated;  // Vuex è già accessibile globalmente
+    if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
+        next({ name: 'login' }); // Reindirizza se non autenticato
+    } else {
+        next(); // Altrimenti vai avanti
+    }
+  });
 
 export default router

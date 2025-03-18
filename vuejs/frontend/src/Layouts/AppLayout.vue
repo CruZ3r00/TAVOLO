@@ -2,13 +2,14 @@
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Footer from '@/components/Footer.vue';
+import { useStore } from 'vuex';
 
 const username = ref('')
-
+const store = useStore();
 const router = useRouter();
 const checkLog = async () => {
-  const token = sessionStorage.getItem('authToken');
-  if(token){
+  if(store.getters.isAuthenticated){
+    const token = store.getters.getToken;
     try {
     const response = await fetch('http://localhost:1337/api/users/me', {
         method: 'GET',
