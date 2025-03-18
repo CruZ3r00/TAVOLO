@@ -22,10 +22,6 @@ const isLoading = ref(false);
 const isError = ref(false);
 const showPassword = ref(false);
 
-const passwordError = ref("");
-const confirmPasswordError = ref("");
-
-
 const router = useRouter();
 
 const submit = async () => {
@@ -53,6 +49,7 @@ const submit = async () => {
         }
     } catch (error) {
         errorMessage.value = 'Network error. Please try again.';
+        isError.value = true;
     } finally {
         isLoading.value = false;
     }
@@ -92,6 +89,7 @@ const submit = async () => {
               <i v-else class="bi bi-eye-slash"></i>
             </span>
           </div>
+
         
         <div class="actions">
           <router-link to="/forgot-password" class="text-sm link">Forgot your password?</router-link>

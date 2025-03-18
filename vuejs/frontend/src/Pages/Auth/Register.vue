@@ -171,7 +171,7 @@ const submit = async () => {
           type="date"
           class="form-control"
           required
-          />
+        />
 
         <InputLabel for="name" value="Nome" class="form-label"/>
         <TextInput
@@ -209,6 +209,7 @@ const submit = async () => {
           </span>
         </div>
 
+
         <InputLabel for="password_confirm" value="Conferma password" class="form-label" />
         <div class="password-container">
           <TextInput 
@@ -224,6 +225,7 @@ const submit = async () => {
             <i v-else class="bi bi-eye-slash"></i>
           </span>
         </div>
+
 
         <div class="form-field terms-field">
           <label class="checkbox-label">

@@ -2,8 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useForm } from 'vee-validate';
 import * as yup from 'yup';
-import ActionSection from '@/Components/ActionSection.vue';
-import ConfirmsPassword from '@/Components/ConfirmsPassword.vue';
+import ConfirmPassword from '@/components/ConfirmPassword.vue';
 import DangerButton from '@/Components/DangerButton.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
@@ -103,7 +102,7 @@ const disableTwoFactorAuthentication = async () => {
 <template>
     <div class="border bg-light p-4 container">
         <h1 class="display-6 fw-bold text-body-emphasis pb-3 mt-3">
-            Abilita l'<span style="text-decoration: underline; text-decoration-color: darkblue">Autenticazione a due fattori.</span>
+            Abilita l'<span style="text-decoration: underline; text-decoration-color: blue">Autenticazione a due fattori.</span>
         </h1>
         <div class="py-5">
             <h3 v-if="twoFactorEnabled && !confirming" class="text-lg font-medium text-gray-900">Hai abilitato l'autenticazione a due fattori</h3>
@@ -135,21 +134,21 @@ const disableTwoFactorAuthentication = async () => {
 
             <div class="mt-5">
                 <div v-if="!twoFactorEnabled">
-                    <ConfirmsPassword @confirmed="enableTwoFactorAuthentication">
-                        <PrimaryButton :disabled="enabling" class="btn-primary" style="background-color: darkblue;">Attiva</PrimaryButton>
-                    </ConfirmsPassword>
+                    <ConfirmPassword @confirmed="enableTwoFactorAuthentication">
+                        <PrimaryButton :disabled="enabling" class="btn btn-primary">Attiva</PrimaryButton>
+                    </ConfirmPassword>
                 </div>
 
                 <div v-else>
-                    <ConfirmsPassword @confirmed="confirmTwoFactorAuthentication">
+                    <ConfirmPassword @confirmed="confirmTwoFactorAuthentication">
                         <PrimaryButton v-if="confirming" :disabled="enabling" class="me-3">Conferma</PrimaryButton>
-                    </ConfirmsPassword>
-                    <ConfirmsPassword @confirmed="regenerateRecoveryCodes">
+                    </ConfirmPassword>
+                    <ConfirmPassword @confirmed="regenerateRecoveryCodes">
                         <SecondaryButton v-if="recoveryCodes.length > 0 && !confirming" class="me-3">Rigenera codici di recupero</SecondaryButton>
-                    </ConfirmsPassword>
-                    <ConfirmsPassword @confirmed="disableTwoFactorAuthentication">
+                    </ConfirmPassword>
+                    <ConfirmPassword @confirmed="disableTwoFactorAuthentication">
                         <DangerButton v-if="!confirming" :disabled="disabling">Disabilita</DangerButton>
-                    </ConfirmsPassword>
+                    </ConfirmPassword>
                 </div>
             </div>
         </div>

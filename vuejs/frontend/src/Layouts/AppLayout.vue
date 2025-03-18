@@ -58,24 +58,21 @@ onMounted(() => {
               </button>
             </li>
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <a class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                 {{ username ? username : 'Profile' }}
               </a>
                 <ul class="dropdown-menu">
-                  <li>
                     <a class="dropdown-item">
                       <button @click="router.push('/profile/show')" class="nav-link" >
                         Profile
                       </button>
-                    </a>
-                  </li>
-                <li>
+                    </a>                
                   <a class="dropdown-item">
                     <button @click="router.push('/logout')" class="nav-link">
                       Logout
                     </button>
                   </a>
-                </li>
+                
               </ul>
             </li>
 

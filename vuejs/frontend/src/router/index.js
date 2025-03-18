@@ -66,6 +66,16 @@ const routes = [
         meta: { requiresAuth: true }, // Protect this route
     },
     { //non protetta
+        path: '/who-are-us', // Route for 404 errors
+        name: 'Chi siamo',
+        component: () => import('../Pages/WhoAreUs.vue'),
+    },
+    { //non protetta
+        path: '/contact-us', // Route for 404 errors
+        name: 'Contattaci',
+        component: () => import('../Pages/ContactUs.vue'),
+    },
+    { //non protetta
         path: '/:pathMatch(.*)*', // Route for 404 errors
         name: 'NotFound',
         component: () => import('../Pages/NotFound.vue'),

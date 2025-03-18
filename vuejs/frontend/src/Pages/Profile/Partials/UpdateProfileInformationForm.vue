@@ -1,8 +1,8 @@
 <script setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import InputLabel from '@/Components/InputLabel.vue';
+import { useStore } from 'vuex';
 import TextInput from '@/Components/TextInput.vue';
-import SectionTitle from '@/Components/SectionTitle.vue';
 
 const isError = ref(false);
 const isSucces = ref(false);
@@ -14,6 +14,7 @@ const props = defineProps({
         type: Object,
         required: true,
         default: () => ({
+            id: '',
             username: '',
             email: '',
         }),
@@ -22,6 +23,9 @@ const props = defineProps({
 
 const username = ref('');
 const email = ref('');
+const store = useStore();
+
+
 
 const updateInfoUser = async () => {
     // Reset status messages before any operation
@@ -37,19 +41,19 @@ const updateInfoUser = async () => {
     }
 
     isLoading.value = true;
+    const tokjwt = store.getters.getToken;
     try {
-        const response = await fetch(`http://localhost:8000/update_info/`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                old_username: props.user.username,
-                new_username: username.value || props.user.username,
-                email: email.value || props.user.email,
-            }),
-        });
-
+      const response = await fetch(`http://localhost:1337/api/users/${props.user.id}`,{
+        method: 'PUT',
+        headers:{
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${tokjwt}`,
+        },
+        body: JSON.stringify({
+            "email": email.value,
+            "username": username.value,
+        }),
+      });
         const responseData = await response.json();
 
         if (!response.ok) {
@@ -57,43 +61,63 @@ const updateInfoUser = async () => {
             alertMessage.value = responseData.error;
         } else {
             isSucces.value = true;
-            alertMessage.value = 'Profile updated';
+            alertMessage.value = 'Profilo aggiornato';
         }
     } catch {
         isError.value = true;
-        alertMessage.value = 'Unexpected error during the update';
+        alertMessage.value = 'Errore inaspettato';
     }
     isLoading.value = false;
 };
+
+onMounted(() => {
+  username.value = props.user.username;
+  email.value = props.user.email;
+});
 </script>
 
 <template>
-  <SectionTitle>
-      <template #title>
-          <slot name="title" />
-      </template>
-      <template #description>
-          <p class="description-text">Update your account's profile information and/or email address</p>
-      </template>
-  </SectionTitle>
-
-  <div v-if="isError" class="error-message fade-in">{{ alertMessage }}</div>
-  <div v-else-if="isSucces" class="success-message fade-in">{{ alertMessage }}</div>
-
-  <div v-if="isLoading" class="loader"></div>
-
-  <form @submit.prevent="updateInfoUser" class="update-form">
-      <div class="form-field">
-          <InputLabel for="username" value="Username" />
-          <TextInput id="username" v-model="username" type="text" class="input-field" :placeholder="props.user.username"/>
-      </div>
-      <div class="form-field">
-          <InputLabel for="email" value="Email" />
-          <TextInput id="email" v-model="email" type="text" class="input-field" :placeholder="props.user.email"/>
-      </div>
-      <button type="submit" class="submit-btn" :disabled="isLoading">
-          <span v-if="isLoading" class="loader-spinner"></span>
-          <span v-else>Save</span>
-      </button>
-  </form>
+    <form @submit.prevent="updateInfoUser">
+        <!-- Name -->
+        <div class="container border bg-light p-4">
+            <h1 class="display-6 fw-bold text-body pb-3 mt-3">
+                Aggiorna le informazioni del <span style="text-decoration: underline; text-decoration-color: blue">tuo profilo.</span>
+            </h1>
+            <div v-if="isError" style="color: red;">{{ alertMessage }}</div>
+            <div v-else-if="isSucces" style="color: green;">{{ alertMessage }}</div>
+            <div class="col pt-3 mb-3">
+                <InputLabel for="name" value="Name" class="form-label"/>
+                <TextInput
+                    id="name"
+                    v-model="username"
+                    type="text"
+                    class="form-control"
+                    required
+                    autocomplete="username"
+                    :placeholder="username"
+                />
+            </div>
+            <!-- Email -->
+            <div class="col pt-3 mb-3">
+                <InputLabel for="email" value="Email" class="form-label" />
+                <TextInput
+                    id="email"
+                    v-model="email"
+                    type="email"
+                    class="form-control"
+                    required
+                    autocomplete="email"
+                    :placeholder="email"
+                />
+            </div>
+            <button 
+                type="submit" 
+                class="btn btn-primary" 
+                :disabled="isLoading"
+            >
+                <span v-if="isLoading" class="loader"></span>
+                <span v-else>Salva</span>
+            </button>
+        </div>
+    </form>
 </template>
