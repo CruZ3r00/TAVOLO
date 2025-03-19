@@ -34,12 +34,6 @@
     "allergens": {
       "type": "text",
       "required": true
-    },
-    "site_id": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::site.site",
-      "inversedBy": "menus"
     }
   }
 }

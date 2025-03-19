@@ -66,14 +66,25 @@ const routes = [
         meta: { requiresAuth: true }, // Protect this route
     },
     { //non protetta
-        path: '/who-are-us', // Route for 404 errors
+        path: '/who-are-us', // Route per pagina chi siamo
         name: 'Chi siamo',
         component: () => import('../Pages/WhoAreUs.vue'),
     },
     { //non protetta
-        path: '/contact-us', // Route for 404 errors
+        path: '/contact-us', // Route for contact page
         name: 'Contattaci',
         component: () => import('../Pages/ContactUs.vue'),
+    },
+    { // protetta
+        path: '/renew-sub', // Route for renew subscription
+        name: 'Rinnova l\'abbonamento',
+        component: () => import('../Pages/RenewSub.vue'),
+        meta: { requiresAuth: true }, // Protect this route
+    },
+    { //non protetta
+        path: '/contact-us', // Route to add payment method
+        name: 'Contattaci',
+        component: () => import('../Pages/AddPayment.vue'),
     },
     { //non protetta
         path: '/:pathMatch(.*)*', // Route for 404 errors
