@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@strapi/strapi": "^5.11.2",
     "@vueuse/head": "^2.0.0",
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.11.3",
