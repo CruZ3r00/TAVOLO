@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { store } from '@/store';
+import { store } from '@/store'; //usato per storage di jwt
 const routes = [
     { //non protetta
       path: '/register',

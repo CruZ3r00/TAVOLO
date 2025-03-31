@@ -1,4 +1,4 @@
-<script setup>
+<script setup> //pagina in cui inseriremo i termini del servizio
 import { useHead } from '@vueuse/head'; // Importa useHead di VueUse
 
 // Imposta il titolo della pagina

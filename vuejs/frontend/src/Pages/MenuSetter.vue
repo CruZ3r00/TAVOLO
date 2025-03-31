@@ -1,11 +1,14 @@
-<script setup>
+<script setup> //Pagina in cui l'utente aggiunge gli elementi al menu
     import { onMounted } from 'vue';
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
     import { useRouter } from 'vue-router';
+
+    //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
     const router = useRouter();
 
+    //funzione che verifica lo stato dell'abbonamento dell'utente loggato
     const verifyPayment = async () => {
         const tkn = store.getters.getToken;
         try {

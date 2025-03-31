@@ -1,4 +1,4 @@
-<script setup>
+<script setup> //pagina per visualizzare privacy policy del nostro servizio
 import { useHead } from '@vueuse/head'; // Importa useHead di VueUse
 
 // Imposta il titolo della pagina

@@ -1,19 +1,9 @@
-<script setup>
+<script setup> //dashboard accessibile a tutti che visualizza tutte le info e le spiegazioni ( come link esterni ) del servizio offerto
 import { useRouter } from 'vue-router';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { ref, watch, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 
 const router = useRouter();
-
-const selectedGame = ref(null);
-
-// Update the title of the window whenever the game selection changes
-watch(selectedGame, (newGame) => {
-  nextTick(() => {
-    document.title = newGame ? `Playing: ${newGame}` : 'Dashboard';
-  });
-});
-
 // Set the window title when page is mounted
 onMounted(() => {
   nextTick(() => {
@@ -27,14 +17,14 @@ onMounted(() => {
         particlesJS("particles-js", {
             particles: {
                 number: {
-                    value: 100, // Adjust particle count
+                    value: 150, // Adjust particle count
                     density: {
                         enable: true,
                         value_area: 800
                     }
                 },
                 color: {
-                    value: "#FFD700" // White particles
+                    value: "#FFD700" // color of particles
                 },
                 shape: {
                     type: "polygon",
@@ -56,7 +46,7 @@ onMounted(() => {
                         enable: false
                     }
                 },
-                line_linked: {
+                line_linked: { //linee between particles
                     enable: true,
                     distance: 150,
                     color: "#FFD700",
@@ -73,7 +63,7 @@ onMounted(() => {
                     bounce: false
                 }
             },
-            interactivity: {
+            interactivity: { //way to interact with particles
                 detect_on: "canvas",
                 events: {
                     onhover: {
@@ -126,12 +116,14 @@ onMounted(() => {
         <section class="align-items-center justify-content-center mx-5" style="height: 20vh; position:relative; background-size: cover; background-position: center;">
             <div class="rounded-3" style="background-color: rgba(0, 0, 0, 0.02);">
                 <div id="multiItemCarousel" class="carousel slide carousel-fade text-center align-items-center justify-content-center" data-bs-ride="carousel">
-                    <div class="carousel-indicators">
+                    <div class="carousel-indicators"> 
+                        <!-- Bottom's button -->
                         <button type="button" data-bs-target="#multiItemCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1" style="background-color: #00A8CC;"></button>
                         <button type="button" data-bs-target= "#multiItemCarousel" data-bs-slide-to="1" aria-label="Slide 2" style="background-color: #00A8CC;"></button>
                         <button type="button" data-bs-target="#multiItemCarousel" data-bs-slide-to="2"  aria-label="Slide 3" style="background-color: #00A8CC;"></button>
                         <button type="button" data-bs-target="#multiItemCarousel" data-bs-slide-to="3"  aria-label="Slide 4" style="background-color: #00A8CC;"></button>
                     </div>
+                    <!-- da reindirizzare verso la pagina che spiega e mostra un tour guidato delle funzioni relative -->
                     <div class="carousel-inner">
                         <div class="carousel-item active mt-5 mb-5" @click="router.push('/menu-handler')" style="color:#00A8CC">
                             <i class="bi bi-book display-1 mb-4 d-block w-100"></i>
@@ -145,12 +137,14 @@ onMounted(() => {
                             <i class="bi bi bi-card-list display-1 mb-4 d-block w-100"></i>
                             <h5 class="fw-bold pt-3" style="color:#2D2D2D;">Divisione delle categorie</h5>
                         </div>
+                         <!-- da aggiunger -->
                         <div class="carousel-item mt-5 mb-5" style="color:#00A8CC">
                             <i class="bi bi-calendar-event display-1 mb-4 d-block w-100"></i>
                             <h5 class="fw-bold pt-3" style="color:#2D2D2D;">4</h5>
                         </div>
                     </div>
                     
+                    <!-- frecce laterali del carousel-->
                     <button class="carousel-control-prev" type="button" data-bs-target="#multiItemCarousel" data-bs-slide="prev">
                         <i class="bi bi-chevron-double-left" style="color: #00A8CC;"></i>
                     </button>

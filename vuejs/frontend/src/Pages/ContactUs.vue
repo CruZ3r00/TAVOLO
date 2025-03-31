@@ -1,10 +1,6 @@
-<script setup>
+<script setup> //pagina che contiene le informazioni di contatto della nostra "societa'"
     import AppLayout from '@/Layouts/AppLayout.vue';
 </script>
-
-
-
-        
 
 <template>
   <AppLayout>

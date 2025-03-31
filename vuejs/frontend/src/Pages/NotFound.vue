@@ -1,4 +1,4 @@
-<template>
+<template> <!-- Pagina in caso di url sbagliati -->
     <div class="not-found">
       <h1 class="text-center text-xl font-bold">404 - Page Not Found</h1>
       <p class="text-center">Sorry, the page you're looking for does not exist.</p>

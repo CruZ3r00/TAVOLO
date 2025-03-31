@@ -1,4 +1,4 @@
-<script setup>
+<script setup> //componete per l'attivazione dell'autenticazione a due fattori
 import { ref, computed, watch } from 'vue';
 import { useForm } from 'vee-validate';
 import * as yup from 'yup';

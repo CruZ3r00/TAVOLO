@@ -1,4 +1,4 @@
-<script setup>
+<script setup> //probabilmente non funzionante ancora, componente form per la cancellazione dell'utente dal servizio
 import { ref } from 'vue';
 import { useForm, defineRule } from 'vee-validate';
 import { useHead } from '@vueuse/head';

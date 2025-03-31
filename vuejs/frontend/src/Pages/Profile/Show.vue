@@ -1,4 +1,4 @@
-<script setup>
+<script setup> //Paginas che gestisce le componenti e la loro visualizzazione del profilo dell'utente
 import { ref } from 'vue';
 import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
 import SectionBorder from '@/components/SectionBorder.vue';
@@ -7,8 +7,11 @@ import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue'
 import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useStore } from 'vuex';
+
+//per recuperare le info dell'utente loggato
 const store = useStore();
 
+//per decidere quale form visualizzare
 const Hprofile = ref(true);
 const Hpsw = ref(false);
 const H2fact = ref(false);
@@ -19,6 +22,7 @@ defineProps({
     confirmsTwoFactorAuthentication: Boolean,
     sessions: Array,
 });
+
 const userinfo = ref('');
 const x = store.getters.getUser;
 userinfo.value = {
@@ -26,6 +30,14 @@ userinfo.value = {
     'username' :  x.username,
     'email' : x.email,
 }
+
+/*
+
+const handler = () => {
+    per il cambio del form da visualizzare in base a quale l'utente desidera visualizzare
+}
+
+*/
 
 </script>
 
@@ -46,6 +58,7 @@ userinfo.value = {
                     </ul>
                 </nav>
                 <main class="col-lg-10 col-12 p-4d-flex flex-column flex-grow-1">
+                    <!-- navbar da sistemare per far si che appaia solo il tasto che fa comparire il menu come offcanvas -->
                     <nav class="navbar navbar-expand-lg navbar-dark bg-dark d-lg-none">
                         <div class="container-fluid">
                             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -62,6 +75,9 @@ userinfo.value = {
                         </div>
                     </nav>
                     <div class="bg-white d-flex justify-content-center align-items-center">
+                        <!-- visualizzati singolarmente nella pagina per non creare confusione
+                            forms per la modifica di varie info e sicurezza dell'utente -->
+
                         <div class="bg-white p-4 w-100">
                             <UpdateProfileInformationForm v-if="Hprofile" :user="userinfo" />
                             <SectionBorder />
