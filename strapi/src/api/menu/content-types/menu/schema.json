@@ -11,35 +11,15 @@
     "draftAndPublish": true
   },
   "attributes": {
-    "element": {
-      "type": "string",
-      "required": true
-    },
-    "description": {
-      "type": "text",
-      "required": true
-    },
-    "price": {
-      "type": "decimal",
-      "required": true
-    },
-    "img": {
-      "type": "media",
-      "multiple": false,
-      "required": false,
-      "allowedTypes": [
-        "images"
-      ]
-    },
-    "allergens": {
-      "type": "text",
-      "required": true
-    },
-    "site_id": {
+    "fk_site": {
       "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::site.site",
-      "inversedBy": "menus"
+      "relation": "oneToOne",
+      "target": "api::site.site"
+    },
+    "fk_elements": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::element.element"
     }
   }
 }

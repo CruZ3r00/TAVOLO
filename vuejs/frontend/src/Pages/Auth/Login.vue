@@ -5,12 +5,15 @@ import AuthenticationCard from '@/Components/AuthenticationCard.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { ref } from 'vue';
+import { useStore } from 'vuex';
 
 
 useHead({
     title: 'Login',
     meta: [{ name: 'description', content: 'Login page for the app' }],
 });
+
+const store = useStore();
 
 const username = ref('');
 const password = ref('');
@@ -33,9 +36,10 @@ const submit = async () => {
 
         if (response.ok) {
             const data = await response.json();
-            // Saving in the SessionStorage
-            sessionStorage.setItem('authToken', data.jwt);
-            sessionStorage.setItem('username', data.user);
+            // Saving in the Storage
+            store.dispatch('login', { user: data.user, token: data.jwt });
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('token', data.jwt);
             router.push('/dashboard'); // Redirects to dashboard
         } else {
             const errorData = await response.json();
@@ -45,6 +49,7 @@ const submit = async () => {
         }
     } catch (error) {
         errorMessage.value = 'Network error. Please try again.';
+        isError.value = true;
     } finally {
         isLoading.value = false;
     }
@@ -84,6 +89,7 @@ const submit = async () => {
               <i v-else class="bi bi-eye-slash"></i>
             </span>
           </div>
+
         
         <div class="actions">
           <router-link to="/forgot-password" class="text-sm link">Forgot your password?</router-link>

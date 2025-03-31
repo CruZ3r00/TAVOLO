@@ -2,17 +2,21 @@
 import { useHead } from '@vueuse/head';
 import { useRouter } from 'vue-router';
 import { ref } from 'vue';
+import { useStore } from 'vuex'; 
 
 useHead({
   title: 'Logout',
   meta: [{ name: 'description', content: 'Logout page for the app' }],
 });
 
+const store = useStore();
 const router = useRouter();
 const errorMessage = ref('');
 
 const logout = () => {
-  sessionStorage.removeItem('token');
+  store.dispatch('logout');
+  localStorage.removeItem('user');
+  localStorage.removeItem('token');
   console.log('Logout effettuato');
   router.push('/login');
 };

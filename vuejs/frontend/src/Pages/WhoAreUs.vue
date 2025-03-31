@@ -4,7 +4,6 @@
 
 <template>
     <AppLayout>
-        contenuto di preferences handler
-
+        
     </AppLayout>
 </template>

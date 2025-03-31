@@ -2,13 +2,14 @@
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Footer from '@/components/Footer.vue';
+import { useStore } from 'vuex';
 
 const username = ref('')
-
+const store = useStore();
 const router = useRouter();
 const checkLog = async () => {
-  const token = sessionStorage.getItem('authToken');
-  if(token){
+  if(store.getters.isAuthenticated){
+    const token = store.getters.getToken;
     try {
     const response = await fetch('http://localhost:1337/api/users/me', {
         method: 'GET',
@@ -57,24 +58,21 @@ onMounted(() => {
               </button>
             </li>
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                {{ username ? username : 'profile' }}
+              <a class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                {{ username ? username : 'Profile' }}
               </a>
                 <ul class="dropdown-menu">
-                  <li>
                     <a class="dropdown-item">
                       <button @click="router.push('/profile/show')" class="nav-link" >
                         Profile
                       </button>
-                    </a>
-                  </li>
-                <li>
+                    </a>                
                   <a class="dropdown-item">
                     <button @click="router.push('/logout')" class="nav-link">
                       Logout
                     </button>
                   </a>
-                </li>
+                
               </ul>
             </li>
 

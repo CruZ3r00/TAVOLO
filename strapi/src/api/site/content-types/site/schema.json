@@ -25,12 +25,6 @@
       "type": "relation",
       "relation": "oneToOne",
       "target": "api::preference.preference"
-    },
-    "menus": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::menu.menu",
-      "mappedBy": "site_id"
     }
   }
 }

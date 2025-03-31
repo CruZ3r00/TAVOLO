@@ -1,7 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-
-
-
+import { store } from '@/store';
 const routes = [
     { //non protetta
       path: '/register',
@@ -68,6 +66,27 @@ const routes = [
         meta: { requiresAuth: true }, // Protect this route
     },
     { //non protetta
+        path: '/who-are-us', // Route per pagina chi siamo
+        name: 'Chi siamo',
+        component: () => import('../Pages/WhoAreUs.vue'),
+    },
+    { //non protetta
+        path: '/contact-us', // Route for contact page
+        name: 'Contattaci',
+        component: () => import('../Pages/ContactUs.vue'),
+    },
+    { // protetta
+        path: '/renew-sub', // Route for renew subscription
+        name: 'Rinnova l\'abbonamento',
+        component: () => import('../Pages/RenewSub.vue'),
+        meta: { requiresAuth: true }, // Protect this route
+    },
+    { //non protetta
+        path: '/contact-us', // Route to add payment method
+        name: 'Contattaci',
+        component: () => import('../Pages/AddPayment.vue'),
+    },
+    { //non protetta
         path: '/:pathMatch(.*)*', // Route for 404 errors
         name: 'NotFound',
         component: () => import('../Pages/NotFound.vue'),
@@ -82,12 +101,12 @@ const router = createRouter({
 
 // Protected route management (auth)
 router.beforeEach((to, from, next) => {
-  const loggedIn = sessionStorage.getItem('authToken');
-  if (to.matched.some(record => record.meta.requiresAuth) && !loggedIn) {
-      next({ name: 'login' }); // Redirects if not logged in
-  } else {
-      next(); // Otherwise go on
-  }
-});
+    const isAuthenticated = store.getters.isAuthenticated;  // Vuex è già accessibile globalmente
+    if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
+        next({ name: 'login' }); // Reindirizza se non autenticato
+    } else {
+        next(); // Altrimenti vai avanti
+    }
+  });
 
 export default router
