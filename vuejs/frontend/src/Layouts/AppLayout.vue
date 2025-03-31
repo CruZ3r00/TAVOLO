@@ -37,7 +37,7 @@ onMounted(() => {
     <nav class="navbar navbar-expand-md sticky-top shadow border-bottom bg-white">
       <div class="container">
         <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-          <span class="bi bi-filter" style="font-size:1.8em"></span>
+          <span class="bi bi-filter" style="font-size:1.8em; color:#00A8CC;"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
@@ -105,5 +105,11 @@ onMounted(() => {
         top: 0;
         left: 0;
         z-index: 1; /* Place particles behind content */
+    }
+    .nav-link{
+      color:#2D2D2D;
+    }
+    .nav-link:hover{
+      color: #00A8CC;
     }
 </style>
