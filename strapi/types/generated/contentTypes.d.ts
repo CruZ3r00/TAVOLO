@@ -372,6 +372,7 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
 export interface ApiElementElement extends Struct.CollectionTypeSchema {
   collectionName: 'elements';
   info: {
+    description: '';
     displayName: 'element';
     pluralName: 'elements';
     singularName: 'element';
@@ -381,12 +382,13 @@ export interface ApiElementElement extends Struct.CollectionTypeSchema {
   };
   attributes: {
     allergens: Schema.Attribute.Text & Schema.Attribute.Required;
+    category: Schema.Attribute.String & Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    description: Schema.Attribute.Text & Schema.Attribute.Required;
     image: Schema.Attribute.Media<'images' | 'files'> &
       Schema.Attribute.Required;
+    ingredients: Schema.Attribute.Text & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',

@@ -82,8 +82,8 @@ const routes = [
         meta: { requiresAuth: true }, // Protect this route
     },
     { //non protetta
-        path: '/contact-us', // Route to add payment method
-        name: 'Contattaci',
+        path: '/add-payment', // Route to add payment method
+        name: 'Inserisci dati per il pagamento',
         component: () => import('../Pages/AddPayment.vue'),
     },
     { //non protetta

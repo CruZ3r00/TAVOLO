@@ -4,7 +4,8 @@
   "info": {
     "singularName": "element",
     "pluralName": "elements",
-    "displayName": "element"
+    "displayName": "element",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -14,7 +15,7 @@
       "type": "string",
       "required": true
     },
-    "description": {
+    "ingredients": {
       "type": "text",
       "required": true
     },
@@ -23,16 +24,20 @@
       "required": true
     },
     "image": {
+      "type": "media",
+      "multiple": false,
+      "required": true,
       "allowedTypes": [
         "images",
         "files"
-      ],
-      "type": "media",
-      "multiple": false,
-      "required": true
+      ]
     },
     "price": {
       "type": "decimal",
+      "required": true
+    },
+    "category": {
+      "type": "string",
       "required": true
     }
   }

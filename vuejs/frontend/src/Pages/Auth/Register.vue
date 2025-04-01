@@ -27,6 +27,7 @@ const preferenceID = ref('');
 const registerData = ref();
 
 
+
 const isError = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
@@ -35,6 +36,7 @@ const showPassword = ref(false);
 
 const router = useRouter();
 
+//funzione che crea la tupla della tabella delle preferenze legate all'utente che si sta registrando in maniera standard
 const CreatePreferences = async () => {
   try{
     const response = await fetch('http://localhost:1337/api/preferences', {
@@ -59,7 +61,7 @@ const CreatePreferences = async () => {
 
 };
 
-// Management of the submit
+// Funzione che registra l'utente nel formato standard richiesto da strapi
 const CreateUSer= async () => {
     try {
         const response = await fetch('http://localhost:1337/api/auth/local/register', {
@@ -87,11 +89,43 @@ const CreateUSer= async () => {
     }
 };
 
+//funzione che crea la tupla della tabella dei siti legato all'utente che si sta registrando in maniera standard, ( collegamento tra user e preferences con l'url del sito )
+const CreateSite= async () => {
+    const idusr = registerData.value.user.id;
+    const username = registerData.value.user.username;
+    const idprefs = preferenceID.value;
+    try {
+        const response = await fetch('http://localhost:1337/api/site', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ data: {
+              url : `localhost:5173/menu/${username}/home`,
+              user_id : idusr,
+              fk_prefs : idprefs,
+            }}),
+        });
+
+        if (response.ok) {
+            registerData.value = await response.json();
+        } else {
+            const errorData = await response.json();
+            errorMessage.value = errorData.email + errorData.username;
+            isError.value = true;
+        }
+
+    } catch (error) {
+        console.error('Errore di rete:', error.message);
+    }
+};
+
 const submit = async () => {
   if( password.value === password_confirmation.value ){
     isLoading.value = true;
     await CreatePreferences();
     await CreateUSer();
+    await CreateSite();
     const tokjwt = registerData.value.jwt;
     const id = registerData.value.user.id;
     try {
