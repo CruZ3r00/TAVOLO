@@ -3,6 +3,7 @@
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
     import { useRouter } from 'vue-router';
+    import qs from 'qs';
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
@@ -93,7 +94,8 @@
 
             if (response.ok){
                 const data = await response.json();
-                elementID.value = data.data.id;
+                elementID.value = data.data.id-1;
+                console.log(elementID.value);
             }
 
         }catch( error ){
@@ -102,8 +104,15 @@
     };
 
     const FetchSite = async () => {
+        const query = qs.stringify({
+            filters: {
+                user_id:{
+                    $eq: usr.id,
+                }
+            }
+        })
         try{
-            const response = await fetch(`http://localhost:1337/api/sites?filters[user_id]=${usr.id}`,{
+            const response = await fetch(`http://localhost:1337/api/sites?${query}`,{
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -113,8 +122,8 @@
 
             if (response.ok){
                 const data = await response.json();
-                siteID.value = data.data.id;
-                console.log(data.id);
+                siteID.value = data.data[0].id-1;
+                console.log(siteID.value)
             }
 
         }catch( error ){
@@ -124,22 +133,59 @@
 
     //funzione quando si fa il submit del form che gestisce le altre funzioni e la richiesta finale
     const submit = async () => {
+        const id = Number(siteID.value);
+        console.log(id);
+        const query = qs.stringify({
+            filters: {
+                fk_site:{
+                    $eq: id,
+                }
+            },
+            populate: "*",
+        })
         try {
             await uploadImage();
             await CreateElement();
-            const response = await fetch('http://localhost:1337/api/menus',{
-                method: "POST",
+            const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
+                method: "GET",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
                 },
-                body: JSON.stringify({
-                    data: {
-                        fk_site: siteID.value,
-                        fk_elements: elementID.value,
-                    }
-                })
             });
+            if (response.ok){
+                const data = await response.json();
+                console.log(data);
+                if(data.data.length <= 0){
+                    const r = await fetch(`http://localhost:1337/api/menus`,{
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                        },
+                        body: JSON.stringify({
+                            data: {
+                                fk_site: siteID.value,
+                                fk_elements: elementID.value,
+                            }
+                        })
+                    });
+                }else{
+                    const first = data.data[0].id;
+                    const update = await fetch(`http://localhost:1337/api/menus?${first}`,{
+                        method: "PUT",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                        },
+                        body: JSON.stringify({
+                            data: {
+                                fk_elements: elementID.value,
+                            }
+                        })
+                    });
+                }
+            }
         } catch (error) {
             console.log(error);
         }
@@ -158,9 +204,9 @@
         }
     };
 
-    onMounted(() => {
-        verifyPayment();
-        FetchSite();
+    onMounted(async () => {
+        await verifyPayment();
+        await FetchSite();
     });
 </script>
 
