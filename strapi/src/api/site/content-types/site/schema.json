@@ -16,11 +16,6 @@
       "required": true,
       "unique": true
     },
-    "user_id": {
-      "type": "relation",
-      "relation": "oneToOne",
-      "target": "plugin::users-permissions.user"
-    },
     "fk_prefs": {
       "type": "relation",
       "relation": "oneToOne",

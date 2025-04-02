@@ -84,6 +84,14 @@
     },
     "end_subscription": {
       "type": "date"
+    },
+    "fk_site": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::site.site"
+    },
+    "birth_date": {
+      "type": "date"
     }
   }
 }

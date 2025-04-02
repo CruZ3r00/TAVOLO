@@ -515,10 +515,6 @@ export interface ApiSiteSite extends Struct.CollectionTypeSchema {
     url: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
-    user_id: Schema.Attribute.Relation<
-      'oneToOne',
-      'plugin::users-permissions.user'
-    >;
   };
 }
 
@@ -979,6 +975,7 @@ export interface PluginUsersPermissionsUser
     draftAndPublish: false;
   };
   attributes: {
+    birth_date: Schema.Attribute.Date;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
@@ -995,6 +992,7 @@ export interface PluginUsersPermissionsUser
       'oneToOne',
       'api::preference.preference'
     >;
+    fk_site: Schema.Attribute.Relation<'oneToOne', 'api::site.site'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',

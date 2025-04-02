@@ -24,6 +24,7 @@ const password = ref('');
 const password_confirmation= ref('');
 const terms = ref(false);
 const preferenceID = ref('');
+const siteID = ref('');
 const registerData = ref();
 
 
@@ -53,7 +54,7 @@ const CreatePreferences = async () => {
     });
     if( response.ok ){
       const data = await response.json();
-      preferenceID.value = data.data.id-1;
+      preferenceID.value = data.data;
     }
   }catch(error){
     console.error('Errore di rete:', error.message);
@@ -78,6 +79,7 @@ const CreateUSer= async () => {
 
         if (response.ok) {
             registerData.value = await response.json();
+            console.log(registerData.value.user.documentId);
         } else {
             const errorData = await response.json();
             errorMessage.value = errorData.email + errorData.username;
@@ -91,24 +93,27 @@ const CreateUSer= async () => {
 
 //funzione che crea la tupla della tabella dei siti legato all'utente che si sta registrando in maniera standard, ( collegamento tra user e preferences con l'url del sito )
 const CreateSite= async () => {
-    const idusr = registerData.value.user.id;
     const username = registerData.value.user.username;
-    const idprefs = preferenceID.value;
+    const idprefs = preferenceID.value.documentId;
     try {
-        const response = await fetch('http://localhost:1337/api/site', {
+        const response = await fetch('http://localhost:1337/api/sites', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ data: {
               url : `localhost:5173/menu/${username}/home`,
-              user_id : idusr,
-              fk_prefs : idprefs,
+              fk_prefs :{
+                  connect: [
+                      { documentId: idprefs },
+                  ]
+              },
             }}),
         });
 
         if (response.ok) {
-            registerData.value = await response.json();
+            const data = await response.json();
+            siteID.value = data.data;
         } else {
             const errorData = await response.json();
             errorMessage.value = errorData.email + errorData.username;
@@ -127,6 +132,7 @@ const submit = async () => {
     await CreateUSer();
     await CreateSite();
     const tokjwt = registerData.value.jwt;
+    console.log(registerData.value.user.documentId);
     const id = registerData.value.user.id;
     try {
       const response = await fetch(`http://localhost:1337/api/users/${id}`,{
@@ -136,10 +142,19 @@ const submit = async () => {
             'Authorization': `Bearer ${tokjwt}`,
         },
         body: JSON.stringify({
-            "birth_date": birth_date.value,
-            "name": name.value,
-            "surname": surname.value,
-            "fk_prefs": preferenceID.value,
+            birth_date: birth_date.value,
+            name: name.value,
+            surname: surname.value,
+            fk_prefs:{
+                  connect: [
+                      { id: preferenceID.value.id-1 },
+                  ]
+              },
+            fk_site:{
+                  connect: [
+                      { id: siteID.value.id-1 },
+                  ]
+              },
         }),
       });
 

@@ -26,7 +26,7 @@ defineProps({
 const userinfo = ref('');
 const x = store.getters.getUser;
 userinfo.value = {
-    'id': x.id,
+    'id': x.documentId,
     'username' :  x.username,
     'email' : x.email,
 }

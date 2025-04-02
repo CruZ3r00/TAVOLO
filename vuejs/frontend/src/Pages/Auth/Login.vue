@@ -36,6 +36,7 @@ const submit = async () => {
 
         if (response.ok) {
             const data = await response.json();
+            console.log(data);
             // Saving in the Storage
             store.dispatch('login', { user: data.user, token: data.jwt });
             localStorage.setItem('user', JSON.stringify(data.user));

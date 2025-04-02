@@ -64,7 +64,7 @@
             
             const result = await response.json();
             if( result && result[0]){
-                uploadedImageId.value = result[0].id;
+                uploadedImageId.value = result[0].documentId;
             }
         } catch (error) {
             console.log(error);
@@ -94,8 +94,7 @@
 
             if (response.ok){
                 const data = await response.json();
-                elementID.value = data.data.id-1;
-                console.log(elementID.value);
+                elementID.value = data.data.documentId;
             }
 
         }catch( error ){
@@ -122,8 +121,9 @@
 
             if (response.ok){
                 const data = await response.json();
-                siteID.value = data.data[0].id-1;
-                console.log(siteID.value)
+                console.log(data);
+                siteID.value = data.data[0].documentId;
+                
             }
 
         }catch( error ){
@@ -133,12 +133,10 @@
 
     //funzione quando si fa il submit del form che gestisce le altre funzioni e la richiesta finale
     const submit = async () => {
-        const id = Number(siteID.value);
-        console.log(id);
         const query = qs.stringify({
             filters: {
                 fk_site:{
-                    $eq: id,
+                    $eq: siteID.value, //piu uno perche strapi risponde con un umero in piu ( non sto estrapolando ma facendo uguaglianza )
                 }
             },
             populate: "*",
@@ -155,7 +153,7 @@
             });
             if (response.ok){
                 const data = await response.json();
-                console.log(data);
+                console.log(data.data[0]);
                 if(data.data.length <= 0){
                     const r = await fetch(`http://localhost:1337/api/menus`,{
                         method: "POST",
@@ -165,14 +163,38 @@
                         },
                         body: JSON.stringify({
                             data: {
-                                fk_site: siteID.value,
-                                fk_elements: elementID.value,
+                                fk_site: {
+                                    connect: [
+                                        { id: siteID.value },
+                                    ]
+                                },
+                                fk_elements:{
+                                    connect: [
+                                        { id: elementID.value },
+                                    ]
+                                }
                             }
                         })
                     });
                 }else{
-                    const first = data.data[0].id;
-                    const update = await fetch(`http://localhost:1337/api/menus?${first}`,{
+                    const menuId = data.data[0].documentId; // -1 perche strapi risponde con 1 numero in piu
+                    let newList = [];
+                    const getUpdate = await fetch(`http://localhost:1337/api/menus?${menuId}&populate=*`,{
+                        method: "GET",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                        },
+                    });
+                    if (!getUpdate.ok) {
+                        throw new Error('Errore nella richiesta');
+                    }
+            
+                    const dataUpdate = await getUpdate.json();
+                    console.log(dataUpdate);
+                    newList = [...newList, ...dataUpdate.data[0].fk_elements];
+                    newList.push(elementID.value);
+                    const update = await fetch(`http://localhost:1337/api/menus?${menuId}`,{
                         method: "PUT",
                         headers: {
                             "Content-Type": "application/json",
@@ -180,7 +202,11 @@
                         },
                         body: JSON.stringify({
                             data: {
-                                fk_elements: elementID.value,
+                                fk_elements: {
+                                    connect: [
+                                        { id: newList },
+                                    ]
+                                }
                             }
                         })
                     });
