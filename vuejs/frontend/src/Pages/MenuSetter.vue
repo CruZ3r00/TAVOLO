@@ -1,5 +1,5 @@
 <script setup> //Pagina in cui l'utente aggiunge gli elementi al menu
-    import { onMounted, ref } from 'vue';
+    import { onMounted, ref, nextTick } from 'vue';
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
     import { useRouter } from 'vue-router';
@@ -63,8 +63,9 @@
             });
             
             const result = await response.json();
+            console.log(result[0]);
             if( result && result[0]){
-                uploadedImageId.value = result[0].documentId;
+                uploadedImageId.value = result[0].id;
             }
         } catch (error) {
             console.log(error);
@@ -85,7 +86,11 @@
                         name: name.value,
                         ingredients: ingredients.value,
                         allergens: allergens.value,
-                        image: uploadedImageId.value,
+                        image:{
+                            connect: [
+                                { id: uploadedImageId.value },
+                            ]
+                        },
                         price: price.value,
                         category: category.value,
                     }
@@ -103,15 +108,8 @@
     };
 
     const FetchSite = async () => {
-        const query = qs.stringify({
-            filters: {
-                user_id:{
-                    $eq: usr.id,
-                }
-            }
-        })
         try{
-            const response = await fetch(`http://localhost:1337/api/sites?${query}`,{
+            const response = await fetch(`http://localhost:1337/api/users/me?populate=fk_site`,{
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -121,9 +119,7 @@
 
             if (response.ok){
                 const data = await response.json();
-                console.log(data);
-                siteID.value = data.data[0].documentId;
-                
+                siteID.value = data.fk_site.documentId;
             }
 
         }catch( error ){
@@ -136,11 +132,14 @@
         const query = qs.stringify({
             filters: {
                 fk_site:{
-                    $eq: siteID.value, //piu uno perche strapi risponde con un umero in piu ( non sto estrapolando ma facendo uguaglianza )
+                    documentId: {
+                        $eq: siteID.value
+                    }, //piu uno perche strapi risponde con un umero in piu ( non sto estrapolando ma facendo uguaglianza )
                 }
             },
             populate: "*",
-        })
+        });
+
         try {
             await uploadImage();
             await CreateElement();
@@ -153,7 +152,6 @@
             });
             if (response.ok){
                 const data = await response.json();
-                console.log(data.data[0]);
                 if(data.data.length <= 0){
                     const r = await fetch(`http://localhost:1337/api/menus`,{
                         method: "POST",
@@ -165,19 +163,19 @@
                             data: {
                                 fk_site: {
                                     connect: [
-                                        { id: siteID.value },
+                                        { documentId: siteID.value },
                                     ]
                                 },
                                 fk_elements:{
                                     connect: [
-                                        { id: elementID.value },
+                                        { documentId: elementID.value },
                                     ]
                                 }
                             }
                         })
                     });
                 }else{
-                    const menuId = data.data[0].documentId; // -1 perche strapi risponde con 1 numero in piu
+                    const menuId = data.data[0].documentId;
                     let newList = [];
                     const getUpdate = await fetch(`http://localhost:1337/api/menus?${menuId}&populate=*`,{
                         method: "GET",
@@ -192,9 +190,10 @@
             
                     const dataUpdate = await getUpdate.json();
                     console.log(dataUpdate);
-                    newList = [...newList, ...dataUpdate.data[0].fk_elements];
+                    newList = [...newList, ...dataUpdate.data[0].fk_elements.map(el => el.documentId)];
                     newList.push(elementID.value);
-                    const update = await fetch(`http://localhost:1337/api/menus?${menuId}`,{
+                    console.log(newList);
+                    const update = await fetch(`http://localhost:1337/api/menus/${menuId}`,{
                         method: "PUT",
                         headers: {
                             "Content-Type": "application/json",
@@ -202,12 +201,12 @@
                         },
                         body: JSON.stringify({
                             data: {
-                                fk_elements: {
+                                fk_elements:{
                                     connect: [
-                                        { id: newList },
+                                        newList.map(i => ({ documentId: i})),
                                     ]
                                 }
-                            }
+                            },         
                         })
                     });
                 }
@@ -231,6 +230,9 @@
     };
 
     onMounted(async () => {
+        nextTick(() => {
+            document.title = 'Crea il tuo menù';
+        });
         await verifyPayment();
         await FetchSite();
     });
