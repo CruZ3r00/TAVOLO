@@ -1,4 +1,4 @@
-<script setup> //Pagina in cui l'utente aggiunge gli elementi al menu
+<script setup> //Pagina in cui l'utente aggiunge gli elementi al menu, da aggiungere selezione per cambiare tra l'inserimento di un nuovo elemento, la modifica di uno (o un gruppo) di elementi o la rimozione/segnare come esaurito un ingrediente.
     import { onMounted, ref, nextTick } from 'vue';
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
@@ -189,10 +189,8 @@
                     }
             
                     const dataUpdate = await getUpdate.json();
-                    console.log(dataUpdate);
                     newList = [...newList, ...dataUpdate.data[0].fk_elements.map(el => el.documentId)];
                     newList.push(elementID.value);
-                    console.log(newList);
                     const update = await fetch(`http://localhost:1337/api/menus/${menuId}`,{
                         method: "PUT",
                         headers: {
