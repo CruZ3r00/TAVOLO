@@ -4,6 +4,7 @@
     import { useStore } from 'vuex';
     import { useRouter } from 'vue-router';
     import MenuAdder from '@/components/MenuAdder.vue';
+    import MenuList from '@/components/MenuList.vue'
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
@@ -11,6 +12,7 @@
     const tkn = store.getters.getToken;
 
     const viewAdder = ref(false);
+    const viewList = ref(false);
     const siteID = ref();
 
 
@@ -56,13 +58,22 @@
         }
     };
 
+    const handleAdder = () => {
+        viewList.value = false;
+        viewAdder.value = true;
+    }
+    const handleList = () => {
+        viewList.value = true;
+        viewAdder.value = false;
+    }
+
     onMounted(async () => {
         nextTick(() => {
-            document.title = 'Crea il tuo menù';
+            document.title = 'Il tuo menù';
         });
         await verifyPayment();
         await FetchSite();
-        viewAdder.value = true;
+        viewList.value = true;
     });
 </script>
 
@@ -70,6 +81,7 @@
 
 <template>
     <AppLayout>
-        <MenuAdder v-if="viewAdder" :siteid="siteID" ></MenuAdder>
+        <MenuAdder v-if="viewAdder" :siteid="siteID" @ViewList="handleList"/>
+        <MenuList v-if="viewList" :siteid="siteID" @AddElement="handleAdder"/>
     </AppLayout>
 </template>

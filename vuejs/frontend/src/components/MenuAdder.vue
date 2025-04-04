@@ -1,13 +1,15 @@
 <script setup> //Pagina in cui l'utente aggiunge gli elementi al menu
-    import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
-    import { ref } from 'vue';
+    import { ref, onMounted, nextTick } from 'vue';
     import qs from 'qs';
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
     const tkn = store.getters.getToken;
     
+    const emit = defineEmits(['ViewList']);
+
+
     const props = defineProps({
         siteid: 'String',
     })
@@ -185,11 +187,17 @@
             reader.readAsDataURL(file);
         }
     };
+    onMounted(async () => {
+        nextTick(() => {
+            document.title = 'Crea il tuo menù';
+        });
+    });
 </script>
 
 
 
 <template>
+    <button @click="emit('ViewList')" class="btn btn-warning align-right m-5">Torna alla lista</button>
     <form @submit.prevent="submit" class="my-5 mx-5">
         <div class="row">
 
