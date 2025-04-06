@@ -1,43 +1,51 @@
 <script setup> //Paginas che gestisce le componenti e la loro visualizzazione del profilo dell'utente
-import { ref } from 'vue';
-import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
-import SectionBorder from '@/components/SectionBorder.vue';
-import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue';
-import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
-import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
-import AppLayout from '@/Layouts/AppLayout.vue';
-import { useStore } from 'vuex';
+    import { ref } from 'vue';
+    import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
+    import SectionBorder from '@/components/SectionBorder.vue';
+    import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue';
+    import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
+    import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
+    import AppLayout from '@/Layouts/AppLayout.vue';
+    import { useStore } from 'vuex';
+    import { nextTick } from 'vue'; 
+    //per recuperare le info dell'utente loggato
+    const store = useStore();
 
-//per recuperare le info dell'utente loggato
-const store = useStore();
-
-//per decidere quale form visualizzare
-const Hprofile = ref(true);
-const Hpsw = ref(false);
-const H2fact = ref(false);
-const Hdelete = ref(false);
+    //per decidere quale form visualizzare
+    const Hprofile = ref(true);
+    const Hpsw = ref(false);
+    const H2fact = ref(false);
+    const Hdelete = ref(false);
 
 
-defineProps({
-    confirmsTwoFactorAuthentication: Boolean,
-    sessions: Array,
-});
+    defineProps({
+        confirmsTwoFactorAuthentication: Boolean,
+        sessions: Array,
+    });
 
-const userinfo = ref('');
-const x = store.getters.getUser;
-userinfo.value = {
-    'id': x.documentId,
-    'username' :  x.username,
-    'email' : x.email,
-}
+    const userinfo = ref('');
+    const x = store.getters.getUser;
+    userinfo.value = {
+        'id': x.documentId,
+        'username' :  x.username,
+        'email' : x.email,
+    }
 
-/*
+    /*
 
-const handler = () => {
-    per il cambio del form da visualizzare in base a quale l'utente desidera visualizzare
-}
+    const handler = () => {
+        per il cambio del form da visualizzare in base a quale l'utente desidera visualizzare
+    }
 
-*/
+    */
+
+
+    // Imposta il titolo della pagina
+    onMounted(async () => {
+            nextTick(() => {
+                document.title = 'Aggiungi metodo di pagamento';
+            });
+    });
 
 </script>
 

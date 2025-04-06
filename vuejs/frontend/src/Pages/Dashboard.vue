@@ -1,7 +1,7 @@
 <script setup> //dashboard accessibile a tutti che visualizza tutte le info e le spiegazioni ( come link esterni ) del servizio offerto
 import { useRouter } from 'vue-router';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { ref, onMounted, nextTick } from 'vue';
+import { onMounted, nextTick } from 'vue';
 
 const router = useRouter();
 // Set the window title when page is mounted

@@ -11,13 +11,16 @@
     const router = useRouter();
     const tkn = store.getters.getToken;
 
+    //variabili utilizzate per la gestione della pagina
     const viewAdder = ref(false);
     const viewList = ref(false);
+
+    //variabili utilizzate nelle fetch
     const siteID = ref();
 
 
 
-    //funzione che verifica lo stato dell'abbonamento dell'utente loggato
+    //funzione che verifica lo stato dell'abbonamento dell'utente loggato al momento && 0 per non gestire al momento gli abbonamenti in modo automatico
     const verifyPayment = async () => {
         try {
             const response = await fetch('http://localhost:1337/api/users/me',{
@@ -27,7 +30,8 @@
                     "Content-Type" : "application/json",
                 },
             });
-            if(response.ok){ //momentaneamente && 0 per returnare sempre true
+
+            if(response.ok){ 
                 const data = await response.json();
                 if( data.payment_method == null && 0) router.push('/add-payment');
                 else if ( new Date(data.end_subscription) < new Date() && 0 ) router.push('/renew-sub');
@@ -38,6 +42,7 @@
         }
     };
 
+    //function che recupera le info del sito collegate all'utente loggato 'users/me'
     const FetchSite = async () => {
         try{
             const response = await fetch(`http://localhost:1337/api/users/me?populate=fk_site`,{
@@ -58,6 +63,7 @@
         }
     };
 
+    //inverto le variabili per invertire cosa visualizzare, in entrambi
     const handleAdder = () => {
         viewList.value = false;
         viewAdder.value = true;
@@ -67,17 +73,17 @@
         viewAdder.value = false;
     }
 
+
+    //al mounting della pagina del dom verifico il pagamento (simulazione al momento) e recupero le info del sito
     onMounted(async () => {
         nextTick(() => {
             document.title = 'Il tuo menù';
         });
         await verifyPayment();
         await FetchSite();
-        viewList.value = true;
+        viewList.value = true; //di default visualizzazione della lista degli elementi
     });
 </script>
-
-
 
 <template>
     <AppLayout>

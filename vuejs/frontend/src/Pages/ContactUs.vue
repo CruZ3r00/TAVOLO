@@ -1,5 +1,12 @@
 <script setup> //pagina che contiene le informazioni di contatto della nostra "societa'"
-    import AppLayout from '@/Layouts/AppLayout.vue';
+    import AppLayout from '@/Layouts/AppLayout.vue';import { nextTick } from 'vue'; 
+
+  // Imposta il titolo della pagina
+  onMounted(async () => {
+          nextTick(() => {
+              document.title = 'Contattaci';
+          });
+  });
 </script>
 
 <template>

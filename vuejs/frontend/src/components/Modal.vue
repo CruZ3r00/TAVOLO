@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 
+//props utilizzato per gestire la visualizzazione
 const props = defineProps({
     show: {
         type: Boolean,
@@ -8,10 +9,14 @@ const props = defineProps({
     },
 });
 
+//emit per chiudere il modale
 const emit = defineEmits(['close']);
-const dialog = ref();
-const showSlot = ref(props.show);
 
+//variabili ref per gestire il comportamento reattivo
+const dialog = ref();
+const showSlot = ref(props.show); 
+
+//watch dei props, quando cambiano allora eseguo
 watch(() => props.show, () => {
     if (props.show) {
         document.body.style.overflow = 'hidden';
@@ -26,19 +31,18 @@ watch(() => props.show, () => {
     }
 });
 
-const close = () => {
-    emit('close');
-};
-
+// funzione che gestice la chiusura premendo esc
 const closeOnEscape = (e) => {
     if (e.key === 'Escape') {
         e.preventDefault();
-        close();
+        emit('close');
     }
 };
 
+// listener di tastiera per quando si preme un tasto
 onMounted(() => document.addEventListener('keydown', closeOnEscape));
 
+//rimuovo il listener quando il componente viene smontato
 onUnmounted(() => {
     document.removeEventListener('keydown', closeOnEscape);
     document.body.style.overflow = null;
@@ -57,10 +61,10 @@ onUnmounted(() => {
     >
       <div class="modal-dialog modal-dialog-centered" :class="maxWidthClass" role="document">
         <div class="modal-content">
-          <!-- Header con bottone di chiusura -->
+          <!-- Header con bottone di chiusura e possibilita di inserire un titolo -->
           <div class="modal-header">
             <slot v-if="showSlot" name="title" />
-            <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
+            <button type="button" class="btn-close" @click="$emit(close)" aria-label="Close"></button>
           </div>
   
           <!-- Contenuto -->

@@ -1,9 +1,11 @@
-<script setup> //pagina in cui inseriremo i termini del servizio
-import { useHead } from '@vueuse/head'; // Importa useHead di VueUse
+<script setup> 
+import { nextTick } from 'vue'; 
 
 // Imposta il titolo della pagina
-useHead({
-    title: 'Terms of Service', // Imposta il titolo della pagina
+onMounted(async () => {
+        nextTick(() => {
+            document.title = 'Termini del servizio';
+        });
 });
 </script>
 

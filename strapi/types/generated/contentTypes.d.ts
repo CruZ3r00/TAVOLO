@@ -381,14 +381,14 @@ export interface ApiElementElement extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    allergens: Schema.Attribute.Text & Schema.Attribute.Required;
+    allergens: Schema.Attribute.JSON & Schema.Attribute.Required;
     category: Schema.Attribute.String & Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     image: Schema.Attribute.Media<'images' | 'files'> &
       Schema.Attribute.Required;
-    ingredients: Schema.Attribute.Text & Schema.Attribute.Required;
+    ingredients: Schema.Attribute.JSON & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',

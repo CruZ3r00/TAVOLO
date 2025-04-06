@@ -1,9 +1,11 @@
 <script setup> //pagina per visualizzare privacy policy del nostro servizio
-import { useHead } from '@vueuse/head'; // Importa useHead di VueUse
+import { nextTick } from 'vue'; 
 
 // Imposta il titolo della pagina
-useHead({
-    title: 'Privacy Policy', // Imposta il titolo della pagina
+onMounted(async () => {
+        nextTick(() => {
+            document.title = 'Privacy e policy';
+        });
 });
 </script>
 

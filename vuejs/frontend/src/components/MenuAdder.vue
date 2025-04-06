@@ -22,8 +22,8 @@
 
     //variabili utilizzate nel form da inviare per la richiesta API per creare nuovi record
     const name = ref('');
-    const ingredients = ref('');
-    const allergens = ref('');
+    const ingredients = ref([]);
+    const allergens = ref([]);
     const image = ref(null);
     const price = ref(null);
     const category = ref('');
@@ -43,11 +43,11 @@
                 body: formData,
             });
             
-            const result = await response.json();
-            console.log(result[0]);
-            if( result && result[0]){
+            if(response.ok){
+                const result = await response.json();
                 uploadedImageId.value = result[0].id;
             }
+            console.log(uploadedImageId.value);
         } catch (error) {
             console.log(error);
         }
@@ -67,7 +67,8 @@
                         name: name.value,
                         ingredients: ingredients.value,
                         allergens: allergens.value,
-                        image:{
+                        //connessione come foreign key all'immagine uploadata
+                        image:{ 
                             connect: [
                                 { id: uploadedImageId.value },
                             ]
@@ -90,20 +91,23 @@
 
     //funzione quando si fa il submit del form che gestisce le altre funzioni e la richiesta finale
     const submit = async () => {
-        const query = qs.stringify({
+        //creazione query standard di strapi v5
+        const query = qs.stringify({ 
             filters: {
                 fk_site:{
                     documentId: {
-                        $eq: siteID.value
-                    }, //piu uno perche strapi risponde con un umero in piu ( non sto estrapolando ma facendo uguaglianza )
+                        $eq: siteID.value.documentId
+                    },
                 }
             },
             populate: "*",
         });
 
         try {
-            await uploadImage();
-            await CreateElement();
+            await uploadImage(); //funzione che carica l'immagine
+            await CreateElement(); //funzione che crea l'elemento (chiamate fetch, quindi await)
+
+            //fetch per estrapolare il contenuto di menu con un certo riferimento al sito dell'utente loggato (tramite props da padre)
             const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
                 method: "GET",
                 headers: {
@@ -111,9 +115,12 @@
                     "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
                 },
             });
+
             if (response.ok){
                 const data = await response.json();
-                if(data.data.length <= 0){
+
+                //se non esiste ancora nel database, quindi vuota
+                if(data.data.length <= 0){ 
                     const r = await fetch(`http://localhost:1337/api/menus`,{
                         method: "POST",
                         headers: {
@@ -122,12 +129,12 @@
                         },
                         body: JSON.stringify({
                             data: {
-                                fk_site: {
+                                fk_site: { //connect per le foreign key
                                     connect: [
-                                        { documentId: siteID.value },
+                                        { documentId: siteID.value.documentId },
                                     ]
                                 },
-                                fk_elements:{
+                                fk_elements:{ //connect per le foreign key
                                     connect: [
                                         { documentId: elementID.value },
                                     ]
@@ -135,10 +142,15 @@
                             }
                         })
                     });
-                }else{
+                }
+
+                // se invece esiste aggiornamento della lista degli elementi
+                else {    
                     const menuId = data.data[0].documentId;
                     let newList = [];
-                    const getUpdate = await fetch(`http://localhost:1337/api/menus?${menuId}&populate=*`,{
+                    
+                    //fetch per estrapolare la lista tramite il documentId della collection menu
+                    const getUpdate = await fetch(`http://localhost:1337/api/menus?${menuId}&populate=*`,{ 
                         method: "GET",
                         headers: {
                             "Content-Type": "application/json",
@@ -148,10 +160,12 @@
                     if (!getUpdate.ok) {
                         throw new Error('Errore nella richiesta');
                     }
-            
+                    
                     const dataUpdate = await getUpdate.json();
                     newList = [...newList, ...dataUpdate.data[0].fk_elements.map(el => el.documentId)];
                     newList.push(elementID.value);
+
+                    //fetch per l'aggiornamento del record con documentId -> menuId
                     const update = await fetch(`http://localhost:1337/api/menus/${menuId}`,{
                         method: "PUT",
                         headers: {
@@ -173,8 +187,32 @@
         } catch (error) {
             console.log(error);
         }
+        resetForm(); //funzione che svuota le variabile e, quindi, il form
     };
 
+    // funzioni per aumentare e dimunire le dimensioni della lista e del forme inerente agli ingredienti
+    const addIngredient = () => ingredients.value.push('');
+    const removeIngredient = (index) => ingredients.value.splice(index, 1);
+
+    // funzioni per aumentare e dimunire le dimensioni della lista e del forme inerente agli ingredienti
+    const addAllergen = () => allergens.value.push('');
+    const removeAllergen = (index) => allergens.value.splice(index, 1);
+
+    //funzione per resettare il form
+    const resetForm = () => {
+        imagePreview.value = null;
+        uploadedImageId.value = null;
+
+        //variabili utilizzate nel form da inviare per la richiesta API per creare nuovi record
+        name.value = '';
+        ingredients.value = [];
+        allergens.value = [];
+        image.value = null;
+        price.value = null;
+        category.value = '';
+    }
+
+    //funzione per gestire il file e la preview dell'immagine
     const handleFile = (event) => {
         const file = event.target.files[0];
         if ( file ){
@@ -187,6 +225,8 @@
             reader.readAsDataURL(file);
         }
     };
+
+    //impostazione del titolo della scheda
     onMounted(async () => {
         nextTick(() => {
             document.title = 'Crea il tuo menù';
@@ -198,56 +238,70 @@
 
 <template>
     <button @click="emit('ViewList')" class="btn btn-warning align-right m-5">Torna alla lista</button>
-    <form @submit.prevent="submit" class="my-5 mx-5">
-        <div class="row">
+        <form @submit.prevent="submit" class="my-5 mx-5">
+            <div class="row">
+                <!-- v-model collegato alla variabile relativa al nome -->
+                <div class="form-group col-md-7">
+                    <label for="inputName">Nome</label>
+                    <input type="text" v-model="name" class="form-control" id="inputName" placeholder="Inserisci il nome" required>
+                </div>
 
-            <div class="form-group col-md-7">
-                <label for="inputName">Nome</label>
-                <input type="text" v-model="name" class="form-control" id="inputName" placeholder="Inserisci il nome" required>
+                <!-- v-model collegato alla variabile relativa al prezzo -->
+                <div class="form-group col-md-4">
+                    <label for="inputPrice">Prezzo</label>
+                    <input type="number" v-model="price" class="form-control" id="inputPrice" step="0.01" placeholder="Inserisci il prezzo" required>
+                </div>
+
             </div>
 
-            <div class="form-group col-md-4">
-                <label for="inputPrice">Prezzo</label>
-                <input type="number" v-model="price" class="form-control" id="inputPrice" step="0.01" placeholder="Inserisci il prezzo" required>
+            <!-- v-model collegato alla variabile relativa agli ingredienti -->
+            <div class="form-group col-md-11">
+                <label>Ingredienti</label>
+                <div v-for="(ingredient, index) in ingredients" :key="index" class="input-group mb-2">
+                    <input v-model="ingredients[index]" class="form-control" placeholder="Ingrediente..." required />
+                    <button type="button" class="btn btn-danger" @click="removeIngredient(index)">🗑️</button>
+                </div>
+                <button type="button" class="btn btn-success" @click="addIngredient">+ Aggiungi Ingrediente</button>
             </div>
 
-        </div>
-
-        <div class="form-group col-md-11">
-            <label for="inputIngredients">Ingredienti </label>
-            <textarea v-model="ingredients" class="form-control" rows="4" cols="50" id="inputIngredients" placeholder="Lista degli ingredienti..."  required/>
-        </div>
-
-        <div class="form-group col-md-11">
-            <label for="inputAllergens">Allergeni</label>
-            <textarea v-model="allergens" class="form-control" rows="4" cols="50" id="inputAllergens" placeholder="Lista degli allergeni..." required/>
-        </div>
-
-        <div class="form-group col-md-11">
-            <label for="inputCategory">Categoria</label>
-            <select id="inputCategory" v-model="category" class="form-control" required>
-                <option>Bevande</option>
-                <option>Dessert</option>
-                <option>Pizze classice</option>
-                <option>Pizze bianche</option>
-                <option>Pizze rosse</option>
-                <option>Primi</option>
-                <option>Secondi</option>
-                <option>Primi di pesce</option>
-                <option>Secondi di pesce</option>
-                <option>Contorni</option>
-            </select>
-        </div>
-        
-        <div class="form-group col-md-2">
-            <label for="inputImage">Immagine</label>
-            <input type="file" accept="image/*" @change="handleFile" required/>
-            <!-- Anteprima dell'immagine -->
-            <div v-if="imagePreview">
-                <img :src="imagePreview" alt="Anteprima Immagine" />
+            <!-- v-model collegato alla variabile relativa agli allergeni -->
+            <div class="form-group col-md-11 mt-3">
+                <label>Allergeni</label>
+                <div v-for="(allergen, index) in allergens" :key="index" class="input-group mb-2">
+                    <input v-model="allergens[index]" class="form-control" placeholder="Allergene..." required />
+                    <button type="button" class="btn btn-danger" @click="removeAllergen(index)">🗑️</button>
+                </div>
+                <button type="button" class="btn btn-success" @click="addAllergen">+ Aggiungi Allergene</button>
             </div>
-        </div>
 
-        <button type="submit" class="btn btn-primary mt-5">Registra elemento</button>
-    </form>
+            <!-- v-model collegato alla variabile relativa alla categoria del prodotto -->
+            <div class="form-group col-md-11">
+                <label for="inputCategory">Categoria</label>
+                <select id="inputCategory" v-model="category" class="form-control" required>
+                    <option>Bevande</option>
+                    <option>Dessert</option>
+                    <option>Pizze classice</option>
+                    <option>Pizze bianche</option>
+                    <option>Pizze rosse</option>
+                    <option>Primi</option>
+                    <option>Secondi</option>
+                    <option>Primi di pesce</option>
+                    <option>Secondi di pesce</option>
+                    <option>Contorni</option>
+                </select>
+            </div>
+            
+            <!-- collegato alla variabile relativa all'immagine con funzione per gestirla-->
+            <div class="form-group col-md-2">
+                <label for="inputImage">Immagine</label>
+                <input type="file" accept="image/*" @change="handleFile" required/>
+                <!-- Anteprima dell'immagine -->
+                <div v-if="imagePreview">
+                    <img :src="imagePreview" alt="Anteprima Immagine" />
+                </div>
+            </div>
+
+            <!--  submit  -->
+            <button type="submit" class="btn btn-primary mt-5">Registra elemento</button>
+        </form>
 </template>

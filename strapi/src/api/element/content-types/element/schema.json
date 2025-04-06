@@ -15,14 +15,6 @@
       "type": "string",
       "required": true
     },
-    "ingredients": {
-      "type": "text",
-      "required": true
-    },
-    "allergens": {
-      "type": "text",
-      "required": true
-    },
     "image": {
       "type": "media",
       "multiple": false,
@@ -38,6 +30,14 @@
     },
     "category": {
       "type": "string",
+      "required": true
+    },
+    "ingredients": {
+      "type": "json",
+      "required": true
+    },
+    "allergens": {
+      "type": "json",
       "required": true
     }
   }
