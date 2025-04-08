@@ -67,12 +67,7 @@
                         name: name.value,
                         ingredients: ingredients.value,
                         allergens: allergens.value,
-                        //connessione come foreign key all'immagine uploadata
-                        image:{ 
-                            connect: [
-                                { id: uploadedImageId.value },
-                            ]
-                        },
+                        image: uploadedImageId.value,
                         price: price.value,
                         category: category.value,
                     }

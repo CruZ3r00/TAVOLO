@@ -1,4 +1,4 @@
-<script setup> //Pagina in cui l'utente aggiunge gli elementi al menu, da aggiungere selezione per cambiare tra l'inserimento di un nuovo elemento, la modifica di uno (o un gruppo) di elementi o la rimozione/segnare come esaurito un ingrediente.
+<script setup> //Pagina in cui l'utente aggiunge gli elementi al menu o li visualizza e modifica
     import { onMounted, ref, nextTick } from 'vue';
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
@@ -17,8 +17,6 @@
 
     //variabili utilizzate nelle fetch
     const siteID = ref();
-
-
 
     //funzione che verifica lo stato dell'abbonamento dell'utente loggato al momento && 0 per non gestire al momento gli abbonamenti in modo automatico
     const verifyPayment = async () => {

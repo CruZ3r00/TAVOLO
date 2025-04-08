@@ -59,12 +59,12 @@ onUnmounted(() => {
       style="background: rgba(0,0,0,0.5);"
       v-if="show"
     >
-      <div class="modal-dialog modal-dialog-centered" :class="maxWidthClass" role="document">
+      <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
           <!-- Header con bottone di chiusura e possibilita di inserire un titolo -->
           <div class="modal-header">
             <slot v-if="showSlot" name="title" />
-            <button type="button" class="btn-close" @click="$emit(close)" aria-label="Close"></button>
+            <button type="button" class="btn-close" @click="emit('close')"></button>
           </div>
   
           <!-- Contenuto -->

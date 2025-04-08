@@ -22,14 +22,39 @@
     const menuId = ref();
     const modalShow = ref(false);
     const toModify = ref();
-
+    const imagePreview = ref(null);
+    const image = ref(null);
+    const uploadedImageId = ref(null);
 
     //lista degli elementi 
     const list = ref([]);
 
+    //caricamento delle immagini su strapi
+    const uploadImage = async () => {
+        if(!image.value) return
+
+        const formData = new FormData();
+        formData.append('files', image.value);
+        try {
+            const response = await fetch('http://localhost:1337/api/upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${tkn}`,
+                },
+                body: formData,
+            });
+            
+            if(response.ok){
+                const result = await response.json();
+                toModify.value.image.id = result[0].id;
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
+
     //recupero della lista degli elementi nel database presenti nel menu
     const fetchList = async () => {
-
         //query di strapi v5 con qs
         const query = qs.stringify({
             filters: {
@@ -70,12 +95,30 @@
     const handleModify = (e) => {
         modalShow.value = !modalShow.value;
         toModify.value = e;
+        console.log(toModify);
     };
 
     //funzione che fa l'update dell'elemento selezionato, con le modifiche apportate nel form
     const update = async () => {
+        console.log(toModify.value);
         try {
-            
+            const update = await fetch(`http://localhost:1337/api/elements/${toModify.value.documentId}`,{
+                method: "UPDATE",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                },
+                body: JSON.stringify({
+                    data: {
+                        name: toModify.value.name,
+                        ingredients: toModify.value.ingredients,
+                        allergens: toModify.value.allergens,
+                        image: toModify.value.image.id,
+                        price: toModify.value.price,
+                        category: toModify.value.category,
+                    }
+                })
+            });
         } catch (error) {
             console.log(error);
         }
@@ -100,7 +143,7 @@
                 })
             });
 
-            //fetch che elimina il record dal database, da testare
+            //fetch che elimina il record dal database
             if (update.ok){
                 const del = await fetch(`http://localhost:1337/api/elements/${id}`,{
                     method: "DELETE",
@@ -121,6 +164,33 @@
 
     }
 
+    // funzioni per aumentare e dimunire le dimensioni della lista e del forme inerente agli ingredienti
+    const addIngredient = () => toModify.value.ingredients.push('');
+    const removeIngredient = (index) => toModify.value.ingredients.splice(index, 1);
+
+    // funzioni per aumentare e dimunire le dimensioni della lista e del forme inerente agli ingredienti
+    const addAllergen = () => toModify.value.allergens.push('');
+    const removeAllergen = (index) => toModify.value.allergens.splice(index, 1);
+
+    //ricavare url dell'immagine
+    const getImageUrl = (obj) => {
+        return `http://localhost:1337${obj.formats.thumbnail.url}`;
+    }
+
+    //funzione per gestire il file e la preview dell'immagine
+    const handleFile = async (event) => {
+        const file = event.target.files[0];
+        if ( file ){
+            image.value = file;
+            // Mostra un'anteprima dell'immagine
+            const reader = new FileReader();
+            reader.onload = () => {
+            imagePreview.value = reader.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        await uploadImage();
+    };
 
     //quando il componente viene montato recupero la lista degli elementi
     onMounted(async () => {
@@ -158,12 +228,51 @@
                                 "Mozzarella", 
                                 "Basilico" 
                                 ], 
-                            "image": null }  ( al momento perche da sistemare menuAdder s)
+                            "image":{
+                                "id": 51,
+                                "documentId": "qnh2zddb5bwsuvdhsnb5ykbu",
+                                "name": "immagine_2025-04-07_111125018.png",
+                                "alternativeText": null,
+                                "caption": null,
+                                "width": 363,
+                                "height": 352,
+                                "formats": {
+                                    "thumbnail": {
+                                        "ext": ".png",
+                                        "url": "/uploads/thumbnail_immagine_2025_04_07_111125018_8bf7488465.png",
+                                        "hash": "thumbnail_immagine_2025_04_07_111125018_8bf7488465",
+                                        "mime": "image/png",
+                                        "name": "thumbnail_immagine_2025-04-07_111125018.png",
+                                        "path": null,
+                                        "size": 73.56,
+                                        "width": 161,
+                                        "height": 156,
+                                        "sizeInBytes": 73557
+                                    }
+                                },
+                                "hash": "immagine_2025_04_07_111125018_8bf7488465",
+                                "ext": ".png",
+                                "mime": "image/png",
+                                "size": 105.72,
+                                "url": "/uploads/immagine_2025_04_07_111125018_8bf7488465.png",
+                                "previewUrl": null,
+                                "provider": "local",
+                                "provider_metadata": null,
+                                "createdAt": "2025-04-07T09:11:29.647Z",
+                                "updatedAt": "2025-04-07T09:11:29.647Z",
+                                "publishedAt": "2025-04-07T09:11:29.648Z"
+                            }
+                        }  
                 -->
                 <div class="ms-2 me-auto">
                     <div class="fw-bold">{{ element.name}}</div>
                     <p>{{ element.ingredients }}</p>
                     <p>{{ element.allergens }}</p>
+                    <img
+                        v-if="element.image"
+                        :src="getImageUrl(element.image)"
+                        alt="Immagine"
+                    />
                 </div>
                 <div v-if="modify">
                     <button @click="handleModify(element)" class="badge text-bg-primary rounded-pill"><i class="bi bi-pencil-fill"></i></button>
@@ -176,7 +285,7 @@
 
     <!-- modale per la modifica di un elemento, utilizzare la varaibile toModify (stessa struttura di sopra, stesso form di menu adder) -->
     <section>
-        <Modal :show="modalShow" @close="modalShow = !modalShow;">
+        <Modal :show="modalShow" @close="modalShow = !modalShow">
             <template #title>Modifica</template>
             <template #body>
                 <form @submit.prevent="update" class="my-5 mx-5">
@@ -184,21 +293,21 @@
                         <!-- v-model collegato alla variabile relativa al nome -->
                         <div class="form-group col-md-7">
                             <label for="inputName">Nome</label>
-                            <input type="text" v-model="name" class="form-control" id="inputName" placeholder="Inserisci il nome" required>
+                            <input type="text" v-model="toModify.name" class="form-control" id="inputName" :placeholder="toModify.name" required>
                         </div>
 
                         <!-- v-model collegato alla variabile relativa al prezzo -->
                         <div class="form-group col-md-4">
                             <label for="inputPrice">Prezzo</label>
-                            <input type="number" v-model="price" class="form-control" id="inputPrice" step="0.01" placeholder="Inserisci il prezzo" required>
+                            <input type="number" v-model="toModify.price" class="form-control" id="inputPrice" step="0.01" :placeholder="toModify.price" required>
                         </div>
                     </div>
 
                     <!-- v-model collegato alla variabile relativa agli ingredienti -->
                     <div class="form-group col-md-11">
                         <label>Ingredienti</label>
-                        <div v-for="(ingredient, index) in ingredients" :key="index" class="input-group mb-2">
-                            <input v-model="ingredients[index]" class="form-control" placeholder="Ingrediente..." required />
+                        <div v-for="(ingredient, index) in toModify.ingredients" :key="index" class="input-group mb-2">
+                            <input v-model="toModify.ingredients[index]" class="form-control" :placeholder="toModify.ingredients[index]" required />
                             <button type="button" class="btn btn-danger" @click="removeIngredient(index)">🗑️</button>
                         </div>
                         <button type="button" class="btn btn-success" @click="addIngredient">+ Aggiungi Ingrediente</button>
@@ -207,8 +316,8 @@
                     <!-- v-model collegato alla variabile relativa agli allergeni -->
                     <div class="form-group col-md-11 mt-3">
                         <label>Allergeni</label>
-                        <div v-for="(allergen, index) in allergens" :key="index" class="input-group mb-2">
-                            <input v-model="allergens[index]" class="form-control" placeholder="Allergene..." required />
+                        <div v-for="(allergen, index) in toModify.allergens" :key="index" class="input-group mb-2">
+                            <input v-model="toModify.allergens[index]" class="form-control" :placeholder="toModify.allergens[index]" required />
                             <button type="button" class="btn btn-danger" @click="removeAllergen(index)">🗑️</button>
                         </div>
                         <button type="button" class="btn btn-success" @click="addAllergen">+ Aggiungi Allergene</button>
@@ -217,7 +326,7 @@
                     <!-- v-model collegato alla variabile relativa alla categoria del prodotto -->
                     <div class="form-group col-md-11">
                         <label for="inputCategory">Categoria</label>
-                        <select id="inputCategory" v-model="category" class="form-control" required>
+                        <select id="inputCategory" v-model="toModify.category" class="form-control" required>
                             <option>Bevande</option>
                             <option>Dessert</option>
                             <option>Pizze classice</option>
@@ -234,11 +343,15 @@
                     <!-- collegato alla variabile relativa all'immagine con funzione per gestirla-->
                     <div class="form-group col-md-2">
                         <label for="inputImage">Immagine</label>
-                        <input type="file" accept="image/*" @change="handleFile" required/>
+                        <input type="file" accept="image/*" @change="handleFile"/>
                         <!-- Anteprima dell'immagine -->
                         <div v-if="imagePreview">
                             <img :src="imagePreview" alt="Anteprima Immagine" />
                         </div>
+                        <div v-else>
+                            <img :src="getImageUrl(toModify.image)" alt="Anteprima Immagine" />
+                        </div>
+                       
                     </div>
 
                     <!--  submit  -->
