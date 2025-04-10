@@ -7,7 +7,7 @@
     import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
-    import { nextTick } from 'vue'; 
+    import { nextTick, onMounted } from 'vue'; 
     //per recuperare le info dell'utente loggato
     const store = useStore();
 

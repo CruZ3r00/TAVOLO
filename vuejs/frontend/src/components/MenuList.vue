@@ -55,6 +55,7 @@
 
     //recupero della lista degli elementi nel database presenti nel menu
     const fetchList = async () => {
+        list.value = []
         //query di strapi v5 con qs
         const query = qs.stringify({
             filters: {
@@ -100,10 +101,11 @@
 
     //funzione che fa l'update dell'elemento selezionato, con le modifiche apportate nel form
     const update = async () => {
-        console.log(toModify.value);
         try {
-            const update = await fetch(`http://localhost:1337/api/elements/${toModify.value.documentId}`,{
-                method: "UPDATE",
+            await handleDelete(toModify.value.documentId);
+            //funzione che aggiorna direttamente l'elemento nel db
+            const update = await fetch(`http://localhost:1337/api/elements`,{
+                method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
@@ -119,6 +121,30 @@
                     }
                 })
             });
+            if( update.ok ){
+                const data = await update.json();
+                list.value.push(data.data);
+                //re-connect di tutta la lista gia salvata con fetchlist, che contiene anche l'id dell'elemento modificato
+                const reconnect = await fetch(`http://localhost:1337/api/menus/${menuId.value}`,{
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                    },
+                    body: JSON.stringify({
+                        data: {
+                            fk_elements:{
+                                connect: [ list.value.map(i =>({ documentId: i.documentId})) ]
+                            }
+                        },         
+                    })
+                });
+                if (reconnect.ok){
+                    await fetchList();
+                }
+            }
+            
+            
         } catch (error) {
             console.log(error);
         }
