@@ -55,24 +55,6 @@
 
     //recupero della lista degli elementi nel database presenti nel menu
     const fetchList = async () => {
-        list.value = []
-        //query di strapi v5 con qs
-        const query = qs.stringify({
-            filters: {
-                fk_site:{
-                    documentId: {
-                        $eq: siteID.value.documentId
-                    }, 
-                }
-            },
-            // Popolare anche il campo 'image' della relazione fk_elements
-            populate: {
-                fk_elements: {
-                    populate: ['image']  
-                }
-            },
-        });
-
         try {
             const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
                 method: "GET",

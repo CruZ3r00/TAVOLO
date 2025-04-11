@@ -443,19 +443,23 @@ export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
+    background: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 7;
+        minLength: 7;
+      }> &
+      Schema.Attribute.DefaultTo<'#FFFFFF'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    layout: Schema.Attribute.Integer &
+    details: Schema.Attribute.String &
       Schema.Attribute.Required &
-      Schema.Attribute.SetMinMax<
-        {
-          max: 1;
-          min: 1;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<1>;
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 7;
+        minLength: 7;
+      }> &
+      Schema.Attribute.DefaultTo<'#111111'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -468,7 +472,7 @@ export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
         maxLength: 7;
         minLength: 7;
       }> &
-      Schema.Attribute.DefaultTo<'#0d6efd'>;
+      Schema.Attribute.DefaultTo<'#1C1C1C'>;
     publishedAt: Schema.Attribute.DateTime;
     second_color: Schema.Attribute.String &
       Schema.Attribute.Required &
@@ -476,10 +480,10 @@ export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
         maxLength: 7;
         minLength: 7;
       }> &
-      Schema.Attribute.DefaultTo<'#ffffff'>;
+      Schema.Attribute.DefaultTo<'#E0E0E0'>;
     theme: Schema.Attribute.String &
       Schema.Attribute.Required &
-      Schema.Attribute.DefaultTo<'standard'>;
+      Schema.Attribute.DefaultTo<'classic'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

@@ -16,26 +16,33 @@
       "required": true,
       "maxLength": 7,
       "minLength": 7,
-      "default": "#0d6efd"
+      "default": "#1C1C1C"
     },
     "second_color": {
       "type": "string",
       "maxLength": 7,
       "minLength": 7,
       "required": true,
-      "default": "#ffffff"
-    },
-    "layout": {
-      "type": "integer",
-      "max": 1,
-      "min": 1,
-      "default": 1,
-      "required": true
+      "default": "#E0E0E0"
     },
     "theme": {
       "type": "string",
-      "default": "standard",
+      "default": "classic",
       "required": true
+    },
+    "background": {
+      "type": "string",
+      "required": true,
+      "maxLength": 7,
+      "minLength": 7,
+      "default": "#FFFFFF"
+    },
+    "details": {
+      "type": "string",
+      "required": true,
+      "maxLength": 7,
+      "minLength": 7,
+      "default": "#111111"
     }
   }
 }
