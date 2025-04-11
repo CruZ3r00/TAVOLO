@@ -42,6 +42,7 @@
         }
     };
 
+    //quando cambia theme (con il menu a tendina), si calcolano i colori con la funzione apposita creata in utils.js
     watch(theme, (newVal, oldVal) => {
         changed.value = true;
         colorCalculator( theme, primary_color, second_color, backgroud, details );
