@@ -55,6 +55,17 @@
 
     //recupero della lista degli elementi nel database presenti nel menu
     const fetchList = async () => {
+        //creazione query standard di strapi v5
+        const query = qs.stringify({ 
+            filters: {
+                fk_site:{
+                    documentId: {
+                        $eq: siteID.value.documentId
+                    },
+                }
+            },
+            populate: "*",
+        });
         try {
             const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
                 method: "GET",

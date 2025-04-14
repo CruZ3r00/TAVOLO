@@ -19,6 +19,32 @@
     const changed = ref(false);
     const userid = ref();
 
+    //funzione che recuperare le informazioni delle preferenze dell'utente
+    const fetchPrefs = async () => {
+        try {
+            const response = await fetch(`http://localhost:1337/api/users/me?populate=fk_prefs`,{
+                method: "GET",
+                headers: {
+                    "Authorization" : `Bearer ${tkn}`,
+                    "Content-Type" : "application/json",
+                },
+            });
+
+            if(response.ok){ 
+                const data = await response.json();
+                console.log(data);
+                primary_color.value = data.fk_prefs.primary_color;
+                second_color.value = data.fk_prefs.second_color;
+                backgroud.value = data.fk_prefs.backgroud;
+                details.value = data.fk_prefs.details;
+                theme.value = data.fk_prefs.theme;
+                id.value = data.fk_prefs.documentId;
+                userid.value = data.id;
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
 
     const submit = async () => {
         try {
@@ -66,6 +92,8 @@
                         })
                     });
                     if(response.ok){
+                        const data = await response.json();
+                        const id_ = data.data.id-1;
                         const reconnect = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
                             method: 'PUT',
                             headers:{
@@ -75,7 +103,7 @@
                             body: JSON.stringify({
                                 fk_prefs:{
                                     connect: [
-                                        {id: id.value}
+                                        {id: id_}
                                     ]
                                         
                                 },
@@ -89,39 +117,10 @@
                     }
                 }
             }
-    
-            
         } catch (error) {
             console.log(error);
         }
     }
-
-    //funzione che verifica lo stato dell'abbonamento dell'utente loggato al momento && 0 per non gestire al momento gli abbonamenti in modo automatico
-    const fetchPrefs = async () => {
-        try {
-            const response = await fetch(`http://localhost:1337/api/users/me?populate=fk_prefs`,{
-                method: "GET",
-                headers: {
-                    "Authorization" : `Bearer ${tkn}`,
-                    "Content-Type" : "application/json",
-                },
-            });
-
-            if(response.ok){ 
-                const data = await response.json();
-                console.log(data);
-                primary_color.value = data.fk_prefs.primary_color;
-                second_color.value = data.fk_prefs.second_color;
-                backgroud.value = data.fk_prefs.backgroud;
-                details.value = data.fk_prefs.details;
-                theme.value = data.fk_prefs.theme;
-                id.value = data.fk_prefs.documentId;
-                userid.value = data.id;
-            }
-        } catch (error) {
-            console.log(error);
-        }
-    };
 
     //quando cambia theme (con il menu a tendina), si calcolano i colori con la funzione apposita creata in utils.js
     watch(theme, (newVal, oldVal) => {
