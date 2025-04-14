@@ -420,7 +420,10 @@ export interface ApiMenuMenu extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     fk_elements: Schema.Attribute.Relation<'oneToMany', 'api::element.element'>;
-    fk_site: Schema.Attribute.Relation<'oneToOne', 'api::site.site'>;
+    fk_user: Schema.Attribute.Relation<
+      'oneToOne',
+      'plugin::users-permissions.user'
+    >;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::menu.menu'> &
       Schema.Attribute.Private;
@@ -487,38 +490,6 @@ export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-  };
-}
-
-export interface ApiSiteSite extends Struct.CollectionTypeSchema {
-  collectionName: 'sites';
-  info: {
-    description: '';
-    displayName: 'Site';
-    pluralName: 'sites';
-    singularName: 'site';
-  };
-  options: {
-    draftAndPublish: true;
-  };
-  attributes: {
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    fk_prefs: Schema.Attribute.Relation<
-      'oneToOne',
-      'api::preference.preference'
-    >;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<'oneToMany', 'api::site.site'> &
-      Schema.Attribute.Private;
-    publishedAt: Schema.Attribute.DateTime;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    url: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.Unique;
   };
 }
 
@@ -996,7 +967,6 @@ export interface PluginUsersPermissionsUser
       'oneToOne',
       'api::preference.preference'
     >;
-    fk_site: Schema.Attribute.Relation<'oneToOne', 'api::site.site'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1021,6 +991,7 @@ export interface PluginUsersPermissionsUser
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    url: Schema.Attribute.String;
     username: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique &
@@ -1043,7 +1014,6 @@ declare module '@strapi/strapi' {
       'api::element.element': ApiElementElement;
       'api::menu.menu': ApiMenuMenu;
       'api::preference.preference': ApiPreferencePreference;
-      'api::site.site': ApiSiteSite;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;

@@ -11,10 +11,10 @@
     "draftAndPublish": true
   },
   "attributes": {
-    "fk_site": {
+    "fk_user": {
       "type": "relation",
       "relation": "oneToOne",
-      "target": "api::site.site"
+      "target": "plugin::users-permissions.user"
     },
     "fk_elements": {
       "type": "relation",

@@ -9,14 +9,8 @@
     
     const emit = defineEmits(['ViewList']);
 
-
-    const props = defineProps({
-        siteid: 'String',
-    })
-
     //variabili per il supporto delle richieste fetch
     const elementID = ref();
-    const siteID = ref(props.siteid);
     const imagePreview = ref(null);
     const uploadedImageId = ref(null);
 
@@ -86,97 +80,107 @@
 
     //funzione quando si fa il submit del form che gestisce le altre funzioni e la richiesta finale
     const submit = async () => {
-        //creazione query standard di strapi v5
-        const query = qs.stringify({ 
-            filters: {
-                fk_site:{
-                    documentId: {
-                        $eq: siteID.value.documentId
-                    },
-                }
-            },
-            populate: "*",
-        });
-
         try {
-            await uploadImage(); //funzione che carica l'immagine
-            await CreateElement(); //funzione che crea l'elemento (chiamate fetch, quindi await)
-
-            //fetch per estrapolare il contenuto di menu con un certo riferimento al sito dell'utente loggato (tramite props da padre)
-            const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
+            const fetchuser = await fetch('http://localhost:1337/api/users/me',{
                 method: "GET",
                 headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                    "Authorization" : `Bearer ${tkn}`,
+                    "Content-Type" : "application/json",
                 },
             });
-
-            if (response.ok){
-                const data = await response.json();
-
-                //se non esiste ancora nel database, quindi vuota
-                if(data.data.length <= 0){ 
-                    const r = await fetch(`http://localhost:1337/api/menus`,{
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
-                        },
-                        body: JSON.stringify({
-                            data: {
-                                fk_site: { //connect per le foreign key
-                                    connect: [
-                                        { documentId: siteID.value.documentId },
-                                    ]
-                                },
-                                fk_elements:{ //connect per le foreign key
-                                    connect: [
-                                        { documentId: elementID.value },
-                                    ]
-                                }
-                            }
-                        })
-                    });
-                }
-
-                // se invece esiste aggiornamento della lista degli elementi
-                else {    
-                    const menuId = data.data[0].documentId;
-                    let newList = [];
+            if(fetchuser.ok){
+                const d = await fetchuser.json();
+                //creazione query standard di strapi v5
+                const query = qs.stringify({ 
+                    filters: {
+                        fk_user:{
+                            id: {
+                                $eq: d.id
+                            },
+                        }
+                    },
+                    populate: "*",
+                });
                     
-                    //fetch per estrapolare la lista tramite il documentId della collection menu
-                    const getUpdate = await fetch(`http://localhost:1337/api/menus?${menuId}&populate=*`,{ 
-                        method: "GET",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
-                        },
-                    });
-                    if (!getUpdate.ok) {
-                        throw new Error('Errore nella richiesta');
+                await uploadImage(); //funzione che carica l'immagine
+                await CreateElement(); //funzione che crea l'elemento (chiamate fetch, quindi await)
+
+                //fetch per estrapolare il contenuto di menu con un certo riferimento al sito dell'utente loggato (tramite props da padre)
+                const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                    },
+                });
+
+                if (response.ok){
+                    const data = await response.json();
+
+                    //se non esiste ancora nel database, quindi vuota
+                    if(data.data.length <= 0){ 
+                        const r = await fetch(`http://localhost:1337/api/menus`,{
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                            },
+                            body: JSON.stringify({
+                                data: {
+                                    fk_user: { //connect per le foreign key
+                                        connect: [
+                                            { id: d.id},
+                                        ]
+                                    },
+                                    fk_elements:{ //connect per le foreign key
+                                        connect: [
+                                            { documentId: elementID.value },
+                                        ]
+                                    }
+                                }
+                            })
+                        });
                     }
-                    
-                    const dataUpdate = await getUpdate.json();
-                    newList = [...newList, ...dataUpdate.data[0].fk_elements.map(el => el.documentId)];
-                    newList.push(elementID.value);
 
-                    //fetch per l'aggiornamento del record con documentId -> menuId
-                    const update = await fetch(`http://localhost:1337/api/menus/${menuId}`,{
-                        method: "PUT",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
-                        },
-                        body: JSON.stringify({
-                            data: {
-                                fk_elements:{
-                                    connect: [
-                                        newList.map(i => ({ documentId: i})),
-                                    ]
-                                }
-                            },         
-                        })
-                    });
+                    // se invece esiste aggiornamento della lista degli elementi
+                    else {    
+                        const menuId = data.data[0].documentId;
+                        let newList = [];
+                        
+                        //fetch per estrapolare la lista tramite il documentId della collection menu
+                        const getUpdate = await fetch(`http://localhost:1337/api/menus?${menuId}&populate=*`,{ 
+                            method: "GET",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                            },
+                        });
+                        if (!getUpdate.ok) {
+                            throw new Error('Errore nella richiesta');
+                        }
+                        
+                        const dataUpdate = await getUpdate.json();
+                        newList = [...newList, ...dataUpdate.data[0].fk_elements.map(el => el.documentId)];
+                        newList.push(elementID.value);
+
+                        //fetch per l'aggiornamento del record con documentId -> menuId
+                        const update = await fetch(`http://localhost:1337/api/menus/${menuId}`,{
+                            method: "PUT",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                            },
+                            body: JSON.stringify({
+                                data: {
+                                    fk_elements:{
+                                        connect: [
+                                            newList.map(i => ({ documentId: i})),
+                                        ]
+                                    }
+                                },         
+                            })
+                        });
+                    }
                 }
             }
         } catch (error) {

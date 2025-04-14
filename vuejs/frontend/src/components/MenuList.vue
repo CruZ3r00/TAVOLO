@@ -55,30 +55,40 @@
 
     //recupero della lista degli elementi nel database presenti nel menu
     const fetchList = async () => {
-        //creazione query standard di strapi v5
-        const query = qs.stringify({ 
-            filters: {
-                fk_site:{
-                    documentId: {
-                        $eq: siteID.value.documentId
-                    },
-                }
-            },
-            populate: "*",
-        });
         try {
-            const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
+            const fetchuser = await fetch('http://localhost:1337/api/users/me',{
                 method: "GET",
                 headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                    "Authorization" : `Bearer ${tkn}`,
+                    "Content-Type" : "application/json",
                 },
             });
-            if (response.ok){
-                const data = await response.json();
-                list.value = [...list.value, ...data.data[0].fk_elements];
-                console.log(list);
-                menuId.value = data.data[0].documentId;
+            if(fetchuser.ok){
+                const d = await fetchuser.json();
+                //creazione query standard di strapi v5
+                const query = qs.stringify({ 
+                    filters: {
+                        fk_user:{
+                            id: {
+                                $eq: d.id
+                            },
+                        }
+                    },
+                    populate: "*",
+                });
+            
+                const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                    },
+                });
+                if (response.ok){
+                    const data = await response.json();
+                    list.value = [...list.value, ...data.data[0].fk_elements];
+                    menuId.value = data.data[0].documentId;
+                }
             }
         } catch (error) {
             console.log(error);

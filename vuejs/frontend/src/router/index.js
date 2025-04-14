@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { store } from '@/store'; //usato per storage di jwt
+
 const routes = [
     { //non protetta
       path: '/register',
@@ -49,7 +50,7 @@ const routes = [
     },
     { //protetta
         path: '/menu-handler', 
-        name: 'Menu',
+        name: 'Menu setter',
         component: () => import('../Pages/MenuSetter.vue'),
         meta: { requiresAuth: true }, // Protect this route
     },
@@ -81,10 +82,16 @@ const routes = [
         component: () => import('../Pages/RenewSub.vue'),
         meta: { requiresAuth: true }, // Protect this route
     },
-    { //non protetta
+    { // protetta
         path: '/add-payment', // Route to add payment method
         name: 'Inserisci dati per il pagamento',
         component: () => import('../Pages/AddPayment.vue'),
+        meta: { requiresAuth: true }, // Protect this route
+    },
+    {
+        path: '/menu/:restaurant/:category',
+        name: 'Menu',
+        component: () => import('../Pages/MenuView.vue'),
     },
     { //non protetta
         path: '/:pathMatch(.*)*', // Route for 404 errors

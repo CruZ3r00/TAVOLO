@@ -24,16 +24,12 @@ const password = ref('');
 const password_confirmation= ref('');
 const terms = ref(false);
 const preferenceID = ref('');
-const siteID = ref('');
 const registerData = ref();
-
-
 
 const isError = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
 const showPassword = ref(false);
-
 
 const router = useRouter();
 
@@ -46,10 +42,11 @@ const CreatePreferences = async () => {
         'Content-Type' : 'application/json',
       },
       body: JSON.stringify({ data: {
-        primary_color: "#0d6efd",
-        second_color: "#ffffff",
-        theme: "standard",
-        layout: 1,
+        primary_color: "#1C1C1C",
+        second_color: "#E0E0E0",
+        theme: "classic",
+        background: "#FFFFFF" ,
+        details: "#111111",
       } }), //using default value
     });
     if( response.ok ){
@@ -82,41 +79,7 @@ const CreateUSer= async () => {
             console.log(registerData.value.user.documentId);
         } else {
             const errorData = await response.json();
-            errorMessage.value = errorData.email + errorData.username;
-            isError.value = true;
-        }
-
-    } catch (error) {
-        console.error('Errore di rete:', error.message);
-    }
-};
-
-//funzione che crea la tupla della tabella dei siti legato all'utente che si sta registrando in maniera standard, ( collegamento tra user e preferences con l'url del sito )
-const CreateSite= async () => {
-    const username = registerData.value.user.username;
-    const idprefs = preferenceID.value.documentId;
-    try {
-        const response = await fetch('http://localhost:1337/api/sites', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ data: {
-              url : `localhost:5173/menu/${username}/home`,
-              fk_prefs :{
-                  connect: [
-                      { documentId: idprefs },
-                  ]
-              },
-            }}),
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            siteID.value = data.data;
-        } else {
-            const errorData = await response.json();
-            errorMessage.value = errorData.email + errorData.username;
+            errorMessage.value = errorData.error.message;
             isError.value = true;
         }
 
@@ -130,9 +93,8 @@ const submit = async () => {
     isLoading.value = true;
     await CreatePreferences();
     await CreateUSer();
-    await CreateSite();
+    const username = registerData.value.user.documentId;
     const tokjwt = registerData.value.jwt;
-    console.log(registerData.value.user.documentId);
     const id = registerData.value.user.id;
     try {
       const response = await fetch(`http://localhost:1337/api/users/${id}`,{
@@ -145,16 +107,12 @@ const submit = async () => {
             birth_date: birth_date.value,
             name: name.value,
             surname: surname.value,
+            url : `localhost:5173/menu/${username}/home`,
             fk_prefs:{
                   connect: [
                       { id: preferenceID.value.id-1 },
                   ]
-              },
-            fk_site:{
-                  connect: [
-                      { id: siteID.value.id-1 },
-                  ]
-              },
+            },
         }),
       });
 
@@ -173,6 +131,7 @@ const submit = async () => {
   }else{
     errorMessage.value = 'Le due password devono coincidere';
     isError.value = true;
+    isLoading.value = false;
   }
 
 };

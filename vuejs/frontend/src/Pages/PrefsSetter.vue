@@ -18,11 +18,13 @@
     const theme = ref('');
     const changed = ref(false);
     const userid = ref();
+    const siteid = ref();
+
 
     //funzione che recuperare le informazioni delle preferenze dell'utente
     const fetchPrefs = async () => {
         try {
-            const response = await fetch(`http://localhost:1337/api/users/me?populate=fk_prefs`,{
+            const response = await fetch(`http://localhost:1337/api/users/me?populate=*`,{
                 method: "GET",
                 headers: {
                     "Authorization" : `Bearer ${tkn}`,
@@ -40,6 +42,7 @@
                 theme.value = data.fk_prefs.theme;
                 id.value = data.fk_prefs.documentId;
                 userid.value = data.id;
+                siteid.value = data.fk_site.documentId;
             }
         } catch (error) {
             console.log(error);
@@ -49,12 +52,12 @@
     const submit = async () => {
         try {
             const update = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
-            },
-            body: JSON.stringify({
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                },
+                body: JSON.stringify({
                     data: {
                         //disconnect elemina la connessione con preference
                         fk_prefs:{
@@ -63,9 +66,22 @@
                     },         
                 })
             });
+            const site = await fetch(`http://localhost:1337/api/sites/${siteid.value}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${tkn}`,
+                },
+                body: JSON.stringify({ data: {
+                    fk_prefs :{
+                        disconnect: { documentId: id.value },
+                    },
+                }}),
+            });
+            
 
             //fetch che elimina il record dal database
-            if (update.ok){
+            if (update.ok && site.ok){
                 const del = await fetch(`http://localhost:1337/api/preferences/${id.value}`,{
                     method: "DELETE",
                     headers: {
@@ -93,7 +109,7 @@
                     });
                     if(response.ok){
                         const data = await response.json();
-                        const id_ = data.data.id-1;
+                        const id_ = data.data;
                         const reconnect = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
                             method: 'PUT',
                             headers:{
@@ -102,14 +118,25 @@
                             },
                             body: JSON.stringify({
                                 fk_prefs:{
-                                    connect: [
-                                        {id: id_}
-                                    ]
-                                        
+                                    connect: 
+                                        {id: id_.id-1}
                                 },
                             }),
                         });
                         if(reconnect.ok){
+                            const r = await fetch(`http://localhost:1337/api/sites/${siteid.value}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${tkn}`,
+                                },
+                                body: JSON.stringify({ data: {
+                                    fk_prefs :{
+                                        connect: 
+                                            { documentId: id_.documentId },
+                                    },
+                                }}),
+                            });
                             await fetchPrefs();
                             changed.value = false;
                         }

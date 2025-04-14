@@ -40,27 +40,6 @@
         }
     };
 
-    //function che recupera le info del sito collegate all'utente loggato 'users/me'
-    const FetchSite = async () => {
-        try{
-            const response = await fetch(`http://localhost:1337/api/users/me?populate=fk_site`,{
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
-                },
-            });
-
-            if (response.ok){
-                const data = await response.json();
-                siteID.value = data.fk_site;
-            }
-
-        }catch( error ){
-            console.log(error);
-        }
-    };
-
     //inverto le variabili per invertire cosa visualizzare, in entrambi
     const handleAdder = () => {
         viewList.value = false;
@@ -78,14 +57,13 @@
             document.title = 'Il tuo menù';
         });
         await verifyPayment();
-        await FetchSite();
         viewList.value = true; //di default visualizzazione della lista degli elementi
     });
 </script>
 
 <template>
     <AppLayout>
-        <MenuAdder v-if="viewAdder" :siteid="siteID" @ViewList="handleList"/>
+        <MenuAdder v-if="viewAdder" @ViewList="handleList"/>
         <MenuList v-if="viewList" :siteid="siteID" @AddElement="handleAdder"/>
     </AppLayout>
 </template>
