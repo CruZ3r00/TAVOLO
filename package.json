@@ -4,6 +4,7 @@
     "@vueuse/head": "^2.0.0",
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.11.3",
+    "qrcode": "^1.5.4",
     "vee-validate": "^4.15.0",
     "yup": "^1.6.1"
   }

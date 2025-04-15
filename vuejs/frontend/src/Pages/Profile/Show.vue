@@ -5,6 +5,7 @@
     import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue';
     import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
     import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
+    import GeneratorQRCode from '@/components/GeneratorQRCode.vue';
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
     import { nextTick, onMounted } from 'vue'; 
@@ -16,7 +17,7 @@
     const Hpsw = ref(false);
     const H2fact = ref(false);
     const Hdelete = ref(false);
-
+    const Hqr = ref(false);
 
     defineProps({
         confirmsTwoFactorAuthentication: Boolean,
@@ -31,26 +32,58 @@
         'email' : x.email,
     }
 
-    /*
-
-    const handler = () => {
-        per il cambio del form da visualizzare in base a quale l'utente desidera visualizzare
+    const handler = (x) => {
+        
+        switch (x){
+            case 'profilo':
+                Hprofile.value = true;
+                Hpsw.value = false;
+                H2fact.value = false;
+                Hqr.value = false;
+                Hdelete.value = false;
+            break;
+            case 'cambiopsw':
+                Hprofile.value = false;
+                Hpsw.value = true;
+                H2fact.value = false;
+                Hqr.value = false;
+                Hdelete.value = false;
+            break;
+            case 'duefattori':
+                Hprofile.value = false;
+                Hpsw.value = false;
+                H2fact.value = true;
+                Hqr.value = false;
+                Hdelete.value = false;
+            break;
+            case 'qr':
+                Hprofile.value = false;
+                Hpsw.value = false;
+                H2fact.value = false;
+                Hqr.value = true;
+                Hdelete.value = false;
+            break;
+            case 'delete':
+                Hprofile.value = false;
+                Hpsw.value = false;
+                H2fact.value = false;
+                Hqr.value = false;
+                Hdelete.value = true;
+            break;
+        }
     }
-
-    */
-
 
     // Imposta il titolo della pagina
     onMounted(async () => {
-            nextTick(() => {
-                document.title = 'Aggiungi metodo di pagamento';
-            });
+        nextTick(() => {
+            document.title = 'Pagina del profilo';
+        });
     });
 
 </script>
 
 <template>
-    <AppLayout class="d-flex flex-column min-vh-100">
+    <AppLayout>
         
         <div class="container-fluid flex-grow-1">
             
@@ -59,10 +92,11 @@
                 <nav class="col-lg-2 bg-dark text-white d-none d-lg-flex flex-column p-3" style="height:100%;">
                     <h4 class="text-center">Menu</h4>
                     <ul class="nav flex-column">
-                        <li class="nav-item"><a class="nav-link text-white" @click="handler('profilo')" value="profile">Profilo</a></li>
-                        <li class="nav-item"><a class="nav-link text-white" @click="handler('cambiopsw')">Cambio password</a></li>
-                        <li class="nav-item"><a class="nav-link text-white" @click="handler('duefattori')">Autenticazione a due fattori</a></li>
-                        <li class="nav-item"><a class="nav-link text-white" @click="handler('delete')">Elimina account</a></li>
+                        <li class="nav-item"><button class="nav-link text-white" @click="handler('profilo')">Profilo</button></li>
+                        <li class="nav-item"><button class="nav-link text-white" @click="handler('cambiopsw')">Cambio password</button></li>
+                        <li class="nav-item"><button class="nav-link text-white" @click="handler('duefattori')">Autenticazione a due fattori</button></li>
+                        <li class="nav-item"><button class="nav-link text-white" @click="handler('qr')">Genera QR code</button></li>
+                        <li class="nav-item"><button class="nav-link text-white" @click="handler('delete')">Elimina account</button></li>
                     </ul>
                 </nav>
                 <main class="col-lg-10 col-12 p-4d-flex flex-column flex-grow-1">
@@ -74,10 +108,11 @@
                             </button>
                             <div class="collapse navbar-collapse" id="navbarNav">
                                 <ul class="navbar-nav">
-                                    <li class="nav-item"><a class="nav-link" href="#">Home</a></li>
-                                    <li class="nav-item"><a class="nav-link" href="#">Servizi</a></li>
-                                    <li class="nav-item"><a class="nav-link" href="#">Menu</a></li>
-                                    <li class="nav-item"><a class="nav-link" href="#">Contatti</a></li>
+                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('profilo')">Profilo</button></li>
+                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('cambiopsw')">Cambio password</button></li>
+                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('duefattori')">Autenticazione a due fattori</button></li>
+                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('qr')">Genera QR code</button></li>
+                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('delete')">Elimina account</button></li>
                                 </ul>
                             </div>
                         </div>
@@ -92,16 +127,14 @@
 
                             <UpdatePasswordForm v-if="Hpsw" :id="userinfo.id"/>
                             <SectionBorder />
-                        
+
+                            <GeneratorQRCode v-if="Hqr" />
+                            <SectionBorder />
+
                             <TwoFactorAuthenticationForm v-if="H2fact" :requires-confirmation="confirmsTwoFactorAuthentication"/>
                             <SectionBorder />
 
-
-                            <template>
-                                <SectionBorder />
-
-                                <DeleteUserForm />
-                            </template>
+                            <DeleteUserForm v-if="Hdelete"/>
                         </div>
                     </div>
                 </main>

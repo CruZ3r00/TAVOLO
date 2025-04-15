@@ -107,7 +107,7 @@ const submit = async () => {
             birth_date: birth_date.value,
             name: name.value,
             surname: surname.value,
-            url : `localhost:5173/menu/${username}/home`,
+            url : `http://localhost:5173/menu/${username}/home`,
             fk_prefs:{
                   connect: [
                       { id: preferenceID.value.id-1 },
