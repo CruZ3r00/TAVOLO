@@ -117,7 +117,11 @@ export const fetchMenuElements = async (id) => {
                         },
                     }
                 },
-                populate: "*",
+                populate: {
+                    fk_elements: {
+                        populate: ['image']
+                    }
+                }
             });
             const response = await fetch(`http://localhost:1337/api/menus?${query}`,{
                 method: 'GET',
