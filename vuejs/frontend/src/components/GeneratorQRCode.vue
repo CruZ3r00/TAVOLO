@@ -6,7 +6,7 @@
     const isLoading = ref(false);
 
     const store = useStore();
-    const URL = 'ciao';
+    const URL = store.getters.getUser.url;
     const qr = ref('');
     const genQR = async () =>{
         isLoading.value = true;
