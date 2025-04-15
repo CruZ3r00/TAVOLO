@@ -11,13 +11,7 @@
     //segnale al padre per visualizzare adder
     const emit = defineEmits(['AddElement']);
 
-    //contiene le info del sito collegate all'utente
-    const props = defineProps({
-        siteid: 'Object',
-    })
-
     //variabili per il supporto delle richieste fetch
-    const siteID = ref(props.siteid);
     const modify = ref(false);
     const menuId = ref();
     const modalShow = ref(false);
@@ -32,7 +26,6 @@
     //caricamento delle immagini su strapi
     const uploadImage = async () => {
         if(!image.value) return
-
         const formData = new FormData();
         formData.append('files', image.value);
         try {
@@ -43,7 +36,6 @@
                 },
                 body: formData,
             });
-            
             if(response.ok){
                 const result = await response.json();
                 toModify.value.image.id = result[0].id;

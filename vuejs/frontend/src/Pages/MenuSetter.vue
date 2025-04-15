@@ -15,9 +15,6 @@
     const viewAdder = ref(false);
     const viewList = ref(false);
 
-    //variabili utilizzate nelle fetch
-    const siteID = ref();
-
     //funzione che verifica lo stato dell'abbonamento dell'utente loggato al momento && 0 per non gestire al momento gli abbonamenti in modo automatico
     const verifyPayment = async () => {
         try {
@@ -64,6 +61,6 @@
 <template>
     <AppLayout>
         <MenuAdder v-if="viewAdder" @ViewList="handleList"/>
-        <MenuList v-if="viewList" :siteid="siteID" @AddElement="handleAdder"/>
+        <MenuList v-if="viewList" @AddElement="handleAdder"/>
     </AppLayout>
 </template>

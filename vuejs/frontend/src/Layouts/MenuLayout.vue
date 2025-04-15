@@ -1,70 +1,31 @@
 <script setup>
     import Footer from '@/components/Footer.vue';
     import { ref,onMounted } from 'vue';
-    import { useRoute } from 'vue-router';
-    import qs from 'qs';
+    import { useRoute, useRouter } from 'vue-router';
+    import { fetchMenuElements } from '@/utils';
     
     const route =  useRoute();
+    const router =  useRouter();
+
     const restaurant = route.params.restaurant;
     const menuCats = ref([]);
 
     //funzione per popolare il menu del sito-menu
     const populate = async () => {
         try {
-            //creazione query standard di strapi v5
-            const query = qs.stringify({ 
-                    filters: {
-                        documentId:{
-                            $eq: restaurant
-                        }
-                    },
-                    populate: "*",
-                });
-            const fetchuser = await fetch(`http://localhost:1337/api/users?${query}`,{
-                method: "GET",
-                headers: {
-                    "Content-Type" : "application/json",
-                },
-            });
-            if(fetchuser.ok){
-                const d = await fetchuser.json();
-                //creazione query standard di strapi v5
-                const query = qs.stringify({ 
-                    filters: {
-                        fk_user:{
-                            id: {
-                                $eq: d[0].id
-                            },
-                        }
-                    },
-                    populate: "*",
-                });
-                const response = await fetch(`http://localhost:1337/api/menus?${query}`,{
-                    method: 'GET',
-                    headers: {
-                        "Content-Type": "application/json",
+            const data = await fetchMenuElements(restaurant);
+            data.data.forEach(d => {
+                d.fk_elements.forEach(element => {
+                    if(!menuCats.value.includes(element.category)){
+                        menuCats.value.push(element.category);
                     }
-                });
-                if(response.ok){
-                    const data = await response.json();
-                    data.data.forEach(d => {
-                        d.fk_elements.forEach(element => {
-                            if(!menuCats.value.includes(element.category)){
-                                menuCats.value.push(element.category);
-                            }
-                        }
-
-                        )
-                        
-                    });
-                }
-            }
+                });                        
+            });
+            
         } catch (error) {
            console.log(error); 
         }
     }
-
-    const emit = defineEmits(['change']);
 
     //quando il componente viene montato recupero la lista degli elementi
     onMounted(async () => {
@@ -85,7 +46,7 @@
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
             <li class="nav-item" v-for="item in menuCats">
-              <button @click="emit('change', item)" class="nav-link">
+              <button @click="router.push('/menu/' + restaurant + '/' + item)" class="nav-link">
                 {{ item }}
               </button>
             </li>

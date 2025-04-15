@@ -86,3 +86,51 @@ export const colorCalculator = ( theme, primary_color, second_color, backgroud, 
             break;
     }
 };
+
+import qs from 'qs';
+
+export const fetchMenuElements = async (id) => {
+    try {
+        //creazione query standard di strapi v5
+        const query = qs.stringify({ 
+            filters: {
+                documentId:{
+                    $eq: id
+                }
+            },
+            populate: "*",
+        });
+        const fetchuser = await fetch(`http://localhost:1337/api/users?${query}`,{
+            method: "GET",
+            headers: {
+                "Content-Type" : "application/json",
+            },
+        });
+        if(fetchuser.ok){
+            const d = await fetchuser.json();
+            //creazione query standard di strapi v5
+            const query = qs.stringify({ 
+                filters: {
+                    fk_user:{
+                        id: {
+                            $eq: d[0].id
+                        },
+                    }
+                },
+                populate: "*",
+            });
+            const response = await fetch(`http://localhost:1337/api/menus?${query}`,{
+                method: 'GET',
+                headers: {
+                    "Content-Type": "application/json",
+                }
+            });
+            if(response.ok){
+                const data = await response.json();
+                return data;
+            }
+        }
+    } catch (error) {
+        console.log(error);
+    }
+}
