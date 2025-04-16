@@ -53,7 +53,7 @@ const submit = handleSubmit(async () => {
   errorMessage.value = '';
   successMessage.value = '';
   try {
-    const response = await fetch('http://localhost:8000/forgotten_password', {
+    const response = await fetch('http://192.168.1.36:8000/forgotten_password', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -4,6 +4,7 @@
     import { useStore } from 'vuex';
     import { useRouter } from 'vue-router';
     import { colorCalculator } from '@/utils';
+    import MenuViewComponent from '@/components/MenuViewComponent.vue';
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
@@ -18,13 +19,11 @@
     const theme = ref('');
     const changed = ref(false);
     const userid = ref();
-    const siteid = ref();
-
 
     //funzione che recuperare le informazioni delle preferenze dell'utente
     const fetchPrefs = async () => {
         try {
-            const response = await fetch(`http://localhost:1337/api/users/me?populate=*`,{
+            const response = await fetch(`http://192.168.1.36:1337/api/users/me?populate=*`,{
                 method: "GET",
                 headers: {
                     "Authorization" : `Bearer ${tkn}`,
@@ -34,7 +33,6 @@
 
             if(response.ok){ 
                 const data = await response.json();
-                console.log(data);
                 primary_color.value = data.fk_prefs.primary_color;
                 second_color.value = data.fk_prefs.second_color;
                 backgroud.value = data.fk_prefs.backgroud;
@@ -42,16 +40,15 @@
                 theme.value = data.fk_prefs.theme;
                 id.value = data.fk_prefs.documentId;
                 userid.value = data.id;
-                siteid.value = data.fk_site.documentId;
             }
         } catch (error) {
-            console.log(error);
+            console.error(error);
         }
     };
 
     const submit = async () => {
         try {
-            const update = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
+            const update = await fetch(`http://192.168.1.36:1337/api/users/${userid.value}`,{
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -65,24 +62,11 @@
                         }
                     },         
                 })
-            });
-            const site = await fetch(`http://localhost:1337/api/sites/${siteid.value}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${tkn}`,
-                },
-                body: JSON.stringify({ data: {
-                    fk_prefs :{
-                        disconnect: { documentId: id.value },
-                    },
-                }}),
-            });
-            
+            });            
 
             //fetch che elimina il record dal database
-            if (update.ok && site.ok){
-                const del = await fetch(`http://localhost:1337/api/preferences/${id.value}`,{
+            if (update.ok){
+                const del = await fetch(`http://192.168.1.36:1337/api/preferences/${id.value}`,{
                     method: "DELETE",
                     headers: {
                         "Authorization": `Bearer ${tkn}`
@@ -91,7 +75,7 @@
                 
                 //se a buon fine elimino dalla lista
                 if (del.ok){
-                    const response = await fetch(`http://localhost:1337/api/preferences`,{
+                    const response = await fetch(`http://192.168.1.36:1337/api/preferences`,{
                         method: "POST",
                         headers: {
                             "Authorization" : `Bearer ${tkn}`,
@@ -110,7 +94,7 @@
                     if(response.ok){
                         const data = await response.json();
                         const id_ = data.data;
-                        const reconnect = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
+                        const reconnect = await fetch(`http://192.168.1.36:1337/api/users/${userid.value}`,{
                             method: 'PUT',
                             headers:{
                                 'Content-Type': 'application/json',
@@ -124,19 +108,6 @@
                             }),
                         });
                         if(reconnect.ok){
-                            const r = await fetch(`http://localhost:1337/api/sites/${siteid.value}`, {
-                                method: 'PUT',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${tkn}`,
-                                },
-                                body: JSON.stringify({ data: {
-                                    fk_prefs :{
-                                        connect: 
-                                            { documentId: id_.documentId },
-                                    },
-                                }}),
-                            });
                             await fetchPrefs();
                             changed.value = false;
                         }
@@ -145,7 +116,7 @@
                 }
             }
         } catch (error) {
-            console.log(error);
+            console.error(error);
         }
     }
 
@@ -153,7 +124,6 @@
     watch(theme, (newVal, oldVal) => {
         changed.value = true;
         colorCalculator( theme, primary_color, second_color, backgroud, details );
-        console.log(theme.value, primary_color.value, second_color.value, backgroud.value, details.value )
     })
 
     //impostazione del titolo della scheda e function per caricare i dati
@@ -199,9 +169,7 @@
 
         <!-- preview del sito -->
         <section>
-
+            <MenuViewComponent :primary="primary_color" :second="second_color" :backgroud="backgroud" :details="details"/>
         </section>
-        
-
     </AppLayout>
 </template>

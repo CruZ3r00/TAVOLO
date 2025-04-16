@@ -6,7 +6,7 @@ module.exports = [
     name: 'strapi::cors',
     config: {
       enabled: true,
-      origin: ['http://localhost:5173'],  // Sostituisci con il tuo dominio frontend
+      origin: ['http://localhost:5174', 'http://192.168.1.36:5174' ],  // Sostituisci con il tuo dominio frontend
       headers: '*',  // Permetti qualsiasi header, puoi specificare specifici header se necessario
     },
   },

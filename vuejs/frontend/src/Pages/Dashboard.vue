@@ -139,8 +139,8 @@ onMounted(() => {
                         </div>
                          <!-- da aggiunger -->
                         <div class="carousel-item mt-5 mb-5" style="color:#00A8CC">
-                            <i class="bi bi-calendar-event display-1 mb-4 d-block w-100"></i>
-                            <h5 class="fw-bold pt-3" style="color:#2D2D2D;">4</h5>
+                            <i class="bi bi-qr-code display-1 mb-4 d-block w-100"></i>
+                            <h5 class="fw-bold pt-3" style="color:#2D2D2D;">QR code per accedere al menu online</h5>
                         </div>
                     </div>
                     
@@ -155,72 +155,93 @@ onMounted(() => {
             </div>
         </section>
 
-        
+        <!-- sezione marketing che spiega offerte e funzionamento dell'abbonamento -->        
         <section class="py-5">
             
         </section>
+
+        <!-- sezione per la spiegazione dell'utilizzo della pagina di aggiunta elementi al menu -->        
+        <section class="py-5">
+            
+        </section>
+
+        <!-- sezione per la spiegazione dell'utilizzo della pagina di settaggio delle preferenze -->        
+        <section class="py-5">
+            
+        </section>
+
+        <!-- sezione per la spiegazione del funzionamento del menu -->        
+        <section class="py-5">
+            
+        </section>
+
+        <!-- sezione che spiega come utilizzare il qr code -->        
+        <section class="py-5">
+            
+        </section>
+        
     </AppLayout>
 </template>
 
 <style scoped>
-.home-page {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  background-size: cover;
-  background-position: center;
-}
+    .home-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-size: cover;
+    background-position: center;
+    }
 
-/* Content Container */
-.content-container {
-  background-color: #f5eee1;
-  border-radius: 15px;
-  padding: 2rem;
-  text-align: center;
-  width: 450px;
-  max-width: 90%;
-  margin: 0 auto; /* Center the form */
-  box-shadow: 0 8px 20px rgba(255, 255, 255, 0.3);
-}
+    /* Content Container */
+    .content-container {
+    background-color: #f5eee1;
+    border-radius: 15px;
+    padding: 2rem;
+    text-align: center;
+    width: 450px;
+    max-width: 90%;
+    margin: 0 auto; /* Center the form */
+    box-shadow: 0 8px 20px rgba(255, 255, 255, 0.3);
+    }
 
-/* Title of the Card */
-.title {
-  font-size: 2rem;
-  font-weight: bold;
-  text-align: center;
-  margin-bottom: 1rem;
-  text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.4);
-}
+    /* Title of the Card */
+    .title {
+    font-size: 2rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 1rem;
+    text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.4);
+    }
 
-/* Description under the title */
-.description {
-  font-size: 1.3rem;
-  color: #f39c12;
-  margin-bottom: 2rem;
-  text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.4);
-}
+    /* Description under the title */
+    .description {
+    font-size: 1.3rem;
+    color: #f39c12;
+    margin-bottom: 2rem;
+    text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.4);
+    }
 
-/* Game Selector Form */
-.game-selection-card {
-  background-color: #ffffff;
-  padding: 2.5rem;
-  text-align: center;
-  border: 1.5px solid #f5eee1;
-}
+    /* Game Selector Form */
+    .game-selection-card {
+    background-color: #ffffff;
+    padding: 2.5rem;
+    text-align: center;
+    border: 1.5px solid #f5eee1;
+    }
 
-/* Game Selector Button Style */
-.game-selection-button {
-  background-color: #2ecc71;
-  color: white;
-  padding: 10px;
-  width: 100%;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
+    /* Game Selector Button Style */
+    .game-selection-button {
+    background-color: #2ecc71;
+    color: white;
+    padding: 10px;
+    width: 100%;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    }
 
-.game-selection-button:hover {
-  background-color: #27ae60;
-}
+    .game-selection-button:hover {
+    background-color: #27ae60;
+    }
 </style>

@@ -17,9 +17,8 @@
                 margin: 2,
                 errorCorrectionLevel: 'H',
             })
-            console.log(qr.value);
         } catch (error) {
-            console.log(error);
+            console.error(error);
         }
         isLoading.value = false;
     }

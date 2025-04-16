@@ -29,7 +29,7 @@
         const formData = new FormData();
         formData.append('files', image.value);
         try {
-            const response = await fetch('http://localhost:1337/api/upload', {
+            const response = await fetch('http://192.168.1.36:1337/api/upload', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${tkn}`,
@@ -41,14 +41,14 @@
                 toModify.value.image.id = result[0].id;
             }
         } catch (error) {
-            console.log(error);
+            console.error(error);
         }
     };
 
     //recupero della lista degli elementi nel database presenti nel menu
     const fetchList = async () => {
         try {
-            const fetchuser = await fetch('http://localhost:1337/api/users/me',{
+            const fetchuser = await fetch('http://192.168.1.36:1337/api/users/me',{
                 method: "GET",
                 headers: {
                     "Authorization" : `Bearer ${tkn}`,
@@ -69,7 +69,7 @@
                     populate: "*",
                 });
             
-                const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
+                const response =  await fetch(`http://192.168.1.36:1337/api/menus?${query}`, {
                     method: "GET",
                     headers: {
                         "Content-Type": "application/json",
@@ -83,7 +83,7 @@
                 }
             }
         } catch (error) {
-            console.log(error);
+            console.error(error);
         }
     }
 
@@ -91,7 +91,6 @@
     const handleModify = (e) => {
         modalShow.value = !modalShow.value;
         toModify.value = e;
-        console.log(toModify);
     };
 
     //funzione che fa l'update dell'elemento selezionato, con le modifiche apportate nel form
@@ -99,7 +98,7 @@
         try {
             await handleDelete(toModify.value.documentId);
             //funzione che aggiorna direttamente l'elemento nel db
-            const update = await fetch(`http://localhost:1337/api/elements`,{
+            const update = await fetch(`http://192.168.1.36:1337/api/elements`,{
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -120,7 +119,7 @@
                 const data = await update.json();
                 list.value.push(data.data);
                 //re-connect di tutta la lista gia salvata con fetchlist, che contiene anche l'id dell'elemento modificato
-                const reconnect = await fetch(`http://localhost:1337/api/menus/${menuId.value}`,{
+                const reconnect = await fetch(`http://192.168.1.36:1337/api/menus/${menuId.value}`,{
                     method: "PUT",
                     headers: {
                         "Content-Type": "application/json",
@@ -141,14 +140,14 @@
             
             
         } catch (error) {
-            console.log(error);
+            console.error(error);
         }
     }
 
     //function che cancella dal database e dalla lista l'elemento cliccato
     const handleDelete = async (id) => {
         try {
-            const update = await fetch(`http://localhost:1337/api/menus/${menuId.value}`,{
+            const update = await fetch(`http://192.168.1.36:1337/api/menus/${menuId.value}`,{
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
@@ -166,7 +165,7 @@
 
             //fetch che elimina il record dal database
             if (update.ok){
-                const del = await fetch(`http://localhost:1337/api/elements/${id}`,{
+                const del = await fetch(`http://192.168.1.36:1337/api/elements/${id}`,{
                     method: "DELETE",
                     headers: {
                         "Authorization": `Bearer ${tkn}`
@@ -179,7 +178,7 @@
                 }
             }
         } catch (error) {
-            console.log(error);
+            console.error(error);
         }
         
 
@@ -195,7 +194,7 @@
 
     //ricavare url dell'immagine
     const getImageUrl = (obj) => {
-        return `http://localhost:1337${obj.formats.thumbnail.url}`;
+        return `http://192.168.1.36:1337${obj.formats.thumbnail.url}`;
     }
 
     //funzione per gestire il file e la preview dell'immagine

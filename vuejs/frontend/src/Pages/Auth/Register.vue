@@ -36,7 +36,7 @@ const router = useRouter();
 //funzione che crea la tupla della tabella delle preferenze legate all'utente che si sta registrando in maniera standard
 const CreatePreferences = async () => {
   try{
-    const response = await fetch('http://localhost:1337/api/preferences', {
+    const response = await fetch('http://192.168.1.36:1337/api/preferences', {
       method: "POST",
       headers: {
         'Content-Type' : 'application/json',
@@ -62,7 +62,7 @@ const CreatePreferences = async () => {
 // Funzione che registra l'utente nel formato standard richiesto da strapi
 const CreateUSer= async () => {
     try {
-        const response = await fetch('http://localhost:1337/api/auth/local/register', {
+        const response = await fetch('http://192.168.1.36:1337/api/auth/local/register', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -97,7 +97,7 @@ const submit = async () => {
     const tokjwt = registerData.value.jwt;
     const id = registerData.value.user.id;
     try {
-      const response = await fetch(`http://localhost:1337/api/users/${id}`,{
+      const response = await fetch(`http://192.168.1.36:1337/api/users/${id}`,{
         method: 'PUT',
         headers:{
             'Content-Type': 'application/json',
@@ -107,7 +107,7 @@ const submit = async () => {
             birth_date: birth_date.value,
             name: name.value,
             surname: surname.value,
-            url : `http://localhost:5173/menu/${username}/home`,
+            url : `http://192.168.1.36:5173/menu/${username}/home`,
             fk_prefs:{
                   connect: [
                       { id: preferenceID.value.id-1 },

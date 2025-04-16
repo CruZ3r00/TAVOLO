@@ -18,7 +18,7 @@
     //funzione che verifica lo stato dell'abbonamento dell'utente loggato al momento && 0 per non gestire al momento gli abbonamenti in modo automatico
     const verifyPayment = async () => {
         try {
-            const response = await fetch('http://localhost:1337/api/users/me',{
+            const response = await fetch('http://192.168.1.36:1337/api/users/me',{
                 method: "GET",
                 headers: {
                     "Authorization" : `Bearer ${tkn}`,
@@ -33,7 +33,7 @@
                 else return true; 
             }
         } catch (error) {
-            console.log(error);
+            console.error(error);
         }
     };
 

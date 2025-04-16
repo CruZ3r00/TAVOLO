@@ -1,41 +1,19 @@
 <script setup>
-    import { useRoute } from 'vue-router';
-    import { ref,onMounted,watch, nextTick } from 'vue';
+    import { onMounted, nextTick } from 'vue';
     import MenuLayout from '@/Layouts/MenuLayout.vue';
-    import { fetchMenuElements } from '@/utils';
+    import MenuViewComponent from '@/components/MenuViewComponent.vue';    
+    import { ref } from 'vue';
 
-    const route = useRoute();
-    const restaurant = ref(route.params.restaurant);
-    const category = ref(route.params.category);
-    const menu = ref([]);
-    const menuList = ref([]);
+    const primary_color = ref('');
+    const second_color = ref('');
+    const backgroud = ref('');
+    const details = ref('');
+
     
-    const getMenu = async () =>{
-        try {
-            const data = await fetchMenuElements(restaurant.value);   
-            console.log(data);
-            data.data[0].fk_elements.forEach(element => {
-                menu.value.push(element);
-            });
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
-    watch(() => route.params.category, async () => {
-        category.value = route.params.category;
-        menuList.value = menu.value.filter(item => item.category === category.value);
-    });
-
-    //ricavare url dell'immagine
-    const getImageUrl = (image) => {
-        return `http://localhost:1337${image.url}`;
-    }
 
     //quando il componente viene montato recupero la lista degli elementi
     onMounted(async () => {
-        await getMenu();
-        menuList.value = menu.value;
+        await fetchPrefs();
         nextTick(() => {
             document.title = 'Menu';
         });
@@ -142,21 +120,7 @@
 
         <!-- lista elementi -->
         <section>
-            <ol class="list-group list-group-flush">
-                <li v-for="element in menuList" class="list-group-item d-flex justify-content-between align-items-start">
-                    <div class="ms-2 me-auto">
-                        
-                        <div class="fw-bold">{{ element.name}}</div>
-                        <p>{{ element.ingredients }}</p>
-                        <p>{{ element.allergens }}</p>
-                        <img
-                            v-if="element.image"
-                            :src="getImageUrl(element.image)"
-                            alt="Immagine"
-                        />
-                    </div>
-                </li>
-            </ol>
+            <MenuViewComponent :primary="primary_color" :second="second_color" :backgroud="backgroud" :details="details"/>
         </section>
     </MenuLayout>
 </template>
