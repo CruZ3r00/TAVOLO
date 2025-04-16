@@ -65,7 +65,7 @@
                             }
                         },
                         color: {
-                            value: "#FFD700" // color of particles
+                            value: second_color.value // color of particles
                         },
                         shape: {
                             type: "polygon",
@@ -90,7 +90,7 @@
                         line_linked: { //linee between particles
                             enable: true,
                             distance: 150,
-                            color: "#FFD700",
+                            color: second_color.value,
                             opacity: 0.4,
                             width: 1
                         },
@@ -134,10 +134,10 @@
 </script>
 
 <template>
-    <MenuLayout>
+    <MenuLayout :primary="primary_color" :second="second_color" :background="background" :details="details">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-        <section class="d-flex align-items-center justify-content-center" style="height: 60vh; position: relative; background-color: #1E3A8A; background-size: cover; background-position: center;">
+        <section class="d-flex align-items-center justify-content-center" :style="{height: '60vh', position: 'relative', backgroundColor: primary_color, backgroundSize: 'cover', backgroundPosition: 'center'}">
             <!-- Particles Background -->
             <div id="particles-js" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;"></div>
         

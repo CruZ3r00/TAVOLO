@@ -96,14 +96,13 @@
 <template>
     <!-- lista elementi -->
     <section>
-        <p>colori nelle preferenze: {{ primary_color }}, {{ second_color }}, {{ details }}, {{ background }}</p>
         <ol class="list-group list-group-flush">
-            <li v-for="element in menuList" class="list-group-item d-flex justify-content-between align-items-start">
+            <li v-for="element in menuList" class="list-group-item d-flex justify-content-between align-items-start" :style="{ backgroundColor: background, color: primary_color }">
                 <div class="ms-2 me-auto">
                     
-                    <div class="fw-bold">{{ element.name}}</div>
-                    <p>{{ element.ingredients }}</p>
-                    <p>{{ element.allergens }}</p>
+                    <div class="fw-bold mb-2">{{ element.name }} </div>
+                    <p v-if="element.ingredients.length">{{ element.ingredients }}</p>
+                    <p v-if="element.allergens.length">{{ element.allergens }}</p>
                     <img
                         v-if="element.image"
                         :src="getImageUrl(element.image)"
@@ -111,6 +110,6 @@
                     />
                 </div>
             </li>
-        </ol>
+            </ol>
     </section>
 </template>
