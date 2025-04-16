@@ -28,7 +28,7 @@ const submit = async () => {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-        const response = await fetch('http://192.168.1.36:1337/api/auth/local', {
+        const response = await fetch('http://localhost:1337/api/auth/local', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ identifier: username.value, password: password.value }),

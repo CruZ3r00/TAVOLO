@@ -24,7 +24,7 @@ const updatePassword = async () => {
     const tkn = store.getters.getToken;
     if( password.value === password_confirmation.value){
         try{
-            const response = await fetch(`http://192.168.1.36:1337/api/users/${props.id}`, {
+            const response = await fetch(`http://localhost:1337/api/users/${props.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -60,7 +60,7 @@ const updatePasswordCheck = async () => {
     const username = store.getters.getUser.username;
     isLoading.value = true;
     try{
-        const response = await fetch('http://192.168.1.36:1337/api/auth/local', {
+        const response = await fetch('http://localhost:1337/api/auth/local', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

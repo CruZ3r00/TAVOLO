@@ -4,6 +4,39 @@
     import { fetchMenuElements } from '@/utils';
     import { useStore } from 'vuex';
 
+    const props = defineProps({
+        primary: {
+            type: String,
+            required: true, 
+        },
+        second: {
+            type: String, 
+            required: true,
+        },
+        background: {
+            type: String, 
+            required: true,
+        },
+        details: {
+            type: String, 
+            required: true,
+        },
+    })
+
+    //ref per i colori presenti nelle preferenze
+    const primary_color = ref(props.primary);
+    const second_color = ref(props.second);
+    const details = ref(props.details);
+    const background = ref(props.background);
+
+    //watchers dei props
+    watch(() => props, () => {
+        primary_color.value = props.primary;
+        second_color.value = props.second;
+        details.value = props.details;
+        background.value = props.background;    
+    },{ deep: true}); //deep per verificare cambiamenti anche nelle nidificazioni
+
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
     const tkn = store.getters.getToken;
@@ -20,7 +53,7 @@
             if(restaurant.value){
                 data.value = await fetchMenuElements(restaurant.value);
             }else{
-                const response = await fetch(`http://192.168.1.36:1337/api/users/me`,{
+                const response = await fetch(`http://localhost:1337/api/users/me`,{
                     method: "GET",
                     headers: {
                         "Authorization" : `Bearer ${tkn}`,
@@ -49,7 +82,7 @@
 
     //ricavare url dell'immagine
     const getImageUrl = (image) => {
-        return `http://192.168.1.36:1337${image.url}`;
+        return `http://localhost:1337${image.url}`;
     }
 
     
@@ -63,6 +96,7 @@
 <template>
     <!-- lista elementi -->
     <section>
+        <p>colori nelle preferenze: {{ primary_color }}, {{ second_color }}, {{ details }}, {{ background }}</p>
         <ol class="list-group list-group-flush">
             <li v-for="element in menuList" class="list-group-item d-flex justify-content-between align-items-start">
                 <div class="ms-2 me-auto">

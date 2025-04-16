@@ -100,7 +100,7 @@ export const fetchMenuElements = async (id) => {
             },
             populate: "*",
         });
-        const fetchuser = await fetch(`http://192.168.1.36:1337/api/users?${query}`,{
+        const fetchuser = await fetch(`http://localhost:1337/api/users?${query}`,{
             method: "GET",
             headers: {
                 "Content-Type" : "application/json",
@@ -123,7 +123,7 @@ export const fetchMenuElements = async (id) => {
                     }
                 }
             });
-            const response = await fetch(`http://192.168.1.36:1337/api/menus?${query}`,{
+            const response = await fetch(`http://localhost:1337/api/menus?${query}`,{
                 method: 'GET',
                 headers: {
                     "Content-Type": "application/json",

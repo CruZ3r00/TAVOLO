@@ -2,19 +2,17 @@
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { ref, onMounted, nextTick, watch } from 'vue';
     import { useStore } from 'vuex';
-    import { useRouter } from 'vue-router';
     import { colorCalculator } from '@/utils';
     import MenuViewComponent from '@/components/MenuViewComponent.vue';
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
-    const router = useRouter();
     const tkn = store.getters.getToken;
 
     const id = ref('');
     const primary_color = ref('');
     const second_color = ref('');
-    const backgroud = ref('');
+    const background = ref('');
     const details = ref('');
     const theme = ref('');
     const changed = ref(false);
@@ -23,7 +21,7 @@
     //funzione che recuperare le informazioni delle preferenze dell'utente
     const fetchPrefs = async () => {
         try {
-            const response = await fetch(`http://192.168.1.36:1337/api/users/me?populate=*`,{
+            const response = await fetch(`http://localhost:1337/api/users/me?populate=*`,{
                 method: "GET",
                 headers: {
                     "Authorization" : `Bearer ${tkn}`,
@@ -35,7 +33,7 @@
                 const data = await response.json();
                 primary_color.value = data.fk_prefs.primary_color;
                 second_color.value = data.fk_prefs.second_color;
-                backgroud.value = data.fk_prefs.backgroud;
+                background.value = data.fk_prefs.background;
                 details.value = data.fk_prefs.details;
                 theme.value = data.fk_prefs.theme;
                 id.value = data.fk_prefs.documentId;
@@ -48,7 +46,7 @@
 
     const submit = async () => {
         try {
-            const update = await fetch(`http://192.168.1.36:1337/api/users/${userid.value}`,{
+            const update = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -66,7 +64,7 @@
 
             //fetch che elimina il record dal database
             if (update.ok){
-                const del = await fetch(`http://192.168.1.36:1337/api/preferences/${id.value}`,{
+                const del = await fetch(`http://localhost:1337/api/preferences/${id.value}`,{
                     method: "DELETE",
                     headers: {
                         "Authorization": `Bearer ${tkn}`
@@ -75,7 +73,7 @@
                 
                 //se a buon fine elimino dalla lista
                 if (del.ok){
-                    const response = await fetch(`http://192.168.1.36:1337/api/preferences`,{
+                    const response = await fetch(`http://localhost:1337/api/preferences`,{
                         method: "POST",
                         headers: {
                             "Authorization" : `Bearer ${tkn}`,
@@ -86,7 +84,7 @@
                                 primary_color: primary_color.value,
                                 second_color: second_color.value,
                                 theme: theme.value,
-                                background: backgroud.value,
+                                background: background.value,
                                 details: details.value,
                             }
                         })
@@ -94,7 +92,7 @@
                     if(response.ok){
                         const data = await response.json();
                         const id_ = data.data;
-                        const reconnect = await fetch(`http://192.168.1.36:1337/api/users/${userid.value}`,{
+                        const reconnect = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
                             method: 'PUT',
                             headers:{
                                 'Content-Type': 'application/json',
@@ -123,7 +121,7 @@
     //quando cambia theme (con il menu a tendina), si calcolano i colori con la funzione apposita creata in utils.js
     watch(theme, (newVal, oldVal) => {
         changed.value = true;
-        colorCalculator( theme, primary_color, second_color, backgroud, details );
+        colorCalculator( theme, primary_color, second_color, background, details );
     })
 
     //impostazione del titolo della scheda e function per caricare i dati
@@ -163,13 +161,13 @@
                     </select>
                 </div>
 
-                <button v-if="changed" type="submit" class="btn btn-warning mt-5">registra elemento</button>
+                <button v-if="changed" type="submit" class="btn btn-warning mt-5">Salva preferenze</button>
             </form>
         </section>
 
         <!-- preview del sito -->
         <section>
-            <MenuViewComponent :primary="primary_color" :second="second_color" :backgroud="backgroud" :details="details"/>
+            <MenuViewComponent :primary="primary_color" :second="second_color" :background="background" :details="details"/>
         </section>
     </AppLayout>
 </template>

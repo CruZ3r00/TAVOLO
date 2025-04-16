@@ -29,7 +29,7 @@
         const formData = new FormData();
         formData.append('files', image.value);
         try {
-            const response = await fetch('http://192.168.1.36:1337/api/upload', {
+            const response = await fetch('http://localhost:1337/api/upload', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${tkn}`,
@@ -49,7 +49,7 @@
     //Creazione di un nuovo record di elemento tramite API strapi 
     const CreateElement = async () => {
         try{
-            const response = await fetch('http://192.168.1.36:1337/api/elements',{
+            const response = await fetch('http://localhost:1337/api/elements',{
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -80,7 +80,7 @@
     //funzione quando si fa il submit del form che gestisce le altre funzioni e la richiesta finale
     const submit = async () => {
         try {
-            const fetchuser = await fetch('http://192.168.1.36:1337/api/users/me',{
+            const fetchuser = await fetch('http://localhost:1337/api/users/me',{
                 method: "GET",
                 headers: {
                     "Authorization" : `Bearer ${tkn}`,
@@ -105,7 +105,7 @@
                 await CreateElement(); //funzione che crea l'elemento (chiamate fetch, quindi await)
 
                 //fetch per estrapolare il contenuto di menu con un certo riferimento al sito dell'utente loggato (tramite props da padre)
-                const response =  await fetch(`http://192.168.1.36:1337/api/menus?${query}`, {
+                const response =  await fetch(`http://localhost:1337/api/menus?${query}`, {
                     method: "GET",
                     headers: {
                         "Content-Type": "application/json",
@@ -118,7 +118,7 @@
 
                     //se non esiste ancora nel database, quindi vuota
                     if(data.data.length <= 0){ 
-                        const r = await fetch(`http://192.168.1.36:1337/api/menus`,{
+                        const r = await fetch(`http://localhost:1337/api/menus`,{
                             method: "POST",
                             headers: {
                                 "Content-Type": "application/json",
@@ -147,7 +147,7 @@
                         let newList = [];
                         
                         //fetch per estrapolare la lista tramite il documentId della collection menu
-                        const getUpdate = await fetch(`http://192.168.1.36:1337/api/menus?${menuId}&populate=*`,{ 
+                        const getUpdate = await fetch(`http://localhost:1337/api/menus?${menuId}&populate=*`,{ 
                             method: "GET",
                             headers: {
                                 "Content-Type": "application/json",
@@ -163,7 +163,7 @@
                         newList.push(elementID.value);
 
                         //fetch per l'aggiornamento del record con documentId -> menuId
-                        const update = await fetch(`http://192.168.1.36:1337/api/menus/${menuId}`,{
+                        const update = await fetch(`http://localhost:1337/api/menus/${menuId}`,{
                             method: "PUT",
                             headers: {
                                 "Content-Type": "application/json",

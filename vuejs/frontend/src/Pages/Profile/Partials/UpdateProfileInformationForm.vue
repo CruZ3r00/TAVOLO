@@ -43,7 +43,7 @@ const updateInfoUser = async () => {
     isLoading.value = true;
     const tokjwt = store.getters.getToken;
     try {
-      const response = await fetch(`http://192.168.1.36:1337/api/users/${props.user.id}`,{
+      const response = await fetch(`http://localhost:1337/api/users/${props.user.id}`,{
         method: 'PUT',
         headers:{
             'Content-Type': 'application/json',

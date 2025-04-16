@@ -3,12 +3,45 @@
     import MenuLayout from '@/Layouts/MenuLayout.vue';
     import MenuViewComponent from '@/components/MenuViewComponent.vue';    
     import { ref } from 'vue';
+    import { useRoute } from 'vue-router';
+    import qs from 'qs';
+
+    const route = useRoute();
+    const restaurant = ref(route.params.restaurant);
 
     const primary_color = ref('');
     const second_color = ref('');
-    const backgroud = ref('');
+    const background = ref('');
     const details = ref('');
 
+    const fetchPrefs = async () => { 
+        try {
+            const query = qs.stringify({ 
+                filters: {
+                    documentId:{
+                        $eq: restaurant.value
+                    }
+                },
+                populate: "*",
+            });
+            const fetchuser = await fetch(`http://localhost:1337/api/users?${query}`,{
+                method: "GET",
+                headers: {
+                    "Content-Type" : "application/json",
+                },
+            });
+            if(fetchuser.ok){
+                const data = await fetchuser.json();
+                primary_color.value = data[0].fk_prefs.primary_color;
+                second_color.value = data[0].fk_prefs.second_color;
+                details.value = data[0].fk_prefs.details;
+                background.value = data[0].fk_prefs.background;
+            }
+            
+        } catch (error) {
+            console.error(error);
+        }
+    }
     
 
     //quando il componente viene montato recupero la lista degli elementi
@@ -120,7 +153,7 @@
 
         <!-- lista elementi -->
         <section>
-            <MenuViewComponent :primary="primary_color" :second="second_color" :backgroud="backgroud" :details="details"/>
+            <MenuViewComponent :primary="primary_color" :second="second_color" :background="background" :details="details"/>
         </section>
     </MenuLayout>
 </template>

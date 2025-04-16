@@ -55,7 +55,7 @@
 
     const submit = async () => {
         try {
-            const response = await fetch('http://192.168.1.36:8000/api/password/update', {
+            const response = await fetch('http://localhost:8000/api/password/update', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json' 
