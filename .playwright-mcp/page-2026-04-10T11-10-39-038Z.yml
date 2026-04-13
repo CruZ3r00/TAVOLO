@@ -1,0 +1,76 @@
+- generic [ref=e436]:
+  - navigation [ref=e437]:
+    - generic [ref=e438]:
+      - link "MenuCMS" [ref=e439] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e440]: MenuCMS
+      - generic [ref=e441]:
+        - list [ref=e442]:
+          - listitem [ref=e443]:
+            - link "Dashboard" [ref=e444] [cursor=pointer]:
+              - /url: /dashboard
+              - text: Dashboard
+          - listitem [ref=e445]:
+            - link "Menu" [ref=e446] [cursor=pointer]:
+              - /url: /menu-handler
+              - text: Menu
+          - listitem [ref=e447]:
+            - link "Configurazione Sito" [ref=e448] [cursor=pointer]:
+              - /url: /site-config
+              - text: Configurazione Sito
+        - list [ref=e449]:
+          - listitem [ref=e450]:
+            - button "qatest3" [ref=e451] [cursor=pointer]: qatest3
+  - main [ref=e452]:
+    - generic [ref=e453]:
+      - generic [ref=e455]:
+        - heading "Configurazione Sito Web" [level=1] [ref=e456]
+        - paragraph [ref=e457]: Configura il tuo sito web esterno e integra il menu tramite API.
+      - generic [ref=e458]:
+        - generic [ref=e459]:
+          - generic [ref=e460]:
+            - heading "Impostazioni" [level=5] [ref=e462]: Impostazioni
+            - generic [ref=e464]:
+              - generic [ref=e465]:
+                - generic [ref=e466]: Nome del ristorante
+                - textbox "Nome del ristorante" [ref=e467]:
+                  - /placeholder: Es. Pizzeria Da Mario
+                  - text: qatest3
+              - generic [ref=e468]:
+                - generic [ref=e469]: URL del sito web
+                - textbox "URL del sito web" [ref=e470]:
+                  - /placeholder: https://www.mioristorante.it
+                - generic [ref=e471]: L'URL del tuo sito web dove verrà visualizzato il menu.
+              - generic [ref=e472]:
+                - generic [ref=e473]: Logo del ristorante
+                - button "Logo del ristorante" [ref=e474] [cursor=pointer]
+              - button "Salva configurazione" [ref=e475] [cursor=pointer]: Salva configurazione
+          - generic [ref=e476]:
+            - heading "API pubblica" [level=5] [ref=e478]: API pubblica
+            - generic [ref=e479]:
+              - paragraph [ref=e480]: "Usa questo endpoint per integrare il menu nel tuo sito web:"
+              - generic [ref=e481]:
+                - code [ref=e483]: GET
+                - textbox [ref=e484]: http://localhost:1337/api/menus/public/rdjvaoubf08o5esndasg7jxw
+                - button "Copia" [ref=e485] [cursor=pointer]
+              - paragraph [ref=e486]: Questa API restituisce il menu completo del tuo ristorante in formato JSON, inclusi elementi, categorie, logo e nome del ristorante. Non richiede autenticazione.
+        - generic [ref=e487]:
+          - paragraph [ref=e490]: Inserisci un URL per visualizzare l'anteprima del tuo sito.
+          - generic [ref=e491]:
+            - heading "QR Code" [level=5] [ref=e493]: QR Code
+            - generic [ref=e495]:
+              - heading "Genera il QR Code che reindirizza al tuo sito." [level=1] [ref=e496]
+              - button "Genera qr" [ref=e497] [cursor=pointer]
+  - contentinfo [ref=e498]:
+    - generic [ref=e500]:
+      - paragraph [ref=e501]: © 2025 MenuCMS
+      - list [ref=e502]:
+        - listitem [ref=e503]:
+          - link "Home" [ref=e504] [cursor=pointer]:
+            - /url: /home
+        - listitem [ref=e505]:
+          - link "Chi siamo" [ref=e506] [cursor=pointer]:
+            - /url: /who-are-us
+        - listitem [ref=e507]:
+          - link "Contattaci" [ref=e508] [cursor=pointer]:
+            - /url: /contact-us

@@ -1,0 +1,4 @@
+[     900ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/register:0
+[     901ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/register:0
+[   14882ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/login:0
+[   43068ms] [LOG] {jwt: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NSwia…5MDN9.GWUni84NjiJwISuiYE3v21s4lOcxxTOyBUGKwrpaMew, user: Object} @ http://localhost:5174/src/Pages/Auth/Login.vue:44

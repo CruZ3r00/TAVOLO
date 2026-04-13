@@ -1,0 +1,88 @@
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e6]:
+      - link " MenuCMS" [ref=e7] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e9]: 
+        - generic [ref=e10]: MenuCMS
+      - generic [ref=e11]:
+        - link " Dashboard" [ref=e12] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e13]: 
+          - generic [ref=e14]: Dashboard
+        - link " Menu" [ref=e15] [cursor=pointer]:
+          - /url: /menu-handler
+          - generic [ref=e16]: 
+          - generic [ref=e17]: Menu
+        - link " Sito" [ref=e18] [cursor=pointer]:
+          - /url: /site-config
+          - generic [ref=e19]: 
+          - generic [ref=e20]: Sito
+      - generic [ref=e22]:
+        - button "P pizzeria_qa_test " [ref=e23] [cursor=pointer]:
+          - generic [ref=e24]: P
+          - generic [ref=e25]: pizzeria_qa_test
+          - generic [ref=e26]: 
+        - text:  
+  - main [ref=e27]:
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - heading "Nuovo elemento" [level=2] [ref=e60]
+          - paragraph [ref=e61]: Aggiungi un nuovo piatto o bevanda al tuo menu
+        - button " Torna alla lista" [ref=e62] [cursor=pointer]:
+          - generic [ref=e63]: 
+          - generic [ref=e64]: Torna alla lista
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - generic [ref=e70]: Nome
+            - textbox "Es. Margherita" [ref=e71]
+          - generic [ref=e72]:
+            - generic [ref=e73]: Prezzo
+            - generic [ref=e74]:
+              - spinbutton [ref=e75]
+              - generic [ref=e76]: €
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - generic [ref=e79]: Categoria
+            - generic [ref=e80]:
+              - combobox [ref=e81]:
+                - option "Seleziona una categoria" [disabled] [selected]
+                - option "Bevande"
+                - option "Dessert"
+                - option "Pizze classiche"
+                - option "Pizze bianche"
+                - option "Pizze rosse"
+                - option "Primi"
+                - option "Secondi"
+                - option "Primi di pesce"
+                - option "Secondi di pesce"
+                - option "Contorni"
+              - button "Scrivi categoria personalizzata" [ref=e82] [cursor=pointer]
+          - generic [ref=e83]:
+            - generic [ref=e84]: Immagine
+            - button "Choose File" [ref=e85]
+        - generic [ref=e86]:
+          - generic [ref=e87]: Ingredienti
+          - button " Aggiungi ingrediente" [ref=e88] [cursor=pointer]:
+            - generic [ref=e89]: 
+            - text: Aggiungi ingrediente
+        - generic [ref=e90]:
+          - generic [ref=e91]: Allergeni
+          - button " Aggiungi allergene" [ref=e92] [cursor=pointer]:
+            - generic [ref=e93]: 
+            - text: Aggiungi allergene
+        - button " Aggiungi al menu" [ref=e94] [cursor=pointer]:
+          - generic [ref=e95]: 
+          - generic [ref=e96]: Aggiungi al menu
+  - contentinfo [ref=e49]:
+    - generic [ref=e50]:
+      - paragraph [ref=e51]: © 2025 MenuCMS
+      - navigation [ref=e52]:
+        - link "Home" [ref=e53] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e54] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e55] [cursor=pointer]:
+          - /url: /contact-us

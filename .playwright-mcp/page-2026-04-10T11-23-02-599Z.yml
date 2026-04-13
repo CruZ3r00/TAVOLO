@@ -1,0 +1,134 @@
+- generic [ref=e85]:
+  - navigation [ref=e86]:
+    - generic [ref=e87]:
+      - link "MenuCMS" [ref=e88] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e89]: MenuCMS
+      - generic [ref=e90]:
+        - list [ref=e91]:
+          - listitem [ref=e92]:
+            - link "Dashboard" [ref=e93] [cursor=pointer]:
+              - /url: /dashboard
+              - text: Dashboard
+          - listitem [ref=e94]:
+            - link "Menu" [ref=e95] [cursor=pointer]:
+              - /url: /menu-handler
+              - text: Menu
+          - listitem [ref=e96]:
+            - link "Configurazione Sito" [ref=e97] [cursor=pointer]:
+              - /url: /site-config
+              - text: Configurazione Sito
+        - list [ref=e98]:
+          - listitem [ref=e99]:
+            - button "demo_restaurant" [ref=e100] [cursor=pointer]: demo_restaurant
+  - main [ref=e101]:
+    - generic [ref=e102]:
+      - generic [ref=e103]:
+        - heading "I tuoi elementi 6" [level=2] [ref=e104]:
+          - text: I tuoi elementi
+          - generic [ref=e105]: "6"
+        - generic [ref=e106]:
+          - button "Fine modifica" [active] [ref=e194] [cursor=pointer]: Fine modifica
+          - button "Aggiungi elemento" [ref=e108] [cursor=pointer]: Aggiungi elemento
+      - generic [ref=e111]:
+        - textbox "Cerca per nome..." [ref=e115]
+        - combobox [ref=e117]:
+          - option "Tutte le categorie" [selected]
+          - option "Pizze classiche"
+          - option "Primi"
+          - option "Secondi"
+          - option "Contorni"
+          - option "Dessert"
+          - option "Bevande"
+      - generic [ref=e118]:
+        - generic [ref=e120]:
+          - generic [ref=e122]:
+            - generic [ref=e123]:
+              - heading "Margherita" [level=5] [ref=e124]
+              - generic [ref=e125]: 6.50 EUR
+            - generic [ref=e126]: Pizze classiche
+            - generic [ref=e127]:
+              - text: "Ingredienti:"
+              - paragraph [ref=e128]: Pomodoro, Mozzarella, Basilico
+            - generic [ref=e129]:
+              - text: "Allergeni:"
+              - paragraph [ref=e130]: Glutine, Lattosio
+          - generic [ref=e195]:
+            - button "Modifica" [ref=e196] [cursor=pointer]: Modifica
+            - button "Elimina" [ref=e197] [cursor=pointer]: Elimina
+        - generic [ref=e132]:
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - heading "Carbonara" [level=5] [ref=e136]
+              - generic [ref=e137]: 10.00 EUR
+            - generic [ref=e138]: Primi
+            - generic [ref=e139]:
+              - text: "Ingredienti:"
+              - paragraph [ref=e140]: Spaghetti, Guanciale, Pecorino, Uova, Pepe nero
+            - generic [ref=e141]:
+              - text: "Allergeni:"
+              - paragraph [ref=e142]: Glutine, Uova, Lattosio
+          - generic [ref=e198]:
+            - button "Modifica" [ref=e199] [cursor=pointer]: Modifica
+            - button "Elimina" [ref=e200] [cursor=pointer]: Elimina
+        - generic [ref=e144]:
+          - generic [ref=e146]:
+            - generic [ref=e147]:
+              - heading "Bistecca alla griglia" [level=5] [ref=e148]
+              - generic [ref=e149]: 14.00 EUR
+            - generic [ref=e150]: Secondi
+            - generic [ref=e151]:
+              - text: "Ingredienti:"
+              - paragraph [ref=e152]: Manzo, Sale, Rosmarino, Olio EVO
+          - generic [ref=e201]:
+            - button "Modifica" [ref=e202] [cursor=pointer]: Modifica
+            - button "Elimina" [ref=e203] [cursor=pointer]: Elimina
+        - generic [ref=e154]:
+          - generic [ref=e156]:
+            - generic [ref=e157]:
+              - heading "Insalata mista" [level=5] [ref=e158]
+              - generic [ref=e159]: 5.00 EUR
+            - generic [ref=e160]: Contorni
+            - generic [ref=e161]:
+              - text: "Ingredienti:"
+              - paragraph [ref=e162]: Lattuga, Pomodori, Carote, Mais
+          - generic [ref=e204]:
+            - button "Modifica" [ref=e205] [cursor=pointer]: Modifica
+            - button "Elimina" [ref=e206] [cursor=pointer]: Elimina
+        - generic [ref=e164]:
+          - generic [ref=e166]:
+            - generic [ref=e167]:
+              - heading "Tiramisu" [level=5] [ref=e168]
+              - generic [ref=e169]: 6.00 EUR
+            - generic [ref=e170]: Dessert
+            - generic [ref=e171]:
+              - text: "Ingredienti:"
+              - paragraph [ref=e172]: Mascarpone, Savoiardi, Caffe, Cacao, Uova
+            - generic [ref=e173]:
+              - text: "Allergeni:"
+              - paragraph [ref=e174]: Glutine, Uova, Lattosio
+          - generic [ref=e207]:
+            - button "Modifica" [ref=e208] [cursor=pointer]: Modifica
+            - button "Elimina" [ref=e209] [cursor=pointer]: Elimina
+        - generic [ref=e176]:
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - heading "Acqua naturale 1L" [level=5] [ref=e180]
+              - generic [ref=e181]: 2.00 EUR
+            - generic [ref=e182]: Bevande
+          - generic [ref=e210]:
+            - button "Modifica" [ref=e211] [cursor=pointer]: Modifica
+            - button "Elimina" [ref=e212] [cursor=pointer]: Elimina
+  - contentinfo [ref=e183]:
+    - generic [ref=e185]:
+      - paragraph [ref=e186]: © 2025 MenuCMS
+      - list [ref=e187]:
+        - listitem [ref=e188]:
+          - link "Home" [ref=e189] [cursor=pointer]:
+            - /url: /home
+        - listitem [ref=e190]:
+          - link "Chi siamo" [ref=e191] [cursor=pointer]:
+            - /url: /who-are-us
+        - listitem [ref=e192]:
+          - link "Contattaci" [ref=e193] [cursor=pointer]:
+            - /url: /contact-us

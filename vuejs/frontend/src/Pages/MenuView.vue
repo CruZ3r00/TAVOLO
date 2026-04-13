@@ -1,7 +1,7 @@
 <script setup>
     import { onMounted, nextTick } from 'vue';
     import MenuLayout from '@/Layouts/MenuLayout.vue';
-    import MenuViewComponent from '@/components/MenuViewComponent.vue';    
+    import MenuViewComponent from '@/components/MenuViewComponent.vue';
     import { ref } from 'vue';
     import { useRoute } from 'vue-router';
     import qs from 'qs';
@@ -14,9 +14,9 @@
     const background = ref('');
     const details = ref('');
 
-    const fetchPrefs = async () => { 
+    const fetchPrefs = async () => {
         try {
-            const query = qs.stringify({ 
+            const query = qs.stringify({
                 filters: {
                     documentId:{
                         $eq: restaurant.value
@@ -37,35 +37,32 @@
                 details.value = data[0].fk_prefs.details;
                 background.value = data[0].fk_prefs.background;
             }
-            
+
         } catch (error) {
             console.error(error);
         }
     }
-    
 
-    //quando il componente viene montato recupero la lista degli elementi
     onMounted(async () => {
         await fetchPrefs();
         nextTick(() => {
             document.title = 'Menu';
         });
-        // Dynamically load the Particles.js script
+
         const script = document.createElement('script');
             script.src = "https://cdn.jsdelivr.net/npm/particles.js";
             script.onload = () => {
-                // Initialize Particles.js after the script is loaded
                 particlesJS("particles-js", {
                     particles: {
                         number: {
-                            value: 150, // Adjust particle count
+                            value: 150,
                             density: {
                                 enable: true,
                                 value_area: 800
                             }
                         },
                         color: {
-                            value: second_color.value // color of particles
+                            value: second_color.value
                         },
                         shape: {
                             type: "polygon",
@@ -87,7 +84,7 @@
                                 enable: false
                             }
                         },
-                        line_linked: { //linee between particles
+                        line_linked: {
                             enable: true,
                             distance: 150,
                             color: second_color.value,
@@ -104,7 +101,7 @@
                             bounce: false
                         }
                     },
-                    interactivity: { //way to interact with particles
+                    interactivity: {
                         detect_on: "canvas",
                         events: {
                             onhover: {
@@ -135,25 +132,71 @@
 
 <template>
     <MenuLayout :primary="primary_color" :second="second_color" :background="background" :details="details">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
-        <section class="d-flex align-items-center justify-content-center" :style="{height: '60vh', position: 'relative', backgroundColor: primary_color, backgroundSize: 'cover', backgroundPosition: 'center'}">
-            <!-- Particles Background -->
-            <div id="particles-js" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;"></div>
-        
-            <!-- Overlay for Opacity -->
-            <div class="position-absolute top-0 start-0 w-100 h-100" style="background-color: rgba(0, 0, 0, 0.1); z-index: 1;"></div>
-        
-            <!-- Content for banner -->
-            <div class="container text-center text-light" style="z-index: 2;">
-                <h1 class="display-3">BENVENUTO</h1>
-                <p class="p-2 lead">Vuoi dare uno sguardo al menu?</p>
+        <section class="menu-hero" :style="{ backgroundColor: primary_color }">
+            <div id="particles-js" class="menu-hero-particles"></div>
+            <div class="menu-hero-overlay"></div>
+            <div class="menu-hero-content">
+                <h1 class="menu-hero-title">BENVENUTO</h1>
+                <p class="menu-hero-subtitle">Vuoi dare uno sguardo al menu?</p>
             </div>
         </section>
 
-        <!-- lista elementi -->
         <section>
             <MenuViewComponent :primary="primary_color" :second="second_color" :background="background" :details="details"/>
         </section>
     </MenuLayout>
 </template>
+
+<style scoped>
+.menu-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  overflow: hidden;
+}
+.menu-hero-particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+.menu-hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.1);
+  z-index: 1;
+}
+.menu-hero-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  color: #fff;
+}
+.menu-hero-title {
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  letter-spacing: var(--tracking-tight);
+  margin: 0 0 var(--space-3) 0;
+}
+.menu-hero-subtitle {
+  font-size: var(--text-lg);
+  opacity: 0.9;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .menu-hero {
+    height: 40vh;
+  }
+  .menu-hero-title {
+    font-size: var(--text-2xl);
+  }
+}
+</style>

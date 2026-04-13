@@ -1,0 +1,6 @@
+[     799ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/register:0
+[     799ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/register:0
+[   90352ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/login:0
+[  124882ms] [ERROR] Failed to load resource: the server responded with a status of 400 (Bad Request) @ http://localhost:1337/api/auth/local:0
+[  124885ms] [LOG] {data: null, error: Object} @ http://localhost:5174/src/Pages/Auth/Login.vue:52
+[  143410ms] [LOG] {jwt: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Niwia…2OTN9.cRf3p7zNk-Sl296f5E-fabNtYhw1H5ixs4QvemHdIYY, user: Object} @ http://localhost:5174/src/Pages/Auth/Login.vue:44

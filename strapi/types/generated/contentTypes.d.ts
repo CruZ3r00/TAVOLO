@@ -382,12 +382,12 @@ export interface ApiElementElement extends Struct.CollectionTypeSchema {
   };
   attributes: {
     allergens: Schema.Attribute.JSON & Schema.Attribute.Required;
+    available: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
     category: Schema.Attribute.String & Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    image: Schema.Attribute.Media<'images' | 'files'> &
-      Schema.Attribute.Required;
+    image: Schema.Attribute.Media<'images' | 'files'>;
     ingredients: Schema.Attribute.JSON & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -487,6 +487,42 @@ export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
     theme: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'classic'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiWebsiteConfigWebsiteConfig
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'website_configs';
+  info: {
+    description: 'Configurazione del sito web esterno del ristorante';
+    displayName: 'WebsiteConfig';
+    pluralName: 'website-configs';
+    singularName: 'website-config';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    fk_user: Schema.Attribute.Relation<
+      'oneToOne',
+      'plugin::users-permissions.user'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::website-config.website-config'
+    > &
+      Schema.Attribute.Private;
+    logo: Schema.Attribute.Media<'images'>;
+    publishedAt: Schema.Attribute.DateTime;
+    restaurant_name: Schema.Attribute.String & Schema.Attribute.Required;
+    site_url: Schema.Attribute.String & Schema.Attribute.DefaultTo<''>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -988,6 +1024,10 @@ export interface PluginUsersPermissionsUser
       'plugin::users-permissions.role'
     >;
     surname: Schema.Attribute.String & Schema.Attribute.Required;
+    two_factor_enabled: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    two_factor_recovery_codes: Schema.Attribute.JSON & Schema.Attribute.Private;
+    two_factor_secret: Schema.Attribute.String & Schema.Attribute.Private;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1014,6 +1054,7 @@ declare module '@strapi/strapi' {
       'api::element.element': ApiElementElement;
       'api::menu.menu': ApiMenuMenu;
       'api::preference.preference': ApiPreferencePreference;
+      'api::website-config.website-config': ApiWebsiteConfigWebsiteConfig;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;

@@ -18,7 +18,7 @@
     "image": {
       "type": "media",
       "multiple": false,
-      "required": true,
+      "required": false,
       "allowedTypes": [
         "images",
         "files"
@@ -39,6 +39,11 @@
     "allergens": {
       "type": "json",
       "required": true
+    },
+    "available": {
+      "type": "boolean",
+      "default": true,
+      "required": false
     }
   }
 }

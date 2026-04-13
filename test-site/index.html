@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Ristorante - Sito di Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        :root {
+            --accent: #0d6efd;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .hero {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            min-height: 40vh;
+            display: flex;
+            align-items: center;
+        }
+        .hero-logo {
+            max-height: 80px;
+            border-radius: 12px;
+            border: 3px solid rgba(255,255,255,0.2);
+        }
+        .category-nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: white;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .category-btn {
+            border: none;
+            background: none;
+            padding: 0.75rem 1.25rem;
+            font-weight: 500;
+            color: #6c757d;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .category-btn:hover,
+        .category-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .menu-card {
+            border: none;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .menu-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        .menu-card img {
+            height: 180px;
+            object-fit: cover;
+        }
+        .allergen-badge {
+            font-size: 0.7rem;
+        }
+        .loading-spinner {
+            min-height: 60vh;
+        }
+        .error-state {
+            min-height: 60vh;
+        }
+        #setup-form {
+            max-width: 500px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Stato: configurazione iniziale -->
+        <div id="setup-state" class="d-flex align-items-center justify-content-center min-vh-100" style="display: none !important;">
+            <div id="setup-form" class="card shadow-sm border-0 p-4 mx-3">
+                <h3 class="fw-bold mb-3">
+                    <i class="bi bi-shop me-2 text-primary"></i>Sito di Test - Menu CMS
+                </h3>
+                <p class="text-muted">Inserisci il Document ID dell'utente per visualizzare il suo menu.</p>
+                <div class="mb-3">
+                    <label for="restaurantId" class="form-label fw-semibold">User Document ID</label>
+                    <input type="text" class="form-control" id="restaurantId" placeholder="Es. abc123def456...">
+                </div>
+                <div class="mb-3">
+                    <label for="apiBase" class="form-label fw-semibold">URL API Strapi</label>
+                    <input type="text" class="form-control" id="apiBase" value="http://localhost:1337">
+                </div>
+                <button onclick="loadMenu()" class="btn btn-primary w-100">
+                    <i class="bi bi-arrow-right me-1"></i>Carica Menu
+                </button>
+            </div>
+        </div>
+
+        <!-- Stato: caricamento -->
+        <div id="loading-state" class="loading-spinner d-flex align-items-center justify-content-center" style="display: none !important;">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+                <p class="text-muted">Caricamento menu...</p>
+            </div>
+        </div>
+
+        <!-- Stato: errore -->
+        <div id="error-state" class="error-state d-flex align-items-center justify-content-center" style="display: none !important;">
+            <div class="text-center">
+                <i class="bi bi-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
+                <h4 class="mt-3">Menu non trovato</h4>
+                <p class="text-muted" id="error-message">Verifica il Document ID e riprova.</p>
+                <button onclick="showSetup()" class="btn btn-outline-primary">Torna indietro</button>
+            </div>
+        </div>
+
+        <!-- Stato: menu caricato -->
+        <div id="menu-state" style="display: none !important;">
+            <!-- Hero -->
+            <section class="hero">
+                <div class="container text-center py-5">
+                    <img id="restaurant-logo" src="" alt="" class="hero-logo mb-3" style="display: none;">
+                    <h1 id="restaurant-name" class="display-4 fw-bold mb-2"></h1>
+                    <p class="lead opacity-75">Il nostro menu</p>
+                </div>
+            </section>
+
+            <!-- Navigazione categorie -->
+            <nav class="category-nav shadow-sm">
+                <div class="container">
+                    <div class="d-flex overflow-auto py-1" id="category-nav">
+                        <button class="category-btn active" onclick="filterCategory(null, this)">Tutti</button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Griglia elementi -->
+            <section class="container py-4">
+                <div class="row g-4" id="menu-grid"></div>
+            </section>
+
+            <!-- Footer -->
+            <footer class="bg-dark text-white py-4 mt-5">
+                <div class="container text-center">
+                    <p class="mb-1 small opacity-75">Menu gestito con MenuCMS</p>
+                    <p class="mb-0 small opacity-50">Dati forniti tramite API pubblica</p>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let menuData = null;
+        let apiBaseUrl = 'http://localhost:1337';
+
+        // Controlla se c'e' un parametro restaurant nell'URL
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const restaurantId = params.get('restaurant');
+            const apiBase = params.get('api');
+
+            if (apiBase) {
+                apiBaseUrl = apiBase;
+                document.getElementById('apiBase').value = apiBase;
+            }
+
+            if (restaurantId) {
+                document.getElementById('restaurantId').value = restaurantId;
+                loadMenu();
+            } else {
+                showSetup();
+            }
+        });
+
+        function showState(stateId) {
+            ['setup-state', 'loading-state', 'error-state', 'menu-state'].forEach(id => {
+                const el = document.getElementById(id);
+                el.style.display = 'none';
+                el.style.setProperty('display', 'none', 'important');
+            });
+            const target = document.getElementById(stateId);
+            if (stateId === 'loading-state' || stateId === 'error-state') {
+                target.style.setProperty('display', 'flex', 'important');
+            } else if (stateId === 'setup-state') {
+                target.style.setProperty('display', 'flex', 'important');
+            } else {
+                target.style.setProperty('display', 'block', 'important');
+            }
+        }
+
+        function showSetup() {
+            showState('setup-state');
+        }
+
+        async function loadMenu() {
+            const restaurantId = document.getElementById('restaurantId').value.trim();
+            apiBaseUrl = document.getElementById('apiBase').value.trim();
+
+            if (!restaurantId) {
+                alert('Inserisci un Document ID valido.');
+                return;
+            }
+
+            showState('loading-state');
+
+            try {
+                const response = await fetch(`${apiBaseUrl}/api/menus/public/${restaurantId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const result = await response.json();
+                menuData = result.data;
+                renderMenu();
+                showState('menu-state');
+
+                // Aggiorna URL senza ricaricare
+                const url = new URL(window.location);
+                url.searchParams.set('restaurant', restaurantId);
+                window.history.replaceState({}, '', url);
+            } catch (error) {
+                console.error('Errore:', error);
+                document.getElementById('error-message').textContent =
+                    `Impossibile caricare il menu. ${error.message}`;
+                showState('error-state');
+            }
+        }
+
+        function renderMenu() {
+            // Header
+            document.getElementById('restaurant-name').textContent = menuData.restaurant_name || 'Menu';
+            document.title = `${menuData.restaurant_name || 'Menu'} - Menu`;
+
+            if (menuData.logo_url) {
+                const logo = document.getElementById('restaurant-logo');
+                logo.src = `${apiBaseUrl}${menuData.logo_url}`;
+                logo.style.display = 'inline-block';
+            }
+
+            // Categorie
+            const nav = document.getElementById('category-nav');
+            // Rimuovi bottoni categorie precedenti (mantieni "Tutti")
+            while (nav.children.length > 1) nav.removeChild(nav.lastChild);
+            menuData.categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = 'category-btn';
+                btn.textContent = cat;
+                btn.onclick = function() { filterCategory(cat, this); };
+                nav.appendChild(btn);
+            });
+
+            // Griglia
+            renderGrid(menuData.elements);
+        }
+
+        function renderGrid(elements) {
+            const grid = document.getElementById('menu-grid');
+            grid.innerHTML = '';
+
+            if (elements.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-12 text-center py-5">
+                        <i class="bi bi-journal-x text-muted" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted">Nessun elemento disponibile.</p>
+                    </div>`;
+                return;
+            }
+
+            elements.forEach(el => {
+                const imgHtml = el.image_url
+                    ? `<img src="${apiBaseUrl}${el.image_full_url || el.image_url}" class="card-img-top" alt="${el.name}">`
+                    : `<div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height:180px">
+                        <i class="bi bi-image text-muted" style="font-size:2rem;"></i>
+                       </div>`;
+
+                const ingredientsHtml = el.ingredients && el.ingredients.length
+                    ? `<p class="small text-muted mb-1"><strong>Ingredienti:</strong> ${el.ingredients.join(', ')}</p>`
+                    : '';
+
+                const allergensHtml = el.allergens && el.allergens.length
+                    ? `<div class="mt-1">${el.allergens.map(a =>
+                        `<span class="badge bg-warning text-dark allergen-badge me-1">${a}</span>`
+                      ).join('')}</div>`
+                    : '';
+
+                const col = document.createElement('div');
+                col.className = 'col-sm-6 col-lg-4 col-xl-3';
+                col.innerHTML = `
+                    <div class="card menu-card shadow-sm h-100">
+                        ${imgHtml}
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title fw-bold mb-0">${el.name}</h5>
+                                <span class="badge bg-primary rounded-pill">${parseFloat(el.price).toFixed(2)} EUR</span>
+                            </div>
+                            ${ingredientsHtml}
+                            ${allergensHtml}
+                        </div>
+                    </div>`;
+                grid.appendChild(col);
+            });
+        }
+
+        function filterCategory(category, btn) {
+            // Aggiorna stato attivo dei bottoni
+            document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            if (!category) {
+                renderGrid(menuData.elements);
+            } else {
+                renderGrid(menuData.elements.filter(el => el.category === category));
+            }
+        }
+    </script>
+</body>
+</html>

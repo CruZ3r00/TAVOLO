@@ -1,0 +1,6 @@
+- generic [ref=e2]:
+  - text:  
+  - generic [ref=e4]:
+    - status [ref=e5]
+    - paragraph [ref=e6]: Caricamento menu...
+  - text: 

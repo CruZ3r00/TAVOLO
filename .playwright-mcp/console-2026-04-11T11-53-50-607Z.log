@@ -1,0 +1,2 @@
+[   34459ms] [LOG] Logout effettuato @ http://localhost:5174/src/Pages/Auth/Logout.vue:24
+[   35088ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/login:0

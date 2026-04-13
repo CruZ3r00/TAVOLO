@@ -1,0 +1,6 @@
+[     884ms] [ERROR] Access to fetch at 'http://localhost:1337/api/menus/public/rdjvaoubf08o5esndasg7jxw' from origin 'http://localhost:8080' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:8080/?restaurant=rdjvaoubf08o5esndasg7jxw&api=http://localhost:1337:0
+[     885ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:1337/api/menus/public/rdjvaoubf08o5esndasg7jxw:0
+[     885ms] [ERROR] Errore: TypeError: Failed to fetch
+    at loadMenu (http://localhost:8080/?restaurant=rdjvaoubf08o5esndasg7jxw&api=http://localhost:1337:211:40)
+    at HTMLDocument.<anonymous> (http://localhost:8080/?restaurant=rdjvaoubf08o5esndasg7jxw&api=http://localhost:1337:173:17) @ http://localhost:8080/?restaurant=rdjvaoubf08o5esndasg7jxw&api=http://localhost:1337:224
+[     887ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8080/favicon.ico:0

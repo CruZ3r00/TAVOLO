@@ -1,13 +1,27 @@
 module.exports = [
   'strapi::logger',
   'strapi::errors',
-  'strapi::security',
+  {
+    name: 'strapi::security',
+    config: {
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          'script-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
+          'style-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
+          'img-src': ["'self'", 'data:', 'blob:', 'cdn.jsdelivr.net'],
+          'font-src': ["'self'", 'cdn.jsdelivr.net'],
+          'connect-src': ["'self'"],
+          'frame-ancestors': ["'self'", "http://localhost:5174"],
+        },
+      },
+    },
+  },
   {
     name: 'strapi::cors',
     config: {
-      enabled: true,
-      origin: ['http://localhost:5174', 'http://192.168.1.36:5174' ],  // Sostituisci con il tuo dominio frontend
-      headers: '*',  // Permetti qualsiasi header, puoi specificare specifici header se necessario
+      origin: '*',
+      headers: '*',
     },
   },
   'strapi::poweredBy',
@@ -16,4 +30,9 @@ module.exports = [
   'strapi::session',
   'strapi::favicon',
   'strapi::public',
+  // Middleware per servire i siti-menu personalizzati su /sites/:username
+  {
+    name: 'global::restaurant-sites',
+    config: {},
+  },
 ];

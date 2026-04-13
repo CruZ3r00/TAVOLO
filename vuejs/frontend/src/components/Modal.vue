@@ -1,7 +1,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 
-//props utilizzato per gestire la visualizzazione
 const props = defineProps({
     show: {
         type: Boolean,
@@ -9,14 +8,11 @@ const props = defineProps({
     },
 });
 
-//emit per chiudere il modale
 const emit = defineEmits(['close']);
 
-//variabili ref per gestire il comportamento reattivo
 const dialog = ref();
-const showSlot = ref(props.show); 
+const showSlot = ref(props.show);
 
-//watch dei props, quando cambiano allora eseguo
 watch(() => props.show, () => {
     if (props.show) {
         document.body.style.overflow = 'hidden';
@@ -31,7 +27,6 @@ watch(() => props.show, () => {
     }
 });
 
-// funzione che gestice la chiusura premendo esc
 const closeOnEscape = (e) => {
     if (e.key === 'Escape') {
         e.preventDefault();
@@ -39,10 +34,8 @@ const closeOnEscape = (e) => {
     }
 };
 
-// listener di tastiera per quando si preme un tasto
 onMounted(() => document.addEventListener('keydown', closeOnEscape));
 
-//rimuovo il listener quando il componente viene smontato
 onUnmounted(() => {
     document.removeEventListener('keydown', closeOnEscape);
     document.body.style.overflow = null;
@@ -50,28 +43,46 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div
-      class="modal fade show d-block"
-      tabindex="-1"
-      role="dialog"
-      ref="dialog"
-      @click.self="close"
-      style="background: rgba(0,0,0,0.5);"
-      v-if="show"
-    >
-      <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-          <!-- Header con bottone di chiusura e possibilita di inserire un titolo -->
-          <div class="modal-header">
-            <slot v-if="showSlot" name="title" />
-            <button type="button" class="btn-close" @click="emit('close')"></button>
-          </div>
-  
-          <!-- Contenuto -->
-          <div class="modal-body">
-            <slot v-if="showSlot" name="body"/>
+    <Transition name="scale">
+        <div
+          v-if="show"
+          class="ds-overlay"
+          ref="dialog"
+          @click.self="emit('close')"
+        >
+          <div class="ds-modal">
+            <div class="ds-modal-header">
+              <slot v-if="showSlot" name="title" />
+              <button type="button" class="modal-close-btn" @click="emit('close')">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div class="ds-modal-body">
+              <slot v-if="showSlot" name="body"/>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Transition>
 </template>
+
+<style scoped>
+.modal-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: none;
+    color: var(--color-text-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: var(--text-md);
+}
+
+.modal-close-btn:hover {
+    background: var(--color-bg-subtle);
+    color: var(--color-text);
+}
+</style>

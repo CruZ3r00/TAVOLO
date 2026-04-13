@@ -1,0 +1,5 @@
+[    1201ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5175/register:0
+[    1202ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5175/register:0
+[   18077ms] [ERROR] Access to fetch at 'http://localhost:1337/api/auth/local/register' from origin 'http://localhost:5175' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ http://localhost:5175/register:0
+[   18078ms] [ERROR] Failed to load resource: net::ERR_FAILED @ http://localhost:1337/api/auth/local/register:0
+[   18078ms] [ERROR] Errore di rete: Failed to fetch @ http://localhost:5175/src/Pages/Auth/Register.vue:91

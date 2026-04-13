@@ -1,0 +1,110 @@
+- generic [ref=e2]:
+  - text:   
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - heading "QA Test Restaurant" [level=1] [ref=e6]
+      - paragraph [ref=e7]: Il nostro menu
+    - navigation [ref=e8]:
+      - generic [ref=e10]:
+        - button "Tutti" [ref=e11] [cursor=pointer]
+        - button "Pizze classiche" [ref=e12] [cursor=pointer]
+        - button "Primi" [ref=e13] [cursor=pointer]
+        - button "Secondi" [ref=e14] [cursor=pointer]
+        - button "Contorni" [ref=e15] [cursor=pointer]
+        - button "Dessert" [ref=e16] [cursor=pointer]
+        - button "Bevande" [ref=e17] [cursor=pointer]
+    - generic [ref=e19]:
+      - generic [ref=e21]:
+        - img "Pizza Margherita" [ref=e22]
+        - generic [ref=e23]:
+          - generic [ref=e24]:
+            - heading "Pizza Margherita" [level=5] [ref=e25]
+            - generic [ref=e26]: 8.50 EUR
+          - paragraph [ref=e27]:
+            - strong [ref=e28]: "Ingredienti:"
+            - text: Mozzarella
+          - generic [ref=e30]: Glutine
+      - generic [ref=e32]:
+        - img "Spaghetti Carbonara" [ref=e33]
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - heading "Spaghetti Carbonara" [level=5] [ref=e36]
+            - generic [ref=e37]: 12.00 EUR
+          - paragraph [ref=e38]:
+            - strong [ref=e39]: "Ingredienti:"
+            - text: Guanciale
+      - generic [ref=e41]:
+        - generic [ref=e43]: 
+        - generic [ref=e45]:
+          - heading "Bistecca alla griglia" [level=5] [ref=e46]
+          - generic [ref=e47]: 18.00 EUR
+      - generic [ref=e49]:
+        - generic [ref=e51]: 
+        - generic [ref=e52]:
+          - generic [ref=e53]:
+            - heading "Margherita" [level=5] [ref=e54]
+            - generic [ref=e55]: 6.50 EUR
+          - paragraph [ref=e56]:
+            - strong [ref=e57]: "Ingredienti:"
+            - text: Pomodoro, Mozzarella, Basilico
+          - generic [ref=e58]:
+            - generic [ref=e59]: Glutine
+            - generic [ref=e60]: Lattosio
+      - generic [ref=e62]:
+        - generic [ref=e64]: 
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - heading "Carbonara" [level=5] [ref=e67]
+            - generic [ref=e68]: 10.00 EUR
+          - paragraph [ref=e69]:
+            - strong [ref=e70]: "Ingredienti:"
+            - text: Spaghetti, Guanciale, Pecorino, Uova, Pepe nero
+          - generic [ref=e71]:
+            - generic [ref=e72]: Glutine
+            - generic [ref=e73]: Uova
+            - generic [ref=e74]: Lattosio
+      - generic [ref=e76]:
+        - generic [ref=e78]: 
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - heading "Bistecca alla griglia" [level=5] [ref=e81]
+            - generic [ref=e82]: 14.00 EUR
+          - paragraph [ref=e83]:
+            - strong [ref=e84]: "Ingredienti:"
+            - text: Manzo, Sale, Rosmarino, Olio EVO
+      - generic [ref=e86]:
+        - generic [ref=e88]: 
+        - generic [ref=e89]:
+          - generic [ref=e90]:
+            - heading "Insalata mista" [level=5] [ref=e91]
+            - generic [ref=e92]: 5.00 EUR
+          - paragraph [ref=e93]:
+            - strong [ref=e94]: "Ingredienti:"
+            - text: Lattuga, Pomodori, Carote, Mais
+      - generic [ref=e96]:
+        - generic [ref=e98]: 
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - heading "Tiramisu" [level=5] [ref=e101]
+            - generic [ref=e102]: 6.00 EUR
+          - paragraph [ref=e103]:
+            - strong [ref=e104]: "Ingredienti:"
+            - text: Mascarpone, Savoiardi, Caffe, Cacao, Uova
+          - generic [ref=e105]:
+            - generic [ref=e106]: Glutine
+            - generic [ref=e107]: Uova
+            - generic [ref=e108]: Lattosio
+      - generic [ref=e110]:
+        - generic [ref=e112]: 
+        - generic [ref=e114]:
+          - heading "Acqua naturale 1L" [level=5] [ref=e115]
+          - generic [ref=e116]: 2.00 EUR
+      - generic [ref=e118]:
+        - generic [ref=e120]: 
+        - generic [ref=e122]:
+          - heading "Coca Cola" [level=5] [ref=e123]
+          - generic [ref=e124]: 3.00 EUR
+    - contentinfo [ref=e125]:
+      - generic [ref=e126]:
+        - paragraph [ref=e127]: Menu gestito con MenuCMS
+        - paragraph [ref=e128]: Dati forniti tramite API pubblica

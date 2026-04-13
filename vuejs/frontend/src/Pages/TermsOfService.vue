@@ -1,23 +1,49 @@
-<script setup> 
-import { nextTick } from 'vue'; 
+<script setup>
+import AppLayout from '@/Layouts/AppLayout.vue';
+import { onMounted, nextTick } from 'vue';
 
-// Imposta il titolo della pagina
 onMounted(async () => {
-        nextTick(() => {
-            document.title = 'Termini del servizio';
-        });
+    nextTick(() => {
+        document.title = 'Termini del servizio';
+    });
 });
 </script>
 
-
 <template>
-    <div class="font-sans text-gray-900 antialiased">
-        <div class="pt-4 bg-gray-100">
-            <div class="min-h-screen flex flex-col items-center pt-6 sm:pt-0">
-            
-
-                <div class="w-full sm:max-w-2xl mt-6 p-6 bg-white shadow-md overflow-hidden sm:rounded-lg prose" v-html="terms" />
+    <AppLayout>
+        <div class="legal-page">
+            <div class="legal-container">
+                <p class="text-overline">Legale</p>
+                <h1 class="legal-title">Termini del Servizio</h1>
+                <div class="ds-card legal-card">
+                    <div class="ds-card-body" v-html="terms" />
+                </div>
             </div>
         </div>
-    </div>
+    </AppLayout>
 </template>
+
+<style scoped>
+.legal-page {
+    padding: var(--space-10) 0 var(--space-16);
+}
+
+.legal-container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+}
+
+.legal-title {
+    font-size: var(--text-3xl);
+    font-weight: 800;
+    color: var(--color-text);
+    margin: var(--space-2) 0 var(--space-8);
+    letter-spacing: var(--tracking-tight);
+}
+
+.legal-card {
+    line-height: var(--leading-relaxed);
+    color: var(--color-text-secondary);
+}
+</style>

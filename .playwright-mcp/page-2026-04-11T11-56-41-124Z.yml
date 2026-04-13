@@ -1,0 +1,59 @@
+- generic [ref=e5]:
+  - generic [ref=e6]:
+    - generic [ref=e8]: 
+    - generic [ref=e9]: MenuCMS
+  - heading "Crea il tuo account" [level=1] [ref=e10]
+  - paragraph [ref=e11]: Inizia a gestire il menu del tuo ristorante
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]: Username
+      - textbox "Username" [ref=e15]:
+        - /placeholder: Il tuo username
+        - text: pizzeria_test
+    - generic [ref=e16]:
+      - generic [ref=e17]: Email
+      - textbox "Email" [ref=e18]:
+        - /placeholder: email@esempio.com
+        - text: pizzeria@test.com
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - generic [ref=e21]: Nome
+        - textbox "Nome" [ref=e22]: Mario
+      - generic [ref=e23]:
+        - generic [ref=e24]: Cognome
+        - textbox "Cognome" [ref=e25]: Rossi
+    - generic [ref=e26]:
+      - generic [ref=e27]: Data di nascita
+      - textbox "Data di nascita" [active] [ref=e28]:
+        - /placeholder: ""
+    - generic [ref=e29]:
+      - generic [ref=e30]: Password
+      - generic [ref=e31]:
+        - textbox "Password" [ref=e32]:
+          - /placeholder: Scegli una password
+          - text: Test1234!
+        - button "" [ref=e33] [cursor=pointer]:
+          - generic [ref=e34]: 
+    - generic [ref=e35]:
+      - generic [ref=e36]: Conferma password
+      - generic [ref=e37]:
+        - textbox "Conferma password" [ref=e38]:
+          - /placeholder: Ripeti la password
+          - text: DifferentPassword!
+        - button "" [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: 
+    - generic [ref=e42] [cursor=pointer]:
+      - checkbox "Ho letto e accetto i termini del servizio e la politica di privacy" [ref=e43]
+      - generic [ref=e44]:
+        - text: Ho letto e accetto i
+        - link "termini del servizio" [ref=e45]:
+          - /url: /terms
+        - text: e la
+        - link "politica di privacy" [ref=e46]:
+          - /url: /privacy-policy
+    - button "Registrati" [ref=e47] [cursor=pointer]:
+      - generic [ref=e48]: Registrati
+    - paragraph [ref=e49]:
+      - text: Hai gia' un account?
+      - link "Accedi ora" [ref=e50] [cursor=pointer]:
+        - /url: /login

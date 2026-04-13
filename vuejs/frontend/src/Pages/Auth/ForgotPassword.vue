@@ -2,27 +2,22 @@
 import { useHead } from '@vueuse/head';
 import { useForm, defineRule, configure } from 'vee-validate';
 import * as yup from 'yup';
-import AuthenticationCard from '@/Components/AuthenticationCard.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import AuthenticationCard from '@/components/AuthenticationCard.vue';
+import InputError from '@/components/InputError.vue';
+import InputLabel from '@/components/InputLabel.vue';
+import TextInput from '@/components/TextInput.vue';
 import { ref } from 'vue';
 
-const errorMessage = ref(''); // To manage error messages
-const successMessage = ref(''); // To manage success messages
+const errorMessage = ref('');
+const successMessage = ref('');
 
-
-
-// Update the page title
 useHead({
-  title: 'Forgot Password',
+  title: 'Password dimenticata',
   meta: [
     { name: 'description', content: 'Password reset request' },
   ],
 });
 
-// Configure vee-validate
 defineRule('required', (value) => (value ? true : 'This field is required'));
 defineRule('email', (value) =>
   /^\S+@\S+\.\S+$/.test(value) || 'Please enter a valid email address.'
@@ -37,18 +32,15 @@ configure({
   },
 });
 
-// Define the validation scheme
 const schema = yup.object({
   username: yup.string().required('Username is required'),
   email: yup.string().required('The email is mandatory.').email('Please enter a valid email address.'),
 });
 
-// Use vee-validate to manage the form
 const { values, errors, isSubmitting, handleSubmit } = useForm({
   validationSchema: schema,
 });
 
-// Management of the submit
 const submit = handleSubmit(async () => {
   errorMessage.value = '';
   successMessage.value = '';
@@ -75,63 +67,95 @@ const submit = handleSubmit(async () => {
     errorMessage.value = 'An unexpected error occurred';
   }
 
-  // Reset the form fields
   values.username = '';
   values.email = '';
 });
 </script>
 
-
 <template>
   <AuthenticationCard>
-    <div class="mb-4 text-sm text-gray-600">
-      Forgot your password? No problem. Please enter your username and email address to confirm your identity.
+    <div class="auth-brand">
+      <div class="auth-brand-icon"><i class="bi bi-shop"></i></div>
+      <span class="auth-brand-name">MenuCMS</span>
     </div>
 
-    <div v-if="status" class="mb-4 font-medium text-sm text-green-600">
-      {{ status }}
-    </div>
+    <h1 class="auth-title">Password dimenticata</h1>
+    <p class="auth-subtitle">Inserisci il tuo username e la tua email per recuperare la password.</p>
 
-    <div v-if="successMessage" class="mb-4 font-medium text-sm text-green-600">
-      {{ successMessage }}
-    </div>
-    <div v-if="errorMessage" class="mb-4 font-medium text-sm text-red-600">
-      {{ errorMessage }}
-    </div>
+    <Transition name="fade">
+      <div v-if="successMessage" class="ds-alert ds-alert-success">
+        <i class="bi bi-check-circle"></i>
+        <span>{{ successMessage }}</span>
+      </div>
+    </Transition>
+    <Transition name="fade">
+      <div v-if="errorMessage" class="ds-alert ds-alert-error">
+        <i class="bi bi-exclamation-circle"></i>
+        <span>{{ errorMessage }}</span>
+      </div>
+    </Transition>
 
-    <form @submit.prevent="submit">
-      <div>
-        <InputLabel for="username" value="Nome Utente" />
-        <TextInput
-          id="username"
-          v-model="values.username"
-          type="text"
-          class="mt-1 block w-full"
-          required
-          autofocus
-          autocomplete="username"
-        />
-        <InputError class="mt-2" :message="errors.username" />
+    <form @submit.prevent="submit" class="auth-form">
+      <div class="ds-field">
+        <InputLabel for="username" value="Username" />
+        <TextInput id="username" v-model="values.username" type="text" required autofocus autocomplete="username" placeholder="Il tuo username" />
+        <InputError :message="errors.username" />
       </div>
 
-      <div>
+      <div class="ds-field">
         <InputLabel for="email" value="Email" />
-        <TextInput
-          id="email"
-          v-model="values.email"
-          type="email"
-          class="mt-1 block w-full"
-          required
-          autocomplete="email"
-        />
-        <InputError class="mt-2" :message="errors.email" />
+        <TextInput id="email" v-model="values.email" type="email" required autocomplete="email" placeholder="La tua email" />
+        <InputError :message="errors.email" />
       </div>
 
-      <div class="flex items-center justify-end mt-4">
-        <PrimaryButton :class="{ 'opacity-25': isSubmitting }" :disabled="isSubmitting">
-          Conferma Identità
-        </PrimaryButton>
-      </div>
+      <button type="submit" class="ds-btn ds-btn-primary ds-btn-lg auth-submit" :disabled="isSubmitting">
+        <span v-if="isSubmitting" class="ds-spinner"></span>
+        <span v-else>Conferma identita'</span>
+      </button>
+
+      <p class="auth-footer-text">
+        <router-link to="/login" class="auth-link-bold">Torna al login</router-link>
+      </p>
     </form>
   </AuthenticationCard>
 </template>
+
+<style scoped>
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-8);
+}
+.auth-brand-icon {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-primary); color: var(--color-text-inverse);
+  border-radius: var(--radius-lg); font-size: var(--text-xl);
+}
+.auth-brand-name {
+  font-size: var(--text-xl); font-weight: 700;
+  color: var(--color-text); letter-spacing: var(--tracking-tight);
+}
+.auth-title {
+  font-size: var(--text-2xl); font-weight: 700;
+  color: var(--color-text); text-align: center;
+  margin: 0 0 var(--space-2) 0; letter-spacing: var(--tracking-tight);
+}
+.auth-subtitle {
+  font-size: var(--text-sm); color: var(--color-text-muted);
+  text-align: center; margin: 0 0 var(--space-6) 0;
+}
+.auth-form { display: flex; flex-direction: column; }
+.auth-submit { width: 100%; margin-bottom: var(--space-5); }
+.auth-footer-text {
+  text-align: center; font-size: var(--text-sm);
+  color: var(--color-text-muted); margin: 0;
+}
+.auth-link-bold {
+  color: var(--color-primary); text-decoration: none;
+  font-weight: 600; transition: color var(--transition-fast);
+}
+.auth-link-bold:hover { color: var(--color-primary-hover); }
+</style>

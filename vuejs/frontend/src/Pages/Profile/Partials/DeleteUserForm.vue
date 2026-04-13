@@ -1,132 +1,130 @@
-<script setup> //probabilmente non funzionante ancora, componente form per la cancellazione dell'utente dal servizio
-import { ref } from 'vue';
-import { useForm, defineRule } from 'vee-validate';
-import { useHead } from '@vueuse/head';
-import DangerButton from '@/Components/DangerButton.vue';
-import DialogModal from '@/Components/DialogModal.vue';
-import InputError from '@/Components/InputError.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+<script setup>
+import { ref, reactive } from 'vue';
+import { useRouter } from 'vue-router';
+import { useStore } from 'vuex';
+import TextInput from '@/components/TextInput.vue';
+import Modal from '@/components/Modal.vue';
+import { API_BASE } from '@/utils';
 
-// Define the "required" rule for password field
-defineRule('required', (value) => {
-    if (!value || value.trim() === '') {
-        return 'Password is required';
-    }
-    return true;
-});
+const storeVx = useStore();
+const router = useRouter();
 
-// Update the page metadata
-useHead({
-    title: 'Delete Account',
-    meta: [
-        { name: 'description', content: 'Permanently delete your account and all its data' },
-    ],
-});
-
-// Status and form
 const confirmingUserDeletion = ref(false);
 const passwordInput = ref(null);
 
-// Use of vee-validate for form validation
-const form = useForm({
-    initialValues: {
-        password: '',
-    },
-    validateOnInput: true,
+const form = reactive({
+    password: '',
+    error: '',
+    processing: false,
 });
 
-// Function to confirm account deletion
 const confirmUserDeletion = () => {
+    form.error = '';
     confirmingUserDeletion.value = true;
-    setTimeout(() => passwordInput.value.focus(), 250);
+    setTimeout(() => passwordInput.value?.focus(), 250);
 };
 
-// Account delete function
-// probabilmente da rifare questa function
-const deleteUser = () => {
-    form.submit(() => {
-        fetch('/api/current-user/destroy', {
+const deleteUser = async () => {
+    form.processing = true;
+    form.error = '';
+    try {
+        const tkn = storeVx.getters.getToken;
+        const response = await fetch(`${API_BASE}/api/account/destroy`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${tkn}`,
             },
-            body: JSON.stringify({ password: form.values.password }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                closeModal();
-            } else {
-                console.error('Error:', data.message);
-            }
-        })
-        .catch(error => {
-            console.error('The request has failed', error);
-            passwordInput.value.focus();
-        })
-        .finally(() => {
-            form.reset();
+            body: JSON.stringify({ password: form.password }),
         });
-    });
+        const data = await response.json();
+        if (!response.ok) {
+            form.error = data?.error?.message || data?.message || 'Password errata';
+            return;
+        }
+        storeVx.dispatch('logout');
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        closeModal();
+        router.push('/login');
+    } catch (e) {
+        form.error = 'Errore di rete. Riprova.';
+    } finally {
+        form.processing = false;
+        form.password = '';
+    }
 };
 
-// Function to close the modal
 const closeModal = () => {
     confirmingUserDeletion.value = false;
-    form.reset();
+    form.password = '';
+    form.error = '';
 };
 </script>
 
 <template>
-    <div class="max-w-xl mx-auto">
-        <p class="text-sm text-gray-600 mb-4">
-            Once your account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.
-        </p>
+    <div class="ds-card">
+        <div class="ds-card-header">
+            <i class="bi bi-trash" style="color: var(--color-destructive);"></i>
+            <h3 class="section-title">Elimina account</h3>
+        </div>
+        <div class="ds-card-body">
+            <p class="section-description">
+                Una volta eliminato il tuo account, tutti i dati e le risorse saranno cancellati permanentemente. Prima di procedere, scarica eventuali dati che desideri conservare.
+            </p>
 
-        <DangerButton @click="confirmUserDeletion" class="w-full md:w-auto">
-            Delete Account
-        </DangerButton>
+            <button @click="confirmUserDeletion" class="ds-btn ds-btn-danger">
+                <i class="bi bi-trash"></i>
+                <span>Elimina account</span>
+            </button>
+        </div>
+    </div>
 
-        <!-- Delete Account Confirmation Modal -->
-        <DialogModal :show="confirmingUserDeletion" @close="closeModal" class="transition-transform transform-gpu">
-            <template #title>
-                <span class="text-lg font-semibold text-red-600">Delete Account</span>
-            </template>
+    <Modal :show="confirmingUserDeletion" @close="closeModal">
+        <template #title>
+            <h3 class="modal-danger-title">
+                <i class="bi bi-exclamation-triangle"></i>
+                Elimina account
+            </h3>
+        </template>
+        <template #body>
+            <p class="modal-description">
+                Sei sicuro di voler eliminare il tuo account? Tutti i dati saranno cancellati permanentemente. Inserisci la tua password per confermare.
+            </p>
+            <div class="ds-field">
+                <TextInput
+                    ref="passwordInput"
+                    v-model="form.password"
+                    type="password"
+                    placeholder="La tua password"
+                    autocomplete="current-password"
+                    @keyup.enter="deleteUser"
+                />
+                <Transition name="fade">
+                    <p v-if="form.error" class="field-error">{{ form.error }}</p>
+                </Transition>
+            </div>
 
-            <template #content>
-                <div class="mt-4 text-gray-800">
-                    Are you sure you want to delete your account? Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.
-                </div>
-                <div class="mt-6">
-                    <TextInput
-                        ref="passwordInput"
-                        v-model="form.values.password"
-                        type="password"
-                        class="w-full rounded-lg border-2 border-gray-300 p-3 mt-2 focus:ring-2 focus:ring-red-500"
-                        placeholder="Password"
-                        autocomplete="current-password"
-                        @keyup.enter="deleteUser"
-                    />
-                    <!-- Error message for password -->
-                    <InputError :message="form.errors.password" class="mt-2 text-red-500 text-sm font-medium" />
-                </div>
-            </template>
-
-            <template #footer>
-                <SecondaryButton @click="closeModal" class="w-full md:w-auto">
-                    Cancel
-                </SecondaryButton>
-
-                <DangerButton
-                    class="w-full md:w-auto mt-3 md:mt-0"
-                    :class="{ 'opacity-50': form.processing }"
-                    :disabled="form.processing"
+            <div class="modal-actions">
+                <button @click="closeModal" class="ds-btn ds-btn-secondary">Annulla</button>
+                <button
+                    class="ds-btn ds-btn-danger"
+                    :disabled="form.processing || !form.password"
                     @click="deleteUser"
                 >
-                    Delete Account
-                </DangerButton>
-            </template>
-        </DialogModal>
-    </div>
+                    <span v-if="form.processing" class="ds-spinner"></span>
+                    <span v-else>Elimina account</span>
+                </button>
+            </div>
+        </template>
+    </Modal>
 </template>
+
+<style scoped>
+.section-title { font-size: var(--text-base); font-weight: 600; margin: 0; }
+.section-description { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0 0 var(--space-5) 0; line-height: var(--leading-relaxed); }
+.modal-danger-title { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-lg); font-weight: 600; color: var(--color-destructive); margin: 0; }
+.modal-description { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0 0 var(--space-5) 0; line-height: var(--leading-relaxed); }
+.field-error { font-size: var(--text-sm); color: var(--color-destructive); margin: var(--space-1) 0 0; }
+.modal-actions { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+</style>

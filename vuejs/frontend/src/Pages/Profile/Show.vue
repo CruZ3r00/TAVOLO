@@ -1,4 +1,4 @@
-<script setup> //Paginas che gestisce le componenti e la loro visualizzazione del profilo dell'utente
+<script setup>
     import { ref } from 'vue';
     import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
     import SectionBorder from '@/components/SectionBorder.vue';
@@ -8,16 +8,12 @@
     import GeneratorQRCode from '@/components/GeneratorQRCode.vue';
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
-    import { nextTick, onMounted } from 'vue'; 
+    import { nextTick, onMounted } from 'vue';
     //per recuperare le info dell'utente loggato
     const store = useStore();
 
     //per decidere quale form visualizzare
-    const Hprofile = ref(true);
-    const Hpsw = ref(false);
-    const H2fact = ref(false);
-    const Hdelete = ref(false);
-    const Hqr = ref(false);
+    const activeSection = ref('profilo');
 
     defineProps({
         confirmsTwoFactorAuthentication: Boolean,
@@ -32,46 +28,13 @@
         'email' : x.email,
     }
 
-    const handler = (x) => {
-        
-        switch (x){
-            case 'profilo':
-                Hprofile.value = true;
-                Hpsw.value = false;
-                H2fact.value = false;
-                Hqr.value = false;
-                Hdelete.value = false;
-            break;
-            case 'cambiopsw':
-                Hprofile.value = false;
-                Hpsw.value = true;
-                H2fact.value = false;
-                Hqr.value = false;
-                Hdelete.value = false;
-            break;
-            case 'duefattori':
-                Hprofile.value = false;
-                Hpsw.value = false;
-                H2fact.value = true;
-                Hqr.value = false;
-                Hdelete.value = false;
-            break;
-            case 'qr':
-                Hprofile.value = false;
-                Hpsw.value = false;
-                H2fact.value = false;
-                Hqr.value = true;
-                Hdelete.value = false;
-            break;
-            case 'delete':
-                Hprofile.value = false;
-                Hpsw.value = false;
-                H2fact.value = false;
-                Hqr.value = false;
-                Hdelete.value = true;
-            break;
-        }
-    }
+    const sections = [
+        { key: 'profilo', label: 'Profilo', icon: 'bi-person' },
+        { key: 'cambiopsw', label: 'Password', icon: 'bi-key' },
+        { key: 'duefattori', label: 'Due fattori', icon: 'bi-shield-lock' },
+        { key: 'qr', label: 'QR Code', icon: 'bi-qr-code' },
+        { key: 'delete', label: 'Elimina account', icon: 'bi-trash', danger: true },
+    ];
 
     // Imposta il titolo della pagina
     onMounted(async () => {
@@ -79,68 +42,172 @@
             document.title = 'Pagina del profilo';
         });
     });
-
 </script>
 
 <template>
     <AppLayout>
-        
-        <div class="container-fluid flex-grow-1">
-            
-            <div class="row vh-100">
-                <!-- Barra Laterale sempre visibile su schermi grandi -->
-                <nav class="col-lg-2 bg-dark text-white d-none d-lg-flex flex-column p-3" style="height:100%;">
-                    <h4 class="text-center">Menu</h4>
-                    <ul class="nav flex-column">
-                        <li class="nav-item"><button class="nav-link text-white" @click="handler('profilo')">Profilo</button></li>
-                        <li class="nav-item"><button class="nav-link text-white" @click="handler('cambiopsw')">Cambio password</button></li>
-                        <li class="nav-item"><button class="nav-link text-white" @click="handler('duefattori')">Autenticazione a due fattori</button></li>
-                        <li class="nav-item"><button class="nav-link text-white" @click="handler('qr')">Genera QR code</button></li>
-                        <li class="nav-item"><button class="nav-link text-white" @click="handler('delete')">Elimina account</button></li>
-                    </ul>
-                </nav>
-                <main class="col-lg-10 col-12 p-4d-flex flex-column flex-grow-1">
-                    <!-- navbar da sistemare per far si che appaia solo il tasto che fa comparire il menu come offcanvas -->
-                    <nav class="navbar navbar-expand-lg navbar-dark bg-dark d-lg-none">
-                        <div class="container-fluid">
-                            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                                <span class="navbar-toggler-icon"></span>
-                            </button>
-                            <div class="collapse navbar-collapse" id="navbarNav">
-                                <ul class="navbar-nav">
-                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('profilo')">Profilo</button></li>
-                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('cambiopsw')">Cambio password</button></li>
-                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('duefattori')">Autenticazione a due fattori</button></li>
-                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('qr')">Genera QR code</button></li>
-                                    <li class="nav-item"><button class="nav-link text-white" @click="handler('delete')">Elimina account</button></li>
-                                </ul>
-                            </div>
-                        </div>
+        <div class="profile-page">
+            <div class="profile-container">
+                <!-- Page header -->
+                <div class="profile-header">
+                    <p class="text-overline">Account</p>
+                    <h1 class="profile-title">Il tuo profilo</h1>
+                </div>
+
+                <div class="profile-layout">
+                    <!-- Sidebar -->
+                    <nav class="profile-sidebar">
+                        <button
+                            v-for="section in sections"
+                            :key="section.key"
+                            class="sidebar-item"
+                            :class="{
+                                'sidebar-item-active': activeSection === section.key,
+                                'sidebar-item-danger': section.danger
+                            }"
+                            @click="activeSection = section.key"
+                        >
+                            <i :class="'bi ' + section.icon"></i>
+                            <span>{{ section.label }}</span>
+                        </button>
                     </nav>
-                    <div class="bg-white d-flex justify-content-center align-items-center">
-                        <!-- visualizzati singolarmente nella pagina per non creare confusione
-                            forms per la modifica di varie info e sicurezza dell'utente -->
 
-                        <div class="bg-white p-4 w-100">
-                            <UpdateProfileInformationForm v-if="Hprofile" :user="userinfo" />
-                            <SectionBorder />
-
-                            <UpdatePasswordForm v-if="Hpsw" :id="userinfo.id"/>
-                            <SectionBorder />
-
-                            <GeneratorQRCode v-if="Hqr" />
-                            <SectionBorder />
-
-                            <TwoFactorAuthenticationForm v-if="H2fact" :requires-confirmation="confirmsTwoFactorAuthentication"/>
-                            <SectionBorder />
-
-                            <DeleteUserForm v-if="Hdelete"/>
-                        </div>
+                    <!-- Content -->
+                    <div class="profile-content">
+                        <Transition name="fade" mode="out-in">
+                            <UpdateProfileInformationForm v-if="activeSection === 'profilo'" :user="userinfo" :key="'profilo'" />
+                            <UpdatePasswordForm v-else-if="activeSection === 'cambiopsw'" :id="userinfo.id" :key="'password'" />
+                            <TwoFactorAuthenticationForm v-else-if="activeSection === 'duefattori'" :requires-confirmation="confirmsTwoFactorAuthentication" :key="'2fa'" />
+                            <div v-else-if="activeSection === 'qr'" :key="'qr'" class="ds-card">
+                                <div class="ds-card-header">
+                                    <i class="bi bi-qr-code" style="color: var(--color-primary);"></i>
+                                    <h3 class="profile-section-title">Genera QR Code</h3>
+                                </div>
+                                <div class="ds-card-body">
+                                    <GeneratorQRCode />
+                                </div>
+                            </div>
+                            <DeleteUserForm v-else-if="activeSection === 'delete'" :key="'delete'" />
+                        </Transition>
                     </div>
-                </main>
+                </div>
             </div>
-
         </div>
-        
     </AppLayout>
 </template>
+
+<style scoped>
+.profile-page {
+    padding: var(--space-8) 0 var(--space-12);
+}
+
+.profile-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 var(--space-6);
+}
+
+.profile-header {
+    margin-bottom: var(--space-8);
+}
+
+.profile-title {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    color: var(--color-text);
+    margin: var(--space-2) 0 0;
+    letter-spacing: var(--tracking-tight);
+}
+
+.profile-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: var(--space-8);
+    align-items: start;
+}
+
+/* Sidebar */
+.profile-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    position: sticky;
+    top: 80px;
+}
+
+.sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-family);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background: none;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+}
+
+.sidebar-item:hover {
+    background: var(--color-bg-subtle);
+    color: var(--color-text);
+}
+
+.sidebar-item-active {
+    background: var(--color-primary-subtle);
+    color: var(--color-primary);
+}
+
+.sidebar-item-danger {
+    color: var(--color-text-muted);
+}
+
+.sidebar-item-danger:hover {
+    color: var(--color-destructive);
+    background: var(--color-destructive-light);
+}
+
+.sidebar-item-danger.sidebar-item-active {
+    color: var(--color-destructive);
+    background: var(--color-destructive-light);
+}
+
+/* Content */
+.profile-content {
+    min-height: 400px;
+}
+
+.profile-section-title {
+    font-size: var(--text-base);
+    font-weight: 600;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .profile-layout {
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+    }
+
+    .profile-sidebar {
+        flex-direction: row;
+        overflow-x: auto;
+        position: static;
+        gap: var(--space-1);
+        padding-bottom: var(--space-2);
+    }
+
+    .sidebar-item {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .profile-container {
+        padding: 0 var(--space-4);
+    }
+}
+</style>

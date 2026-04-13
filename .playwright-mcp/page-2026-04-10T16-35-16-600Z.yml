@@ -1,0 +1,49 @@
+- generic [ref=e153]:
+  - navigation [ref=e154]:
+    - generic [ref=e155]:
+      - link "MenuCMS" [ref=e156] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e157]: MenuCMS
+      - generic [ref=e158]:
+        - list [ref=e159]:
+          - listitem [ref=e160]:
+            - link "Dashboard" [ref=e161] [cursor=pointer]:
+              - /url: /dashboard
+              - text: Dashboard
+          - listitem [ref=e162]:
+            - link "Menu" [ref=e163] [cursor=pointer]:
+              - /url: /menu-handler
+              - text: Menu
+          - listitem [ref=e164]:
+            - link "Configurazione Sito" [ref=e165] [cursor=pointer]:
+              - /url: /site-config
+              - text: Configurazione Sito
+        - list [ref=e166]:
+          - listitem [ref=e167]:
+            - button "trattoria_test" [ref=e168] [cursor=pointer]: trattoria_test
+  - main [ref=e169]:
+    - generic [ref=e170]:
+      - generic [ref=e171]:
+        - heading "I tuoi elementi 0" [level=2] [ref=e172]:
+          - text: I tuoi elementi
+          - generic [ref=e173]: "0"
+        - generic [ref=e174]:
+          - button "Modifica" [ref=e175] [cursor=pointer]: Modifica
+          - button "Aggiungi elemento" [ref=e176] [cursor=pointer]: Aggiungi elemento
+      - generic [ref=e177]:
+        - heading "Nessun elemento nel menu" [level=4] [ref=e178]
+        - paragraph [ref=e179]: Inizia aggiungendo il primo elemento al tuo menu.
+        - button "Aggiungi il primo elemento" [ref=e180] [cursor=pointer]: Aggiungi il primo elemento
+  - contentinfo [ref=e181]:
+    - generic [ref=e183]:
+      - paragraph [ref=e184]: © 2025 MenuCMS
+      - list [ref=e185]:
+        - listitem [ref=e186]:
+          - link "Home" [ref=e187] [cursor=pointer]:
+            - /url: /home
+        - listitem [ref=e188]:
+          - link "Chi siamo" [ref=e189] [cursor=pointer]:
+            - /url: /who-are-us
+        - listitem [ref=e190]:
+          - link "Contattaci" [ref=e191] [cursor=pointer]:
+            - /url: /contact-us

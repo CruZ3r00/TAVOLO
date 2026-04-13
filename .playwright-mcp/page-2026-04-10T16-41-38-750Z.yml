@@ -1,0 +1,9 @@
+- generic [ref=e3]:
+  - heading "404" [level=1] [ref=e4]
+  - heading "Sito menu non ancora disponibile" [level=3] [ref=e5]
+  - paragraph [ref=e6]:
+    - text: Il sito menu per
+    - strong [ref=e7]: ristorante_inesistente
+    - text: non e' ancora stato creato.
+  - link "Torna alla home" [ref=e8] [cursor=pointer]:
+    - /url: /

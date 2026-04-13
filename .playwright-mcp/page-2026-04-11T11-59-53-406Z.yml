@@ -1,0 +1,63 @@
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e6]:
+      - link " MenuCMS" [ref=e7] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e9]: 
+        - generic [ref=e10]: MenuCMS
+      - generic [ref=e11]:
+        - link " Dashboard" [ref=e12] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e13]: 
+          - generic [ref=e14]: Dashboard
+        - link " Menu" [ref=e15] [cursor=pointer]:
+          - /url: /menu-handler
+          - generic [ref=e16]: 
+          - generic [ref=e17]: Menu
+        - link " Sito" [ref=e18] [cursor=pointer]:
+          - /url: /site-config
+          - generic [ref=e19]: 
+          - generic [ref=e20]: Sito
+      - generic [ref=e22]:
+        - button "P pizzeria_qa_test " [ref=e23] [cursor=pointer]:
+          - generic [ref=e24]: P
+          - generic [ref=e25]: pizzeria_qa_test
+          - generic [ref=e26]: 
+        - text:  
+  - main [ref=e27]:
+    - generic [ref=e103]:
+      - generic [ref=e104]:
+        - generic [ref=e105]:
+          - heading "I tuoi elementi" [level=2] [ref=e106]
+          - generic [ref=e107]: "1"
+        - generic [ref=e108]:
+          - button " Modifica" [ref=e109] [cursor=pointer]:
+            - generic [ref=e110]: 
+            - generic [ref=e111]: Modifica
+          - button " Aggiungi" [ref=e112] [cursor=pointer]:
+            - generic [ref=e113]: 
+            - generic [ref=e114]: Aggiungi
+      - generic [ref=e116]:
+        - generic [ref=e117]:
+          - generic [ref=e118]: 
+          - textbox "Cerca per nome..." [ref=e119]
+        - combobox [ref=e120]:
+          - option "Tutte le categorie" [selected]
+          - option "Bevande"
+      - generic [ref=e122]:
+        - generic [ref=e125]: 
+        - generic [ref=e126]:
+          - generic [ref=e127]:
+            - heading "Coca Cola" [level=3] [ref=e128]
+            - generic [ref=e129]: 3.50 €
+          - generic [ref=e130]: Bevande
+  - contentinfo [ref=e49]:
+    - generic [ref=e50]:
+      - paragraph [ref=e51]: © 2025 MenuCMS
+      - navigation [ref=e52]:
+        - link "Home" [ref=e53] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e54] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e55] [cursor=pointer]:
+          - /url: /contact-us

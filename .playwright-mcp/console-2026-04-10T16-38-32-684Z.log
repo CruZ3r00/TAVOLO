@@ -1,0 +1,1 @@
+[      91ms] [ERROR] Executing inline script violates the following Content Security Policy directive 'script-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-AG9pc72dLvdqcjDXf0pjVXmG4REO6QsbB1F0fNp6mLk='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked. @ http://localhost:1337/sites/trattoria_test:172

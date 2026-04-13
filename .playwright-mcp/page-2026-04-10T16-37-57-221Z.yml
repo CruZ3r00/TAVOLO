@@ -1,0 +1,80 @@
+- generic [ref=e153]:
+  - navigation [ref=e154]:
+    - generic [ref=e155]:
+      - link "MenuCMS" [ref=e156] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e157]: MenuCMS
+      - generic [ref=e158]:
+        - list [ref=e159]:
+          - listitem [ref=e160]:
+            - link "Dashboard" [ref=e161] [cursor=pointer]:
+              - /url: /dashboard
+              - text: Dashboard
+          - listitem [ref=e162]:
+            - link "Menu" [ref=e163] [cursor=pointer]:
+              - /url: /menu-handler
+              - text: Menu
+          - listitem [ref=e164]:
+            - link "Configurazione Sito" [ref=e165] [cursor=pointer]:
+              - /url: /site-config
+              - text: Configurazione Sito
+        - list [ref=e166]:
+          - listitem [ref=e167]:
+            - button "trattoria_test" [ref=e168] [cursor=pointer]: trattoria_test
+  - main [ref=e169]:
+    - generic [ref=e242]:
+      - generic [ref=e243]:
+        - heading "I tuoi elementi 3" [level=2] [ref=e244]:
+          - text: I tuoi elementi
+          - generic [ref=e245]: "3"
+        - generic [ref=e246]:
+          - button "Modifica" [ref=e247] [cursor=pointer]: Modifica
+          - button "Aggiungi elemento" [ref=e248] [cursor=pointer]: Aggiungi elemento
+      - generic [ref=e251]:
+        - textbox "Cerca per nome..." [ref=e255]
+        - combobox [ref=e257]:
+          - option "Tutte le categorie" [selected]
+          - option "Pizze classiche"
+          - option "Primi"
+          - option "Bevande"
+      - generic [ref=e258]:
+        - generic [ref=e262]:
+          - generic [ref=e263]:
+            - heading "Pizza Napoli" [level=5] [ref=e264]
+            - generic [ref=e265]: 8.50 EUR
+          - generic [ref=e266]: Pizze classiche
+          - generic [ref=e267]:
+            - text: "Ingredienti:"
+            - paragraph [ref=e268]: Pomodoro, Mozzarella
+          - generic [ref=e269]:
+            - text: "Allergeni:"
+            - paragraph [ref=e270]: Glutine
+        - generic [ref=e274]:
+          - generic [ref=e275]:
+            - heading "Carbonara" [level=5] [ref=e276]
+            - generic [ref=e277]: 10.00 EUR
+          - generic [ref=e278]: Primi
+          - generic [ref=e279]:
+            - text: "Ingredienti:"
+            - paragraph [ref=e280]: Guanciale
+          - generic [ref=e281]:
+            - text: "Allergeni:"
+            - paragraph [ref=e282]: Uova
+        - generic [ref=e286]:
+          - generic [ref=e287]:
+            - heading "Acqua naturale 1L" [level=5] [ref=e288]
+            - generic [ref=e289]: 2.00 EUR
+          - generic [ref=e290]: Bevande
+  - contentinfo [ref=e181]:
+    - generic [ref=e183]:
+      - paragraph [ref=e184]: © 2025 MenuCMS
+      - list [ref=e185]:
+        - listitem [ref=e186]:
+          - link "Home" [ref=e187] [cursor=pointer]:
+            - /url: /home
+        - listitem [ref=e188]:
+          - link "Chi siamo" [ref=e189] [cursor=pointer]:
+            - /url: /who-are-us
+        - listitem [ref=e190]:
+          - link "Contattaci" [ref=e191] [cursor=pointer]:
+            - /url: /contact-us

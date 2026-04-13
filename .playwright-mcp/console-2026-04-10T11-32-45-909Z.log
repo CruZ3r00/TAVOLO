@@ -1,0 +1,2 @@
+[     443ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/login:0
+[   10872ms] [LOG] {jwt: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwia…3NzZ9.YLLcNoBTz0NNhEBAlcMStyd4EA5eyMYWo4bOiEH141E, user: Object} @ http://localhost:5174/src/Pages/Auth/Login.vue:44

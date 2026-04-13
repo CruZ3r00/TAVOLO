@@ -3,7 +3,7 @@ import SectionTitle from './SectionTitle.vue';
 </script>
 
 <template>
-    <div class="text-left">
+    <div class="action-section">
         <SectionTitle>
             <template #title>
                 <slot name="title" />
@@ -13,8 +13,17 @@ import SectionTitle from './SectionTitle.vue';
             </template>
         </SectionTitle>
 
-        <div class="text-left">
+        <div class="action-section-content">
             <slot name="content" />
         </div>
     </div>
 </template>
+
+<style scoped>
+.action-section {
+  text-align: left;
+}
+.action-section-content {
+  margin-top: var(--space-4);
+}
+</style>

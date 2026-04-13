@@ -1,0 +1,96 @@
+- generic [ref=e21]:
+  - navigation [ref=e22]:
+    - generic [ref=e23]:
+      - link "MenuCMS" [ref=e24] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e25]: MenuCMS
+      - generic [ref=e26]:
+        - list [ref=e27]:
+          - listitem [ref=e28]:
+            - link "Dashboard" [ref=e29] [cursor=pointer]:
+              - /url: /dashboard
+              - text: Dashboard
+          - listitem [ref=e30]:
+            - link "Menu" [ref=e31] [cursor=pointer]:
+              - /url: /menu-handler
+              - text: Menu
+          - listitem [ref=e32]:
+            - link "Configurazione Sito" [ref=e33] [cursor=pointer]:
+              - /url: /site-config
+              - text: Configurazione Sito
+        - list [ref=e34]:
+          - listitem [ref=e35]:
+            - button "trattoria_test" [ref=e36] [cursor=pointer]: trattoria_test
+  - main [ref=e37]:
+    - generic [ref=e41]:
+      - heading "Benvenuto, trattoria_test!" [level=1] [ref=e42]
+      - paragraph [ref=e43]: trattoria_test
+    - generic [ref=e45]:
+      - generic [ref=e46]:
+        - generic [ref=e49]:
+          - heading "3" [level=3] [ref=e50]
+          - paragraph [ref=e51]: Elementi totali
+        - generic [ref=e54]:
+          - heading "2" [level=3] [ref=e55]
+          - paragraph [ref=e56]: Piatti
+        - generic [ref=e59]:
+          - heading "1" [level=3] [ref=e60]
+          - paragraph [ref=e61]: Bevande
+        - generic [ref=e64]:
+          - heading "3" [level=3] [ref=e65]
+          - paragraph [ref=e66]: Categorie
+        - generic [ref=e69]:
+          - heading "3" [level=3] [ref=e70]
+          - paragraph [ref=e71]: Ingredienti unici
+        - generic [ref=e74]:
+          - heading "2" [level=3] [ref=e75]
+          - paragraph [ref=e76]: Allergeni
+      - generic [ref=e77]:
+        - generic [ref=e79]:
+          - heading "Elementi per categoria" [level=5] [ref=e81]: Elementi per categoria
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - generic [ref=e84]:
+                - generic [ref=e85]: Pizze classiche
+                - generic [ref=e86]: "1"
+              - progressbar [ref=e88]
+            - generic [ref=e89]:
+              - generic [ref=e90]:
+                - generic [ref=e91]: Primi
+                - generic [ref=e92]: "1"
+              - progressbar [ref=e94]
+            - generic [ref=e95]:
+              - generic [ref=e96]:
+                - generic [ref=e97]: Bevande
+                - generic [ref=e98]: "1"
+              - progressbar [ref=e100]
+        - generic [ref=e102]:
+          - heading "Sito menu" [level=5] [ref=e104]: Sito menu
+          - generic [ref=e106]:
+            - generic [ref=e107]: Configurato
+            - paragraph [ref=e108]: "URL del tuo sito menu:"
+            - link "http://localhost:1337/sites/trattoria_test" [ref=e109] [cursor=pointer]:
+              - /url: http://localhost:1337/sites/trattoria_test
+            - button "Gestisci configurazione" [ref=e110] [cursor=pointer]: Gestisci configurazione
+    - generic [ref=e112]:
+      - heading "Azioni rapide" [level=3] [ref=e113]
+      - generic [ref=e114]:
+        - button "Gestisci Menu" [ref=e116] [cursor=pointer]:
+          - generic [ref=e117]: Gestisci Menu
+        - button "Configurazione Sito" [ref=e119] [cursor=pointer]:
+          - generic [ref=e120]: Configurazione Sito
+        - button "Il tuo Profilo" [ref=e122] [cursor=pointer]:
+          - generic [ref=e123]: Il tuo Profilo
+  - contentinfo [ref=e124]:
+    - generic [ref=e126]:
+      - paragraph [ref=e127]: © 2025 MenuCMS
+      - list [ref=e128]:
+        - listitem [ref=e129]:
+          - link "Home" [ref=e130] [cursor=pointer]:
+            - /url: /home
+        - listitem [ref=e131]:
+          - link "Chi siamo" [ref=e132] [cursor=pointer]:
+            - /url: /who-are-us
+        - listitem [ref=e133]:
+          - link "Contattaci" [ref=e134] [cursor=pointer]:
+            - /url: /contact-us

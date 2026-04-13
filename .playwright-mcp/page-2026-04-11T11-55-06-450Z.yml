@@ -1,0 +1,41 @@
+- generic [ref=e63]:
+  - navigation [ref=e64]:
+    - generic [ref=e65]:
+      - link " MenuCMS" [ref=e66] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e68]: 
+        - generic [ref=e69]: MenuCMS
+      - generic [ref=e70]:
+        - link "Home" [ref=e71] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e72]: Home
+        - link "Chi siamo" [ref=e73] [cursor=pointer]:
+          - /url: /who-are-us
+          - generic [ref=e74]: Chi siamo
+        - link "Contattaci" [ref=e75] [cursor=pointer]:
+          - /url: /contact-us
+          - generic [ref=e76]: Contattaci
+      - generic [ref=e77]:
+        - link "Accedi" [ref=e78] [cursor=pointer]:
+          - /url: /login
+        - link "Registrati" [ref=e79] [cursor=pointer]:
+          - /url: /register
+  - main [ref=e80]:
+    - generic [ref=e82]:
+      - paragraph [ref=e83]: Chi siamo
+      - heading "Il team dietro MenuCMS" [level=1] [ref=e84]
+      - paragraph [ref=e85]: Siamo un team dedicato a rendere semplice la gestione dei menu digitali per i ristoratori.
+      - generic [ref=e88]:
+        - generic [ref=e90]: 
+        - paragraph [ref=e91]: Contenuto in arrivo
+        - paragraph [ref=e92]: Questa pagina verra' completata con le informazioni sul nostro team.
+  - contentinfo [ref=e93]:
+    - generic [ref=e94]:
+      - paragraph [ref=e95]: © 2025 MenuCMS
+      - navigation [ref=e96]:
+        - link "Home" [ref=e97] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e98] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e99] [cursor=pointer]:
+          - /url: /contact-us

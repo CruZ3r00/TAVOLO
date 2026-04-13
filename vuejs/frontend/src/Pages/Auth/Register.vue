@@ -1,17 +1,18 @@
 <script setup>
 import { useHead } from '@vueuse/head';
 import { useRouter } from 'vue-router';
-import AuthenticationCard from '@/Components/AuthenticationCard.vue';
-import Checkbox from '@/Components/Checkbox.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import TextInput from '@/Components/TextInput.vue';
+import AuthenticationCard from '@/components/AuthenticationCard.vue';
+import Checkbox from '@/components/Checkbox.vue';
+import InputLabel from '@/components/InputLabel.vue';
+import TextInput from '@/components/TextInput.vue';
 import { ref } from 'vue';
+import { API_BASE } from '@/utils';
 
 // Page title
 useHead({
-  title: 'Register',
+  title: 'Registrazione',
   meta: [
-    { name: 'description', content: 'Registration page' },
+    { name: 'description', content: 'Pagina di registrazione' },
   ],
 });
 
@@ -23,7 +24,6 @@ const birth_date = ref('');
 const password = ref('');
 const password_confirmation= ref('');
 const terms = ref(false);
-const preferenceID = ref('');
 const registerData = ref();
 
 const isError = ref(false);
@@ -33,36 +33,39 @@ const showPassword = ref(false);
 
 const router = useRouter();
 
-//funzione che crea la tupla della tabella delle preferenze legate all'utente che si sta registrando in maniera standard
-const CreatePreferences = async () => {
-  try{
-    const response = await fetch('http://localhost:1337/api/preferences', {
+// Crea la configurazione del sito web per il nuovo utente
+// Genera automaticamente il site_url basato sullo username
+const CreateWebsiteConfig = async (userId, jwt) => {
+  try {
+    const siteUrl = `${API_BASE}/sites/${username.value}`;
+    const response = await fetch(`${API_BASE}/api/website-configs`, {
       method: "POST",
       headers: {
-        'Content-Type' : 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${jwt}`,
       },
-      body: JSON.stringify({ data: {
-        primary_color: "#1C1C1C",
-        second_color: "#E0E0E0",
-        theme: "classic",
-        background: "#FFFFFF" ,
-        details: "#111111",
-      } }), //using default value
+      body: JSON.stringify({
+        data: {
+          restaurant_name: username.value,
+          site_url: siteUrl,
+          fk_user: {
+            connect: [{ id: userId }],
+          },
+        },
+      }),
     });
-    if( response.ok ){
-      const data = await response.json();
-      preferenceID.value = data.data;
+    if (!response.ok) {
+      console.error('Errore nella creazione della configurazione sito web');
     }
-  }catch(error){
+  } catch (error) {
     console.error('Errore di rete:', error.message);
   }
-
 };
 
 // Funzione che registra l'utente nel formato standard richiesto da strapi
 const CreateUSer= async () => {
     try {
-        const response = await fetch('http://localhost:1337/api/auth/local/register', {
+        const response = await fetch(`${API_BASE}/api/auth/local/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -76,7 +79,6 @@ const CreateUSer= async () => {
 
         if (response.ok) {
             registerData.value = await response.json();
-            console.log(registerData.value.user.documentId);
         } else {
             const errorData = await response.json();
             errorMessage.value = errorData.error.message;
@@ -89,15 +91,40 @@ const CreateUSer= async () => {
 };
 
 const submit = async () => {
+  // Validazione data di nascita
+  if (birth_date.value) {
+    const bd = new Date(birth_date.value);
+    const today = new Date();
+    const age = today.getFullYear() - bd.getFullYear();
+    if (bd >= today) {
+      errorMessage.value = 'La data di nascita non può essere nel futuro.';
+      isError.value = true;
+      return;
+    }
+    if (age > 120 || age < 14) {
+      errorMessage.value = 'Inserisci una data di nascita valida (età tra 14 e 120 anni).';
+      isError.value = true;
+      return;
+    }
+  }
+
   if( password.value === password_confirmation.value ){
     isLoading.value = true;
-    await CreatePreferences();
     await CreateUSer();
-    const username = registerData.value.user.documentId;
+
+    if (!registerData.value) {
+      isLoading.value = false;
+      return;
+    }
+
+    const userDocumentId = registerData.value.user.documentId;
     const tokjwt = registerData.value.jwt;
     const id = registerData.value.user.id;
+
     try {
-      const response = await fetch(`http://localhost:1337/api/users/${id}`,{
+      // Aggiorna i dati utente (nome, cognome, data nascita, URL)
+      const siteUrl = `${API_BASE}/sites/${username.value}`;
+      const response = await fetch(`${API_BASE}/api/users/${id}`,{
         method: 'PUT',
         headers:{
             'Content-Type': 'application/json',
@@ -107,17 +134,14 @@ const submit = async () => {
             birth_date: birth_date.value,
             name: name.value,
             surname: surname.value,
-            url : `http://localhost:5174/menu/${username}/home`, //da cambiare con il futuro dominio
-            fk_prefs:{
-                  connect: [
-                      { id: preferenceID.value.id-1 },
-                  ]
-            },
+            url: siteUrl,
         }),
       });
 
       if( response.ok ){
-          router.push('/login');
+          // Crea la configurazione del sito web
+          await CreateWebsiteConfig(id, tokjwt);
+          router.push({ path: '/login', query: { registered: '1' } });
       }else{
           const errorData = await response.json();
           errorMessage.value = errorData.email + errorData.username;
@@ -127,7 +151,7 @@ const submit = async () => {
       console.error('Errore di rete:', error.message);
     } finally{
       isLoading.value = false;
-    } 
+    }
   }else{
     errorMessage.value = 'Le due password devono coincidere';
     isError.value = true;
@@ -138,301 +162,248 @@ const submit = async () => {
 </script>
 
 <template>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <div class="register-page">
-    <AuthenticationCard class="auth-card">
-      <!-- Welcome message remains static -->
-      <div class="welcome-message">
-        <span class="welcome-text">Registrati!</span>
+  <AuthenticationCard>
+    <!-- Brand -->
+    <div class="auth-brand">
+      <div class="auth-brand-icon">
+        <i class="bi bi-shop"></i>
       </div>
-      
-      <div v-if="isError" class="error-message fade-in">
-        {{ errorMessage }}
+      <span class="auth-brand-name">MenuCMS</span>
+    </div>
+
+    <h1 class="auth-title">Crea il tuo account</h1>
+    <p class="auth-subtitle">Inizia a gestire il menu del tuo ristorante</p>
+
+    <!-- Error -->
+    <Transition name="fade">
+      <div v-if="isError" class="ds-alert ds-alert-error">
+        <i class="bi bi-exclamation-circle"></i>
+        <span>{{ errorMessage }}</span>
+      </div>
+    </Transition>
+
+    <form @submit.prevent="submit" class="auth-form">
+      <div class="ds-field">
+        <InputLabel for="username" value="Username" />
+        <TextInput id="username" v-model="username" type="text" placeholder="Il tuo username" required />
       </div>
 
-      <form @submit.prevent="submit" class="register-form">
+      <div class="ds-field">
+        <InputLabel for="email" value="Email" />
+        <TextInput id="email" v-model="email" type="email" placeholder="email@esempio.com" required />
+      </div>
 
-        <InputLabel for="username" value="Username" class="form-label"/>
-        <TextInput
-          id="username"
-          v-model="username"
-          type="text"
-          class="form-control"
-          placeholder="Username"
-          required
-        />
+      <div class="form-row">
+        <div class="ds-field">
+          <InputLabel for="name" value="Nome" />
+          <TextInput id="name" v-model="name" type="text" placeholder="Nome" required />
+        </div>
+        <div class="ds-field">
+          <InputLabel for="surname" value="Cognome" />
+          <TextInput id="surname" v-model="surname" type="text" placeholder="Cognome" required />
+        </div>
+      </div>
 
-        <InputLabel for="email" value="Email" class="form-label"/>
-        <TextInput
-          id="email"
-          v-model="email"
-          type="email"
-          class="form-control"
-          placeholder="Email"
-          required
-        />
+      <div class="ds-field">
+        <InputLabel for="birth_date" value="Data di nascita" />
+        <TextInput id="birth_date" v-model="birth_date" type="date" required />
+      </div>
 
-        <InputLabel for="birth_date" value="Birth date" class="form-label"/>
-        <TextInput
-          id="birth_date"
-          v-model="birth_date"
-          type="date"
-          class="form-control"
-          required
-        />
-
-        <InputLabel for="name" value="Nome" class="form-label"/>
-        <TextInput
-          id="name"
-          v-model="name"
-          type="text"
-          class="form-control"
-          placeholder="Nome"
-          required
-        />
-
-        <InputLabel for="surname" value="Cognome" class="form-label"/>
-        <TextInput
-          id="surname"
-          v-model="surname"
-          type="text"
-          class="form-control"
-          placeholder="Cognome"
-          required
-        />
-
-        <InputLabel for="password" value="Password" class="form-label" />
-        <div class="password-container">
-          <TextInput 
-            id="password" 
-            v-model="password" 
-            :type="showPassword ? 'text' : 'password'" 
-            class="form-control" 
-            placeholder="password"
-            required 
+      <div class="ds-field">
+        <InputLabel for="password" value="Password" />
+        <div class="password-field">
+          <TextInput
+            id="password"
+            v-model="password"
+            :type="showPassword ? 'text' : 'password'"
+            placeholder="Scegli una password"
+            required
           />
-          <span @click="showPassword = !showPassword" class="icon">
+          <button type="button" class="password-toggle" @click="showPassword = !showPassword" tabindex="-1">
             <i v-if="showPassword" class="bi bi-eye"></i>
             <i v-else class="bi bi-eye-slash"></i>
-          </span>
-        </div>
-
-
-        <InputLabel for="password_confirm" value="Conferma password" class="form-label" />
-        <div class="password-container">
-          <TextInput 
-            id="password_confirm" 
-            v-model="password_confirmation" 
-            :type="showPassword ? 'text' : 'password'" 
-            class="form-control" 
-            placeholder="Ripeti password"
-            required 
-          />
-          <span @click="showPassword = !showPassword" class="icon">
-            <i v-if="showPassword" class="bi bi-eye"></i>
-            <i v-else class="bi bi-eye-slash"></i>
-          </span>
-        </div>
-
-
-        <div class="form-field terms-field">
-          <label class="checkbox-label">
-            <Checkbox id="terms" v-model:checked="terms" name="terms" required />
-            <span class="terms-text">
-              Ho letto e accetto i
-              <router-link to="/terms" class="link">termini del servizio</router-link> e la 
-              <router-link to="/privacy-policy" class="link">Politica di privacy</router-link>
-            </span>
-          </label>
-        </div>
-
-        <div class="form-actions">
-          <button type="submit" class="submit-btn" :disabled="isLoading">
-            <span v-if="isLoading" class="loader"></span>
-            <span v-else>Register</span>
           </button>
         </div>
+      </div>
 
-        <!-- Modified "Already Registered" link -->
-        <router-link to="/login" class="already-registered link">
-          Already have an account? <span>Log in now</span>
-        </router-link>
-      </form>
-    </AuthenticationCard>
-  </div>
+      <div class="ds-field">
+        <InputLabel for="password_confirm" value="Conferma password" />
+        <div class="password-field">
+          <TextInput
+            id="password_confirm"
+            v-model="password_confirmation"
+            :type="showPassword ? 'text' : 'password'"
+            placeholder="Ripeti la password"
+            required
+          />
+          <button type="button" class="password-toggle" @click="showPassword = !showPassword" tabindex="-1">
+            <i v-if="showPassword" class="bi bi-eye"></i>
+            <i v-else class="bi bi-eye-slash"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="terms-field">
+        <label class="terms-label">
+          <Checkbox id="terms" v-model:checked="terms" name="terms" required />
+          <span class="terms-text">
+            Ho letto e accetto i
+            <router-link to="/terms" class="auth-link">termini del servizio</router-link> e la
+            <router-link to="/privacy-policy" class="auth-link">politica di privacy</router-link>
+          </span>
+        </label>
+      </div>
+
+      <button type="submit" class="ds-btn ds-btn-primary ds-btn-lg auth-submit" :disabled="isLoading">
+        <span v-if="isLoading" class="ds-spinner"></span>
+        <span v-else>Registrati</span>
+      </button>
+
+      <p class="auth-footer-text">
+        Hai già un account?
+        <router-link to="/login" class="auth-link-bold">Accedi ora</router-link>
+      </p>
+    </form>
+  </AuthenticationCard>
 </template>
 
 <style scoped>
-  body {
-    margin: 0;
-    font-family: 'Arial', sans-serif;
-  }
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
 
-  .register-page  {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    background-size: cover;
-    background-position: center;
-  }
+.auth-brand-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-xl);
+}
 
-  .auth-card{
-    background-color: #f5eee1;
-    border-radius: 15px;
-    padding: 2rem;
-    box-shadow: 0 8px 20px rgba(255, 255, 255, 0.3);
-    width: 450px;
-    max-width: 90%;
-    position: relative;
-    margin: 0 auto; /* Center the form */
-  }
+.auth-brand-name {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: var(--tracking-tight);
+}
 
-  .welcome-message {
-    font-size: 1.6rem;
-    text-align: center;
-    color: #2c3e50;
-    margin-bottom: 0.2rem;
-    text-shadow: 4px 4px 10px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 255, 255, 0.8);
-  }
+.auth-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+  margin: 0 0 var(--space-2) 0;
+  letter-spacing: var(--tracking-tight);
+}
 
-  .welcome-text {
-    color: #2c3e50;
-    font-size: 26px;
-    font-weight: bold;
-    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-  }
-  .password-container {
-    position: relative;
-    display: inline-block;
-  }
+.auth-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  margin: 0 0 var(--space-6) 0;
+}
 
-  .password-container input {
-    padding-right: 30px; /* Spazio per l'icona */
-    height: 35px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-  }
+.auth-form {
+  display: flex;
+  flex-direction: column;
+}
 
-  .password-container .icon {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-  }
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
 
-  .error-message {
-    color: #e74c3c;
-    font-size: 14px;
-    text-align: center;
-    margin-bottom: 1rem;
-  }
-  .register-form {
-    width: 350px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1.5rem;
-    background-color: #ffffff;
-    border-radius: 12px;
-  }
-  .input-field {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
-    box-sizing: border-box;
-    font-size: 13px;
-    transition: border-color 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  }
+.password-field {
+  position: relative;
+}
 
-  .input-field:focus {
-    border-color: #2980b9;
-    outline: none;
-    box-shadow: 0 4px 8px rgba(41, 128, 185, 0.3);
-  }
+.password-field :deep(.ds-input) {
+  padding-right: 44px;
+}
 
-  .password-field {
-    position: relative;
-  }
-
-  .password-toggle {
-    position: absolute;
-    top: 40%;
-    right: 5px;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: #2ecc71;
-    font-size: 12.5px;
-    font-weight: bold;
-    cursor: pointer;
-  }
-
-  .submit-btn {
-  background-color: #2ecc71;
-  color: white;
-  padding: 10px 18px;
+.password-toggle {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
   border: none;
-  margin-top: 0.8rem;
-  border-radius: 6px;
-  width: 100%;
+  color: var(--color-text-muted);
   cursor: pointer;
-  transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
-  font-size: 14px;
- }
+  padding: var(--space-1);
+  display: flex;
+  align-items: center;
+  transition: color var(--transition-fast);
+}
 
- .submit-btn:hover {
-  background-color: #27ae60;
-  transform: translateY(-3px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
- }
+.password-toggle:hover {
+  color: var(--color-text);
+}
 
-  .terms-text {
-    font-size: 12px;
-  }
+.terms-field {
+  margin-bottom: var(--space-5);
+}
 
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    font-size: 14px;
-    margin-top: 10px;
-  }
+.terms-label {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  cursor: pointer;
+}
 
-  .already-registered {
-    display: block;
-    text-align: center;
-    color: #2c3e50;
-    font-size: 14px;
-    font-weight: 500;
-    margin-top: 15px;
-  }
+.terms-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+}
 
-  .already-registered span {
-    font-weight: bold;
-  }
+.auth-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
 
-  .already-registered:hover {
-    text-decoration: underline;
-  }
+.auth-link:hover {
+  color: var(--color-primary-hover);
+}
 
-  .loader {
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #3498db;
-    border-radius: 50%;
-    width: 18px;
-    height: 18px;
-    animation: spin 2s linear infinite;
+.auth-submit {
+  width: 100%;
+  margin-bottom: var(--space-5);
+}
+
+.auth-footer-text {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.auth-link-bold {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.auth-link-bold:hover {
+  color: var(--color-primary-hover);
+}
+
+@media (max-width: 480px) {
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
   }
-  /* Smoother transitions */
-  .fade-in {
-    animation: fadeIn 1s;
-  }
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
+}
 </style>

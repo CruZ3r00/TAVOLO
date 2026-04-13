@@ -1,0 +1,5 @@
+[    1623ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/register:0
+[    1640ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/register:0
+[   29848ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/login:0
+[   66404ms] [LOG] {jwt: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwia…4MDJ9.10I2ZzfurNeLbqShPnl4LKetDhoLRw0hv8yjaBhrO1g, user: Object} @ http://localhost:5174/src/Pages/Auth/Login.vue:44
+[   66599ms] [ERROR] Errore nel caricamento statistiche: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON @ http://localhost:5174/src/Pages/Dashboard.vue:85

@@ -1,0 +1,3 @@
+[     304ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/login:0
+[    9706ms] [LOG] {jwt: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwia…xMzh9.NwurK5DYFTGxL2oITCXN6VSVXR8eo-OodvgvO3T2m9c, user: Object} @ http://localhost:5174/src/Pages/Auth/Login.vue:44
+[    9754ms] [ERROR] Errore nel caricamento statistiche: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON @ http://localhost:5174/src/Pages/Dashboard.vue:85

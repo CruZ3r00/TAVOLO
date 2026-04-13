@@ -1,0 +1,11 @@
+[     401ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/register:0
+[     403ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/register:0
+[   11597ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5174/login:0
+[   29248ms] [LOG] {jwt: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NCwia…xMDF9.wH3XaiJaOvlRdfIq3bhuuTmzGiCTB60Msh-i75hnKR0, user: Object} @ http://localhost:5174/src/Pages/Auth/Login.vue:44
+[   29333ms] [ERROR] Errore nel caricamento statistiche: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON @ http://localhost:5174/src/Pages/Dashboard.vue:85
+[  899923ms] [ERROR] Error: No input text
+    at Object.create (http://localhost:5174/node_modules/.vite/deps/qrcode.js?v=a36705ea:1804:15)
+    at http://localhost:5174/node_modules/.vite/deps/qrcode.js?v=a36705ea:2060:33
+    at new Promise (<anonymous>)
+    at renderCanvas (http://localhost:5174/node_modules/.vite/deps/qrcode.js?v=a36705ea:2058:16)
+    at genQR (http://localhost:5174/src/components/GeneratorQRCode.vue:20:37) @ http://localhost:5174/src/components/GeneratorQRCode.vue:25

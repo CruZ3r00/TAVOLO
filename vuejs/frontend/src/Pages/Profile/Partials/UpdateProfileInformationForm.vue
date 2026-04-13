@@ -1,8 +1,9 @@
 <script setup>
 import { onMounted, ref } from 'vue';
-import InputLabel from '@/Components/InputLabel.vue';
+import InputLabel from '@/components/InputLabel.vue';
 import { useStore } from 'vuex';
-import TextInput from '@/Components/TextInput.vue';
+import TextInput from '@/components/TextInput.vue';
+import { API_BASE } from '@/utils';
 
 const isError = ref(false);
 const isSucces = ref(false);
@@ -13,11 +14,7 @@ const props = defineProps({
     user: {
         type: Object,
         required: true,
-        default: () => ({
-            id: '',
-            username: '',
-            email: '',
-        }),
+        default: () => ({ id: '', username: '', email: '' }),
     },
 });
 
@@ -25,99 +22,101 @@ const username = ref('');
 const email = ref('');
 const store = useStore();
 
-
-
 const updateInfoUser = async () => {
-    // Reset status messages before any operation
     isError.value = false;
     isSucces.value = false;
     alertMessage.value = '';
 
-    // Check if at least one data has been entered
     if (!username.value && !email.value) {
         isError.value = true;
-        alertMessage.value = 'Error: no data was entered';
+        alertMessage.value = 'Nessun dato inserito';
         return;
     }
 
     isLoading.value = true;
-    const tokjwt = store.getters.getToken;
     try {
-      const response = await fetch(`http://localhost:1337/api/users/${props.user.id}`,{
-        method: 'PUT',
-        headers:{
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${tokjwt}`,
-        },
-        body: JSON.stringify({
-            "email": email.value,
-            "username": username.value,
-        }),
-      });
-        const responseData = await response.json();
-
+        const tkn = store.getters.getToken;
+        const response = await fetch(`${API_BASE}/api/account/profile`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${tkn}`,
+            },
+            body: JSON.stringify({ email: email.value, username: username.value }),
+        });
+        const data = await response.json();
         if (!response.ok) {
             isError.value = true;
-            alertMessage.value = responseData.error;
+            alertMessage.value = data?.error?.message || data?.message || 'Errore durante l\'aggiornamento';
         } else {
             isSucces.value = true;
             alertMessage.value = 'Profilo aggiornato';
+            if (data.user) {
+                const current = store.getters.getUser || {};
+                const merged = { ...current, username: data.user.username, email: data.user.email };
+                store.commit('setUser', merged);
+                localStorage.setItem('user', JSON.stringify(merged));
+            }
         }
     } catch {
         isError.value = true;
-        alertMessage.value = 'Errore inaspettato';
+        alertMessage.value = 'Errore di rete. Riprova.';
     }
     isLoading.value = false;
 };
 
 onMounted(() => {
-  username.value = props.user.username;
-  email.value = props.user.email;
+    username.value = props.user.username;
+    email.value = props.user.email;
 });
 </script>
 
 <template>
-    <form @submit.prevent="updateInfoUser">
-        <!-- Name -->
-        <div class="container border bg-light p-4">
-            <h1 class="display-6 fw-bold text-body pb-3 mt-3">
-                Aggiorna le informazioni del <span style="text-decoration: underline; text-decoration-color: blue">tuo profilo.</span>
-            </h1>
-            <div v-if="isError" style="color: red;">{{ alertMessage }}</div>
-            <div v-else-if="isSucces" style="color: green;">{{ alertMessage }}</div>
-            <div class="col pt-3 mb-3">
-                <InputLabel for="name" value="Name" class="form-label"/>
-                <TextInput
-                    id="name"
-                    v-model="username"
-                    type="text"
-                    class="form-control"
-                    required
-                    autocomplete="username"
-                    :placeholder="username"
-                />
-            </div>
-            <!-- Email -->
-            <div class="col pt-3 mb-3">
-                <InputLabel for="email" value="Email" class="form-label" />
-                <TextInput
-                    id="email"
-                    v-model="email"
-                    type="email"
-                    class="form-control"
-                    required
-                    autocomplete="email"
-                    :placeholder="email"
-                />
-            </div>
-            <button 
-                type="submit" 
-                class="btn btn-primary" 
-                :disabled="isLoading"
-            >
-                <span v-if="isLoading" class="loader"></span>
-                <span v-else>Salva</span>
-            </button>
+    <div class="ds-card">
+        <div class="ds-card-header">
+            <i class="bi bi-person" style="color: var(--color-primary);"></i>
+            <h3 class="section-title">Informazioni profilo</h3>
         </div>
-    </form>
+        <div class="ds-card-body">
+            <p class="section-description">Aggiorna le informazioni del tuo account.</p>
+
+            <Transition name="fade">
+                <div v-if="isError" class="ds-alert ds-alert-error">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <span>{{ alertMessage }}</span>
+                </div>
+            </Transition>
+            <Transition name="fade">
+                <div v-if="isSucces" class="ds-alert ds-alert-success">
+                    <i class="bi bi-check-circle"></i>
+                    <span>{{ alertMessage }}</span>
+                </div>
+            </Transition>
+
+            <form @submit.prevent="updateInfoUser">
+                <div class="ds-field">
+                    <InputLabel for="name" value="Username" />
+                    <TextInput id="name" v-model="username" type="text" required autocomplete="username" :placeholder="username" />
+                </div>
+
+                <div class="ds-field">
+                    <InputLabel for="email" value="Email" />
+                    <TextInput id="email" v-model="email" type="email" required autocomplete="email" :placeholder="email" />
+                </div>
+
+                <button type="submit" class="ds-btn ds-btn-primary" :disabled="isLoading">
+                    <span v-if="isLoading" class="ds-spinner"></span>
+                    <template v-else>
+                        <i class="bi bi-check2"></i>
+                        <span>Salva</span>
+                    </template>
+                </button>
+            </form>
+        </div>
+    </div>
 </template>
+
+<style scoped>
+.section-title { font-size: var(--text-base); font-weight: 600; margin: 0; }
+.section-description { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 var(--space-5) 0; }
+</style>

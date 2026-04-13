@@ -1,0 +1,4 @@
+[     524ms] [ERROR] Framing 'http://localhost:1337/' violates the following Content Security Policy directive: "frame-ancestors 'self'". The request has been blocked.
+ @ :0
+[  370289ms] [ERROR] Framing 'http://localhost:1337/' violates the following Content Security Policy directive: "frame-ancestors 'self'". The request has been blocked.
+ @ :0

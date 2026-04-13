@@ -1,156 +1,220 @@
-<script setup> //componete per l'attivazione dell'autenticazione a due fattori
-import { ref, computed, watch } from 'vue';
-import { useForm } from 'vee-validate';
-import * as yup from 'yup';
-import ConfirmPassword from '@/components/ConfirmPassword.vue';
-import DangerButton from '@/Components/DangerButton.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+<script setup>
+import { ref, onMounted } from 'vue';
+import QRCode from 'qrcode';
+import { useStore } from 'vuex';
+import InputLabel from '@/components/InputLabel.vue';
+import InputError from '@/components/InputError.vue';
+import TextInput from '@/components/TextInput.vue';
+import { API_BASE } from '@/utils';
 
-const enabling = ref(false);
-const confirming = ref(false);
-const disabling = ref(false);
-const qrCode = ref(null);
-const setupKey = ref(null);
+const store = useStore();
+
+const loading = ref(false);
+const enabled = ref(false);
+const pending = ref(false);
+const qrDataUrl = ref('');
+const setupKey = ref('');
 const recoveryCodes = ref([]);
+const code = ref('');
+const errorMsg = ref('');
+const successMsg = ref('');
 
-// Definisci lo schema di validazione con Yup
-const schema = yup.object({
-    code: yup.string().required('Il codice è obbligatorio').matches(/^\d{6}$/, 'Il codice deve essere di 6 cifre'),
+const authHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${store.getters.getToken}`,
 });
 
-// Usa vee-validate con Yup
-const { values, errors, handleSubmit, reset } = useForm({
-    validationSchema: schema,
-    initialValues: { code: '' },
-});
+const resetMessages = () => { errorMsg.value = ''; successMsg.value = ''; };
 
-const twoFactorEnabled = computed(() => !enabling.value && localStorage.getItem('two_factor_enabled') === 'true');
-
-watch(twoFactorEnabled, () => {
-    if (!twoFactorEnabled.value) {
-        reset();
-    }
-});
-
-const enableTwoFactorAuthentication = async () => {
-    enabling.value = true;
+const loadStatus = async () => {
     try {
-        await fetch('/api/two-factor/enable', { method: 'POST' });
-        await Promise.all([showQrCode(), showSetupKey(), showRecoveryCodes()]);
-        localStorage.setItem('two_factor_enabled', 'true');
+        const r = await fetch(`${API_BASE}/api/account/2fa/status`, { headers: authHeaders() });
+        if (r.ok) {
+            const d = await r.json();
+            enabled.value = !!d.enabled;
+            pending.value = !!d.pending;
+        }
+    } catch {}
+};
+
+const renderQr = async (otpauth) => {
+    qrDataUrl.value = await QRCode.toDataURL(otpauth, { scale: 6, margin: 2, errorCorrectionLevel: 'M' });
+};
+
+const enableTwoFactor = async () => {
+    resetMessages();
+    loading.value = true;
+    try {
+        const r = await fetch(`${API_BASE}/api/account/2fa/enable`, { method: 'POST', headers: authHeaders() });
+        const d = await r.json();
+        if (!r.ok) { errorMsg.value = d?.error?.message || 'Errore'; return; }
+        setupKey.value = d.secret;
+        recoveryCodes.value = d.recoveryCodes || [];
+        await renderQr(d.otpauth);
+        pending.value = true;
+        enabled.value = false;
+    } catch {
+        errorMsg.value = 'Errore di rete';
     } finally {
-        enabling.value = false;
-        confirming.value = true;
+        loading.value = false;
     }
 };
 
-const showQrCode = async () => {
-    const response = await fetch('/api/two-factor/qr-code');
-    const data = await response.json();
-    qrCode.value = data.svg;
-};
-
-const showSetupKey = async () => {
-    const response = await fetch('/api/two-factor/secret-key');
-    const data = await response.json();
-    setupKey.value = data.secretKey;
-};
-
-const showRecoveryCodes = async () => {
-    const response = await fetch('/api/two-factor/recovery-codes');
-    recoveryCodes.value = await response.json();
-};
-
-// Funzione di conferma con validazione
-const confirmTwoFactorAuthentication = handleSubmit(async () => {
+const confirmTwoFactor = async () => {
+    resetMessages();
+    if (!/^\d{6}$/.test(code.value)) { errorMsg.value = 'Inserisci un codice di 6 cifre'; return; }
+    loading.value = true;
     try {
-        await fetch('/api/two-factor/confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: values.code }),
+        const r = await fetch(`${API_BASE}/api/account/2fa/confirm`, {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ code: code.value }),
         });
-        confirming.value = false;
-        qrCode.value = null;
-        setupKey.value = null;
-        reset();
-    } catch (error) {
-        console.error('Errore nella conferma', error);
-    }
-});
-
-const regenerateRecoveryCodes = async () => {
-    await fetch('/api/two-factor/recovery-codes', { method: 'POST' });
-    await showRecoveryCodes();
-};
-
-const disableTwoFactorAuthentication = async () => {
-    disabling.value = true;
-    try {
-        await fetch('/api/two-factor/disable', { method: 'DELETE' });
-        localStorage.removeItem('two_factor_enabled');
+        const d = await r.json();
+        if (!r.ok) { errorMsg.value = d?.error?.message || 'Codice non valido'; return; }
+        enabled.value = true;
+        pending.value = false;
+        qrDataUrl.value = '';
+        setupKey.value = '';
+        code.value = '';
+        successMsg.value = '2FA attivato con successo';
+    } catch {
+        errorMsg.value = 'Errore di rete';
     } finally {
-        disabling.value = false;
-        confirming.value = false;
+        loading.value = false;
     }
 };
+
+const disableTwoFactor = async () => {
+    resetMessages();
+    if (!confirm('Sei sicuro di voler disabilitare l\'autenticazione a due fattori?')) return;
+    loading.value = true;
+    try {
+        const r = await fetch(`${API_BASE}/api/account/2fa/disable`, { method: 'DELETE', headers: authHeaders() });
+        if (!r.ok) { errorMsg.value = 'Errore durante la disabilitazione'; return; }
+        enabled.value = false;
+        pending.value = false;
+        qrDataUrl.value = '';
+        setupKey.value = '';
+        recoveryCodes.value = [];
+        successMsg.value = '2FA disabilitato';
+    } catch {
+        errorMsg.value = 'Errore di rete';
+    } finally {
+        loading.value = false;
+    }
+};
+
+const regenerateRecovery = async () => {
+    resetMessages();
+    loading.value = true;
+    try {
+        const r = await fetch(`${API_BASE}/api/account/2fa/recovery`, { method: 'POST', headers: authHeaders() });
+        const d = await r.json();
+        if (!r.ok) { errorMsg.value = 'Errore'; return; }
+        recoveryCodes.value = d.recoveryCodes || [];
+        successMsg.value = 'Codici di recupero rigenerati';
+    } catch {
+        errorMsg.value = 'Errore di rete';
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(loadStatus);
 </script>
 
 <template>
-    <div class="border bg-light p-4 container">
-        <h1 class="display-6 fw-bold text-body-emphasis pb-3 mt-3">
-            Abilita l'<span style="text-decoration: underline; text-decoration-color: blue">Autenticazione a due fattori.</span>
-        </h1>
-        <div class="py-5">
-            <h3 v-if="twoFactorEnabled && !confirming" class="text-lg font-medium text-gray-900">Hai abilitato l'autenticazione a due fattori</h3>
-            <h3 v-else-if="twoFactorEnabled && confirming" class="text-lg font-medium text-gray-900">Termina il processo</h3>
-            <h3 v-else class="text-lg font-medium text-gray-900">Non hai abilitato l'autenticazione a due fattori</h3>
-
-            <div v-if="twoFactorEnabled">
-                <div v-if="qrCode">
-                    <p class="mt-4 font-semibold">Scansiona il codice QR o inserisci la setup key</p>
-                    <div class="mt-4 p-2 inline-block bg-white" v-html="qrCode" />
-                    <p v-if="setupKey" class="mt-4 font-semibold">Setup Key: <span v-html="setupKey"></span></p>
+    <div class="ds-card">
+        <div class="ds-card-header">
+            <i class="bi bi-shield-lock" style="color: var(--color-primary);"></i>
+            <h3 class="section-title">Autenticazione a due fattori</h3>
+        </div>
+        <div class="ds-card-body">
+            <Transition name="fade">
+                <div v-if="errorMsg" class="ds-alert ds-alert-error">
+                    <i class="bi bi-exclamation-circle"></i><span>{{ errorMsg }}</span>
                 </div>
+            </Transition>
+            <Transition name="fade">
+                <div v-if="successMsg" class="ds-alert ds-alert-success">
+                    <i class="bi bi-check-circle"></i><span>{{ successMsg }}</span>
+                </div>
+            </Transition>
 
-                <div v-if="confirming" class="mt-4">
-                    <InputLabel for="code" value="Code" />
-                    <TextInput
-                        id="code"
-                        v-model="values.code"
-                        type="text"
-                        class="block mt-1 w-1/2"
-                        inputmode="numeric"
-                        autofocus
-                        autocomplete="one-time-code"
-                        @keyup.enter="confirmTwoFactorAuthentication"
-                    />
-                    <InputError :message="errors.code" class="mt-2 text-red-500" />
+            <div class="tfa-status">
+                <div v-if="enabled" class="ds-alert ds-alert-success">
+                    <i class="bi bi-shield-check"></i>
+                    <span>Hai abilitato l'autenticazione a due fattori.</span>
+                </div>
+                <div v-else-if="pending" class="ds-alert ds-alert-warning">
+                    <i class="bi bi-shield-exclamation"></i>
+                    <span>Completa la configurazione per attivare la protezione.</span>
+                </div>
+                <div v-else class="ds-alert ds-alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <span>L'autenticazione a due fattori non è attiva.</span>
                 </div>
             </div>
 
-            <div class="mt-5">
-                <div v-if="!twoFactorEnabled">
-                    <ConfirmPassword @confirmed="enableTwoFactorAuthentication">
-                        <PrimaryButton :disabled="enabling" class="btn btn-primary">Attiva</PrimaryButton>
-                    </ConfirmPassword>
+            <div v-if="pending && qrDataUrl" class="tfa-qr-section">
+                <p class="tfa-instruction">Scansiona il QR con la tua app di autenticazione (Google Authenticator, Authy, 1Password...) oppure inserisci manualmente la setup key.</p>
+                <div class="tfa-qr-wrapper">
+                    <img :src="qrDataUrl" alt="QR 2FA" style="max-width: 200px;" />
                 </div>
+                <div v-if="setupKey" class="tfa-setup-key">
+                    <span class="ds-label">Setup Key:</span>
+                    <code class="setup-key-code">{{ setupKey }}</code>
+                </div>
+            </div>
 
-                <div v-else>
-                    <ConfirmPassword @confirmed="confirmTwoFactorAuthentication">
-                        <PrimaryButton v-if="confirming" :disabled="enabling" class="me-3">Conferma</PrimaryButton>
-                    </ConfirmPassword>
-                    <ConfirmPassword @confirmed="regenerateRecoveryCodes">
-                        <SecondaryButton v-if="recoveryCodes.length > 0 && !confirming" class="me-3">Rigenera codici di recupero</SecondaryButton>
-                    </ConfirmPassword>
-                    <ConfirmPassword @confirmed="disableTwoFactorAuthentication">
-                        <DangerButton v-if="!confirming" :disabled="disabling">Disabilita</DangerButton>
-                    </ConfirmPassword>
-                </div>
+            <div v-if="pending" class="ds-field">
+                <InputLabel for="code" value="Codice di verifica" />
+                <TextInput
+                    id="code"
+                    v-model="code"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    placeholder="000000"
+                    @keyup.enter="confirmTwoFactor"
+                />
+            </div>
+
+            <div v-if="recoveryCodes.length > 0" class="recovery-section">
+                <p class="tfa-instruction"><strong>Codici di recupero</strong> — salvali in un posto sicuro. Ogni codice può essere usato una volta se perdi il dispositivo.</p>
+                <ul class="recovery-list">
+                    <li v-for="rc in recoveryCodes" :key="rc"><code>{{ rc }}</code></li>
+                </ul>
+            </div>
+
+            <div class="tfa-actions-row">
+                <button v-if="!enabled && !pending" class="ds-btn ds-btn-primary" :disabled="loading" @click="enableTwoFactor">
+                    <i class="bi bi-shield-lock"></i><span>Attiva</span>
+                </button>
+                <button v-if="pending" class="ds-btn ds-btn-primary" :disabled="loading" @click="confirmTwoFactor">
+                    <span>Conferma</span>
+                </button>
+                <button v-if="enabled" class="ds-btn ds-btn-secondary" :disabled="loading" @click="regenerateRecovery">
+                    <span>Rigenera codici</span>
+                </button>
+                <button v-if="enabled || pending" class="ds-btn ds-btn-danger" :disabled="loading" @click="disableTwoFactor">
+                    <span>Disabilita</span>
+                </button>
             </div>
         </div>
     </div>
 </template>
+
+<style scoped>
+.section-title { font-size: var(--text-base); font-weight: 600; margin: 0; }
+.tfa-status { margin-bottom: var(--space-5); }
+.tfa-qr-section { margin-bottom: var(--space-5); }
+.tfa-instruction { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0 0 var(--space-4) 0; }
+.tfa-qr-wrapper { display: inline-flex; padding: var(--space-4); background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); margin-bottom: var(--space-3); }
+.tfa-setup-key { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.setup-key-code { font-family: var(--font-mono); font-size: var(--text-sm); padding: var(--space-1) var(--space-2); background: var(--color-bg-subtle); border-radius: var(--radius-sm); }
+.recovery-section { margin: var(--space-4) 0; padding: var(--space-4); background: var(--color-bg-subtle); border-radius: var(--radius-md); }
+.recovery-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+.recovery-list code { font-family: var(--font-mono); font-size: var(--text-sm); }
+.tfa-actions-row { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-5); }
+</style>

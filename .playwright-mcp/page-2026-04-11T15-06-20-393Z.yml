@@ -1,0 +1,96 @@
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e6]:
+      - link " MenuCMS" [ref=e7] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e9]: 
+        - generic [ref=e10]: MenuCMS
+      - generic [ref=e11]:
+        - link " Dashboard" [ref=e12] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e13]: 
+          - generic [ref=e14]: Dashboard
+        - link " Menu" [ref=e15] [cursor=pointer]:
+          - /url: /menu-handler
+          - generic [ref=e16]: 
+          - generic [ref=e17]: Menu
+        - link " Sito" [ref=e18] [cursor=pointer]:
+          - /url: /site-config
+          - generic [ref=e19]: 
+          - generic [ref=e20]: Sito
+      - generic [ref=e22]:
+        - button "P pizzeria_qa_test " [ref=e23] [cursor=pointer]:
+          - generic [ref=e24]: P
+          - generic [ref=e25]: pizzeria_qa_test
+          - generic [ref=e26]: 
+        - text:  
+  - main [ref=e27]:
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - paragraph [ref=e31]: Impostazioni
+        - heading "Configurazione Sito Web" [level=1] [ref=e32]
+        - paragraph [ref=e33]: Configura il tuo sito web esterno e integra il menu tramite API.
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - generic [ref=e37]:
+              - generic [ref=e38]: 
+              - heading "Impostazioni" [level=3] [ref=e39]
+            - generic [ref=e41]:
+              - generic [ref=e42]:
+                - generic [ref=e43]: Nome del ristorante
+                - textbox "Es. Pizzeria Da Mario" [ref=e44]: pizzeria_qa_test
+              - generic [ref=e45]:
+                - generic [ref=e46]: URL del sito web
+                - textbox "https://www.mioristorante.it" [ref=e47]: http://localhost:1337/sites/pizzeria_qa_test
+                - paragraph [ref=e48]: L'URL del tuo sito web dove verra' visualizzato il menu.
+              - generic [ref=e49]:
+                - generic [ref=e50]: Logo del ristorante
+                - button "Choose File" [ref=e51]
+              - button " Salva configurazione" [ref=e52] [cursor=pointer]:
+                - generic [ref=e53]: 
+                - generic [ref=e54]: Salva configurazione
+          - generic [ref=e55]:
+            - generic [ref=e56]:
+              - generic [ref=e57]: 
+              - heading "API pubblica" [level=3] [ref=e58]
+            - generic [ref=e59]:
+              - paragraph [ref=e60]: "Usa questo endpoint per integrare il menu nel tuo sito web:"
+              - generic [ref=e61]:
+                - generic [ref=e62]: GET
+                - code [ref=e63]: http://localhost:1337/api/menus/public/gzg7g40tk68wkrtrc96ix6tk
+                - button "" [ref=e64] [cursor=pointer]:
+                  - generic [ref=e65]: 
+              - paragraph [ref=e66]: Questa API restituisce il menu completo del tuo ristorante in formato JSON. Non richiede autenticazione.
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - generic [ref=e69]:
+              - generic [ref=e70]: 
+              - heading "Anteprima sito" [level=3] [ref=e71]
+            - iframe [ref=e73]:
+              - generic [ref=f1e3]:
+                - text: Connessione negata da
+                - strong [ref=f1e4]: localhost
+                - text: .
+          - generic [ref=e74]:
+            - generic [ref=e75]:
+              - generic [ref=e76]: 
+              - heading "QR Code" [level=3] [ref=e77]
+            - generic [ref=e79]:
+              - generic [ref=e80]:
+                - heading "Genera QR Code" [level=3] [ref=e81]
+                - paragraph [ref=e82]: Crea un QR code che reindirizza al tuo sito menu.
+              - button " Genera QR" [ref=e83] [cursor=pointer]:
+                - generic [ref=e93]: 
+                - generic [ref=e94]: Genera QR
+              - img "QR Code generato" [ref=e96]
+  - contentinfo [ref=e86]:
+    - generic [ref=e87]:
+      - paragraph [ref=e88]: © 2025 MenuCMS
+      - navigation [ref=e89]:
+        - link "Home" [ref=e90] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e91] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e92] [cursor=pointer]:
+          - /url: /contact-us

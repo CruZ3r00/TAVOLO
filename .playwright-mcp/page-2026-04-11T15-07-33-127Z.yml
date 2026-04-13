@@ -1,0 +1,7 @@
+- generic [ref=e5]:
+  - generic [ref=e6]: "404"
+  - heading "Pagina non trovata" [level=1] [ref=e7]
+  - paragraph [ref=e8]: La pagina che stai cercando non esiste o e' stata spostata.
+  - button " Torna alla home" [ref=e9] [cursor=pointer]:
+    - generic [ref=e10]: 
+    - generic [ref=e11]: Torna alla home

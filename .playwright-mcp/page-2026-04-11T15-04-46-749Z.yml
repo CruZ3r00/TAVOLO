@@ -1,0 +1,99 @@
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e6]:
+      - link " MenuCMS" [ref=e7] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e9]: 
+        - generic [ref=e10]: MenuCMS
+      - generic [ref=e11]:
+        - link " Dashboard" [ref=e12] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e13]: 
+          - generic [ref=e14]: Dashboard
+        - link " Menu" [ref=e15] [cursor=pointer]:
+          - /url: /menu-handler
+          - generic [ref=e16]: 
+          - generic [ref=e17]: Menu
+        - link " Sito" [ref=e18] [cursor=pointer]:
+          - /url: /site-config
+          - generic [ref=e19]: 
+          - generic [ref=e20]: Sito
+      - generic [ref=e22]:
+        - button "P pizzeria_qa_test " [ref=e23] [cursor=pointer]:
+          - generic [ref=e24]: P
+          - generic [ref=e25]: pizzeria_qa_test
+          - generic [ref=e26]: 
+        - text:  
+  - main [ref=e27]:
+    - generic [ref=e220]:
+      - generic [ref=e221]:
+        - generic [ref=e222]:
+          - heading "I tuoi elementi" [level=2] [ref=e223]
+          - generic [ref=e224]: "4"
+        - generic [ref=e225]:
+          - button " Modifica" [ref=e226] [cursor=pointer]:
+            - generic [ref=e227]: 
+            - generic [ref=e228]: Modifica
+          - button " Aggiungi" [ref=e229] [cursor=pointer]:
+            - generic [ref=e230]: 
+            - generic [ref=e231]: Aggiungi
+      - generic [ref=e233]:
+        - generic [ref=e234]:
+          - generic [ref=e235]: 
+          - textbox "Cerca per nome..." [ref=e236]
+        - combobox [ref=e237]:
+          - option "Tutte le categorie" [selected]
+          - option "Bevande"
+          - option "Pizze classiche"
+          - option "Pizze bianche"
+      - generic [ref=e238]:
+        - generic [ref=e239]:
+          - generic [ref=e242]: 
+          - generic [ref=e243]:
+            - generic [ref=e244]:
+              - heading "Coca Cola" [level=3] [ref=e245]
+              - generic [ref=e246]: 3.50 €
+            - generic [ref=e247]: Bevande
+        - generic [ref=e248]:
+          - generic [ref=e251]: 
+          - generic [ref=e252]:
+            - generic [ref=e253]:
+              - heading "Pizza Margherita" [level=3] [ref=e254]
+              - generic [ref=e255]: 8.00 €
+            - generic [ref=e256]: Pizze classiche
+            - generic [ref=e257]:
+              - text: Ingredienti
+              - paragraph [ref=e258]: Mozzarella, Pomodoro, Basilico
+            - generic [ref=e259]:
+              - text: Allergeni
+              - paragraph [ref=e260]: Glutine, Lattosio
+        - generic [ref=e261]:
+          - generic [ref=e264]: 
+          - generic [ref=e265]:
+            - generic [ref=e266]:
+              - heading "Pizza Patate e Salsiccia" [level=3] [ref=e267]
+              - generic [ref=e268]: 10.00 €
+            - generic [ref=e269]: Pizze bianche
+            - generic [ref=e270]:
+              - text: Ingredienti
+              - paragraph [ref=e271]: Patate, Salsiccia
+            - generic [ref=e272]:
+              - text: Allergeni
+              - paragraph [ref=e273]: Glutine
+        - generic [ref=e274]:
+          - generic [ref=e277]: 
+          - generic [ref=e278]:
+            - generic [ref=e279]:
+              - heading "Acqua Naturale" [level=3] [ref=e280]
+              - generic [ref=e281]: 2.00 €
+            - generic [ref=e282]: Bevande
+  - contentinfo [ref=e49]:
+    - generic [ref=e50]:
+      - paragraph [ref=e51]: © 2025 MenuCMS
+      - navigation [ref=e52]:
+        - link "Home" [ref=e53] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e54] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e55] [cursor=pointer]:
+          - /url: /contact-us

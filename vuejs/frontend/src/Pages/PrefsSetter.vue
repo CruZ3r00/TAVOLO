@@ -1,11 +1,10 @@
-<script setup> //pagina in cui l'utente selezionera' le preferenze del suo sito-menu
+<script setup>
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { ref, onMounted, nextTick, watch } from 'vue';
     import { useStore } from 'vuex';
     import { colorCalculator } from '@/utils';
     import MenuViewComponent from '@/components/MenuViewComponent.vue';
 
-    //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
     const tkn = store.getters.getToken;
 
@@ -17,8 +16,8 @@
     const theme = ref('');
     const changed = ref(false);
     const userid = ref();
+    const saving = ref(false);
 
-    //funzione che recuperare le informazioni delle preferenze dell'utente
     const fetchPrefs = async () => {
         try {
             const response = await fetch(`http://localhost:1337/api/users/me?populate=*`,{
@@ -29,7 +28,7 @@
                 },
             });
 
-            if(response.ok){ 
+            if(response.ok){
                 const data = await response.json();
                 primary_color.value = data.fk_prefs.primary_color;
                 second_color.value = data.fk_prefs.second_color;
@@ -45,24 +44,23 @@
     };
 
     const submit = async () => {
+        saving.value = true;
         try {
             const update = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${tkn}`, // Se l'API è protetta
+                    "Authorization": `Bearer ${tkn}`,
                 },
                 body: JSON.stringify({
                     data: {
-                        //disconnect elemina la connessione con preference
                         fk_prefs:{
                             disconnect: { id: id.value },
                         }
-                    },         
+                    },
                 })
-            });            
+            });
 
-            //fetch che elimina il record dal database
             if (update.ok){
                 const del = await fetch(`http://localhost:1337/api/preferences/${id.value}`,{
                     method: "DELETE",
@@ -70,8 +68,7 @@
                         "Authorization": `Bearer ${tkn}`
                     }
                 });
-                
-                //se a buon fine elimino dalla lista
+
                 if (del.ok){
                     const response = await fetch(`http://localhost:1337/api/preferences`,{
                         method: "POST",
@@ -100,7 +97,7 @@
                             },
                             body: JSON.stringify({
                                 fk_prefs:{
-                                    connect: 
+                                    connect:
                                         {id: id_.id-1}
                                 },
                             }),
@@ -109,22 +106,21 @@
                             await fetchPrefs();
                             changed.value = false;
                         }
-                        
                     }
                 }
             }
         } catch (error) {
             console.error(error);
+        } finally {
+            saving.value = false;
         }
     }
 
-    //quando cambia theme (con il menu a tendina), si calcolano i colori con la funzione apposita creata in utils.js
     watch(theme, (newVal, oldVal) => {
         changed.value = true;
         colorCalculator( theme, primary_color, second_color, background, details );
     })
 
-    //impostazione del titolo della scheda e function per caricare i dati
     onMounted(async () => {
         await fetchPrefs();
         changed.value = false;
@@ -133,41 +129,112 @@
         });
     });
 
+    const themes = [
+        'Classico', 'Luxury', 'Street food', 'Minimal', 'Nature', 'Rustico', 'Pop',
+        'Classico scuro', 'Luxury scuro', 'Street food scuro', 'Minimal scuro',
+        'Nature scuro', 'Rustico scuro', 'Pop scuro',
+    ];
 </script>
 
 <template>
     <AppLayout>
-        <!-- scelta del layout -->
-        <section>
-            <form @submit.prevent="submit" class="my-5 mx-5">
-                <!-- v-model collegato alla variabile relativa alla categoria del prodotto -->
-                <div class="form-group col-md-11">
-                    <label for="inputCategory">Scegli il tema</label>
-                    <select id="inputCategory" v-model="theme" class="form-control" required>
-                        <option>Classico</option>
-                        <option>Luxury</option>
-                        <option>Street food</option>
-                        <option>Minimal</option>
-                        <option>Nature</option>
-                        <option>Rustico</option>
-                        <option>Pop</option>
-                        <option>Classico scuro</option>
-                        <option>Luxury scuro</option>
-                        <option>Street food scuro</option>
-                        <option>Minimal scuro</option>
-                        <option>Nature scuro</option>
-                        <option>Rustico scuro</option>
-                        <option>Pop scuro</option>
-                    </select>
+        <div class="prefs-page">
+            <div class="prefs-container">
+                <p class="text-overline">Personalizzazione</p>
+                <h1 class="prefs-title">Modifica il layout</h1>
+                <p class="prefs-subtitle">Scegli il tema del tuo sito menu e visualizza l'anteprima in tempo reale.</p>
+
+                <div class="ds-card prefs-card">
+                    <div class="ds-card-body">
+                        <form @submit.prevent="submit" class="prefs-form">
+                            <div class="ds-field">
+                                <label for="inputCategory" class="ds-label">Scegli il tema</label>
+                                <select id="inputCategory" v-model="theme" class="ds-select" required>
+                                    <option v-for="t in themes" :key="t" :value="t">{{ t }}</option>
+                                </select>
+                            </div>
+
+                            <div v-if="theme" class="prefs-colors">
+                                <div class="prefs-color-swatch" :style="{ background: primary_color }" title="Primario"></div>
+                                <div class="prefs-color-swatch" :style="{ background: second_color }" title="Secondario"></div>
+                                <div class="prefs-color-swatch" :style="{ background: background }" title="Sfondo"></div>
+                                <div class="prefs-color-swatch" :style="{ background: details }" title="Dettagli"></div>
+                            </div>
+
+                            <Transition name="fade">
+                                <button v-if="changed" type="submit" class="ds-btn ds-btn-primary" :disabled="saving">
+                                    <span v-if="saving" class="ds-spinner"></span>
+                                    <span v-else><i class="bi bi-check-lg"></i> Salva preferenze</span>
+                                </button>
+                            </Transition>
+                        </form>
+                    </div>
                 </div>
 
-                <button v-if="changed" type="submit" class="btn btn-warning mt-5">Salva preferenze</button>
-            </form>
-        </section>
-
-        <!-- preview del sito -->
-        <section>
-            <MenuViewComponent :primary="primary_color" :second="second_color" :background="background" :details="details"/>
-        </section>
+                <div class="prefs-preview">
+                    <h2 class="prefs-preview-title">Anteprima</h2>
+                    <div class="prefs-preview-frame">
+                        <MenuViewComponent :primary="primary_color" :second="second_color" :background="background" :details="details"/>
+                    </div>
+                </div>
+            </div>
+        </div>
     </AppLayout>
 </template>
+
+<style scoped>
+.prefs-page {
+  padding: var(--space-10) 0 var(--space-16);
+}
+.prefs-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+.prefs-title {
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  color: var(--color-text);
+  margin: var(--space-2) 0;
+  letter-spacing: var(--tracking-tight);
+}
+.prefs-subtitle {
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-8) 0;
+  line-height: var(--leading-relaxed);
+}
+.prefs-card {
+  margin-bottom: var(--space-10);
+}
+.prefs-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.prefs-colors {
+  display: flex;
+  gap: var(--space-3);
+}
+.prefs-color-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+.prefs-preview {
+  margin-top: var(--space-6);
+}
+.prefs-preview-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-4) 0;
+}
+.prefs-preview-frame {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+</style>

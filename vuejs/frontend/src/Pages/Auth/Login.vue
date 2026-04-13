@@ -1,16 +1,17 @@
 <script setup>
 import { useHead } from '@vueuse/head';
-import { useRouter } from 'vue-router';
-import AuthenticationCard from '@/Components/AuthenticationCard.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import TextInput from '@/Components/TextInput.vue';
-import { ref } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import AuthenticationCard from '@/components/AuthenticationCard.vue';
+import InputLabel from '@/components/InputLabel.vue';
+import TextInput from '@/components/TextInput.vue';
+import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
+import { API_BASE } from '@/utils';
 
 
 useHead({
     title: 'Login',
-    meta: [{ name: 'description', content: 'Login page for the app' }],
+    meta: [{ name: 'description', content: 'Pagina di login' }],
 });
 
 const store = useStore();
@@ -23,12 +24,14 @@ const isError = ref(false);
 const showPassword = ref(false);
 
 const router = useRouter();
+const route = useRoute();
+const justRegistered = computed(() => route.query.registered === '1');
 
 const submit = async () => {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-        const response = await fetch('http://localhost:1337/api/auth/local', {
+        const response = await fetch(`${API_BASE}/api/auth/local`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ identifier: username.value, password: password.value }),
@@ -45,11 +48,11 @@ const submit = async () => {
         } else {
             const errorData = await response.json();
             console.log(errorData);
-            errorMessage.value = 'Login failed. Please try again.';
+            errorMessage.value = 'Credenziali non valide. Riprova.';
             isError.value = true;
         }
     } catch (error) {
-        errorMessage.value = 'Network error. Please try again.';
+        errorMessage.value = 'Errore di rete. Riprova più tardi.';
         isError.value = true;
     } finally {
         isLoading.value = false;
@@ -58,233 +61,202 @@ const submit = async () => {
 </script>
 
 <template>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <div class="login-container">
-    <AuthenticationCard class="auth-card">
-      <h1 class="welcome-message">
-        Bentornato!
-      </h1>
-      
-      <div v-if="isError" class="error-message fade-in">
-        {{ errorMessage }}
+  <AuthenticationCard>
+    <!-- Brand -->
+    <div class="auth-brand">
+      <div class="auth-brand-icon">
+        <i class="bi bi-shop"></i>
       </div>
-      
-      <form @submit.prevent="submit" class="login-form">
-        <div class="form-field">
-          <InputLabel for="username" value="Username" class="form-label"/>
-          <TextInput id="username" v-model="username" type="text" class="form-control" required placeholder="Email o Username"/>
-        </div>
+      <span class="auth-brand-name">MenuCMS</span>
+    </div>
 
-        <InputLabel for="password" value="Password" class="form-label" />
-          <div class="password-container">
-            <TextInput 
-              id="password" 
-              v-model="password" 
-              :type="showPassword ? 'text' : 'password'" 
-              class="form-control" 
-              placeholder="password"
-              required 
-            />
-            <span @click="showPassword = !showPassword" class="icon">
-              <i v-if="showPassword" class="bi bi-eye"></i>
-              <i v-else class="bi bi-eye-slash"></i>
-            </span>
-          </div>
+    <h1 class="auth-title">Bentornato!</h1>
+    <p class="auth-subtitle">Accedi al tuo account per gestire il menu</p>
 
-        
-        <div class="actions">
-          <router-link to="/forgot-password" class="text-sm link">Forgot your password?</router-link>
-          <router-link to="/register" class="text-sm link">Create an account</router-link>
+    <!-- Registration success -->
+    <Transition name="fade">
+      <div v-if="justRegistered" class="ds-alert ds-alert-success">
+        <i class="bi bi-check-circle"></i>
+        <span>Registrazione completata! Accedi con le tue credenziali.</span>
+      </div>
+    </Transition>
+
+    <!-- Error -->
+    <Transition name="fade">
+      <div v-if="isError" class="ds-alert ds-alert-error">
+        <i class="bi bi-exclamation-circle"></i>
+        <span>{{ errorMessage }}</span>
+      </div>
+    </Transition>
+
+    <form @submit.prevent="submit" class="auth-form">
+      <div class="ds-field">
+        <InputLabel for="username" value="Username o Email" />
+        <TextInput
+          id="username"
+          v-model="username"
+          type="text"
+          class="ds-input"
+          required
+          placeholder="Il tuo username o email"
+        />
+      </div>
+
+      <div class="ds-field">
+        <InputLabel for="password" value="Password" />
+        <div class="password-field">
+          <TextInput
+            id="password"
+            v-model="password"
+            :type="showPassword ? 'text' : 'password'"
+            class="ds-input"
+            placeholder="La tua password"
+            required
+          />
+          <button
+            type="button"
+            class="password-toggle"
+            @click="showPassword = !showPassword"
+            tabindex="-1"
+          >
+            <i v-if="showPassword" class="bi bi-eye"></i>
+            <i v-else class="bi bi-eye-slash"></i>
+          </button>
         </div>
-        
-        <button 
-          type="submit" 
-          class="submit-btn" 
-          :disabled="isLoading"
-        >
-          <span v-if="isLoading" class="loader"></span>
-          <span v-else>Login</span>
-        </button>
-      </form>
-    </AuthenticationCard>
-  </div>
+      </div>
+
+      <div class="auth-links">
+        <router-link to="/forgot-password" class="auth-link">Password dimenticata?</router-link>
+      </div>
+
+      <button type="submit" class="ds-btn ds-btn-primary ds-btn-lg auth-submit" :disabled="isLoading">
+        <span v-if="isLoading" class="ds-spinner"></span>
+        <span v-else>Accedi</span>
+      </button>
+
+      <p class="auth-footer-text">
+        Non hai un account?
+        <router-link to="/register" class="auth-link-bold">Registrati ora</router-link>
+      </p>
+    </form>
+  </AuthenticationCard>
 </template>
 
 <style scoped>
-  body {
-    margin: 0;
-    font-family: 'Arial', sans-serif;
-  }
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-8);
+}
 
-  .login-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    background-size: cover;
-    background-position: center;
-  }
+.auth-brand-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-xl);
+}
 
-  .auth-card {
-    background-color: #f5eee1;
-    border-radius: 15px;
-    padding: 2rem;
-    box-shadow: 0 8px 20px rgba(255, 255, 255, 0.3);
-    width: 450px;
-    max-width: 90%;
-    position: relative;
-    margin: 0 auto; /* Center the form */
-  }
+.auth-brand-name {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: var(--tracking-tight);
+}
 
-  .login-form {
-    width: 350px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1.5rem;
-    background-color: #ffffff;
-    border-radius: 12px;
-  }
+.auth-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+  margin: 0 0 var(--space-2) 0;
+  letter-spacing: var(--tracking-tight);
+}
 
-  .welcome-message {
-    font-size: 2rem;
-    text-align: center;
-    color: #2c3e50;
-    margin-bottom: 0.2rem;
-    text-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.6);
-  }
+.auth-subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  margin: 0 0 var(--space-6) 0;
+}
 
-  .error-message {
-    color: #e74c3c;
-    font-size: 14px;
-    text-align: center;
-    margin-bottom: 1rem;
-  }
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
 
-  .form-field {
-    margin-bottom: 0.8rem;
-  }
+.password-field {
+  position: relative;
+}
 
-  .password-container {
-    position: relative;
-    display: inline-block;
-  }
+.password-field .ds-input {
+  padding-right: 44px;
+}
 
-  .password-container input {
-    padding-right: 30px; /* Spazio per l'icona */
-    height: 35px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-  }
+.password-toggle {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: var(--space-1);
+  display: flex;
+  align-items: center;
+  transition: color var(--transition-fast);
+}
 
-  .password-container .icon {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-  }
+.password-toggle:hover {
+  color: var(--color-text);
+}
 
+.auth-links {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-5);
+}
 
-  .toggle-password-text {
-    position: absolute;
-    top: 55%;
-    right: 10px;
-    transform: translateY(-50%);
-    color: #2ecc71;
-    font-size: 12.5px;
-    font-weight: bold;
-    cursor: pointer;
-  }
+.auth-link {
+  font-size: var(--text-sm);
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color var(--transition-fast);
+}
 
-  .toggle-password-text:hover {
-    color: #27ae60;
-  }
+.auth-link:hover {
+  color: var(--color-primary-hover);
+}
 
-  .input-field {
-    width: 100%;
-    padding: 0.6rem;
-    padding-right: 50px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 14px;
-    background-color: #ffffff;
-    box-shadow: 0 2px 5px rgba(255, 255, 255, 0.3);
-    transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
-  }
+.auth-submit {
+  width: 100%;
+  margin-bottom: var(--space-5);
+}
 
-  .input-field:focus {
-    outline: none;
-    box-shadow: 0 4px 10px rgba(41, 128, 185, 0.3);
-    transform: scale(1.02);
-  }
+.auth-footer-text {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
 
-  .input-field:hover {
-    border-color: #2ecc71;
-  }
+.auth-link-bold {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
 
-  .actions {
-    display: flex;
-    justify-content: space-between;
-    margin: 1rem 0;
-  }
-
-  .link {
-    color: #2c3e50;
-    font-size: 14px;
-    text-decoration: none;
-  }
-
-  .link:hover {
-    text-decoration: underline;
-  }
-
-  .submit-btn {
-    width: 100%;
-    padding: 0.8rem;
-    background-color: #27ae60;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.3);
-    transition: all 0.3s ease;
-  }
-
-  .submit-btn:hover {
-    background-color: #2ecc71;
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  }
-
-  .submit-btn:disabled {
-    background-color: #bdc3c7;
-    cursor: not-allowed;
-  }
-
-  .loader {
-    width: 20px;
-    height: 20px;
-    border: 4px solid #fff;
-    border-top: 4px solid #3498db;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  /* Smoother transitions */
-  .fade-in {
-    animation: fadeIn 1s;
-  }
-
-  @keyframes fadeIn {
-    0% { opacity: 0; }
-    100% { opacity: 1; }
-  }
+.auth-link-bold:hover {
+  color: var(--color-primary-hover);
+}
 </style>

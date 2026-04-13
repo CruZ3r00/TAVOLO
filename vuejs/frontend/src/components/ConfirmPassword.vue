@@ -11,15 +11,15 @@ const emit = defineEmits(['confirmed']);
 defineProps({
     title: {
         type: String,
-        default: 'Confirm Password',
+        default: 'Conferma password',
     },
     content: {
         type: String,
-        default: 'For your security, please confirm your password to continue.',
+        default: 'Per la tua sicurezza, conferma la password per continuare.',
     },
     button: {
         type: String,
-        default: 'Confirm',
+        default: 'Conferma',
     },
 });
 
@@ -82,30 +82,27 @@ const closeModal = () => {
             </template>
 
             <template #content>
-                {{ content }}
+                <p class="confirm-description">{{ content }}</p>
 
-                <div class="mt-4">
+                <div class="ds-field">
                     <TextInput
                         ref="passwordInput"
                         v-model="form.password"
                         type="password"
-                        class="mt-1 block w-3/4"
                         placeholder="Password"
                         autocomplete="current-password"
                         @keyup.enter="confirmPassword"
                     />
-
-                    <InputError :message="form.error" class="mt-2" />
+                    <InputError :message="form.error" />
                 </div>
             </template>
 
             <template #footer>
                 <SecondaryButton @click="closeModal">
-                    Cancel
+                    Annulla
                 </SecondaryButton>
 
                 <PrimaryButton
-                    class="ms-3"
                     :class="{ 'opacity-25': form.processing }"
                     :disabled="form.processing"
                     @click="confirmPassword"
@@ -116,3 +113,12 @@ const closeModal = () => {
         </DialogModal>
     </span>
 </template>
+
+<style scoped>
+.confirm-description {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4) 0;
+  line-height: var(--leading-relaxed);
+}
+</style>

@@ -1,35 +1,27 @@
 <script setup>
-    import { RouterView } from 'vue-router';
+    import { RouterView, useRoute } from 'vue-router';
+    import { computed } from 'vue';
+
+    const route = useRoute();
+    const routeKey = computed(() => route.fullPath);
 </script>
 
 <template>
     <div id="app">
-      <RouterView> </RouterView> <!-- Questo è il punto dove verrà caricato il contenuto della rotta -->
+      <RouterView v-slot="{ Component }">
+        <Transition name="page" mode="out-in">
+          <component :is="Component" :key="routeKey" />
+        </Transition>
+      </RouterView>
     </div>
 </template>
-  
-<style scoped>
+
+<style>
     #app {
-        font-family: Arial, sans-serif;
-        color: #333;
+        font-family: var(--font-family);
+        color: var(--color-text);
         margin: 0;
         padding: 0;
-    }
-    
-    header {
-        background-color: #4CAF50;
-        color: white;
-        padding: 10px;
-        text-align: center;
-    }
-    
-    footer {
-        background-color: #f1f1f1;
-        color: #333;
-        padding: 10px;
-        text-align: center;
-        position: absolute;
-        bottom: 0;
-        width: 100%;
+        min-height: 100vh;
     }
 </style>

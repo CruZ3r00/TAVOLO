@@ -1,0 +1,102 @@
+- generic [ref=e82]:
+  - navigation [ref=e83]:
+    - generic [ref=e84]:
+      - link " MenuCMS" [ref=e85] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e87]: 
+        - generic [ref=e88]: MenuCMS
+      - generic [ref=e89]:
+        - link " Dashboard" [ref=e90] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e91]: 
+          - generic [ref=e92]: Dashboard
+        - link " Menu" [ref=e93] [cursor=pointer]:
+          - /url: /menu-handler
+          - generic [ref=e94]: 
+          - generic [ref=e95]: Menu
+        - link " Sito" [ref=e96] [cursor=pointer]:
+          - /url: /site-config
+          - generic [ref=e97]: 
+          - generic [ref=e98]: Sito
+      - generic [ref=e100]:
+        - button "P pizzeria_qa_test " [ref=e101] [cursor=pointer]:
+          - generic [ref=e102]: P
+          - generic [ref=e103]: pizzeria_qa_test
+          - generic [ref=e104]: 
+        - text:  
+  - main [ref=e105]:
+    - generic [ref=e108]:
+      - paragraph [ref=e109]: Dashboard
+      - heading "Ciao, pizzeria_qa_test" [level=1] [ref=e110]
+      - paragraph [ref=e111]: pizzeria_qa_test
+    - generic [ref=e113]:
+      - generic [ref=e114]:
+        - generic [ref=e116]:
+          - generic [ref=e118]: 
+          - generic [ref=e119]: "0"
+          - generic [ref=e120]: Elementi totali
+        - generic [ref=e122]:
+          - generic [ref=e124]: 
+          - generic [ref=e125]: "0"
+          - generic [ref=e126]: Piatti
+        - generic [ref=e128]:
+          - generic [ref=e130]: 
+          - generic [ref=e131]: "0"
+          - generic [ref=e132]: Bevande
+        - generic [ref=e134]:
+          - generic [ref=e136]: 
+          - generic [ref=e137]: "0"
+          - generic [ref=e138]: Categorie
+        - generic [ref=e140]:
+          - generic [ref=e142]: 
+          - generic [ref=e143]: "0"
+          - generic [ref=e144]: Ingredienti unici
+        - generic [ref=e146]:
+          - generic [ref=e148]: 
+          - generic [ref=e149]: "0"
+          - generic [ref=e150]: Allergeni
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e153]:
+            - generic [ref=e154]: 
+            - heading "Elementi per categoria" [level=3] [ref=e155]
+          - generic [ref=e157]:
+            - generic [ref=e159]: 
+            - paragraph [ref=e160]: Nessun elemento nel menu
+        - generic [ref=e161]:
+          - generic [ref=e162]:
+            - generic [ref=e163]: 
+            - heading "Sito menu" [level=3] [ref=e164]
+          - generic [ref=e166]:
+            - generic [ref=e167]: Configurato
+            - paragraph [ref=e168]: "URL del tuo sito menu:"
+            - link "http://localhost:1337/sites/pizzeria_qa_test" [ref=e169] [cursor=pointer]:
+              - /url: http://localhost:1337/sites/pizzeria_qa_test
+            - button " Gestisci configurazione" [ref=e170] [cursor=pointer]:
+              - generic [ref=e171]: 
+              - generic [ref=e172]: Gestisci configurazione
+      - generic [ref=e173]:
+        - paragraph [ref=e174]: Azioni rapide
+        - generic [ref=e175]:
+          - button " Gestisci Menu " [ref=e176] [cursor=pointer]:
+            - generic [ref=e177]: 
+            - generic [ref=e178]: Gestisci Menu
+            - generic [ref=e179]: 
+          - button " Configurazione Sito " [ref=e180] [cursor=pointer]:
+            - generic [ref=e181]: 
+            - generic [ref=e182]: Configurazione Sito
+            - generic [ref=e183]: 
+          - button " Il tuo Profilo " [ref=e184] [cursor=pointer]:
+            - generic [ref=e185]: 
+            - generic [ref=e186]: Il tuo Profilo
+            - generic [ref=e187]: 
+  - contentinfo [ref=e188]:
+    - generic [ref=e189]:
+      - paragraph [ref=e190]: © 2025 MenuCMS
+      - navigation [ref=e191]:
+        - link "Home" [ref=e192] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e193] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e194] [cursor=pointer]:
+          - /url: /contact-us

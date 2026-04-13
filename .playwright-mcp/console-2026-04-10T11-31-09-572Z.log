@@ -1,0 +1,4 @@
+[     140ms] [WARNING] [Vue warn]: Property "terms" was accessed during render but is not defined on instance. 
+  at <TermsOfService onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< undefined > > 
+  at <RouterView> 
+  at <App> @ http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=a36705ea:2115

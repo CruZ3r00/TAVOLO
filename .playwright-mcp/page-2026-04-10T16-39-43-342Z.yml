@@ -1,0 +1,62 @@
+- generic [active] [ref=e1]:
+  - text: 
+  - generic [ref=e6]:
+    - generic [ref=e8]:
+      - heading "trattoria_test" [level=1] [ref=e9]
+      - paragraph [ref=e10]:
+        - generic [ref=e11]: 
+        - text: Il nostro menu
+    - navigation [ref=e12]:
+      - generic [ref=e14]:
+        - button "Tutti" [ref=e15] [cursor=pointer]
+        - button "Pizze classiche" [ref=e16] [cursor=pointer]
+        - button "Primi" [ref=e17] [cursor=pointer]
+        - button "Bevande" [ref=e18] [cursor=pointer]
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - heading " Pizze classiche" [level=2] [ref=e22]:
+          - generic [ref=e23]: 
+          - text: Pizze classiche
+        - generic [ref=e26]:
+          - generic [ref=e28]: 
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - heading "Pizza Napoli" [level=5] [ref=e31]
+              - generic [ref=e32]: 8.50 €
+            - paragraph [ref=e33]:
+              - generic [ref=e34]: 
+              - text: Pomodoro, Mozzarella
+            - generic [ref=e36]:
+              - generic [ref=e37]: 
+              - text: Glutine
+      - generic [ref=e38]:
+        - heading " Primi" [level=2] [ref=e39]:
+          - generic [ref=e40]: 
+          - text: Primi
+        - generic [ref=e43]:
+          - generic [ref=e45]: 
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - heading "Carbonara" [level=5] [ref=e48]
+              - generic [ref=e49]: 10.00 €
+            - paragraph [ref=e50]:
+              - generic [ref=e51]: 
+              - text: Guanciale
+            - generic [ref=e53]:
+              - generic [ref=e54]: 
+              - text: Uova
+      - generic [ref=e55]:
+        - heading " Bevande" [level=2] [ref=e56]:
+          - generic [ref=e57]: 
+          - text: Bevande
+        - generic [ref=e60]:
+          - generic [ref=e62]: 
+          - generic [ref=e64]:
+            - heading "Acqua naturale 1L" [level=5] [ref=e65]
+            - generic [ref=e66]: 2.00 €
+    - contentinfo [ref=e67]:
+      - generic [ref=e68]:
+        - paragraph [ref=e69]:
+          - text: Menu digitale gestito con
+          - strong [ref=e70]: MenuCMS
+        - paragraph [ref=e71]: Dati aggiornati in tempo reale tramite API

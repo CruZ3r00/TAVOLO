@@ -1,0 +1,37 @@
+{
+  "kind": "collectionType",
+  "collectionName": "website_configs",
+  "info": {
+    "singularName": "website-config",
+    "pluralName": "website-configs",
+    "displayName": "WebsiteConfig",
+    "description": "Configurazione del sito web esterno del ristorante"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "site_url": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "restaurant_name": {
+      "type": "string",
+      "required": true
+    },
+    "logo": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images"
+      ]
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

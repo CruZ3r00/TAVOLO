@@ -1,0 +1,57 @@
+- generic [ref=e55]:
+  - navigation [ref=e56]:
+    - generic [ref=e57]:
+      - link "MenuCMS" [ref=e58] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e59]: MenuCMS
+      - generic [ref=e60]:
+        - list [ref=e61]:
+          - listitem [ref=e62]:
+            - link "Dashboard" [ref=e63] [cursor=pointer]:
+              - /url: /dashboard
+              - text: Dashboard
+          - listitem [ref=e64]:
+            - link "Menu" [ref=e65] [cursor=pointer]:
+              - /url: /menu-handler
+              - text: Menu
+          - listitem [ref=e66]:
+            - link "Configurazione Sito" [ref=e67] [cursor=pointer]:
+              - /url: /site-config
+              - text: Configurazione Sito
+        - list [ref=e68]:
+          - listitem [ref=e69]:
+            - button "demo_restaurant" [ref=e70] [cursor=pointer]: demo_restaurant
+  - main [ref=e71]:
+    - heading "Benvenuto, !" [level=1] [ref=e76]
+    - generic [ref=e79]:
+      - generic [ref=e82]:
+        - heading "0" [level=2] [ref=e83]
+        - paragraph [ref=e84]: Elementi nel menu
+      - generic [ref=e87]:
+        - heading "0" [level=2] [ref=e88]
+        - paragraph [ref=e89]: Categorie
+      - generic [ref=e92]:
+        - heading "Da configurare" [level=2] [ref=e93]
+        - paragraph [ref=e94]: Sito web
+    - generic [ref=e96]:
+      - heading "Azioni rapide" [level=3] [ref=e97]
+      - generic [ref=e98]:
+        - button "Gestisci Menu" [ref=e100] [cursor=pointer]:
+          - generic [ref=e101]: Gestisci Menu
+        - button "Configurazione Sito" [ref=e103] [cursor=pointer]:
+          - generic [ref=e104]: Configurazione Sito
+        - button "Il tuo Profilo" [ref=e106] [cursor=pointer]:
+          - generic [ref=e107]: Il tuo Profilo
+  - contentinfo [ref=e108]:
+    - generic [ref=e110]:
+      - paragraph [ref=e111]: © 2025 MenuCMS
+      - list [ref=e112]:
+        - listitem [ref=e113]:
+          - link "Home" [ref=e114] [cursor=pointer]:
+            - /url: /home
+        - listitem [ref=e115]:
+          - link "Chi siamo" [ref=e116] [cursor=pointer]:
+            - /url: /who-are-us
+        - listitem [ref=e117]:
+          - link "Contattaci" [ref=e118] [cursor=pointer]:
+            - /url: /contact-us

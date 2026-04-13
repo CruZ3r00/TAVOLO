@@ -1,0 +1,54 @@
+- generic [ref=e195]:
+  - navigation [ref=e196]:
+    - generic [ref=e197]:
+      - link " MenuCMS" [ref=e198] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e200]: 
+        - generic [ref=e201]: MenuCMS
+      - generic [ref=e202]:
+        - link " Dashboard" [ref=e203] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e204]: 
+          - generic [ref=e205]: Dashboard
+        - link " Menu" [ref=e206] [cursor=pointer]:
+          - /url: /menu-handler
+          - generic [ref=e207]: 
+          - generic [ref=e208]: Menu
+        - link " Sito" [ref=e209] [cursor=pointer]:
+          - /url: /site-config
+          - generic [ref=e210]: 
+          - generic [ref=e211]: Sito
+      - generic [ref=e213]:
+        - button "P pizzeria_qa_test " [ref=e214] [cursor=pointer]:
+          - generic [ref=e215]: P
+          - generic [ref=e216]: pizzeria_qa_test
+          - generic [ref=e217]: 
+        - text:  
+  - main [ref=e218]:
+    - generic [ref=e220]:
+      - generic [ref=e221]:
+        - heading "I tuoi elementi" [level=2] [ref=e223]
+        - generic [ref=e224]:
+          - button " Modifica" [ref=e225] [cursor=pointer]:
+            - generic [ref=e226]: 
+            - generic [ref=e227]: Modifica
+          - button " Aggiungi" [ref=e228] [cursor=pointer]:
+            - generic [ref=e229]: 
+            - generic [ref=e230]: Aggiungi
+      - generic [ref=e232]:
+        - generic [ref=e234]: 
+        - paragraph [ref=e235]: Nessun elemento nel menu
+        - paragraph [ref=e236]: Inizia aggiungendo il primo elemento al tuo menu.
+        - button " Aggiungi il primo elemento" [ref=e237] [cursor=pointer]:
+          - generic [ref=e238]: 
+          - generic [ref=e239]: Aggiungi il primo elemento
+  - contentinfo [ref=e240]:
+    - generic [ref=e241]:
+      - paragraph [ref=e242]: © 2025 MenuCMS
+      - navigation [ref=e243]:
+        - link "Home" [ref=e244] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e245] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e246] [cursor=pointer]:
+          - /url: /contact-us

@@ -1,0 +1,81 @@
+- generic [ref=e2]:
+  - text:   
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - heading "Ristorante Demo" [level=1] [ref=e6]
+      - paragraph [ref=e7]: Il nostro menu
+    - navigation [ref=e8]:
+      - generic [ref=e10]:
+        - button "Tutti" [ref=e11] [cursor=pointer]
+        - button "Pizze classiche" [ref=e12] [cursor=pointer]
+        - button "Primi" [ref=e13] [cursor=pointer]
+        - button "Secondi" [ref=e14] [cursor=pointer]
+        - button "Contorni" [ref=e15] [cursor=pointer]
+        - button "Dessert" [ref=e16] [cursor=pointer]
+        - button "Bevande" [ref=e17] [cursor=pointer]
+    - generic [ref=e19]:
+      - generic [ref=e21]:
+        - generic [ref=e23]: 
+        - generic [ref=e24]:
+          - generic [ref=e25]:
+            - heading "Margherita" [level=5] [ref=e26]
+            - generic [ref=e27]: 6.50 EUR
+          - paragraph [ref=e28]:
+            - strong [ref=e29]: "Ingredienti:"
+            - text: Pomodoro, Mozzarella, Basilico
+          - generic [ref=e30]:
+            - generic [ref=e31]: Glutine
+            - generic [ref=e32]: Lattosio
+      - generic [ref=e34]:
+        - generic [ref=e36]: 
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - heading "Carbonara" [level=5] [ref=e39]
+            - generic [ref=e40]: 10.00 EUR
+          - paragraph [ref=e41]:
+            - strong [ref=e42]: "Ingredienti:"
+            - text: Spaghetti, Guanciale, Pecorino, Uova, Pepe nero
+          - generic [ref=e43]:
+            - generic [ref=e44]: Glutine
+            - generic [ref=e45]: Uova
+            - generic [ref=e46]: Lattosio
+      - generic [ref=e48]:
+        - generic [ref=e50]: 
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - heading "Bistecca alla griglia" [level=5] [ref=e53]
+            - generic [ref=e54]: 14.00 EUR
+          - paragraph [ref=e55]:
+            - strong [ref=e56]: "Ingredienti:"
+            - text: Manzo, Sale, Rosmarino, Olio EVO
+      - generic [ref=e58]:
+        - generic [ref=e60]: 
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - heading "Insalata mista" [level=5] [ref=e63]
+            - generic [ref=e64]: 5.00 EUR
+          - paragraph [ref=e65]:
+            - strong [ref=e66]: "Ingredienti:"
+            - text: Lattuga, Pomodori, Carote, Mais
+      - generic [ref=e68]:
+        - generic [ref=e70]: 
+        - generic [ref=e71]:
+          - generic [ref=e72]:
+            - heading "Tiramisu" [level=5] [ref=e73]
+            - generic [ref=e74]: 6.00 EUR
+          - paragraph [ref=e75]:
+            - strong [ref=e76]: "Ingredienti:"
+            - text: Mascarpone, Savoiardi, Caffe, Cacao, Uova
+          - generic [ref=e77]:
+            - generic [ref=e78]: Glutine
+            - generic [ref=e79]: Uova
+            - generic [ref=e80]: Lattosio
+      - generic [ref=e82]:
+        - generic [ref=e84]: 
+        - generic [ref=e86]:
+          - heading "Acqua naturale 1L" [level=5] [ref=e87]
+          - generic [ref=e88]: 2.00 EUR
+    - contentinfo [ref=e89]:
+      - generic [ref=e90]:
+        - paragraph [ref=e91]: Menu gestito con MenuCMS
+        - paragraph [ref=e92]: Dati forniti tramite API pubblica

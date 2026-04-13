@@ -1,29 +1,32 @@
 <script setup>
 import { computed, defineProps } from 'vue';
 
-// Props
 const props = defineProps({
   message: {
     type: String,
-    default: '', // Stringa vuota come valore predefinito
+    default: '',
   },
 });
 
-// Computed per verificare se `message` è un errore
 const hasError = computed(() => props.message.trim() !== '');
 </script>
 
 <template>
-    <div v-if="hasError" class="error-message"> 
-        <p class="text-sm text-red-600">
-            {{ message }}
-        </p>
-    </div>
+    <Transition name="fade">
+        <div v-if="hasError" class="input-error">
+            <i class="bi bi-exclamation-circle"></i>
+            <span>{{ message }}</span>
+        </div>
+    </Transition>
 </template>
 
 <style scoped>
-.error-message {
-  color: red;
-  font-size: 14px;
+.input-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--color-destructive);
 }
 </style>

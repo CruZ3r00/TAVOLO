@@ -1,0 +1,26 @@
+- generic [ref=e143]:
+  - generic [ref=e144]:
+    - generic [ref=e146]: 
+    - generic [ref=e147]: MenuCMS
+  - heading "Bentornato!" [level=1] [ref=e148]
+  - paragraph [ref=e149]: Accedi al tuo account per gestire il menu
+  - generic [ref=e150]:
+    - generic [ref=e151]:
+      - generic [ref=e152]: Username o Email
+      - textbox "Username o Email" [ref=e153]:
+        - /placeholder: Il tuo username o email
+    - generic [ref=e154]:
+      - generic [ref=e155]: Password
+      - generic [ref=e156]:
+        - textbox "Password" [ref=e157]:
+          - /placeholder: La tua password
+        - button "" [ref=e158] [cursor=pointer]:
+          - generic [ref=e159]: 
+    - link "Password dimenticata?" [ref=e161] [cursor=pointer]:
+      - /url: /forgot-password
+    - button "Accedi" [ref=e162] [cursor=pointer]:
+      - generic [ref=e163]: Accedi
+    - paragraph [ref=e164]:
+      - text: Non hai un account?
+      - link "Registrati ora" [ref=e165] [cursor=pointer]:
+        - /url: /register

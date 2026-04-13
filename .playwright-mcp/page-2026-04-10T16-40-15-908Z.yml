@@ -1,0 +1,36 @@
+- generic [ref=e1]:
+  - text: 
+  - generic [ref=e6]:
+    - generic [ref=e8]:
+      - heading "trattoria_test" [level=1] [ref=e9]
+      - paragraph [ref=e10]:
+        - generic [ref=e11]: 
+        - text: Il nostro menu
+    - navigation [ref=e12]:
+      - generic [ref=e14]:
+        - button "Tutti" [ref=e15] [cursor=pointer]
+        - button "Pizze classiche" [ref=e16] [cursor=pointer]
+        - button "Primi" [active] [ref=e17] [cursor=pointer]
+        - button "Bevande" [ref=e18] [cursor=pointer]
+    - generic [ref=e72]:
+      - heading " Primi" [level=2] [ref=e73]:
+        - generic [ref=e74]: 
+        - text: Primi
+      - generic [ref=e77]:
+        - generic [ref=e79]: 
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - heading "Carbonara" [level=5] [ref=e82]
+            - generic [ref=e83]: 10.00 €
+          - paragraph [ref=e84]:
+            - generic [ref=e85]: 
+            - text: Guanciale
+          - generic [ref=e87]:
+            - generic [ref=e88]: 
+            - text: Uova
+    - contentinfo [ref=e67]:
+      - generic [ref=e68]:
+        - paragraph [ref=e69]:
+          - text: Menu digitale gestito con
+          - strong [ref=e70]: MenuCMS
+        - paragraph [ref=e71]: Dati aggiornati in tempo reale tramite API

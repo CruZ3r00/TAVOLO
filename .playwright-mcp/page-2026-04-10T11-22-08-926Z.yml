@@ -1,0 +1,18 @@
+- generic [ref=e6]:
+  - heading "Bentornato!" [level=1] [ref=e7]
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]: Username
+      - textbox "Username" [ref=e11]:
+        - /placeholder: Email o Username
+    - generic [ref=e12]: Password
+    - generic [ref=e13]:
+      - textbox "Password" [ref=e14]:
+        - /placeholder: password
+      - generic [ref=e16]: 
+    - generic [ref=e17]:
+      - link "Forgot your password?" [ref=e18] [cursor=pointer]:
+        - /url: /forgot-password
+      - link "Create an account" [ref=e19] [cursor=pointer]:
+        - /url: /register
+    - button "Login" [ref=e20] [cursor=pointer]
