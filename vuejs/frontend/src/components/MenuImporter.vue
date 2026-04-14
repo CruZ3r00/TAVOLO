@@ -294,7 +294,7 @@ const closeModal = () => {
           </div>
         </div>
       </div>
-    </Transition>
+    </Teleport>
   </div>
 </template>
 
