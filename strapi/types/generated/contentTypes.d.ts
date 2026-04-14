@@ -1028,6 +1028,7 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.DefaultTo<false>;
     two_factor_recovery_codes: Schema.Attribute.JSON & Schema.Attribute.Private;
     two_factor_secret: Schema.Attribute.String & Schema.Attribute.Private;
+    unavailable_ingredients: Schema.Attribute.JSON;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

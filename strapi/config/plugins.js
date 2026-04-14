@@ -12,8 +12,8 @@ module.exports = () => ({
         }
       },
       settings: {
-        defaultFrom: 'MS_aoKERo@test-zkq340er7p3gd796.mlsender.net',
-        defaultReplyTo: 'MS_aoKERo@test-zkq340er7p3gd796.mlsender.net',
+        defaultFrom: 'no-reply@test-zkq340er7p3gd796.mlsender.net',
+        defaultReplyTo: 'support@test-zkq340er7p3gd796.mlsender.net',
       },
     },
   },
