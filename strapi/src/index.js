@@ -62,7 +62,7 @@ module.exports = {
 
           await strapi.plugin('email').service('email').send({
             to: 'site.alerts@outlook.com',
-            from:  'a7e207001@smtp-brevo.com',
+            from:  'cms-info-private@sandboxf5f07150cafb4ab4bf27c57b189f7220.mailgun.org',
             subject: `Nuovo ristoratore registrato: ${result.username}`,
             text: [
               'Un nuovo ristoratore si e\' registrato sul CMS!',

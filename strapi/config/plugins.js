@@ -3,17 +3,17 @@ module.exports = () => ({
     config: {
       provider: 'nodemailer',
       providerOptions: {
-        host: 'smtp-relay.brevo.com',
+        host: 'smtp.mailersend.net',
         port: 587,
         secure: false,
         auth:{
-          user: 'a7e207001@smtp-brevo.com',
-          pass: 'bsk7tVsuZEvheYK',
+          user: 'MS_aoKERo@test-zkq340er7p3gd796.mlsender.net',
+          pass: 'mssp.zym3IXI.vywj2lp28opg7oqz.kgdwenE', //mssp.zym3lXl.vywj2lp28opg7oqz.kgdwenE
         }
       },
       settings: {
-        defaultFrom: 'a7e207001@smtp-brevo.com',
-        defaultReplyTo: 'noreply@smtp-brevo.com',
+        defaultFrom: 'MS_aoKERo@test-zkq340er7p3gd796.mlsender.net',
+        defaultReplyTo: 'MS_aoKERo@test-zkq340er7p3gd796.mlsender.net',
       },
     },
   },
