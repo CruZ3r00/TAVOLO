@@ -135,9 +135,10 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
       }
 
       const menu = menus[0];
-      const elements = menu.fk_elements || [];
+      // Filtra solo i piatti disponibili (available !== false)
+      const elements = (menu.fk_elements || []).filter((el) => el.available !== false);
 
-      // 4. Estrai le categorie uniche
+      // 4. Estrai le categorie uniche (solo dai piatti disponibili)
       const categories = [...new Set(elements.map((el) => el.category))];
 
       // 5. Formatta la risposta
@@ -148,6 +149,7 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
         category: el.category,
         ingredients: el.ingredients || [],
         allergens: el.allergens || [],
+        available: el.available !== false,
         image_url: el.image
           ? el.image.formats && el.image.formats.thumbnail
             ? el.image.formats.thumbnail.url

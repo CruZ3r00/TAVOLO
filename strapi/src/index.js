@@ -135,6 +135,8 @@ async function grantImportPermissions(strapi) {
       'api::account.account.twoFactorConfirm',
       'api::account.account.twoFactorDisable',
       'api::account.account.twoFactorRegenerateRecovery',
+      'api::ingredient.ingredient.list',
+      'api::ingredient.ingredient.toggle',
     ];
     for (const action of actions) {
       const existing = await strapi.db.query('plugin::users-permissions.permission').findOne({
