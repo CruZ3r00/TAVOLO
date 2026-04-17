@@ -1,0 +1,4 @@
+[     600ms] [LOG] [Orders] openOrderFromQuery docId= r8uc7pqzv2wg01okvn43xd8n query= {"order":"r8uc7pqzv2wg01okvn43xd8n"} @ http://localhost:5174/src/Pages/Orders.vue?t=1776425881953:244
+[     600ms] [LOG] [Orders] showOrderDetail set to true, currentOrderDocId= r8uc7pqzv2wg01okvn43xd8n @ http://localhost:5174/src/Pages/Orders.vue?t=1776425881953:248
+[    1194ms] [LOG] [Orders] openOrderFromQuery docId= null query= {} @ http://localhost:5174/src/Pages/Orders.vue?t=1776425881953:244
+[   25297ms] [LOG] [Orders] openOrderFromQuery docId= null query= {} @ http://localhost:5174/src/Pages/Orders.vue?t=1776425881953:244

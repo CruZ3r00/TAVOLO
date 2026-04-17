@@ -3,7 +3,6 @@
     import { ref, onMounted, nextTick } from 'vue';
     import qs from 'qs';
     import { API_BASE } from '@/utils';
-    import MenuImporter from '@/components/MenuImporter.vue';
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
@@ -260,7 +259,6 @@
                     <p class="adder-subtitle">Aggiungi un nuovo piatto o bevanda al tuo menu</p>
                 </div>
                 <div class="adder-header-actions">
-                    <MenuImporter @imported="emit('ViewList')" />
                     <button @click="emit('ViewList')" class="ds-btn ds-btn-secondary">
                         <i class="bi bi-arrow-left"></i>
                         <span>Torna alla lista</span>

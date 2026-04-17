@@ -24,6 +24,8 @@ const saveSuccess = ref(false);
 const saveError = ref('');
 const apiEndpoint = ref('');
 const apiCopied = ref(false);
+const copertiInvernali = ref('');
+const copertiEstivi = ref('');
 
 const fetchConfig = async () => {
   try {
@@ -61,6 +63,8 @@ const fetchConfig = async () => {
           configId.value = config.documentId;
           restaurantName.value = config.restaurant_name || '';
           siteUrl.value = config.site_url || '';
+          copertiInvernali.value = config.coperti_invernali != null ? String(config.coperti_invernali) : '';
+          copertiEstivi.value = config.coperti_estivi != null ? String(config.coperti_estivi) : '';
           if (config.logo) {
             currentLogoUrl.value = `${API_BASE}${config.logo.url}`;
             uploadedLogoId.value = config.logo.id;
@@ -112,9 +116,27 @@ const saveConfig = async () => {
   try {
     await uploadLogo();
 
+    const cInv = parseInt(copertiInvernali.value, 10);
+    if (!Number.isFinite(cInv) || cInv < 1 || cInv > 10000) {
+      saveError.value = 'Coperti invernali: inserisci un intero tra 1 e 10000.';
+      isSaving.value = false;
+      return;
+    }
+    let cEst = null;
+    if (copertiEstivi.value !== '' && copertiEstivi.value != null) {
+      cEst = parseInt(copertiEstivi.value, 10);
+      if (!Number.isFinite(cEst) || cEst < 1 || cEst > 10000) {
+        saveError.value = 'Coperti estivi: inserisci un intero tra 1 e 10000 (o lascia vuoto).';
+        isSaving.value = false;
+        return;
+      }
+    }
+
     const bodyData = {
       restaurant_name: restaurantName.value,
       site_url: siteUrl.value,
+      coperti_invernali: cInv,
+      coperti_estivi: cEst != null ? cEst : cInv,
     };
 
     if (uploadedLogoId.value) {
@@ -230,6 +252,18 @@ onMounted(async () => {
                     <label class="ds-label">URL del sito web</label>
                     <input type="url" v-model="siteUrl" class="ds-input" placeholder="https://www.mioristorante.it">
                     <p class="ds-helper">L'URL del tuo sito web dove verrà visualizzato il menu.</p>
+                  </div>
+
+                  <div class="ds-field">
+                    <label class="ds-label">Coperti invernali *</label>
+                    <input type="number" min="1" max="10000" v-model="copertiInvernali" class="ds-input" placeholder="Es. 40" required>
+                    <p class="ds-helper">Capienza massima nei mesi invernali. Usata per il controllo overbooking.</p>
+                  </div>
+
+                  <div class="ds-field">
+                    <label class="ds-label">Coperti estivi</label>
+                    <input type="number" min="1" max="10000" v-model="copertiEstivi" class="ds-input" placeholder="Uguale agli invernali se vuoto">
+                    <p class="ds-helper">Capienza massima nei mesi estivi (default aprile-ottobre).</p>
                   </div>
 
                   <div class="ds-field">

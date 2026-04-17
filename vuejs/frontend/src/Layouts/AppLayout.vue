@@ -1,15 +1,18 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Footer from '@/components/Footer.vue';
 import { useStore } from 'vuex';
-import { API_BASE } from '@/utils';
+import { API_BASE, fetchReservations, fetchOrders } from '@/utils';
 
 const username = ref('');
 const store = useStore();
 const router = useRouter();
 const isLoggedIn = ref(false);
 const mobileMenuOpen = ref(false);
+const pendingCount = ref(0);
+const activeOrdersCount = ref(0);
+let pendingPollId = null;
 
 const checkLog = async () => {
   isLoggedIn.value = store.getters.isAuthenticated;
@@ -28,6 +31,30 @@ const checkLog = async () => {
   }
 };
 
+const refreshPendingCount = async () => {
+  if (!store.getters.isAuthenticated) return;
+  const token = store.getters.getToken;
+  if (!token) return;
+  try {
+    const res = await fetchReservations({ status: 'pending', pageSize: 1 }, token);
+    pendingCount.value = res?.meta?.pagination?.total ?? 0;
+  } catch (_err) {
+    // Silenzioso: il badge è non-critico.
+  }
+};
+
+const refreshActiveOrdersCount = async () => {
+  if (!store.getters.isAuthenticated) return;
+  const token = store.getters.getToken;
+  if (!token) return;
+  try {
+    const res = await fetchOrders({ status: 'active', pageSize: 1 }, token);
+    activeOrdersCount.value = res?.meta?.pagination?.total ?? 0;
+  } catch (_err) {
+    // Silenzioso: il badge è non-critico.
+  }
+};
+
 const toggleMobileMenu = () => {
   mobileMenuOpen.value = !mobileMenuOpen.value;
 };
@@ -36,8 +63,19 @@ const closeMobileMenu = () => {
   mobileMenuOpen.value = false;
 };
 
-onMounted(() => {
-  checkLog();
+onMounted(async () => {
+  await checkLog();
+  if (isLoggedIn.value) {
+    await Promise.all([refreshPendingCount(), refreshActiveOrdersCount()]);
+    pendingPollId = setInterval(() => {
+      refreshPendingCount();
+      refreshActiveOrdersCount();
+    }, 30000);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (pendingPollId) clearInterval(pendingPollId);
 });
 </script>
 
@@ -64,6 +102,20 @@ onMounted(() => {
             <router-link to="/menu-handler" class="nav-item" active-class="nav-item-active">
               <i class="bi bi-journal-text nav-item-icon"></i>
               <span>Menu</span>
+            </router-link>
+            <router-link to="/reservations" class="nav-item" active-class="nav-item-active">
+              <i class="bi bi-calendar-check nav-item-icon"></i>
+              <span>Prenotazioni</span>
+              <span v-if="pendingCount > 0" class="nav-item-badge" :aria-label="`${pendingCount} richieste in attesa`">
+                {{ pendingCount > 99 ? '99+' : pendingCount }}
+              </span>
+            </router-link>
+            <router-link to="/orders" class="nav-item" active-class="nav-item-active">
+              <i class="bi bi-receipt nav-item-icon"></i>
+              <span>Ordinazioni</span>
+              <span v-if="activeOrdersCount > 0" class="nav-item-badge nav-item-badge-info" :aria-label="`${activeOrdersCount} ordini attivi`">
+                {{ activeOrdersCount > 99 ? '99+' : activeOrdersCount }}
+              </span>
             </router-link>
             <router-link to="/site-config" class="nav-item" active-class="nav-item-active">
               <i class="bi bi-globe2 nav-item-icon"></i>
@@ -134,6 +186,20 @@ onMounted(() => {
             </router-link>
             <router-link to="/menu-handler" class="mobile-nav-item" @click="closeMobileMenu">
               <i class="bi bi-journal-text"></i> Menu
+            </router-link>
+            <router-link to="/reservations" class="mobile-nav-item" @click="closeMobileMenu">
+              <i class="bi bi-calendar-check"></i>
+              <span>Prenotazioni</span>
+              <span v-if="pendingCount > 0" class="nav-item-badge">
+                {{ pendingCount > 99 ? '99+' : pendingCount }}
+              </span>
+            </router-link>
+            <router-link to="/orders" class="mobile-nav-item" @click="closeMobileMenu">
+              <i class="bi bi-receipt"></i>
+              <span>Ordinazioni</span>
+              <span v-if="activeOrdersCount > 0" class="nav-item-badge nav-item-badge-info">
+                {{ activeOrdersCount > 99 ? '99+' : activeOrdersCount }}
+              </span>
             </router-link>
             <router-link to="/site-config" class="mobile-nav-item" @click="closeMobileMenu">
               <i class="bi bi-globe2"></i> Configurazione Sito
@@ -258,6 +324,26 @@ onMounted(() => {
 .nav-item-icon {
   font-size: var(--text-md);
   opacity: 0.7;
+}
+
+.nav-item-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 4px;
+  background: var(--color-destructive, #dc3545);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.nav-item-badge-info {
+  background: var(--color-primary, #0d6efd);
 }
 
 /* Right section */

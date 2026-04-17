@@ -66,6 +66,18 @@ const routes = [
         component: () => import('../Pages/WebsiteConfig.vue'),
         meta: { requiresAuth: true },
     },
+    { //protetta - Gestione prenotazioni
+        path: '/reservations',
+        name: 'Prenotazioni',
+        component: () => import('../Pages/Reservations.vue'),
+        meta: { requiresAuth: true },
+    },
+    { //protetta - Gestione ordinazioni
+        path: '/orders',
+        name: 'Ordinazioni',
+        component: () => import('../Pages/Orders.vue'),
+        meta: { requiresAuth: true },
+    },
     { //non protetta
         path: '/who-are-us', // Route per pagina chi siamo
         name: 'Chi siamo',

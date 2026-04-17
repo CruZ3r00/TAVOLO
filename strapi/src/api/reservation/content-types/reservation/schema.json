@@ -1,0 +1,68 @@
+{
+  "kind": "collectionType",
+  "collectionName": "reservations",
+  "info": {
+    "singularName": "reservation",
+    "pluralName": "reservations",
+    "displayName": "Reservation",
+    "description": "Prenotazione tavolo del ristorante"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "customer_name": {
+      "type": "string",
+      "required": true,
+      "maxLength": 120
+    },
+    "phone": {
+      "type": "string",
+      "required": true,
+      "maxLength": 32
+    },
+    "date": {
+      "type": "date",
+      "required": true
+    },
+    "time": {
+      "type": "time",
+      "required": true
+    },
+    "datetime": {
+      "type": "datetime",
+      "required": true
+    },
+    "slot_start": {
+      "type": "datetime",
+      "required": true
+    },
+    "number_of_people": {
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "max": 1000
+    },
+    "notes": {
+      "type": "text",
+      "required": false
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "pending",
+        "confirmed",
+        "at_restaurant",
+        "completed",
+        "cancelled"
+      ],
+      "default": "pending",
+      "required": true
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

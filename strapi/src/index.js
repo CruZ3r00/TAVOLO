@@ -112,8 +112,11 @@ module.exports = {
   async bootstrap({ strapi }) {
     // Seed data: crea utente demo e dati di test se non esistono
     await seedDemoData(strapi);
-    // Concede permission alle action custom di import menu per il ruolo Authenticated
+    // Concede permission alle action custom (menu import, account, ingredient,
+    // reservation) per il ruolo Authenticated, e la create pubblica delle
+    // prenotazioni per il ruolo Public (usato dal sito vetrina esterno).
     await grantImportPermissions(strapi);
+    await grantPublicReservationPermission(strapi);
   },
 };
 
@@ -137,6 +140,22 @@ async function grantImportPermissions(strapi) {
       'api::account.account.twoFactorRegenerateRecovery',
       'api::ingredient.ingredient.list',
       'api::ingredient.ingredient.toggle',
+      'api::reservation.reservation.createAuthenticated',
+      'api::reservation.reservation.list',
+      'api::reservation.reservation.updateStatus',
+      'api::table.table.list',
+      'api::table.table.create',
+      'api::table.table.update',
+      'api::table.table.remove',
+      'api::order.order.create',
+      'api::order.order.list',
+      'api::order.order.findOne',
+      'api::order.order.getTotal',
+      'api::order.order.addItem',
+      'api::order.order.updateItem',
+      'api::order.order.deleteItem',
+      'api::order.order.updateItemStatus',
+      'api::order.order.close',
     ];
     for (const action of actions) {
       const existing = await strapi.db.query('plugin::users-permissions.permission').findOne({
@@ -151,6 +170,28 @@ async function grantImportPermissions(strapi) {
     }
   } catch (e) {
     strapi.log.warn('Impossibile concedere permission import: ' + e.message);
+  }
+}
+
+async function grantPublicReservationPermission(strapi) {
+  try {
+    const publicRole = await strapi.db.query('plugin::users-permissions.role').findOne({
+      where: { type: 'public' },
+    });
+    if (!publicRole) return;
+
+    const action = 'api::reservation.reservation.createPublic';
+    const existing = await strapi.db.query('plugin::users-permissions.permission').findOne({
+      where: { action, role: publicRole.id },
+    });
+    if (!existing) {
+      await strapi.db.query('plugin::users-permissions.permission').create({
+        data: { action, role: publicRole.id },
+      });
+      strapi.log.info(`Permission pubblica creata: ${action}`);
+    }
+  } catch (e) {
+    strapi.log.warn('Impossibile concedere permission pubblica reservation: ' + e.message);
   }
 }
 
@@ -206,6 +247,8 @@ async function seedDemoData(strapi) {
       data: {
         restaurant_name: 'Ristorante Demo',
         site_url: `${siteBaseUrl}/sites/${demoUser.username}`,
+        coperti_invernali: 30,
+        coperti_estivi: 60,
         fk_user: { connect: [{ id: demoUser.id }] },
       },
     });
@@ -287,6 +330,29 @@ async function seedDemoData(strapi) {
     });
 
     strapi.log.info(`Seed: menu demo creato (id: ${menu.id})`);
+
+    // 6. Crea i tavoli demo
+    const demoTables = [
+      { number: 1, seats: 2, area: 'interno' },
+      { number: 2, seats: 4, area: 'interno' },
+      { number: 3, seats: 4, area: 'interno' },
+      { number: 4, seats: 6, area: 'interno' },
+      { number: 5, seats: 4, area: 'esterno' },
+    ];
+
+    for (const t of demoTables) {
+      await strapi.documents('api::table.table').create({
+        data: {
+          number: t.number,
+          seats: t.seats,
+          area: t.area,
+          status: 'free',
+          fk_user: { connect: [{ id: demoUser.id }] },
+        },
+      });
+    }
+
+    strapi.log.info(`Seed: ${demoTables.length} tavoli demo creati`);
     strapi.log.info('Seed: dati demo creati con successo!');
     strapi.log.info('Seed: credenziali demo -> email: demo@restaurant.com, password: DemoPass123!');
   } catch (error) {

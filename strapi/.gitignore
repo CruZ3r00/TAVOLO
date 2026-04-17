@@ -127,3 +127,9 @@ dist
 build
 .strapi-updater.json
 .strapi-cloud.json
+
+############################
+# OCR upload workspace
+############################
+
+.menu-upload/

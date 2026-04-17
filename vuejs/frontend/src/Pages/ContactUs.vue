@@ -18,6 +18,7 @@
         <p class="contact-subtitle">Puoi contattarci ai seguenti indirizzi email o numeri di telefono.</p>
 
         <div class="contact-cards">
+
           <div class="ds-card contact-card">
             <div class="contact-avatar">F</div>
             <div class="contact-info">
@@ -34,19 +35,35 @@
           </div>
 
           <div class="ds-card contact-card">
-            <div class="contact-avatar">L</div>
+            <div class="contact-avatar">P</div>
             <div class="contact-info">
-              <h3 class="contact-name">Leonardo</h3>
-              <a href="mailto:LeoLodi@outlook.com" class="contact-detail">
+              <h3 class="contact-name">Pietro</h3>
+              <a href="mailto:comelli.pietro@outlook.com" class="contact-detail">
                 <i class="bi bi-envelope"></i>
-                LeoLodi@outlook.com
+                comelli.pietro@gmail.com
               </a>
-              <a href="tel:+393499119941" class="contact-detail">
+              <a href="tel:+393279152295c@outlo" class="contact-detail">
                 <i class="bi bi-telephone"></i>
-                +39 349 911 9941
+                +39 327 915 2295
               </a>
             </div>
           </div>
+
+          <div class="ds-card contact-card">
+            <div class="contact-avatar">M</div>
+            <div class="contact-info">
+              <h3 class="contact-name">Mattia</h3>
+              <a href="" class="contact-detail">
+                <i class="bi bi-envelope"></i>
+                Non disponibile
+              </a>
+              <a href="tel:+393460605599" class="contact-detail">
+                <i class="bi bi-telephone"></i>
+                +39 346 060 5599
+              </a>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

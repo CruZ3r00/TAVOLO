@@ -1,0 +1,40 @@
+[     803ms] [LOG] [Orders] openOrderFromQuery docId= r8uc7pqzv2wg01okvn43xd8n query= {"order":"r8uc7pqzv2wg01okvn43xd8n"} @ http://localhost:5174/src/Pages/Orders.vue?t=1776425881953:244
+[     804ms] [LOG] [Orders] showOrderDetail set to true, currentOrderDocId= r8uc7pqzv2wg01okvn43xd8n @ http://localhost:5174/src/Pages/Orders.vue?t=1776425881953:248
+[    1389ms] [LOG] [Orders] openOrderFromQuery docId= null query= {} @ http://localhost:5174/src/Pages/Orders.vue?t=1776425881953:244
+[   69982ms] [WARNING] [Vue warn]: Unhandled error during execution of setup function 
+  at <Orders onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< null > key="/orders" > 
+  at <BaseTransition mode="out-in" appear=false persisted=false  ... > 
+  at <Transition name="page" mode="out-in" > 
+  at <RouterView> 
+  at <App> @ http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:2115
+[   69985ms] [WARNING] [Vue warn]: Unhandled error during execution of scheduler flush 
+  at <Orders onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< null > key="/orders" > 
+  at <BaseTransition mode="out-in" appear=false persisted=false  ... > 
+  at <Transition name="page" mode="out-in" > 
+  at <RouterView> 
+  at <App> @ http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:2115
+[   69999ms] ReferenceError: useRouter is not defined
+    at setup (http://localhost:5174/src/Pages/Orders.vue?t=1776426026430:27:16)
+    at callWithErrorHandling (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:2263:19)
+    at setupStatefulComponent (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:9983:25)
+    at setupComponent (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:9944:36)
+    at mountComponent (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:7300:7)
+    at processComponent (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:7266:9)
+    at patch (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:6782:11)
+    at ReactiveEffect.componentUpdateFn [as fn] (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:7490:9)
+    at ReactiveEffect.run (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:481:19)
+    at http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:2591:25
+[   74940ms] [WARNING] [Vue warn]: Unhandled error during execution of scheduler flush 
+  at <Orders onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< null > key="/orders" > 
+  at <BaseTransition mode="out-in" appear=false persisted=false  ... > 
+  at <Transition name="page" mode="out-in" > 
+  at <RouterView> 
+  at <App> @ http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:2115
+[   74965ms] TypeError: Cannot read properties of null (reading 'component')
+    at locateNonHydratedAsyncRoot (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:8186:41)
+    at locateNonHydratedAsyncRoot (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:8191:14)
+    at ReactiveEffect.componentUpdateFn [as fn] (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:7445:40)
+    at ReactiveEffect.run (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:481:19)
+    at http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:2591:25
+    at callWithErrorHandling (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:2263:33)
+    at flushJobs (http://localhost:5174/node_modules/.vite/deps/chunk-U3LI7FBV.js?v=c61c975a:2471:9)

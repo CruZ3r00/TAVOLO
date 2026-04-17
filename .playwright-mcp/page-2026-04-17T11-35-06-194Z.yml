@@ -1,0 +1,79 @@
+- generic [ref=e119]:
+  - navigation [ref=e120]:
+    - generic [ref=e121]:
+      - link " MenuCMS" [ref=e122] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e124]: 
+        - generic [ref=e125]: MenuCMS
+      - generic [ref=e126]:
+        - link " Dashboard" [ref=e127] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e128]: 
+          - generic [ref=e129]: Dashboard
+        - link " Menu" [ref=e130] [cursor=pointer]:
+          - /url: /menu-handler
+          - generic [ref=e131]: 
+          - generic [ref=e132]: Menu
+        - link " Prenotazioni" [ref=e133] [cursor=pointer]:
+          - /url: /reservations
+          - generic [ref=e134]: 
+          - generic [ref=e135]: Prenotazioni
+        - link " Ordinazioni 1 ordini attivi" [ref=e136] [cursor=pointer]:
+          - /url: /orders
+          - generic [ref=e137]: 
+          - generic [ref=e138]: Ordinazioni
+          - generic "1 ordini attivi" [ref=e139]: "1"
+        - link " Sito" [ref=e140] [cursor=pointer]:
+          - /url: /site-config
+          - generic [ref=e141]: 
+          - generic [ref=e142]: Sito
+      - generic [ref=e144]:
+        - button "D demo_restaurant " [ref=e145] [cursor=pointer]:
+          - generic [ref=e146]: D
+          - generic [ref=e147]: demo_restaurant
+          - generic [ref=e148]: 
+        - text:  
+  - main [ref=e149]:
+    - generic [ref=e151]:
+      - generic [ref=e152]:
+        - generic [ref=e153]:
+          - paragraph [ref=e154]: Gestione
+          - heading "Ordinazioni" [level=1] [ref=e155]
+          - paragraph [ref=e156]: Gestisci tavoli e ordini in sala.
+        - generic [ref=e157]:
+          - tablist "Modalita vista" [ref=e158]:
+            - tab "Cameriere" [selected] [ref=e159] [cursor=pointer]:
+              - generic [ref=e160]: 
+              - text: Cameriere
+            - tab "Cucina" [ref=e161] [cursor=pointer]:
+              - generic [ref=e162]: 
+              - text: Cucina
+          - button "Ricarica dati" [ref=e163] [cursor=pointer]:
+            - generic [ref=e164]: 
+            - generic [ref=e165]: Aggiorna
+          - button "Gestisci tavoli" [ref=e166] [cursor=pointer]:
+            - generic [ref=e167]: 
+            - generic [ref=e168]: Gestisci tavoli
+      - button "Tavolo 1 - Occupato" [ref=e171] [cursor=pointer]:
+        - generic [ref=e173]:
+          - generic [ref=e174]: Tavolo
+          - generic [ref=e175]: "1"
+        - generic [ref=e178]:
+          - generic [ref=e179]:
+            - generic [ref=e180]:
+              - generic [ref=e181]: 
+              - text: "2"
+            - generic [ref=e182]: Interno
+          - generic [ref=e183]:
+            - generic [ref=e184]: 0 piatti
+            - generic [ref=e185]: € 0.00
+  - contentinfo [ref=e187]:
+    - generic [ref=e188]:
+      - paragraph [ref=e189]: © 2025 MenuCMS
+      - navigation [ref=e190]:
+        - link "Home" [ref=e191] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e192] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e193] [cursor=pointer]:
+          - /url: /contact-us

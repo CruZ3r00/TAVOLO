@@ -9,8 +9,8 @@
     const store = useStore();
     const tkn = store.getters.getToken;
 
-    //segnale al padre per visualizzare adder
-    const emit = defineEmits(['AddElement']);
+    //segnale al padre per visualizzare adder, notificare il conteggio elementi e richiedere l'import
+    const emit = defineEmits(['AddElement', 'count-changed', 'RequestImport']);
 
     //variabili per il supporto delle richieste fetch
     const modify = ref(false);
@@ -102,7 +102,11 @@
                         menuId.value = data.data[0].documentId;
                         // Estrai categorie uniche
                         categories.value = [...new Set(list.value.map(el => el.category))];
+                    } else {
+                        list.value = [];
+                        categories.value = [];
                     }
+                    emit('count-changed', list.value.length);
                 }
             }
         } catch (error) {
@@ -194,6 +198,7 @@
                 if (del.ok){
                     list.value = list.value.filter(item => item.documentId !== id);
                     categories.value = [...new Set(list.value.map(el => el.category))];
+                    emit('count-changed', list.value.length);
                 }
             }
         } catch (error) {
@@ -235,6 +240,9 @@
         document.title = 'Gestione Menu';
         await fetchList();
     });
+
+    // Esposto al parent per permettere il refresh della lista dopo un import bulk
+    defineExpose({ refresh: fetchList });
 </script>
 
 <template>
@@ -247,6 +255,10 @@
                     <span v-if="list.length > 0" class="ds-badge ds-badge-primary">{{ list.length }}</span>
                 </div>
                 <div class="menu-header-actions">
+                    <button @click="emit('RequestImport')" class="ds-btn ds-btn-secondary">
+                        <i class="bi bi-file-earmark-arrow-up"></i>
+                        <span>Importa da PDF/Immagine</span>
+                    </button>
                     <button @click="modify = !modify" class="ds-btn" :class="modify ? 'ds-btn-primary' : 'ds-btn-secondary'">
                         <i class="bi bi-pencil"></i>
                         <span v-if="!modify">Modifica</span>

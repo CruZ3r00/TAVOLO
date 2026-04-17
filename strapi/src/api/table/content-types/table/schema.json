@@ -1,0 +1,43 @@
+{
+  "kind": "collectionType",
+  "collectionName": "tables",
+  "info": {
+    "singularName": "table",
+    "pluralName": "tables",
+    "displayName": "Table",
+    "description": "Tavolo del ristorante"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "number": {
+      "type": "integer",
+      "required": true,
+      "min": 1
+    },
+    "seats": {
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "max": 100
+    },
+    "area": {
+      "type": "enumeration",
+      "enum": ["interno", "esterno"],
+      "default": "interno",
+      "required": false
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["free", "occupied", "reserved"],
+      "default": "free",
+      "required": true
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

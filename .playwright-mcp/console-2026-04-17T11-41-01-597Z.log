@@ -1,0 +1,5 @@
+[  105105ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:1337/api/reservations?status=pending&pageSize=1:0
+[  105107ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:1337/api/orders?status=active&pageSize=1:0
+[  115004ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:1337/api/tables:0
+[  115007ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:1337/api/orders?status=active&pageSize=100:0
+[  634170ms] [ERROR] Failed to load resource: the server responded with a status of 409 (Conflict) @ http://localhost:1337/api/reservations:0

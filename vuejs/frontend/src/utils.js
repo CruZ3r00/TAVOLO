@@ -81,3 +81,438 @@ export const fetchPublicMenu = async (userDocumentId) => {
  * URL base delle API Strapi
  */
 export const API_BASE = 'http://localhost:1337';
+
+/**
+ * Invia un file (PDF/immagine) al backend per estrazione OCR + strutturazione LLM.
+ * Ritorna i dati normalizzati in caso di successo, propaga errore con status/code altrimenti.
+ */
+export const importMenuAnalyze = async (file, token) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch(`${API_BASE}/api/menus/import/analyze`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+        const err = new Error(payload?.error?.message || `Analisi fallita (HTTP ${resp.status})`);
+        err.status = resp.status;
+        err.code = payload?.error?.code || null;
+        throw err;
+    }
+    return payload.data;
+};
+
+/**
+ * Bulk insert degli elementi estratti nel menu utente.
+ * mode: "append" per aggiungere, "replace" per sostituire (transazione lato backend).
+ */
+export const importMenuBulk = async ({ mode, elements }, token) => {
+    const resp = await fetch(`${API_BASE}/api/menus/import/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ mode, elements }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+        const err = new Error(payload?.error?.message || `Import fallito (HTTP ${resp.status})`);
+        err.status = resp.status;
+        throw err;
+    }
+    return payload.data;
+};
+
+// ============================================================================
+// Reservations API — ADR-0001
+// ============================================================================
+
+/**
+ * Costruisce un Error arricchito con code/status/details per gestire in UI
+ * i vari scenari (OVERBOOKING, CAPACITY_NOT_CONFIGURED, ecc).
+ */
+const buildReservationError = (resp, payload) => {
+    const err = new Error(payload?.error?.message || `Richiesta fallita (HTTP ${resp.status})`);
+    err.status = resp.status;
+    err.code = payload?.error?.code || null;
+    err.details = payload?.error?.details || null;
+    return err;
+};
+
+/**
+ * Lista paginata delle prenotazioni del ristoratore corrente.
+ * params: { status?, from?, to?, page?, pageSize? }
+ */
+export const fetchReservations = async (params = {}, token) => {
+    const query = qs.stringify(params, { skipNulls: true });
+    const url = query
+        ? `${API_BASE}/api/reservations?${query}`
+        : `${API_BASE}/api/reservations`;
+    const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildReservationError(resp, payload);
+    return payload;
+};
+
+/**
+ * Crea una prenotazione dal gestionale (owner).
+ * payload: { datetime (ISO), guests, customer: { name, phone, email?, notes? }, status? }
+ */
+export const createReservation = async (payload, token) => {
+    const resp = await fetch(`${API_BASE}/api/reservations`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildReservationError(resp, body);
+    return body.data;
+};
+
+/**
+ * Aggiorna lo status di una prenotazione secondo la FSM.
+ * status: 'confirmed' | 'at_restaurant' | 'completed' | 'cancelled'
+ */
+export const updateReservationStatus = async (documentId, status, token) => {
+    const resp = await fetch(`${API_BASE}/api/reservations/${documentId}/status`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildReservationError(resp, payload);
+    return payload.data;
+};
+
+// ============================================================================
+// Tables API — ADR-0002
+// ============================================================================
+
+const buildOrderError = (resp, payload) => {
+    const err = new Error(payload?.error?.message || `Richiesta fallita (HTTP ${resp.status})`);
+    err.status = resp.status;
+    err.code = payload?.error?.code || null;
+    err.details = payload?.error?.details || null;
+    return err;
+};
+
+/**
+ * Lista tavoli del ristorante corrente.
+ */
+export const fetchTables = async (token) => {
+    const resp = await fetch(`${API_BASE}/api/tables`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload;
+};
+
+/**
+ * Crea un nuovo tavolo.
+ * body: { number, seats, area? }
+ */
+export const createTable = async (body, token) => {
+    const resp = await fetch(`${API_BASE}/api/tables`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Aggiorna un tavolo.
+ * body: { number?, seats?, area? }
+ */
+export const updateTable = async (documentId, body, token) => {
+    const resp = await fetch(`${API_BASE}/api/tables/${documentId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Elimina un tavolo.
+ */
+export const deleteTable = async (documentId, token) => {
+    const resp = await fetch(`${API_BASE}/api/tables/${documentId}`, {
+        method: 'DELETE',
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    if (resp.status === 204) return true;
+    const payload = await resp.json().catch(() => ({}));
+    throw buildOrderError(resp, payload);
+};
+
+// ============================================================================
+// Orders API — ADR-0002
+// ============================================================================
+
+/**
+ * Lista paginata degli ordini del ristoratore corrente.
+ * params: { status?, table?, from?, to?, page?, pageSize? }
+ */
+export const fetchOrders = async (params = {}, token) => {
+    const query = qs.stringify(params, { skipNulls: true });
+    const url = query
+        ? `${API_BASE}/api/orders?${query}`
+        : `${API_BASE}/api/orders`;
+    const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload;
+};
+
+/**
+ * Apre un ordine su un tavolo.
+ * body: { table_id (documentId), covers? }
+ */
+export const openOrder = async (body, token) => {
+    const resp = await fetch(`${API_BASE}/api/orders`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Dettaglio ordine con items.
+ */
+export const fetchOrder = async (documentId, token) => {
+    const resp = await fetch(`${API_BASE}/api/orders/${documentId}`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Totale derivato in tempo reale.
+ */
+export const fetchOrderTotal = async (documentId, token) => {
+    const resp = await fetch(`${API_BASE}/api/orders/${documentId}/total`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Aggiunge item all'ordine.
+ * body: { element_id?, name?, price?, quantity, notes?, lock_version? }
+ */
+export const addOrderItem = async (orderDocumentId, body, token) => {
+    const resp = await fetch(`${API_BASE}/api/orders/${orderDocumentId}/items`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Aggiorna quantity/notes di un item.
+ * body: { quantity?, notes?, lock_version? }
+ */
+export const updateOrderItem = async (orderDocumentId, itemDocumentId, body, token) => {
+    const resp = await fetch(`${API_BASE}/api/orders/${orderDocumentId}/items/${itemDocumentId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Elimina un item dall'ordine.
+ */
+export const deleteOrderItem = async (orderDocumentId, itemDocumentId, body, token) => {
+    const resp = await fetch(`${API_BASE}/api/orders/${orderDocumentId}/items/${itemDocumentId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body || {}),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Transizione stato item (FSM).
+ * body: { status }
+ */
+export const updateItemStatus = async (orderDocumentId, itemDocumentId, status, token) => {
+    const resp = await fetch(`${API_BASE}/api/orders/${orderDocumentId}/items/${itemDocumentId}/status`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Chiude ordine + pagamento.
+ * body: { payment_method?, lock_version? }
+ */
+export const closeOrder = async (documentId, body, token) => {
+    const resp = await fetch(`${API_BASE}/api/orders/${documentId}/close`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body || {}),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Traduce un errore ordine in messaggio italiano.
+ */
+export const orderErrorMessage = (err) => {
+    if (!err) return 'Errore sconosciuto.';
+    const code = err.code;
+    switch (code) {
+        case 'TABLE_NOT_FOUND':
+            return 'Tavolo non trovato.';
+        case 'TABLE_ALREADY_OCCUPIED':
+            return 'Tavolo gia occupato da un ordine attivo.';
+        case 'TABLE_ALREADY_EXISTS':
+            return 'Esiste gia un tavolo con questo numero.';
+        case 'ORDER_NOT_FOUND':
+            return 'Ordine non trovato.';
+        case 'ORDER_NOT_ACTIVE':
+            return 'Ordine gia chiuso.';
+        case 'ITEM_NOT_FOUND':
+            return 'Elemento non trovato nell\'ordine.';
+        case 'ITEM_NOT_EDITABLE':
+            return 'Elemento gia in lavorazione, non modificabile.';
+        case 'INVALID_ITEM_TRANSITION':
+            return 'Transizione di stato non ammessa per questo elemento.';
+        case 'STALE_ORDER':
+            return 'Ordine modificato da un altro utente. Ricarica e riprova.';
+        case 'ORDER_CONTENTION':
+            return 'Troppe richieste concorrenti. Riprova tra qualche secondo.';
+        case 'NOT_OWNER':
+            return 'Non sei autorizzato a modificare questa risorsa.';
+        case 'INVALID_PAYLOAD':
+            return err.message || 'Dati non validi. Controlla i campi e riprova.';
+        case 'PAYMENT_DECLINED':
+            return 'Pagamento rifiutato. Riprova o utilizza un altro metodo.';
+        case 'PAYMENT_TIMEOUT':
+            return 'Timeout nel pagamento. Riprova.';
+        case 'PAYMENT_UNAVAILABLE':
+            return 'Servizio di pagamento non disponibile. Riprova.';
+        default:
+            return err.message || 'Si e\' verificato un errore durante l\'operazione.';
+    }
+};
+
+/**
+ * Mappa un errore (con err.code dall'API) in un messaggio italiano pronto da
+ * mostrare all'utente. Se err.details contiene capacity/current/requested per
+ * OVERBOOKING, il messaggio include i numeri.
+ */
+export const reservationErrorMessage = (err) => {
+    if (!err) return 'Errore sconosciuto.';
+    const code = err.code;
+    const d = err.details || {};
+    switch (code) {
+        case 'OVERBOOKING': {
+            if (Number.isFinite(d.capacity) && Number.isFinite(d.current)) {
+                const remaining = Math.max(0, d.capacity - d.current);
+                return `Capacità raggiunta per questo slot. Coperti disponibili: ${remaining} su ${d.capacity}.`;
+            }
+            return 'Capacità raggiunta per lo slot selezionato. Prova un altro orario.';
+        }
+        case 'CAPACITY_NOT_CONFIGURED':
+            return 'Capacità del ristorante non configurata. Vai in Configurazione Sito e imposta i coperti invernali.';
+        case 'INVALID_TRANSITION':
+            return 'Transizione di stato non ammessa per questa prenotazione.';
+        case 'NOT_OWNER':
+            return 'Non sei autorizzato a modificare questa prenotazione.';
+        case 'RESTAURANT_NOT_FOUND':
+            return 'Ristorante non trovato.';
+        case 'RESERVATION_NOT_FOUND':
+            return 'Prenotazione non trovata.';
+        case 'INVALID_PAYLOAD':
+            return err.message || 'Dati non validi. Controlla i campi e riprova.';
+        case 'RESERVATION_CONTENTION':
+            return 'Troppe richieste concorrenti in questo momento. Riprova tra qualche secondo.';
+        default:
+            return err.message || 'Si è verificato un errore durante l\'operazione.';
+    }
+};

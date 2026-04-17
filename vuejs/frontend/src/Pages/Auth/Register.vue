@@ -25,6 +25,8 @@ const password = ref('');
 const password_confirmation= ref('');
 const terms = ref(false);
 const registerData = ref();
+const copertiInvernali = ref('');
+const copertiEstivi = ref('');
 
 const isError = ref(false);
 const isLoading = ref(false);
@@ -33,55 +35,34 @@ const showPassword = ref(false);
 
 const router = useRouter();
 
-// Crea la configurazione del sito web per il nuovo utente
-// Genera automaticamente il site_url basato sullo username
-const CreateWebsiteConfig = async (userId, jwt) => {
-  try {
-    const siteUrl = `${API_BASE}/sites/${username.value}`;
-    const response = await fetch(`${API_BASE}/api/website-configs`, {
-      method: "POST",
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt}`,
-      },
-      body: JSON.stringify({
-        data: {
-          restaurant_name: username.value,
-          site_url: siteUrl,
-          fk_user: {
-            connect: [{ id: userId }],
-          },
-        },
-      }),
-    });
-    if (!response.ok) {
-      console.error('Errore nella creazione della configurazione sito web');
-    }
-  } catch (error) {
-    console.error('Errore di rete:', error.message);
-  }
-};
-
-// Funzione che registra l'utente nel formato standard richiesto da strapi
+// Funzione che registra l'utente + crea la WebsiteConfig in transazione
+// server-side (override users-permissions auth.register). I campi coperti_*
+// sono obbligatori in input; la WebsiteConfig viene popolata atomicamente.
 const CreateUSer= async () => {
     try {
+        const payload = {
+            username: username.value,
+            email: email.value,
+            password: password.value,
+            coperti_invernali: parseInt(copertiInvernali.value, 10),
+            restaurant_name: username.value,
+        };
+        if (copertiEstivi.value !== '' && copertiEstivi.value != null) {
+            payload.coperti_estivi = parseInt(copertiEstivi.value, 10);
+        }
         const response = await fetch(`${API_BASE}/api/auth/local/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                "username": username.value,
-                "email": email.value,
-                "password": password.value,
-            }),
+            body: JSON.stringify(payload),
         });
 
         if (response.ok) {
             registerData.value = await response.json();
         } else {
             const errorData = await response.json();
-            errorMessage.value = errorData.error.message;
+            errorMessage.value = errorData?.error?.message || 'Errore durante la registrazione.';
             isError.value = true;
         }
 
@@ -91,6 +72,22 @@ const CreateUSer= async () => {
 };
 
 const submit = async () => {
+  // Validazione coperti invernali (obbligatori)
+  const cInv = parseInt(copertiInvernali.value, 10);
+  if (!Number.isFinite(cInv) || cInv < 1 || cInv > 10000) {
+    errorMessage.value = 'Inserisci i coperti invernali (intero tra 1 e 10000).';
+    isError.value = true;
+    return;
+  }
+  if (copertiEstivi.value !== '' && copertiEstivi.value != null) {
+    const cEst = parseInt(copertiEstivi.value, 10);
+    if (!Number.isFinite(cEst) || cEst < 1 || cEst > 10000) {
+      errorMessage.value = 'Coperti estivi non validi (intero tra 1 e 10000).';
+      isError.value = true;
+      return;
+    }
+  }
+
   // Validazione data di nascita
   if (birth_date.value) {
     const bd = new Date(birth_date.value);
@@ -117,7 +114,6 @@ const submit = async () => {
       return;
     }
 
-    const userDocumentId = registerData.value.user.documentId;
     const tokjwt = registerData.value.jwt;
     const id = registerData.value.user.id;
 
@@ -139,12 +135,10 @@ const submit = async () => {
       });
 
       if( response.ok ){
-          // Crea la configurazione del sito web
-          await CreateWebsiteConfig(id, tokjwt);
           router.push({ path: '/login', query: { registered: '1' } });
       }else{
           const errorData = await response.json();
-          errorMessage.value = errorData.email + errorData.username;
+          errorMessage.value = errorData?.error?.message || 'Errore aggiornamento profilo.';
           isError.value = true;
       }
     } catch (error) {
@@ -207,6 +201,17 @@ const submit = async () => {
       <div class="ds-field">
         <InputLabel for="birth_date" value="Data di nascita" />
         <TextInput id="birth_date" v-model="birth_date" type="date" required />
+      </div>
+
+      <div class="form-row">
+        <div class="ds-field">
+          <InputLabel for="coperti_invernali" value="Coperti invernali *" />
+          <TextInput id="coperti_invernali" v-model="copertiInvernali" type="number" min="1" max="10000" placeholder="Es. 40" required />
+        </div>
+        <div class="ds-field">
+          <InputLabel for="coperti_estivi" value="Coperti estivi" />
+          <TextInput id="coperti_estivi" v-model="copertiEstivi" type="number" min="1" max="10000" placeholder="Uguale agli invernali se vuoto" />
+        </div>
       </div>
 
       <div class="ds-field">

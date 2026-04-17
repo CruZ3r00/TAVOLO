@@ -32,6 +32,18 @@
       "type": "relation",
       "relation": "oneToOne",
       "target": "plugin::users-permissions.user"
+    },
+    "coperti_invernali": {
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "max": 10000
+    },
+    "coperti_estivi": {
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 10000
     }
   }
 }

@@ -1,0 +1,72 @@
+{
+  "kind": "collectionType",
+  "collectionName": "orders",
+  "info": {
+    "singularName": "order",
+    "pluralName": "orders",
+    "displayName": "Order",
+    "description": "Ordine in sala"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "status": {
+      "type": "enumeration",
+      "enum": ["active", "closed"],
+      "default": "active",
+      "required": true
+    },
+    "opened_at": {
+      "type": "datetime",
+      "required": true
+    },
+    "closed_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "total_amount": {
+      "type": "decimal",
+      "default": 0,
+      "required": true
+    },
+    "payment_status": {
+      "type": "enumeration",
+      "enum": ["unpaid", "paid"],
+      "default": "unpaid",
+      "required": true
+    },
+    "payment_reference": {
+      "type": "string",
+      "required": false,
+      "maxLength": 255
+    },
+    "lock_version": {
+      "type": "integer",
+      "default": 0,
+      "required": true
+    },
+    "covers": {
+      "type": "integer",
+      "required": false,
+      "min": 1,
+      "max": 1000
+    },
+    "fk_table": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::table.table"
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "fk_items": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-item.order-item",
+      "mappedBy": "fk_order"
+    }
+  }
+}

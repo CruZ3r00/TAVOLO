@@ -1,0 +1,53 @@
+{
+  "kind": "collectionType",
+  "collectionName": "order_items",
+  "info": {
+    "singularName": "order-item",
+    "pluralName": "order-items",
+    "displayName": "OrderItem",
+    "description": "Elemento di un ordine"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "maxLength": 200
+    },
+    "price": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
+    },
+    "quantity": {
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "default": 1
+    },
+    "notes": {
+      "type": "text",
+      "required": false,
+      "maxLength": 500
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["taken", "preparing", "ready", "served"],
+      "default": "taken",
+      "required": true
+    },
+    "fk_order": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::order.order",
+      "inversedBy": "fk_items"
+    },
+    "fk_element": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::element.element"
+    }
+  }
+}

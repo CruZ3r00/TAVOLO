@@ -1,0 +1,110 @@
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e6]:
+      - link " MenuCMS" [ref=e7] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e9]: 
+        - generic [ref=e10]: MenuCMS
+      - generic [ref=e11]:
+        - link " Dashboard" [ref=e12] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e13]: 
+          - generic [ref=e14]: Dashboard
+        - link " Menu" [ref=e15] [cursor=pointer]:
+          - /url: /menu-handler
+          - generic [ref=e16]: 
+          - generic [ref=e17]: Menu
+        - link " Prenotazioni" [ref=e18] [cursor=pointer]:
+          - /url: /reservations
+          - generic [ref=e19]: 
+          - generic [ref=e20]: Prenotazioni
+        - link " Ordinazioni 1 ordini attivi" [ref=e61] [cursor=pointer]:
+          - /url: /orders
+          - generic [ref=e22]: 
+          - generic [ref=e23]: Ordinazioni
+          - generic "1 ordini attivi" [ref=e62]: "1"
+        - link " Sito" [ref=e24] [cursor=pointer]:
+          - /url: /site-config
+          - generic [ref=e25]: 
+          - generic [ref=e26]: Sito
+      - generic [ref=e28]:
+        - button "D demo_restaurant " [ref=e63] [cursor=pointer]:
+          - generic [ref=e30]: D
+          - generic [ref=e31]: demo_restaurant
+          - generic [ref=e32]: 
+        - text:  
+  - main [ref=e33]:
+    - generic [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Gestione
+          - heading "Prenotazioni" [level=1] [ref=e39]
+          - paragraph [ref=e40]: Monitora richieste, conferme e coperti in sala in tempo reale.
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - generic [ref=e43]: Mostra dal giorno
+            - generic: 
+            - textbox "Mostra dal giorno" [ref=e44]: 2026-04-17
+          - button "Ricarica prenotazioni" [ref=e45] [cursor=pointer]:
+            - generic [ref=e46]: 
+            - generic [ref=e47]: Aggiorna
+          - button "Nuova prenotazione" [ref=e48] [cursor=pointer]:
+            - generic [ref=e49]: 
+            - generic [ref=e50]: Nuova prenotazione
+      - generic [ref=e64]:
+        - region "Richieste" [ref=e65]:
+          - generic [ref=e66]:
+            - generic [ref=e67]:
+              - generic [ref=e69]: 
+              - heading "Richieste" [level=3] [ref=e70]
+            - generic "Numero prenotazioni" [ref=e71]: "0"
+          - generic [ref=e73]:
+            - generic [ref=e75]: 
+            - paragraph [ref=e76]: Nessuna richiesta in attesa.
+        - region "Richieste" [ref=e77]:
+          - generic [ref=e78]:
+            - generic [ref=e79]:
+              - generic [ref=e81]: 
+              - heading "Confermate" [level=3] [ref=e82]
+            - generic "Numero prenotazioni" [ref=e83]: "0"
+          - generic [ref=e85]:
+            - generic [ref=e87]: 
+            - paragraph [ref=e88]: Nessuna prenotazione confermata.
+        - region "Tavoli occupati" [ref=e89]:
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - generic [ref=e93]: 
+              - heading "Tavoli occupati" [level=3] [ref=e94]
+            - generic "Numero tavoli occupati" [ref=e95]: "1"
+          - article [ref=e98]:
+            - generic [ref=e99]:
+              - generic [ref=e100]:
+                - generic [ref=e101]: Tavolo 1
+                - generic [ref=e102]: Interno
+              - generic [ref=e103]:
+                - generic [ref=e104]: 
+                - text: Ordine attivo
+            - generic [ref=e105]:
+              - generic [ref=e106]:
+                - generic [ref=e107]: 
+                - generic [ref=e108]: Aperto alle 13:30
+              - generic [ref=e109]:
+                - generic [ref=e110]: 
+                - generic [ref=e111]: 0 piatti
+              - generic [ref=e112]:
+                - generic [ref=e113]: Totale
+                - generic [ref=e114]: € 0.00
+            - button "Gestisci ordine" [ref=e116] [cursor=pointer]:
+              - generic [ref=e117]: 
+              - generic [ref=e118]: Gestisci ordine
+      - text: 
+  - contentinfo [ref=e54]:
+    - generic [ref=e55]:
+      - paragraph [ref=e56]: © 2025 MenuCMS
+      - navigation [ref=e57]:
+        - link "Home" [ref=e58] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e59] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e60] [cursor=pointer]:
+          - /url: /contact-us

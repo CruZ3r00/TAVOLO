@@ -1,0 +1,112 @@
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e6]:
+      - link " MenuCMS" [ref=e7] [cursor=pointer]:
+        - /url: /dashboard
+        - generic [ref=e9]: 
+        - generic [ref=e10]: MenuCMS
+      - generic [ref=e11]:
+        - link " Dashboard" [ref=e12] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e13]: 
+          - generic [ref=e14]: Dashboard
+        - link " Menu" [ref=e15] [cursor=pointer]:
+          - /url: /menu-handler
+          - generic [ref=e16]: 
+          - generic [ref=e17]: Menu
+        - link " Prenotazioni" [ref=e18] [cursor=pointer]:
+          - /url: /reservations
+          - generic [ref=e19]: 
+          - generic [ref=e20]: Prenotazioni
+        - link " Ordinazioni" [ref=e21] [cursor=pointer]:
+          - /url: /orders
+          - generic [ref=e22]: 
+          - generic [ref=e23]: Ordinazioni
+        - link " Sito" [ref=e24] [cursor=pointer]:
+          - /url: /site-config
+          - generic [ref=e25]: 
+          - generic [ref=e26]: Sito
+      - generic [ref=e28]:
+        - button "D demo_restaurant " [ref=e29] [cursor=pointer]:
+          - generic [ref=e30]: D
+          - generic [ref=e31]: demo_restaurant
+          - generic [ref=e32]: 
+        - text:  
+  - main [ref=e33]:
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - paragraph [ref=e38]: Gestione
+            - heading "Ordinazioni" [level=1] [ref=e39]
+            - paragraph [ref=e40]: Gestisci tavoli e ordini in sala.
+          - generic [ref=e41]:
+            - tablist "Modalita vista" [ref=e42]:
+              - tab "Cameriere" [selected] [ref=e43] [cursor=pointer]:
+                - generic [ref=e44]: 
+                - text: Cameriere
+              - tab "Cucina" [ref=e45] [cursor=pointer]:
+                - generic [ref=e46]: 
+                - text: Cucina
+            - button "Ricarica dati" [ref=e47] [cursor=pointer]:
+              - generic [ref=e122]: 
+              - generic [ref=e123]: Aggiorna
+            - button "Gestisci tavoli" [ref=e50] [cursor=pointer]:
+              - generic [ref=e51]: 
+              - generic [ref=e52]: Gestisci tavoli
+        - status [ref=e124]:
+          - generic [ref=e125]: 
+          - generic [ref=e126]: Ordine aperto per tavolo 1.
+        - button "Tavolo 1 - Occupato" [active] [ref=e127] [cursor=pointer]:
+          - generic [ref=e97]:
+            - generic [ref=e98]: Tavolo
+            - generic [ref=e99]: "1"
+          - generic [ref=e102]:
+            - generic [ref=e103]:
+              - generic [ref=e104]:
+                - generic [ref=e105]: 
+                - text: "2"
+              - generic [ref=e106]: Interno
+            - generic [ref=e128]:
+              - generic [ref=e129]: 0 piatti
+              - generic [ref=e130]: € 0.00
+      - generic [ref=e132]:
+        - generic [ref=e133]:
+          - generic [ref=e134]:
+            - generic [ref=e135]: 
+            - heading "Ordine - Tavolo 1" [level=2] [ref=e136]
+            - generic [ref=e137]:
+              - generic [ref=e138]: 
+              - generic [ref=e139]: Attivo
+          - button "" [ref=e140] [cursor=pointer]:
+            - generic [ref=e141]: 
+        - generic [ref=e143]:
+          - generic [ref=e144]:
+            - generic [ref=e145]:
+              - generic [ref=e146]: Aperto
+              - generic [ref=e147]: 13:30
+            - generic [ref=e148]:
+              - generic [ref=e149]: Piatti
+              - generic [ref=e150]: "0"
+          - paragraph [ref=e153]: Nessun piatto nell'ordine. Aggiungi il primo piatto.
+          - generic [ref=e154]:
+            - generic [ref=e155]:
+              - generic [ref=e156]: Totale
+              - generic [ref=e157]: € 0.00
+            - generic [ref=e158]:
+              - button "Aggiungi piatto" [ref=e159] [cursor=pointer]:
+                - generic [ref=e160]: 
+                - generic [ref=e161]: Aggiungi piatto
+              - button "Chiudi conto" [ref=e162] [cursor=pointer]:
+                - generic [ref=e163]: 
+                - generic [ref=e164]: Chiudi conto
+  - contentinfo [ref=e58]:
+    - generic [ref=e59]:
+      - paragraph [ref=e60]: © 2025 MenuCMS
+      - navigation [ref=e61]:
+        - link "Home" [ref=e62] [cursor=pointer]:
+          - /url: /home
+        - link "Chi siamo" [ref=e63] [cursor=pointer]:
+          - /url: /who-are-us
+        - link "Contattaci" [ref=e64] [cursor=pointer]:
+          - /url: /contact-us
