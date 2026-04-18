@@ -42,7 +42,8 @@ async def generate(prompt: str, model: str, reinforced: bool = False) -> str:
         "stream": False,
         "options": {
             "temperature": 0.1,
-            "num_predict": 4096,
+            "num_ctx": 8192,
+            "num_predict": 8192,
         },
     }
 
