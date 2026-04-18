@@ -237,7 +237,82 @@ function sanitizeElement(raw) {
   };
 }
 
+function serializeElement(el) {
+  if (!el) return null;
+
+  const parsedPrice = Number(el.price);
+
+  return {
+    id: el.id,
+    documentId: el.documentId,
+    name: el.name,
+    price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
+    category: el.category || '',
+    ingredients: Array.isArray(el.ingredients) ? el.ingredients : [],
+    allergens: Array.isArray(el.allergens) ? el.allergens : [],
+    image: el.image || null,
+    available: el.available !== false,
+    createdAt: el.createdAt,
+    updatedAt: el.updatedAt,
+  };
+}
+
+function serializeMenu(menu) {
+  if (!menu) return null;
+
+  return {
+    id: menu.id,
+    documentId: menu.documentId,
+    fk_elements: Array.isArray(menu.fk_elements)
+      ? menu.fk_elements.map(serializeElement)
+      : [],
+    createdAt: menu.createdAt,
+    updatedAt: menu.updatedAt,
+  };
+}
+
+async function loadPublishedMenuByUserId(strapi, userId) {
+  const menus = await strapi.documents('api::menu.menu').findMany({
+    filters: {
+      fk_user: {
+        id: { $eq: userId },
+      },
+    },
+    populate: {
+      fk_elements: {
+        populate: ['image'],
+      },
+    },
+    status: 'published',
+    sort: ['createdAt:asc'],
+    limit: 1,
+  });
+
+  return Array.isArray(menus) && menus.length > 0 ? menus[0] : null;
+}
+
 module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
+  /**
+   * GET /api/menus
+   * Restituisce il menu del ristoratore autenticato.
+   */
+  async list(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const menu = await loadPublishedMenuByUserId(strapi, user.id);
+
+      ctx.body = {
+        data: menu ? [serializeMenu(menu)] : [],
+        meta: { total: menu ? 1 : 0 },
+      };
+    } catch (error) {
+      strapi.log.error('Errore in menu.list:', error);
+      return ctx.internalServerError('Errore nel recupero del menu.');
+    }
+  },
+
   /**
    * API pubblica: restituisce il menu completo di un ristorante.
    * GET /api/menus/public/:userDocumentId
@@ -273,20 +348,9 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
         ? websiteConfigs[0]
         : null;
 
-      const menus = await strapi.documents('api::menu.menu').findMany({
-        filters: {
-          fk_user: {
-            id: { $eq: user.id },
-          },
-        },
-        populate: {
-          fk_elements: {
-            populate: ['image'],
-          },
-        },
-      });
+      const menu = await loadPublishedMenuByUserId(strapi, user.id);
 
-      if (!menus || menus.length === 0) {
+      if (!menu) {
         return ctx.send({
           data: {
             restaurant_name: websiteConfig ? websiteConfig.restaurant_name : user.username,
@@ -297,7 +361,6 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
         });
       }
 
-      const menu = menus[0];
       const elements = (menu.fk_elements || []).filter((el) => el.available !== false);
       const categories = [...new Set(elements.map((el) => el.category))];
       const formattedElements = elements.map((el) => ({

@@ -24,7 +24,6 @@ const birth_date = ref('');
 const password = ref('');
 const password_confirmation= ref('');
 const terms = ref(false);
-const registerData = ref();
 const copertiInvernali = ref('');
 const copertiEstivi = ref('');
 
@@ -35,43 +34,51 @@ const showPassword = ref(false);
 
 const router = useRouter();
 
-// Funzione che registra l'utente + crea la WebsiteConfig in transazione
-// server-side (override users-permissions auth.register). I campi coperti_*
-// sono obbligatori in input; la WebsiteConfig viene popolata atomicamente.
-const CreateUSer= async () => {
-    try {
-        const payload = {
-            username: username.value,
-            email: email.value,
-            password: password.value,
-            coperti_invernali: parseInt(copertiInvernali.value, 10),
-            restaurant_name: username.value,
-        };
-        if (copertiEstivi.value !== '' && copertiEstivi.value != null) {
-            payload.coperti_estivi = parseInt(copertiEstivi.value, 10);
-        }
-        const response = await fetch(`${API_BASE}/api/auth/local/register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-        });
-
-        if (response.ok) {
-            registerData.value = await response.json();
-        } else {
-            const errorData = await response.json();
-            errorMessage.value = errorData?.error?.message || 'Errore durante la registrazione.';
-            isError.value = true;
-        }
-
-    } catch (error) {
-        console.error('Errore di rete:', error.message);
+// Registra l'utente in un'unica chiamata: dati anagrafici e WebsiteConfig
+// vengono persistiti server-side durante il flusso di signup.
+const createUser = async () => {
+  try {
+    const payload = {
+      username: username.value,
+      email: email.value,
+      password: password.value,
+      name: name.value,
+      surname: surname.value,
+      birth_date: birth_date.value,
+      coperti_invernali: parseInt(copertiInvernali.value, 10),
+      restaurant_name: username.value,
+    };
+    if (copertiEstivi.value !== '' && copertiEstivi.value != null) {
+      payload.coperti_estivi = parseInt(copertiEstivi.value, 10);
     }
+    const response = await fetch(`${API_BASE}/api/auth/local/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      errorMessage.value = errorData?.error?.message || 'Errore durante la registrazione.';
+      isError.value = true;
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Errore di rete:', error.message);
+    errorMessage.value = 'Errore di rete durante la registrazione.';
+    isError.value = true;
+    return false;
+  }
 };
 
 const submit = async () => {
+  isError.value = false;
+  errorMessage.value = '';
+
   // Validazione coperti invernali (obbligatori)
   const cInv = parseInt(copertiInvernali.value, 10);
   if (!Number.isFinite(cInv) || cInv < 1 || cInv > 10000) {
@@ -107,43 +114,12 @@ const submit = async () => {
 
   if( password.value === password_confirmation.value ){
     isLoading.value = true;
-    await CreateUSer();
-
-    if (!registerData.value) {
-      isLoading.value = false;
-      return;
-    }
-
-    const tokjwt = registerData.value.jwt;
-    const id = registerData.value.user.id;
-
     try {
-      // Aggiorna i dati utente (nome, cognome, data nascita, URL)
-      const siteUrl = `${API_BASE}/sites/${username.value}`;
-      const response = await fetch(`${API_BASE}/api/users/${id}`,{
-        method: 'PUT',
-        headers:{
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${tokjwt}`,
-        },
-        body: JSON.stringify({
-            birth_date: birth_date.value,
-            name: name.value,
-            surname: surname.value,
-            url: siteUrl,
-        }),
-      });
-
-      if( response.ok ){
-          router.push({ path: '/login', query: { registered: '1' } });
-      }else{
-          const errorData = await response.json();
-          errorMessage.value = errorData?.error?.message || 'Errore aggiornamento profilo.';
-          isError.value = true;
+      const created = await createUser();
+      if (created) {
+        router.push({ path: '/login', query: { registered: '1' } });
       }
-    } catch (error) {
-      console.error('Errore di rete:', error.message);
-    } finally{
+    } finally {
       isLoading.value = false;
     }
   }else{

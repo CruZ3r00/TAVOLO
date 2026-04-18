@@ -1,4 +1,18 @@
 module.exports = () => ({
+  'users-permissions': {
+    config: {
+      register: {
+        allowedFields: [
+          'name',
+          'surname',
+          'birth_date',
+          'coperti_invernali',
+          'coperti_estivi',
+          'restaurant_name',
+        ],
+      },
+    },
+  },
   email: {
     config: {
       provider: 'nodemailer',

@@ -2,55 +2,58 @@ import qs from 'qs';
 
 /**
  * Recupera gli elementi del menu di un utente tramite il suo documentId.
- * Usa l'API standard di Strapi v5.
+ * Normalizza la risposta dell'API pubblica sul formato legacy usato dal frontend.
  */
 export const fetchMenuElements = async (id) => {
+    const emptyMenu = {
+        data: [
+            {
+                documentId: id,
+                fk_elements: [],
+            },
+        ],
+    };
+
     try {
-        //creazione query standard di strapi v5
-        const query = qs.stringify({
-            filters: {
-                documentId:{
-                    $eq: id
-                }
-            },
-            populate: "*",
-        });
-        const fetchuser = await fetch(`${API_BASE}/api/users?${query}`,{
-            method: "GET",
+        const response = await fetch(`${API_BASE}/api/menus/public/${id}`, {
+            method: 'GET',
             headers: {
-                "Content-Type" : "application/json",
+                'Content-Type': 'application/json',
             },
         });
-        if(fetchuser.ok){
-            const d = await fetchuser.json();
-            //creazione query standard di strapi v5
-            const query = qs.stringify({
-                filters: {
-                    fk_user:{
-                        id: {
-                            $eq: d[0].id
-                        },
-                    }
-                },
-                populate: {
-                    fk_elements: {
-                        populate: ['image']
-                    }
-                }
-            });
-            const response = await fetch(`${API_BASE}/api/menus?${query}`,{
-                method: 'GET',
-                headers: {
-                    "Content-Type": "application/json",
-                }
-            });
-            if(response.ok){
-                const data = await response.json();
-                return data;
-            }
+
+        if (response.ok) {
+            const payload = await response.json();
+            const elements = Array.isArray(payload?.data?.elements)
+                ? payload.data.elements.map((element) => ({
+                    id: element.documentId,
+                    documentId: element.documentId,
+                    name: element.name,
+                    price: Number.isFinite(Number(element.price)) ? Number(element.price) : 0,
+                    category: element.category,
+                    ingredients: Array.isArray(element.ingredients) ? element.ingredients : [],
+                    allergens: Array.isArray(element.allergens) ? element.allergens : [],
+                    available: element.available !== false,
+                    image: element.image_full_url || element.image_url
+                        ? { url: element.image_full_url || element.image_url }
+                        : null,
+                }))
+                : [];
+
+            return {
+                data: [
+                    {
+                        documentId: id,
+                        fk_elements: elements,
+                    },
+                ],
+            };
         }
+
+        return emptyMenu;
     } catch (error) {
         console.error(error);
+        return emptyMenu;
     }
 }
 

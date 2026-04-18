@@ -2,7 +2,6 @@
     import { onMounted, ref } from 'vue';
     import { useStore } from 'vuex';
     import Modal from '@/components/Modal.vue';
-    import qs from 'qs';
     import { API_BASE } from '@/utils';
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
@@ -14,7 +13,6 @@
 
     //variabili per il supporto delle richieste fetch
     const modify = ref(false);
-    const menuId = ref();
     const modalShow = ref(false);
     const toModify = ref();
     const imagePreview = ref(null);
@@ -42,6 +40,11 @@
         return result;
     };
 
+    const readErrorMessage = async (response, fallback) => {
+        const payload = await response.json().catch(() => null);
+        return payload?.error?.message || payload?.message || fallback;
+    };
+
     //caricamento delle immagini su strapi
     const uploadImage = async () => {
         if(!image.value) return
@@ -55,60 +58,42 @@
                 },
                 body: formData,
             });
-            if(response.ok){
-                const result = await response.json();
-                toModify.value.image.id = result[0].id;
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response, 'Upload immagine non riuscito.'));
             }
+
+            const result = await response.json();
+            uploadedImageId.value = result[0]?.id ?? null;
+            toModify.value.image = { ...(toModify.value.image || {}), id: uploadedImageId.value };
         } catch (error) {
-            console.error(error);
+            console.error(error?.message || error);
         }
     };
 
     //recupero della lista degli elementi nel database presenti nel menu
     const fetchList = async () => {
         try {
-            const fetchuser = await fetch(`${API_BASE}/api/users/me`,{
+            const response =  await fetch(`${API_BASE}/api/menus`, {
                 method: "GET",
                 headers: {
-                    "Authorization" : `Bearer ${tkn}`,
                     "Content-Type" : "application/json",
+                    "Authorization": `Bearer ${tkn}`,
                 },
             });
-            if(fetchuser.ok){
-                const d = await fetchuser.json();
-                //creazione query standard di strapi v5
-                const query = qs.stringify({
-                    filters: {
-                        fk_user:{
-                            id: {
-                                $eq: d.id
-                            },
-                        }
-                    },
-                    populate: "*",
-                });
 
-                const response =  await fetch(`${API_BASE}/api/menus?${query}`, {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${tkn}`,
-                    },
-                });
-                if (response.ok){
-                    const data = await response.json();
-                    if (data.data && data.data.length > 0) {
-                        list.value = [...data.data[0].fk_elements];
-                        menuId.value = data.data[0].documentId;
-                        // Estrai categorie uniche
-                        categories.value = [...new Set(list.value.map(el => el.category))];
-                    } else {
-                        list.value = [];
-                        categories.value = [];
-                    }
-                    emit('count-changed', list.value.length);
-                }
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response, 'Errore nel recupero del menu.'));
             }
+
+            const data = await response.json();
+            if (data.data && data.data.length > 0) {
+                list.value = [...data.data[0].fk_elements];
+                categories.value = [...new Set(list.value.map(el => el.category))];
+            } else {
+                list.value = [];
+                categories.value = [];
+            }
+            emit('count-changed', list.value.length);
         } catch (error) {
             console.error(error);
         }
@@ -118,14 +103,14 @@
     const handleModify = (e) => {
         modalShow.value = !modalShow.value;
         toModify.value = JSON.parse(JSON.stringify(e));
+        imagePreview.value = null;
     };
 
     //funzione che fa l'update dell'elemento selezionato
     const update = async () => {
         try {
-            await handleDelete(toModify.value.documentId);
-            const update = await fetch(`${API_BASE}/api/elements`,{
-                method: "POST",
+            const update = await fetch(`${API_BASE}/api/elements/${toModify.value.documentId}`,{
+                method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${tkn}`,
@@ -135,35 +120,19 @@
                         name: toModify.value.name,
                         ingredients: toModify.value.ingredients,
                         allergens: toModify.value.allergens,
-                        image: toModify.value.image.id,
+                        image: toModify.value.image?.id ?? null,
                         price: toModify.value.price,
                         category: toModify.value.category,
                     }
                 })
             });
-            if( update.ok ){
-                const data = await update.json();
-                list.value.push(data.data);
-                const reconnect = await fetch(`${API_BASE}/api/menus/${menuId.value}`,{
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${tkn}`,
-                    },
-                    body: JSON.stringify({
-                        data: {
-                            fk_elements:{
-                                connect: [ list.value.map(i =>({ documentId: i.documentId})) ]
-                            }
-                        },
-                    })
-                });
-                if (reconnect.ok){
-                    list.value = [];
-                    await fetchList();
-                }
+            if (!update.ok) {
+                throw new Error(await readErrorMessage(update, 'Errore durante l\'aggiornamento dell\'elemento.'));
             }
+
             modalShow.value = false;
+            imagePreview.value = null;
+            await fetchList();
         } catch (error) {
             console.error(error);
         }
@@ -172,35 +141,18 @@
     //function che cancella dal database e dalla lista l'elemento cliccato
     const handleDelete = async (id) => {
         try {
-            const update = await fetch(`${API_BASE}/api/menus/${menuId.value}`,{
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${tkn}`,
-            },
-            body: JSON.stringify({
-                    data: {
-                        fk_elements:{
-                            disconnect: { documentId: id },
-                        }
-                    },
-                })
+            const del = await fetch(`${API_BASE}/api/elements/${id}`,{
+                method: "DELETE",
+                headers: {
+                    "Authorization": `Bearer ${tkn}`
+                }
             });
 
-            if (update.ok){
-                const del = await fetch(`${API_BASE}/api/elements/${id}`,{
-                    method: "DELETE",
-                    headers: {
-                        "Authorization": `Bearer ${tkn}`
-                    }
-                });
-
-                if (del.ok){
-                    list.value = list.value.filter(item => item.documentId !== id);
-                    categories.value = [...new Set(list.value.map(el => el.category))];
-                    emit('count-changed', list.value.length);
-                }
+            if (!del.ok && del.status !== 204) {
+                throw new Error(await readErrorMessage(del, 'Errore durante l\'eliminazione dell\'elemento.'));
             }
+
+            await fetchList();
         } catch (error) {
             console.error(error);
         }

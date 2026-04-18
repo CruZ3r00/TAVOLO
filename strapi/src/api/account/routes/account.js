@@ -2,6 +2,8 @@
 
 module.exports = {
   routes: [
+    { method: 'GET',    path: '/account/website-config',  handler: 'account.getWebsiteConfig' },
+    { method: 'PUT',    path: '/account/website-config',  handler: 'account.upsertWebsiteConfig' },
     { method: 'PUT',    path: '/account/profile',         handler: 'account.updateProfile' },
     { method: 'PUT',    path: '/account/password',        handler: 'account.updatePassword' },
     { method: 'POST',   path: '/account/destroy',         handler: 'account.destroy' },

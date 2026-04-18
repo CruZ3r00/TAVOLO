@@ -75,15 +75,23 @@ module.exports = (plugin) => {
 
     try {
       const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+      const siteUrl = `${siteBaseUrl}/sites/${createdUser.username}`;
       await strapi.documents('api::website-config.website-config').create({
         data: {
           restaurant_name: restaurantName,
-          site_url: `${siteBaseUrl}/sites/${createdUser.username}`,
+          site_url: siteUrl,
           coperti_invernali: cInv,
           coperti_estivi: copertiEstivi,
           fk_user: { connect: [{ id: createdUser.id }] },
         },
       });
+      await strapi.db.query('plugin::users-permissions.user').update({
+        where: { id: createdUser.id },
+        data: { url: siteUrl },
+      });
+      if (ctx.body && ctx.body.user) {
+        ctx.body.user.url = siteUrl;
+      }
     } catch (error) {
       strapi.log.error(
         `register: creazione WebsiteConfig fallita per user ${createdUser.username}, rollback utente: ${error.message}`

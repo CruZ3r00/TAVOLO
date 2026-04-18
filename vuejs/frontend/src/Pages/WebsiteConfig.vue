@@ -3,12 +3,10 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import GeneratorQRCode from '@/components/GeneratorQRCode.vue';
 import { ref, onMounted, nextTick } from 'vue';
 import { useStore } from 'vuex';
-import qs from 'qs';
 import { API_BASE } from '@/utils';
 
 const store = useStore();
 const tkn = store.getters.getToken;
-const user = store.getters.getUser;
 
 const configId = ref('');
 const restaurantName = ref('');
@@ -17,7 +15,6 @@ const logoPreview = ref(null);
 const logoFile = ref(null);
 const uploadedLogoId = ref(null);
 const currentLogoUrl = ref(null);
-const userId = ref(null);
 const userDocumentId = ref('');
 const isSaving = ref(false);
 const saveSuccess = ref(false);
@@ -26,6 +23,16 @@ const apiEndpoint = ref('');
 const apiCopied = ref(false);
 const copertiInvernali = ref('');
 const copertiEstivi = ref('');
+
+const applyConfig = (config) => {
+  configId.value = config?.documentId || '';
+  restaurantName.value = config?.restaurant_name || '';
+  siteUrl.value = config?.site_url || '';
+  copertiInvernali.value = config?.coperti_invernali != null ? String(config.coperti_invernali) : '';
+  copertiEstivi.value = config?.coperti_estivi != null ? String(config.coperti_estivi) : '';
+  currentLogoUrl.value = config?.logo?.url ? `${API_BASE}${config.logo.url}` : null;
+  uploadedLogoId.value = config?.logo?.id || null;
+};
 
 const fetchConfig = async () => {
   try {
@@ -38,18 +45,10 @@ const fetchConfig = async () => {
     });
     if (userRes.ok) {
       const userData = await userRes.json();
-      userId.value = userData.id;
       userDocumentId.value = userData.documentId;
       apiEndpoint.value = `${API_BASE}/api/menus/public/${userData.documentId}`;
 
-      // Recupera website-config
-      const query = qs.stringify({
-        filters: {
-          fk_user: { id: { $eq: userData.id } },
-        },
-        populate: ['logo'],
-      });
-      const wcRes = await fetch(`${API_BASE}/api/website-configs?${query}`, {
+      const wcRes = await fetch(`${API_BASE}/api/account/website-config`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${tkn}`,
@@ -58,18 +57,10 @@ const fetchConfig = async () => {
       });
       if (wcRes.ok) {
         const wcData = await wcRes.json();
-        if (wcData.data && wcData.data.length > 0) {
-          const config = wcData.data[0];
-          configId.value = config.documentId;
-          restaurantName.value = config.restaurant_name || '';
-          siteUrl.value = config.site_url || '';
-          copertiInvernali.value = config.coperti_invernali != null ? String(config.coperti_invernali) : '';
-          copertiEstivi.value = config.coperti_estivi != null ? String(config.coperti_estivi) : '';
-          if (config.logo) {
-            currentLogoUrl.value = `${API_BASE}${config.logo.url}`;
-            uploadedLogoId.value = config.logo.id;
-          }
-        }
+        applyConfig(wcData.data);
+      } else {
+        const errorData = await wcRes.json().catch(() => ({}));
+        saveError.value = errorData?.error?.message || 'Impossibile caricare la configurazione del sito.';
       }
     }
   } catch (error) {
@@ -143,42 +134,22 @@ const saveConfig = async () => {
       bodyData.logo = uploadedLogoId.value;
     }
 
-    if (configId.value) {
-      // Aggiorna configurazione esistente
-      const response = await fetch(`${API_BASE}/api/website-configs/${configId.value}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${tkn}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ data: bodyData }),
-      });
-      if (response.ok) {
-        saveSuccess.value = true;
-        // Aggiorna URL nel profilo utente
-        await updateUserUrl();
-      } else {
-        saveError.value = 'Errore nel salvataggio della configurazione.';
-      }
+    const response = await fetch(`${API_BASE}/api/account/website-config`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${tkn}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(bodyData),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      applyConfig(data.data);
+      saveSuccess.value = true;
     } else {
-      // Crea nuova configurazione
-      bodyData.fk_user = { connect: [{ id: userId.value }] };
-      const response = await fetch(`${API_BASE}/api/website-configs`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${tkn}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ data: bodyData }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        configId.value = data.data.documentId;
-        saveSuccess.value = true;
-        await updateUserUrl();
-      } else {
-        saveError.value = 'Errore nella creazione della configurazione.';
-      }
+      const errorData = await response.json().catch(() => ({}));
+      saveError.value = errorData?.error?.message || 'Errore nel salvataggio della configurazione.';
     }
   } catch (error) {
     saveError.value = 'Errore di rete nel salvataggio.';
@@ -188,22 +159,6 @@ const saveConfig = async () => {
     if (saveSuccess.value) {
       setTimeout(() => { saveSuccess.value = false; }, 3000);
     }
-  }
-};
-
-const updateUserUrl = async () => {
-  if (!siteUrl.value || !userId.value) return;
-  try {
-    await fetch(`${API_BASE}/api/users/${userId.value}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${tkn}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url: siteUrl.value }),
-    });
-  } catch (error) {
-    console.error('Errore aggiornamento URL utente:', error);
   }
 };
 

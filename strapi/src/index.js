@@ -12,6 +12,118 @@ module.exports = {
    * This gives you an opportunity to extend code.
    */
   register({ strapi }) {
+    // ── WebsiteConfig creation on registration ──
+    // The plugin extension at src/extensions/users-permissions/strapi-server.js
+    // doesn't load without a build step (Strapi v5 reads from dist/). Instead,
+    // we use a Koa middleware that intercepts POST /api/auth/local/register,
+    // captures the custom fields (coperti_invernali, coperti_estivi,
+    // restaurant_name), lets the original controller run, then creates
+    // the WebsiteConfig atomically.
+    strapi.server.use(async (ctx, next) => {
+      const isRegister =
+        ctx.request.method === 'POST' &&
+        ctx.request.path === '/api/auth/local/register';
+
+      if (!isRegister) {
+        return next();
+      }
+
+      // Body parser hasn't run yet (this middleware is registered before
+      // Strapi's middleware stack). Let everything run first.
+      await next();
+
+      // Now ctx.request.body is parsed by the body parser and the
+      // register controller has already executed.
+      const registerResp = ctx.body;
+      const createdUser = registerResp && registerResp.user ? registerResp.user : null;
+      if (!createdUser || !createdUser.id) {
+        return; // registration failed or response isn't a success, nothing to do
+      }
+
+      // The custom fields survived in ctx.request.body because the
+      // original register only _.pick()s allowedKeys without deleting.
+      const body = ctx.request.body || {};
+      const rawInv = body.coperti_invernali;
+      const rawEst = body.coperti_estivi;
+      const rawName = body.restaurant_name;
+
+      // Parse & validate capacity
+      const cInv = Number.isFinite(Number(rawInv)) ? parseInt(rawInv, 10) : null;
+      if (!cInv || cInv < 1 || cInv > 10000) {
+        // Invalid capacity — rollback the created user
+        try {
+          await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+        } catch (_) { /* best effort */ }
+        ctx.status = 400;
+        ctx.body = {
+          data: null,
+          error: { status: 400, name: 'ValidationError', message: 'coperti_invernali obbligatorio (intero 1..10000).' },
+        };
+        return;
+      }
+
+      let cEst = null;
+      if (rawEst !== undefined && rawEst !== null && rawEst !== '') {
+        cEst = Number.isFinite(Number(rawEst)) ? parseInt(rawEst, 10) : null;
+        if (!cEst || cEst < 1 || cEst > 10000) {
+          try {
+            await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+          } catch (_) { /* best effort */ }
+          ctx.status = 400;
+          ctx.body = {
+            data: null,
+            error: { status: 400, name: 'ValidationError', message: 'coperti_estivi non valido (intero 1..10000).' },
+          };
+          return;
+        }
+      }
+      const copertiEstivi = cEst != null ? cEst : cInv;
+
+      const restaurantName =
+        (typeof rawName === 'string' && rawName.trim()) ||
+        (typeof createdUser.username === 'string' && createdUser.username.trim()) ||
+        'Ristorante';
+
+      try {
+        const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+        const siteUrl = `${siteBaseUrl}/sites/${createdUser.username}`;
+        await strapi.documents('api::website-config.website-config').create({
+          data: {
+            restaurant_name: restaurantName,
+            site_url: siteUrl,
+            coperti_invernali: cInv,
+            coperti_estivi: copertiEstivi,
+            fk_user: { connect: [{ id: createdUser.id }] },
+          },
+        });
+        await strapi.db.query('plugin::users-permissions.user').update({
+          where: { id: createdUser.id },
+          data: { url: siteUrl },
+        });
+        if (ctx.body && ctx.body.user) {
+          ctx.body.user.url = siteUrl;
+        }
+      } catch (error) {
+        strapi.log.error(
+          `register middleware: creazione WebsiteConfig fallita per user ${createdUser.username}, rollback utente: ${error.message}`
+        );
+        try {
+          await strapi.db
+            .query('plugin::users-permissions.user')
+            .delete({ where: { id: createdUser.id } });
+        } catch (cleanupErr) {
+          strapi.log.error(`register middleware: rollback utente fallito: ${cleanupErr.message}`);
+        }
+        ctx.status = 500;
+        ctx.body = {
+          error: {
+            code: 'REGISTER_CAPACITY_FAILED',
+            message: 'Registrazione annullata: impossibile configurare la capacità del ristorante.',
+          },
+        };
+      }
+    });
+
     // Lifecycle hook: invia email di notifica quando un nuovo utente si registra
     strapi.db.lifecycles.subscribe({
       models: ['plugin::users-permissions.user'],
@@ -128,9 +240,15 @@ async function grantImportPermissions(strapi) {
     if (!role) return;
 
     const actions = [
+      'api::menu.menu.list',
       'api::menu.menu.analyzeImport',
       'api::menu.menu.bulkImport',
+      'api::element.element.create',
+      'api::element.element.update',
+      'api::element.element.remove',
       'api::account.account.updateProfile',
+      'api::account.account.getWebsiteConfig',
+      'api::account.account.upsertWebsiteConfig',
       'api::account.account.updatePassword',
       'api::account.account.destroy',
       'api::account.account.twoFactorStatus',
@@ -156,6 +274,7 @@ async function grantImportPermissions(strapi) {
       'api::order.order.deleteItem',
       'api::order.order.updateItemStatus',
       'api::order.order.close',
+      'plugin::upload.content-api.upload',
     ];
     for (const action of actions) {
       const existing = await strapi.db.query('plugin::users-permissions.permission').findOne({

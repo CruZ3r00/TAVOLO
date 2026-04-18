@@ -1,6 +1,8 @@
 'use strict';
 
 const crypto = require('crypto');
+const CAPACITY_MIN = 1;
+const CAPACITY_MAX = 10000;
 
 // ----- TOTP helpers (RFC 6238, SHA1, 6 digits, 30s) -----
 const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -80,6 +82,25 @@ async function verifyUserPassword(strapi, user, password) {
   return strapi.plugin('users-permissions').service('user').validatePassword(password, fresh.password);
 }
 
+function parseCapacity(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
+}
+
+function isValidCapacity(value) {
+  return Number.isFinite(value) && value >= CAPACITY_MIN && value <= CAPACITY_MAX;
+}
+
+async function findUserWebsiteConfig(userId, populate = []) {
+  const configs = await strapi.documents('api::website-config.website-config').findMany({
+    filters: { fk_user: { id: { $eq: userId } } },
+    populate,
+  });
+  return configs && configs.length > 0 ? configs[0] : null;
+}
+
 module.exports = {
   async updateProfile(ctx) {
     const user = ctx.state.user;
@@ -118,6 +139,72 @@ module.exports = {
     if (!ok) return ctx.badRequest('Password corrente errata');
     await strapi.plugin('users-permissions').service('user').edit(user.id, { password });
     return ctx.send({ success: true });
+  },
+
+  async getWebsiteConfig(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+
+    const config = await findUserWebsiteConfig(user.id, ['logo']);
+    return ctx.send({ data: config });
+  },
+
+  async upsertWebsiteConfig(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+
+    const body = ctx.request.body || {};
+    const cInv = parseCapacity(body.coperti_invernali);
+    if (!isValidCapacity(cInv)) {
+      return ctx.badRequest('coperti_invernali obbligatorio (intero 1..10000).');
+    }
+
+    let cEst = cInv;
+    if (body.coperti_estivi !== undefined && body.coperti_estivi !== null && body.coperti_estivi !== '') {
+      cEst = parseCapacity(body.coperti_estivi);
+      if (!isValidCapacity(cEst)) {
+        return ctx.badRequest('coperti_estivi non valido (intero 1..10000).');
+      }
+    }
+
+    const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+    const siteUrl =
+      (typeof body.site_url === 'string' && body.site_url.trim()) ||
+      `${siteBaseUrl}/sites/${user.username}`;
+    const restaurantName =
+      (typeof body.restaurant_name === 'string' && body.restaurant_name.trim()) ||
+      user.username ||
+      'Ristorante';
+
+    const data = {
+      restaurant_name: restaurantName,
+      site_url: siteUrl,
+      coperti_invernali: cInv,
+      coperti_estivi: cEst,
+      fk_user: { connect: [{ id: user.id }] },
+    };
+
+    if (body.logo !== undefined && body.logo !== null && body.logo !== '') {
+      data.logo = body.logo;
+    }
+
+    const existing = await findUserWebsiteConfig(user.id);
+    if (existing) {
+      await strapi.documents('api::website-config.website-config').update({
+        documentId: existing.documentId,
+        data,
+      });
+    } else {
+      await strapi.documents('api::website-config.website-config').create({ data });
+    }
+
+    await strapi.db.query('plugin::users-permissions.user').update({
+      where: { id: user.id },
+      data: { url: siteUrl },
+    });
+
+    const config = await findUserWebsiteConfig(user.id, ['logo']);
+    return ctx.send({ data: config });
   },
 
   async destroy(ctx) {

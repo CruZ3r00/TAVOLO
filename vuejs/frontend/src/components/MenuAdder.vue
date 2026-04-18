@@ -1,7 +1,6 @@
 <script setup>
     import { useStore } from 'vuex';
     import { ref, onMounted, nextTick } from 'vue';
-    import qs from 'qs';
     import { API_BASE } from '@/utils';
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
@@ -11,7 +10,6 @@
     const emit = defineEmits(['ViewList']);
 
     //variabili per il supporto delle richieste fetch
-    const elementID = ref();
     const imagePreview = ref(null);
     const uploadedImageId = ref(null);
     const isSubmitting = ref(false);
@@ -27,60 +25,64 @@
     const customCategory = ref('');
     const useCustomCategory = ref(false);
 
+    const readErrorMessage = async (response, fallback) => {
+        const payload = await response.json().catch(() => null);
+        return payload?.error?.message || payload?.message || fallback;
+    };
+
     //caricamento delle immagini su strapi
     const uploadImage = async () => {
-        if(!image.value) return
+        if(!image.value){
+            uploadedImageId.value = null;
+            return null;
+        }
 
         const formData = new FormData();
         formData.append('files', image.value);
-        try {
-            const response = await fetch(`${API_BASE}/api/upload`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${tkn}`,
-                },
-                body: formData,
-            });
+        const response = await fetch(`${API_BASE}/api/upload`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${tkn}`,
+            },
+            body: formData,
+        });
 
-            if(response.ok){
-                const result = await response.json();
-                uploadedImageId.value = result[0].id;
-            }
-        } catch (error) {
-            console.error(error);
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, 'Upload immagine non riuscito.'));
         }
+
+        const result = await response.json();
+        uploadedImageId.value = result[0]?.id ?? null;
+        return uploadedImageId.value;
     };
 
     //Creazione di un nuovo record di elemento tramite API strapi
     const CreateElement = async () => {
-        try{
-            const finalCategory = useCustomCategory.value ? customCategory.value : category.value;
-            const response = await fetch(`${API_BASE}/api/elements`,{
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${tkn}`,
-                },
-                body: JSON.stringify({
-                    data: {
-                        name: name.value,
-                        ingredients: ingredients.value,
-                        allergens: allergens.value,
-                        image: uploadedImageId.value,
-                        price: price.value,
-                        category: finalCategory,
-                    }
-                })
-            });
+        const finalCategory = useCustomCategory.value ? customCategory.value : category.value;
+        const response = await fetch(`${API_BASE}/api/elements`,{
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${tkn}`,
+            },
+            body: JSON.stringify({
+                data: {
+                    name: name.value,
+                    ingredients: ingredients.value,
+                    allergens: allergens.value,
+                    image: uploadedImageId.value,
+                    price: price.value,
+                    category: finalCategory,
+                }
+            })
+        });
 
-            if (response.ok){
-                const data = await response.json();
-                elementID.value = data.data.documentId;
-            }
-
-        }catch( error ){
-            console.log(error);
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, 'Creazione elemento non riuscita.'));
         }
+
+        const data = await response.json();
+        return data.data;
     };
 
     const validationError = ref('');
@@ -102,108 +104,16 @@
         isSubmitting.value = true;
         submitSuccess.value = false;
         try {
-            const fetchuser = await fetch(`${API_BASE}/api/users/me`,{
-                method: "GET",
-                headers: {
-                    "Authorization" : `Bearer ${tkn}`,
-                    "Content-Type" : "application/json",
-                },
-            });
-            if(fetchuser.ok){
-                const d = await fetchuser.json();
-                //creazione query standard di strapi v5
-                const query = qs.stringify({
-                    filters: {
-                        fk_user:{
-                            id: {
-                                $eq: d.id
-                            },
-                        }
-                    },
-                    populate: "*",
-                });
-
-                await uploadImage();
-                await CreateElement();
-
-                const response =  await fetch(`${API_BASE}/api/menus?${query}`, {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${tkn}`,
-                    },
-                });
-
-                if (response.ok){
-                    const data = await response.json();
-
-                    if(data.data.length <= 0){
-                        const r = await fetch(`${API_BASE}/api/menus`,{
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": `Bearer ${tkn}`,
-                            },
-                            body: JSON.stringify({
-                                data: {
-                                    fk_user: {
-                                        connect: [
-                                            { id: d.id},
-                                        ]
-                                    },
-                                    fk_elements:{
-                                        connect: [
-                                            { documentId: elementID.value },
-                                        ]
-                                    }
-                                }
-                            })
-                        });
-                    }
-                    else {
-                        const menuId = data.data[0].documentId;
-                        let newList = [];
-
-                        const getUpdate = await fetch(`${API_BASE}/api/menus/${menuId}?populate=*`,{
-                            method: "GET",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": `Bearer ${tkn}`,
-                            },
-                        });
-                        if (!getUpdate.ok) {
-                            throw new Error('Errore nella richiesta');
-                        }
-
-                        const dataUpdate = await getUpdate.json();
-                        newList = [...newList, ...dataUpdate.data.fk_elements.map(el => el.documentId)];
-                        newList.push(elementID.value);
-
-                        const update = await fetch(`${API_BASE}/api/menus/${menuId}`,{
-                            method: "PUT",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": `Bearer ${tkn}`,
-                            },
-                            body: JSON.stringify({
-                                data: {
-                                    fk_elements:{
-                                        connect: newList.map(i => ({ documentId: i})),
-                                    }
-                                },
-                            })
-                        });
-                    }
-                }
-            }
+            await uploadImage();
+            await CreateElement();
             submitSuccess.value = true;
+            resetForm();
             setTimeout(() => { submitSuccess.value = false; }, 2000);
         } catch (error) {
-            console.error(error);
+            validationError.value = error?.message || 'Errore durante il salvataggio dell\'elemento.';
         } finally {
             isSubmitting.value = false;
         }
-        resetForm();
     };
 
     // funzioni per aumentare e dimunire le dimensioni della lista degli ingredienti

@@ -3,7 +3,6 @@ import { useRouter } from 'vue-router';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { onMounted, nextTick, ref } from 'vue';
 import { useStore } from 'vuex';
-import qs from 'qs';
 import { API_BASE } from '@/utils';
 
 const router = useRouter();
@@ -39,13 +38,7 @@ const loadStats = async () => {
       username.value = userData.username;
 
       // Recupera menu dell'utente
-      const query = qs.stringify({
-        filters: {
-          fk_user: { id: { $eq: userData.id } },
-        },
-        populate: { fk_elements: { populate: ['image'] } },
-      });
-      const menuRes = await fetch(`${API_BASE}/api/menus?${query}`, {
+      const menuRes = await fetch(`${API_BASE}/api/menus`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${tkn}`,
@@ -96,13 +89,7 @@ const loadStats = async () => {
         }
       }
 
-      // Recupera website-config
-      const wcQuery = qs.stringify({
-        filters: {
-          fk_user: { id: { $eq: userData.id } },
-        },
-      });
-      const wcRes = await fetch(`${API_BASE}/api/website-configs?${wcQuery}`, {
+      const wcRes = await fetch(`${API_BASE}/api/account/website-config`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${tkn}`,
@@ -111,10 +98,10 @@ const loadStats = async () => {
       });
       if (wcRes.ok) {
         const wcData = await wcRes.json();
-        if (wcData.data && wcData.data.length > 0) {
-          hasSiteConfig.value = !!wcData.data[0].site_url;
-          restaurantName.value = wcData.data[0].restaurant_name || '';
-          siteUrl.value = wcData.data[0].site_url || '';
+        if (wcData.data) {
+          hasSiteConfig.value = !!wcData.data.site_url;
+          restaurantName.value = wcData.data.restaurant_name || '';
+          siteUrl.value = wcData.data.site_url || '';
         }
       }
     }
