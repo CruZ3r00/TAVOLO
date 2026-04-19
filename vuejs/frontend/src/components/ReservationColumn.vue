@@ -14,7 +14,7 @@ defineProps({
     emptyMessage: { type: String, default: 'Nessuna prenotazione.' },
 });
 
-const emit = defineEmits(['action']);
+const emit = defineEmits(['action', 'seat']);
 </script>
 
 <template>
@@ -40,6 +40,7 @@ const emit = defineEmits(['action']);
                         :reservation="r"
                         :busy="busyIds.has(r.documentId)"
                         @action="payload => emit('action', payload)"
+                        @seat="payload => emit('seat', payload)"
                     />
                 </TransitionGroup>
             </template>

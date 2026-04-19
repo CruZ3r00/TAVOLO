@@ -183,7 +183,8 @@ export const createReservation = async (payload, token) => {
 
 /**
  * Aggiorna lo status di una prenotazione secondo la FSM.
- * status: 'confirmed' | 'at_restaurant' | 'completed' | 'cancelled'
+ * status: 'confirmed' | 'completed' | 'cancelled'.
+ * Nota: 'at_restaurant' non e' ammesso qui — usa seatReservation.
  */
 export const updateReservationStatus = async (documentId, status, token) => {
     const resp = await fetch(`${API_BASE}/api/reservations/${documentId}/status`, {
@@ -193,6 +194,44 @@ export const updateReservationStatus = async (documentId, status, token) => {
             Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ status }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildReservationError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Fa accomodare una prenotazione su un tavolo.
+ * body: { table_id (documentId), covers? }
+ * Risposta: { reservation, order: { documentId } }
+ */
+export const seatReservation = async (documentId, body, token) => {
+    const resp = await fetch(`${API_BASE}/api/reservations/${documentId}/seat`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildReservationError(resp, payload);
+    return payload.data;
+};
+
+/**
+ * Registra un walk-in (cliente senza prenotazione) su un tavolo libero.
+ * body: { table_id, number_of_people, customer_name?, phone?, covers?, notes? }
+ * Risposta: { reservation, order: { documentId } }
+ */
+export const createWalkin = async (body, token) => {
+    const resp = await fetch(`${API_BASE}/api/reservations/walkin`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
     });
     const payload = await resp.json().catch(() => ({}));
     if (!resp.ok) throw buildReservationError(resp, payload);
@@ -504,13 +543,19 @@ export const reservationErrorMessage = (err) => {
         case 'CAPACITY_NOT_CONFIGURED':
             return 'Capacità del ristorante non configurata. Vai in Configurazione Sito e imposta i coperti invernali.';
         case 'INVALID_TRANSITION':
-            return 'Transizione di stato non ammessa per questa prenotazione.';
+            return err.message || 'Transizione di stato non ammessa per questa prenotazione.';
         case 'NOT_OWNER':
             return 'Non sei autorizzato a modificare questa prenotazione.';
         case 'RESTAURANT_NOT_FOUND':
             return 'Ristorante non trovato.';
         case 'RESERVATION_NOT_FOUND':
             return 'Prenotazione non trovata.';
+        case 'TABLE_NOT_FOUND':
+            return 'Tavolo non trovato.';
+        case 'TABLE_ALREADY_OCCUPIED':
+            return 'Tavolo gia occupato. Scegline un altro libero.';
+        case 'RESERVATION_ALREADY_SEATED':
+            return 'Prenotazione gia in sala.';
         case 'INVALID_PAYLOAD':
             return err.message || 'Dati non validi. Controlla i campi e riprova.';
         case 'RESERVATION_CONTENTION':

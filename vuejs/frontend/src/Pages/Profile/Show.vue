@@ -1,19 +1,30 @@
 <script setup>
     import { ref } from 'vue';
     import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
-    import SectionBorder from '@/components/SectionBorder.vue';
     import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue';
     import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
     import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
-    import GeneratorQRCode from '@/components/GeneratorQRCode.vue';
+    import WebsiteConfigForm from '@/Pages/Profile/Partials/WebsiteConfigForm.vue';
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
+    import { useRoute } from 'vue-router';
     import { nextTick, onMounted } from 'vue';
     //per recuperare le info dell'utente loggato
     const store = useStore();
+    const route = useRoute();
 
-    //per decidere quale form visualizzare
-    const activeSection = ref('profilo');
+    const sections = [
+        { key: 'profilo', label: 'Profilo', icon: 'bi-person' },
+        { key: 'cambiopsw', label: 'Password', icon: 'bi-key' },
+        { key: 'duefattori', label: 'Due fattori', icon: 'bi-shield-lock' },
+        { key: 'sito', label: 'Sito web', icon: 'bi-globe2' },
+        { key: 'delete', label: 'Elimina account', icon: 'bi-trash', danger: true },
+    ];
+
+    // Se la route arriva con ?section=... e la chiave esiste, apri quella scheda.
+    const requestedSection = typeof route.query.section === 'string' ? route.query.section : '';
+    const initialSection = sections.some(s => s.key === requestedSection) ? requestedSection : 'profilo';
+    const activeSection = ref(initialSection);
 
     defineProps({
         confirmsTwoFactorAuthentication: Boolean,
@@ -27,14 +38,6 @@
         'username' :  x.username,
         'email' : x.email,
     }
-
-    const sections = [
-        { key: 'profilo', label: 'Profilo', icon: 'bi-person' },
-        { key: 'cambiopsw', label: 'Password', icon: 'bi-key' },
-        { key: 'duefattori', label: 'Due fattori', icon: 'bi-shield-lock' },
-        { key: 'qr', label: 'QR Code', icon: 'bi-qr-code' },
-        { key: 'delete', label: 'Elimina account', icon: 'bi-trash', danger: true },
-    ];
 
     // Imposta il titolo della pagina
     onMounted(async () => {
@@ -78,15 +81,7 @@
                             <UpdateProfileInformationForm v-if="activeSection === 'profilo'" :user="userinfo" :key="'profilo'" />
                             <UpdatePasswordForm v-else-if="activeSection === 'cambiopsw'" :id="userinfo.id" :key="'password'" />
                             <TwoFactorAuthenticationForm v-else-if="activeSection === 'duefattori'" :requires-confirmation="confirmsTwoFactorAuthentication" :key="'2fa'" />
-                            <div v-else-if="activeSection === 'qr'" :key="'qr'" class="ds-card">
-                                <div class="ds-card-header">
-                                    <i class="bi bi-qr-code" style="color: var(--color-primary);"></i>
-                                    <h3 class="profile-section-title">Genera QR Code</h3>
-                                </div>
-                                <div class="ds-card-body">
-                                    <GeneratorQRCode />
-                                </div>
-                            </div>
+                            <WebsiteConfigForm v-else-if="activeSection === 'sito'" :key="'sito'" />
                             <DeleteUserForm v-else-if="activeSection === 'delete'" :key="'delete'" />
                         </Transition>
                     </div>

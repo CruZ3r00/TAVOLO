@@ -5,7 +5,18 @@ const props = defineProps({
     order: { type: Object, required: true },
 });
 
-const emit = defineEmits(['open']);
+const emit = defineEmits(['open', 'checkout']);
+
+const reservation = computed(() => props.order?.reservation || null);
+
+const isWalkin = computed(() => reservation.value?.is_walkin === true);
+
+const customerName = computed(() => {
+    const r = reservation.value;
+    if (!r) return null;
+    const name = (r.customer_name || '').trim();
+    return name || null;
+});
 
 const tableLabel = computed(() => {
     const t = props.order?.table;
@@ -49,19 +60,27 @@ const coversLabel = computed(() => {
 </script>
 
 <template>
-    <article class="oo-card">
+    <article class="oo-card" :class="{ 'oo-card-walkin': isWalkin }">
         <header class="oo-card-header">
             <div class="oo-table">
                 <span class="oo-table-label">{{ tableLabel }}</span>
                 <span class="oo-table-area">{{ areaLabel }}</span>
             </div>
-            <span class="oo-status-badge">
+            <span v-if="isWalkin" class="oo-status-badge oo-badge-walkin">
+                <i class="bi bi-person-walking" aria-hidden="true"></i>
+                Walk-in
+            </span>
+            <span v-else class="oo-status-badge">
                 <i class="bi bi-cup-straw" aria-hidden="true"></i>
                 Ordine attivo
             </span>
         </header>
 
         <div class="oo-card-body">
+            <div class="oo-line" v-if="customerName">
+                <i class="bi bi-person" aria-hidden="true"></i>
+                <span class="oo-customer">{{ customerName }}</span>
+            </div>
             <div class="oo-line">
                 <i class="bi bi-clock" aria-hidden="true"></i>
                 <span>Aperto alle {{ openedTime }}</span>
@@ -87,11 +106,19 @@ const coversLabel = computed(() => {
         <footer class="oo-card-footer">
             <button
                 type="button"
-                class="ds-btn ds-btn-sm ds-btn-primary"
+                class="ds-btn ds-btn-sm ds-btn-ghost"
                 @click="emit('open', order)"
             >
                 <i class="bi bi-pencil-square" aria-hidden="true"></i>
                 <span>Gestisci ordine</span>
+            </button>
+            <button
+                type="button"
+                class="ds-btn ds-btn-sm ds-btn-primary"
+                @click="emit('checkout', order)"
+            >
+                <i class="bi bi-receipt" aria-hidden="true"></i>
+                <span>Chiudi conto</span>
             </button>
         </footer>
     </article>
@@ -113,6 +140,12 @@ const coversLabel = computed(() => {
     box-shadow: var(--shadow-sm);
     border-color: var(--color-border-hover);
     border-left-color: var(--color-primary);
+}
+.oo-card-walkin {
+    border-left-color: var(--color-accent);
+}
+.oo-card-walkin:hover {
+    border-left-color: var(--color-accent);
 }
 
 .oo-card-header {
@@ -153,6 +186,10 @@ const coversLabel = computed(() => {
     font-weight: 600;
     white-space: nowrap;
 }
+.oo-badge-walkin {
+    background: var(--color-accent-light);
+    color: var(--color-accent);
+}
 
 .oo-card-body {
     padding: var(--space-3) var(--space-4);
@@ -171,6 +208,10 @@ const coversLabel = computed(() => {
 .oo-line i {
     color: var(--color-text-muted);
     font-size: var(--text-base);
+}
+.oo-customer {
+    color: var(--color-text);
+    font-weight: 600;
 }
 
 .oo-ready-chip {

@@ -6,7 +6,7 @@ const props = defineProps({
     activeOrder: { type: Object, default: null },
 });
 
-const emit = defineEmits(['open-order', 'view-order', 'edit-table', 'delete-table']);
+const emit = defineEmits(['view-order']);
 
 const isOccupied = computed(() => props.table.status === 'occupied');
 
@@ -35,10 +35,10 @@ const areaLabel = computed(() => {
     <article
         class="otc"
         :class="{ 'otc-occupied': isOccupied, 'otc-free': !isOccupied }"
-        @click="isOccupied ? emit('view-order', activeOrder) : emit('open-order', table)"
-        role="button"
-        tabindex="0"
-        @keydown.enter="isOccupied ? emit('view-order', activeOrder) : emit('open-order', table)"
+        @click="isOccupied ? emit('view-order', activeOrder) : null"
+        :role="isOccupied ? 'button' : null"
+        :tabindex="isOccupied ? 0 : -1"
+        @keydown.enter="isOccupied ? emit('view-order', activeOrder) : null"
         :aria-label="`Tavolo ${table.number} - ${isOccupied ? 'Occupato' : 'Libero'}`"
     >
         <header class="otc-header">
@@ -72,31 +72,10 @@ const areaLabel = computed(() => {
             </template>
             <template v-else>
                 <div class="otc-free-label">
-                    <i class="bi bi-plus-circle" aria-hidden="true"></i>
-                    <span>Apri ordine</span>
+                    <i class="bi bi-hourglass" aria-hidden="true"></i>
+                    <span>In attesa host</span>
                 </div>
             </template>
-        </div>
-
-        <div class="otc-actions" @click.stop>
-            <button
-                v-if="!isOccupied"
-                type="button"
-                class="otc-action-btn"
-                @click.stop="emit('edit-table', table)"
-                aria-label="Modifica tavolo"
-            >
-                <i class="bi bi-pencil" aria-hidden="true"></i>
-            </button>
-            <button
-                v-if="!isOccupied"
-                type="button"
-                class="otc-action-btn otc-action-danger"
-                @click.stop="emit('delete-table', table)"
-                aria-label="Elimina tavolo"
-            >
-                <i class="bi bi-trash" aria-hidden="true"></i>
-            </button>
         </div>
     </article>
 </template>
@@ -110,14 +89,20 @@ const areaLabel = computed(() => {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xs);
     overflow: hidden;
-    cursor: pointer;
     transition: box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
     position: relative;
 }
-.otc:hover {
+.otc-occupied {
+    cursor: pointer;
+}
+.otc-occupied:hover {
     box-shadow: var(--shadow-sm);
     border-color: var(--color-border-hover);
     transform: translateY(-1px);
+}
+.otc-free {
+    cursor: default;
+    opacity: 0.85;
 }
 .otc:focus-visible {
     outline: 2px solid var(--color-primary);

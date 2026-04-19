@@ -1,0 +1,49 @@
+{
+  "kind": "collectionType",
+  "collectionName": "menu_element_stats",
+  "info": {
+    "singularName": "menu-element-stat",
+    "pluralName": "menu-element-stats",
+    "displayName": "MenuElementStat",
+    "description": "Contatore lifetime per piatto del menu (quante volte ordinato, ricavo totale)"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "element_name_snapshot": {
+      "type": "string",
+      "required": true,
+      "maxLength": 200
+    },
+    "total_ordered": {
+      "type": "integer",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "total_revenue": {
+      "type": "decimal",
+      "default": 0,
+      "required": true
+    },
+    "first_ordered_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "last_ordered_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "fk_element": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::element.element"
+    }
+  }
+}

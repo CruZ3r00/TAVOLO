@@ -1,7 +1,6 @@
 <script setup>
-import AppLayout from '@/Layouts/AppLayout.vue';
 import GeneratorQRCode from '@/components/GeneratorQRCode.vue';
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { API_BASE } from '@/utils';
 
@@ -169,195 +168,130 @@ const copyApiEndpoint = () => {
 };
 
 onMounted(async () => {
-  nextTick(() => {
-    document.title = 'Configurazione Sito Web';
-  });
   await fetchConfig();
 });
 </script>
 
 <template>
-  <AppLayout>
-    <div class="config-page">
-      <div class="config-container">
-        <!-- Page header -->
-        <div class="config-header">
-          <p class="text-overline">Impostazioni</p>
-          <h1 class="config-title">Configurazione Sito Web</h1>
-          <p class="config-subtitle">Configura il tuo sito web esterno e integra il menu tramite API.</p>
-        </div>
-
-        <div class="config-grid">
-          <!-- Left column: Settings -->
-          <div class="config-left">
-            <!-- Settings card -->
-            <div class="ds-card">
-              <div class="ds-card-header">
-                <i class="bi bi-gear" style="color: var(--color-primary);"></i>
-                <h3 class="card-section-title">Impostazioni</h3>
-              </div>
-              <div class="ds-card-body">
-                <form @submit.prevent="saveConfig">
-                  <div class="ds-field">
-                    <label class="ds-label">Nome del ristorante</label>
-                    <input type="text" v-model="restaurantName" class="ds-input" placeholder="Es. Pizzeria Da Mario" required>
-                  </div>
-
-                  <div class="ds-field">
-                    <label class="ds-label">URL del sito web</label>
-                    <input type="url" v-model="siteUrl" class="ds-input" placeholder="https://www.mioristorante.it">
-                    <p class="ds-helper">L'URL del tuo sito web dove verrà visualizzato il menu.</p>
-                  </div>
-
-                  <div class="ds-field">
-                    <label class="ds-label">Coperti invernali *</label>
-                    <input type="number" min="1" max="10000" v-model="copertiInvernali" class="ds-input" placeholder="Es. 40" required>
-                    <p class="ds-helper">Capienza massima nei mesi invernali. Usata per il controllo overbooking.</p>
-                  </div>
-
-                  <div class="ds-field">
-                    <label class="ds-label">Coperti estivi</label>
-                    <input type="number" min="1" max="10000" v-model="copertiEstivi" class="ds-input" placeholder="Uguale agli invernali se vuoto">
-                    <p class="ds-helper">Capienza massima nei mesi estivi (default aprile-ottobre).</p>
-                  </div>
-
-                  <div class="ds-field">
-                    <label class="ds-label">Logo del ristorante</label>
-                    <label class="file-upload-area" tabindex="0">
-                      <input type="file" accept="image/*" @change="handleLogoFile" class="file-upload-hidden">
-                      <div v-if="!logoPreview && !currentLogoUrl" class="file-upload-content">
-                        <i class="bi bi-cloud-arrow-up file-upload-icon"></i>
-                        <span class="file-upload-text">Clicca per caricare il logo</span>
-                      </div>
-                      <div v-else class="file-upload-preview">
-                        <img :src="logoPreview || currentLogoUrl" :alt="logoPreview ? 'Anteprima logo' : 'Logo attuale'" class="logo-preview-img">
-                        <span class="file-upload-change">Clicca per cambiare</span>
-                      </div>
-                    </label>
-                  </div>
-
-                  <!-- Feedback -->
-                  <Transition name="fade">
-                    <div v-if="saveSuccess" class="ds-alert ds-alert-success">
-                      <i class="bi bi-check-circle"></i>
-                      <span>Configurazione salvata con successo!</span>
-                    </div>
-                  </Transition>
-                  <Transition name="fade">
-                    <div v-if="saveError" class="ds-alert ds-alert-error">
-                      <i class="bi bi-exclamation-circle"></i>
-                      <span>{{ saveError }}</span>
-                    </div>
-                  </Transition>
-
-                  <button type="submit" class="ds-btn ds-btn-primary" :disabled="isSaving">
-                    <span v-if="isSaving" class="ds-spinner"></span>
-                    <template v-else>
-                      <i class="bi bi-check2"></i>
-                      <span>Salva configurazione</span>
-                    </template>
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <!-- API card -->
-            <div class="ds-card">
-              <div class="ds-card-header">
-                <i class="bi bi-code-slash" style="color: var(--color-accent);"></i>
-                <h3 class="card-section-title">API pubblica</h3>
-              </div>
-              <div class="ds-card-body">
-                <p class="api-description">Usa questo endpoint per integrare il menu nel tuo sito web:</p>
-                <div class="api-endpoint">
-                  <span class="api-method">GET</span>
-                  <code class="api-url">{{ apiEndpoint }}</code>
-                  <button class="ds-btn ds-btn-ghost ds-btn-icon" @click="copyApiEndpoint" title="Copia">
-                    <i :class="apiCopied ? 'bi bi-check-lg' : 'bi bi-clipboard'"></i>
-                  </button>
-                </div>
-                <p class="api-note">
-                  Questa API restituisce il menu completo del tuo ristorante in formato JSON. Non richiede autenticazione.
-                </p>
-              </div>
-            </div>
+  <div class="wcf">
+    <!-- Settings card -->
+    <div class="ds-card">
+      <div class="ds-card-header">
+        <i class="bi bi-gear" style="color: var(--color-primary);"></i>
+        <h3 class="card-section-title">Impostazioni sito</h3>
+      </div>
+      <div class="ds-card-body">
+        <form @submit.prevent="saveConfig">
+          <div class="ds-field">
+            <label class="ds-label">Nome del ristorante</label>
+            <input type="text" v-model="restaurantName" class="ds-input" placeholder="Es. Pizzeria Da Mario" required>
           </div>
 
-          <!-- Right column: Preview + QR -->
-          <div class="config-right">
-            <!-- Preview -->
-            <div class="ds-card" v-if="siteUrl">
-              <div class="ds-card-header">
-                <i class="bi bi-eye" style="color: var(--color-info);"></i>
-                <h3 class="card-section-title">Anteprima sito</h3>
-              </div>
-              <div class="preview-frame">
-                <iframe :src="siteUrl" class="preview-iframe"
-                  sandbox="allow-scripts allow-same-origin" loading="lazy"></iframe>
-              </div>
-            </div>
-            <div class="ds-card" v-else>
-              <div class="ds-empty">
-                <div class="ds-empty-icon"><i class="bi bi-globe2"></i></div>
-                <p class="ds-empty-description">Inserisci un URL per visualizzare l'anteprima del tuo sito.</p>
-              </div>
-            </div>
-
-            <!-- QR Code -->
-            <div class="ds-card">
-              <div class="ds-card-header">
-                <i class="bi bi-qr-code" style="color: var(--color-primary);"></i>
-                <h3 class="card-section-title">QR Code</h3>
-              </div>
-              <div class="ds-card-body">
-                <GeneratorQRCode :siteUrl="siteUrl" />
-              </div>
-            </div>
+          <div class="ds-field">
+            <label class="ds-label">URL del sito web</label>
+            <input type="url" v-model="siteUrl" class="ds-input" placeholder="https://www.mioristorante.it">
+            <p class="ds-helper">L'URL del tuo sito web dove verrà visualizzato il menu.</p>
           </div>
-        </div>
+
+          <div class="ds-field">
+            <label class="ds-label">Coperti invernali *</label>
+            <input type="number" min="1" max="10000" v-model="copertiInvernali" class="ds-input" placeholder="Es. 40" required>
+            <p class="ds-helper">Capienza massima nei mesi invernali. Usata per il controllo overbooking.</p>
+          </div>
+
+          <div class="ds-field">
+            <label class="ds-label">Coperti estivi</label>
+            <input type="number" min="1" max="10000" v-model="copertiEstivi" class="ds-input" placeholder="Uguale agli invernali se vuoto">
+            <p class="ds-helper">Capienza massima nei mesi estivi (default aprile-ottobre).</p>
+          </div>
+
+          <div class="ds-field">
+            <label class="ds-label">Logo del ristorante</label>
+            <label class="file-upload-area" tabindex="0">
+              <input type="file" accept="image/*" @change="handleLogoFile" class="file-upload-hidden">
+              <div v-if="!logoPreview && !currentLogoUrl" class="file-upload-content">
+                <i class="bi bi-cloud-arrow-up file-upload-icon"></i>
+                <span class="file-upload-text">Clicca per caricare il logo</span>
+              </div>
+              <div v-else class="file-upload-preview">
+                <img :src="logoPreview || currentLogoUrl" :alt="logoPreview ? 'Anteprima logo' : 'Logo attuale'" class="logo-preview-img">
+                <span class="file-upload-change">Clicca per cambiare</span>
+              </div>
+            </label>
+          </div>
+
+          <Transition name="fade">
+            <div v-if="saveSuccess" class="ds-alert ds-alert-success">
+              <i class="bi bi-check-circle"></i>
+              <span>Configurazione salvata con successo!</span>
+            </div>
+          </Transition>
+          <Transition name="fade">
+            <div v-if="saveError" class="ds-alert ds-alert-error">
+              <i class="bi bi-exclamation-circle"></i>
+              <span>{{ saveError }}</span>
+            </div>
+          </Transition>
+
+          <button type="submit" class="ds-btn ds-btn-primary" :disabled="isSaving">
+            <span v-if="isSaving" class="ds-spinner"></span>
+            <template v-else>
+              <i class="bi bi-check2"></i>
+              <span>Salva configurazione</span>
+            </template>
+          </button>
+        </form>
       </div>
     </div>
-  </AppLayout>
+
+    <!-- API card -->
+    <div class="ds-card">
+      <div class="ds-card-header">
+        <i class="bi bi-code-slash" style="color: var(--color-accent);"></i>
+        <h3 class="card-section-title">API pubblica</h3>
+      </div>
+      <div class="ds-card-body">
+        <p class="api-description">Usa questo endpoint per integrare il menu nel tuo sito web:</p>
+        <div class="api-endpoint">
+          <span class="api-method">GET</span>
+          <code class="api-url">{{ apiEndpoint }}</code>
+          <button type="button" class="ds-btn ds-btn-ghost ds-btn-icon" @click="copyApiEndpoint" title="Copia">
+            <i :class="apiCopied ? 'bi bi-check-lg' : 'bi bi-clipboard'"></i>
+          </button>
+        </div>
+        <p class="api-note">
+          Questa API restituisce il menu completo del tuo ristorante in formato JSON. Non richiede autenticazione.
+        </p>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="ds-card" v-if="siteUrl">
+      <div class="ds-card-header">
+        <i class="bi bi-eye" style="color: var(--color-info);"></i>
+        <h3 class="card-section-title">Anteprima sito</h3>
+      </div>
+      <div class="preview-frame">
+        <iframe :src="siteUrl" class="preview-iframe"
+          sandbox="allow-scripts allow-same-origin" loading="lazy"></iframe>
+      </div>
+    </div>
+
+    <!-- QR Code -->
+    <div class="ds-card">
+      <div class="ds-card-header">
+        <i class="bi bi-qr-code" style="color: var(--color-primary);"></i>
+        <h3 class="card-section-title">QR Code</h3>
+      </div>
+      <div class="ds-card-body">
+        <GeneratorQRCode :siteUrl="siteUrl" />
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.config-page {
-  padding: var(--space-8) 0 var(--space-12);
-}
-
-.config-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 var(--space-6);
-}
-
-.config-header {
-  margin-bottom: var(--space-8);
-}
-
-.config-title {
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  color: var(--color-text);
-  margin: var(--space-2) 0;
-  letter-spacing: var(--tracking-tight);
-}
-
-.config-subtitle {
-  font-size: var(--text-base);
-  color: var(--color-text-muted);
-  margin: 0;
-}
-
-.config-grid {
-  display: grid;
-  grid-template-columns: 3fr 2fr;
-  gap: var(--space-6);
-  align-items: start;
-}
-
-.config-left,
-.config-right {
+.wcf {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
@@ -370,7 +304,6 @@ onMounted(async () => {
   margin: 0;
 }
 
-/* File upload */
 .file-upload-area {
   display: flex;
   align-items: center;
@@ -432,7 +365,6 @@ onMounted(async () => {
   max-height: 80px;
 }
 
-/* API */
 .api-description {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
@@ -478,7 +410,6 @@ onMounted(async () => {
   line-height: var(--leading-relaxed);
 }
 
-/* Preview */
 .preview-frame {
   padding: 0;
 }
@@ -488,18 +419,5 @@ onMounted(async () => {
   height: 400px;
   border: none;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-}
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .config-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .config-container {
-    padding: 0 var(--space-4);
-  }
 }
 </style>

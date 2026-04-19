@@ -18,7 +18,7 @@
     },
     "phone": {
       "type": "string",
-      "required": true,
+      "required": false,
       "maxLength": 32
     },
     "date": {
@@ -59,10 +59,26 @@
       "default": "pending",
       "required": true
     },
+    "is_walkin": {
+      "type": "boolean",
+      "default": false,
+      "required": false
+    },
     "fk_user": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "plugin::users-permissions.user"
+    },
+    "fk_table": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::table.table"
+    },
+    "fk_order": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::order.order",
+      "inversedBy": "fk_reservation"
     }
   }
 }

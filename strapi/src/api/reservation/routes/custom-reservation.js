@@ -10,6 +10,12 @@ module.exports = {
     },
     {
       method: 'POST',
+      path: '/reservations/walkin',
+      handler: 'reservation.walkin',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
       path: '/reservations/public/:userDocumentId',
       handler: 'reservation.createPublic',
       config: {
@@ -28,6 +34,12 @@ module.exports = {
       method: 'PATCH',
       path: '/reservations/:documentId/status',
       handler: 'reservation.updateStatus',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
+      path: '/reservations/:documentId/seat',
+      handler: 'reservation.seat',
       config: { policies: [], middlewares: [] },
     },
   ],

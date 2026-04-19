@@ -67,6 +67,12 @@
       "relation": "oneToMany",
       "target": "api::order-item.order-item",
       "mappedBy": "fk_order"
+    },
+    "fk_reservation": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::reservation.reservation",
+      "mappedBy": "fk_order"
     }
   }
 }

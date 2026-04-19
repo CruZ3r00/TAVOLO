@@ -117,10 +117,6 @@ onBeforeUnmount(() => {
                 {{ activeOrdersCount > 99 ? '99+' : activeOrdersCount }}
               </span>
             </router-link>
-            <router-link to="/site-config" class="nav-item" active-class="nav-item-active">
-              <i class="bi bi-globe2 nav-item-icon"></i>
-              <span>Sito</span>
-            </router-link>
           </template>
           <template v-else>
             <router-link to="/dashboard" class="nav-item" active-class="nav-item-active">
@@ -200,9 +196,6 @@ onBeforeUnmount(() => {
               <span v-if="activeOrdersCount > 0" class="nav-item-badge nav-item-badge-info">
                 {{ activeOrdersCount > 99 ? '99+' : activeOrdersCount }}
               </span>
-            </router-link>
-            <router-link to="/site-config" class="mobile-nav-item" @click="closeMobileMenu">
-              <i class="bi bi-globe2"></i> Configurazione Sito
             </router-link>
             <router-link to="/profile/show" class="mobile-nav-item" @click="closeMobileMenu">
               <i class="bi bi-person"></i> Profilo

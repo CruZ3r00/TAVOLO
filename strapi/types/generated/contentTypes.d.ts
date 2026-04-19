@@ -404,6 +404,59 @@ export interface ApiElementElement extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiMenuElementStatMenuElementStat
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'menu_element_stats';
+  info: {
+    description: 'Contatore lifetime per piatto del menu (quante volte ordinato, ricavo totale)';
+    displayName: 'MenuElementStat';
+    pluralName: 'menu-element-stats';
+    singularName: 'menu-element-stat';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    element_name_snapshot: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    first_ordered_at: Schema.Attribute.DateTime;
+    fk_element: Schema.Attribute.Relation<'manyToOne', 'api::element.element'>;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    last_ordered_at: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::menu-element-stat.menu-element-stat'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    total_ordered: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    total_revenue: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<0>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiMenuMenu extends Struct.CollectionTypeSchema {
   collectionName: 'menus';
   info: {
@@ -428,6 +481,94 @@ export interface ApiMenuMenu extends Struct.CollectionTypeSchema {
     localizations: Schema.Attribute.Relation<'oneToMany', 'api::menu.menu'> &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiOrderArchiveOrderArchive
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'order_archives';
+  info: {
+    description: 'Snapshot immutabile di un ordine chiuso per storico e analytics';
+    displayName: 'OrderArchive';
+    pluralName: 'order-archives';
+    singularName: 'order-archive';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    closed_at: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    covers: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 1000;
+          min: 1;
+        },
+        number
+      >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    customer_name: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    duration_minutes: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    is_walkin: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    items_count: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    items_json: Schema.Attribute.JSON & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::order-archive.order-archive'
+    > &
+      Schema.Attribute.Private;
+    opened_at: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    order_document_id: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 64;
+      }>;
+    payment_method: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 64;
+      }>;
+    payment_reference: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 255;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    reservation_document_id: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 64;
+      }>;
+    table_area: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 32;
+      }>;
+    table_number: Schema.Attribute.Integer;
+    total_amount: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<0>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -522,6 +663,10 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     fk_items: Schema.Attribute.Relation<
       'oneToMany',
       'api::order-item.order-item'
+    >;
+    fk_reservation: Schema.Attribute.Relation<
+      'oneToOne',
+      'api::reservation.reservation'
     >;
     fk_table: Schema.Attribute.Relation<'manyToOne', 'api::table.table'>;
     fk_user: Schema.Attribute.Relation<
@@ -636,10 +781,13 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
       }>;
     date: Schema.Attribute.Date & Schema.Attribute.Required;
     datetime: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    fk_order: Schema.Attribute.Relation<'oneToOne', 'api::order.order'>;
+    fk_table: Schema.Attribute.Relation<'manyToOne', 'api::table.table'>;
     fk_user: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.user'
     >;
+    is_walkin: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -657,7 +805,6 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
         number
       >;
     phone: Schema.Attribute.String &
-      Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 32;
       }>;
@@ -672,6 +819,88 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+  };
+}
+
+export interface ApiRestaurantDailyStatRestaurantDailyStat
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'restaurant_daily_stats';
+  info: {
+    description: 'Aggregazione giornaliera per ristorante (ordini, coperti, revenue)';
+    displayName: 'RestaurantDailyStat';
+    pluralName: 'restaurant-daily-stats';
+    singularName: 'restaurant-daily-stat';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    customers_count: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    date: Schema.Attribute.Date & Schema.Attribute.Required;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    items_sold: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::restaurant-daily-stat.restaurant-daily-stat'
+    > &
+      Schema.Attribute.Private;
+    orders_count: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    publishedAt: Schema.Attribute.DateTime;
+    reservation_count: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    revenue: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<0>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    walkin_count: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
   };
 }
 
@@ -1303,11 +1532,14 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::element.element': ApiElementElement;
+      'api::menu-element-stat.menu-element-stat': ApiMenuElementStatMenuElementStat;
       'api::menu.menu': ApiMenuMenu;
+      'api::order-archive.order-archive': ApiOrderArchiveOrderArchive;
       'api::order-item.order-item': ApiOrderItemOrderItem;
       'api::order.order': ApiOrderOrder;
       'api::preference.preference': ApiPreferencePreference;
       'api::reservation.reservation': ApiReservationReservation;
+      'api::restaurant-daily-stat.restaurant-daily-stat': ApiRestaurantDailyStatRestaurantDailyStat;
       'api::table.table': ApiTableTable;
       'api::website-config.website-config': ApiWebsiteConfigWebsiteConfig;
       'plugin::content-releases.release': PluginContentReleasesRelease;

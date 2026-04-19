@@ -60,12 +60,6 @@ const routes = [
         component: () => import('../Pages/Profile/Show.vue'),
         meta: { requiresAuth: true },
     },
-    { //protetta - Nuova pagina configurazione sito web
-        path: '/site-config',
-        name: 'Configurazione Sito',
-        component: () => import('../Pages/WebsiteConfig.vue'),
-        meta: { requiresAuth: true },
-    },
     { //protetta - Gestione prenotazioni
         path: '/reservations',
         name: 'Prenotazioni',

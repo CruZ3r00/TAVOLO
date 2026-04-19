@@ -7,11 +7,20 @@ import ReservationColumn from '@/components/ReservationColumn.vue';
 import ReservationCard from '@/components/ReservationCard.vue';
 import OccupiedOrderCard from '@/components/OccupiedOrderCard.vue';
 import ReservationCreateModal from '@/components/ReservationCreateModal.vue';
+import SeatReservationModal from '@/components/SeatReservationModal.vue';
+import WalkinModal from '@/components/WalkinModal.vue';
+import TableManagerModal from '@/components/TableManagerModal.vue';
+import OrderDetailModal from '@/components/OrderDetailModal.vue';
+import AddItemModal from '@/components/AddItemModal.vue';
+import CheckoutModal from '@/components/CheckoutModal.vue';
 import {
     fetchReservations,
     updateReservationStatus,
     reservationErrorMessage,
     fetchOrders,
+    fetchTables,
+    closeOrder,
+    addOrderItem,
     orderErrorMessage,
 } from '@/utils';
 
@@ -23,6 +32,7 @@ const POLL_INTERVAL_MS = 20000;
 
 const reservations = ref([]);
 const activeOrders = ref([]);
+const tables = ref([]);
 const loading = ref(false);
 const refreshing = ref(false);
 const errorMessage = ref('');
@@ -30,19 +40,32 @@ const toast = ref(null);
 const busyIds = ref(new Set());
 
 const showCreateModal = ref(false);
-const activeTab = ref('pending'); // mobile tabs
+const showSeatModal = ref(false);
+const seatTargetReservation = ref(null);
+const showWalkinModal = ref(false);
+const showTableManager = ref(false);
+
+// Order management modals (for "Chiudi conto" and "Gestisci ordine" from In sala cards)
+const showOrderDetail = ref(false);
+const currentOrderDocId = ref(null);
+const showAddItem = ref(false);
+const addItemOrderDocId = ref(null);
+const addItemLockVersion = ref(0);
+const showCheckout = ref(false);
+const checkoutOrder = ref(null);
+const orderDetailRef = ref(null);
+
+const activeTab = ref('pending');
 const fromDate = ref(todayISO());
 
 function todayISO() {
     return new Date().toISOString().slice(0, 10);
 }
 
-// Range di default: dal giorno selezionato (00:00 locale) in poi
 const buildParams = () => {
     const params = {
         pageSize: 100,
         sort: 'datetime:asc',
-        // Tutti gli stati "attivi": escludiamo completed/cancelled
         status: 'pending,confirmed,at_restaurant',
     };
     if (fromDate.value) {
@@ -52,24 +75,25 @@ const buildParams = () => {
     return params;
 };
 
-const loadReservations = async ({ silent = false } = {}) => {
+const loadData = async ({ silent = false } = {}) => {
     if (!token.value) return;
     if (silent) refreshing.value = true; else loading.value = true;
     try {
-        const [resvResp, ordersResp] = await Promise.all([
+        const [resvResp, ordersResp, tablesResp] = await Promise.all([
             fetchReservations(buildParams(), token.value),
-            fetchOrders({ status: 'active', pageSize: 100 }, token.value)
+            fetchOrders({ status: 'active', linked_reservation: true, pageSize: 100 }, token.value)
                 .catch((err) => ({ __err: orderErrorMessage(err) })),
+            fetchTables(token.value).catch(() => ({ data: [] })),
         ]);
         reservations.value = Array.isArray(resvResp?.data) ? resvResp.data : [];
         if (ordersResp && !ordersResp.__err) {
             activeOrders.value = Array.isArray(ordersResp.data) ? ordersResp.data : [];
             errorMessage.value = '';
         } else {
-            // Non bloccare la pagina se la fetch ordini fallisce: manteniamo le prenotazioni.
             activeOrders.value = [];
             errorMessage.value = ordersResp?.__err || '';
         }
+        tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
     } catch (err) {
         errorMessage.value = reservationErrorMessage(err);
     } finally {
@@ -78,14 +102,27 @@ const loadReservations = async ({ silent = false } = {}) => {
     }
 };
 
-// Filtra per status
 const byStatus = (status) => reservations.value.filter(r => r.status === status);
 
 const pendingList = computed(() => byStatus('pending'));
 const confirmedList = computed(() => byStatus('confirmed'));
 const atRestaurantList = computed(() => byStatus('at_restaurant'));
 
-// Ordini attivi (tavoli occupati da ordini in sala), ordinati per apertura desc.
+// Set of reservation documentIds that already have a linked active order (so we don't double-show).
+const reservationIdsWithOrder = computed(() => {
+    const set = new Set();
+    for (const o of activeOrders.value) {
+        const rid = o?.reservation?.documentId;
+        if (rid) set.add(rid);
+    }
+    return set;
+});
+
+// Legacy at_restaurant reservations with no linked order (fallback).
+const orphanReservations = computed(() =>
+    atRestaurantList.value.filter(r => !reservationIdsWithOrder.value.has(r.documentId))
+);
+
 const occupiedOrders = computed(() => {
     const list = Array.isArray(activeOrders.value) ? [...activeOrders.value] : [];
     list.sort((a, b) => {
@@ -96,34 +133,28 @@ const occupiedOrders = computed(() => {
     return list;
 });
 
-const occupiedTotalCount = computed(() => atRestaurantList.value.length + occupiedOrders.value.length);
+const occupiedTotalCount = computed(() => orphanReservations.value.length + occupiedOrders.value.length);
 
 const pendingCount = computed(() => pendingList.value.length);
 
-const handleOpenOrder = (order) => {
-    const documentId = order?.documentId;
-    if (documentId) {
-        router.push({ path: '/orders', query: { order: documentId } });
-    } else {
-        router.push({ path: '/orders' });
-    }
+// --- Toast ---
+const showToast = (type, message) => {
+    toast.value = { type, message };
+    setTimeout(() => { toast.value = null; }, 3500);
 };
 
-// Azione su una card: patch status + feedback
+// --- Reservation status action (no longer handles 'arrived') ---
 const handleAction = async ({ documentId, next }) => {
     if (!documentId || !next) return;
     busyIds.value = new Set([...busyIds.value, documentId]);
     try {
         const updated = await updateReservationStatus(documentId, next, token.value);
-        // Aggiorna in-place
         const idx = reservations.value.findIndex(r => r.documentId === documentId);
         if (idx !== -1 && updated) {
             reservations.value.splice(idx, 1, { ...reservations.value[idx], ...updated });
         }
         showToast('success', transitionToast(next));
-        // Se è transitato a cancelled/completed, potrebbe uscire dallo scope dei filtri
         if (next === 'cancelled' || next === 'completed') {
-            // Rimuovi dalla lista visibile
             reservations.value = reservations.value.filter(r => r.documentId !== documentId);
         }
     } catch (err) {
@@ -138,21 +169,100 @@ const handleAction = async ({ documentId, next }) => {
 const transitionToast = (next) => {
     switch (next) {
         case 'confirmed': return 'Prenotazione accettata.';
-        case 'at_restaurant': return 'Cliente segnato come arrivato.';
         case 'completed': return 'Prenotazione completata.';
         case 'cancelled': return 'Prenotazione annullata.';
         default: return 'Aggiornamento effettuato.';
     }
 };
 
-const showToast = (type, message) => {
-    toast.value = { type, message };
-    setTimeout(() => { toast.value = null; }, 3500);
+// --- Seat flow ---
+const handleSeatIntent = (reservation) => {
+    seatTargetReservation.value = reservation;
+    showSeatModal.value = true;
+};
+
+const onSeated = async () => {
+    showToast('success', 'Cliente accomodato e tavolo in servizio.');
+    await loadData({ silent: true });
+};
+
+// --- Walk-in flow ---
+const onWalkinCreated = async () => {
+    showToast('success', 'Walk-in registrato e tavolo in servizio.');
+    await loadData({ silent: true });
+};
+
+// --- Table manager ---
+const onTableManagerUpdated = async () => {
+    await loadData({ silent: true });
+};
+
+// --- Order management from In sala cards ---
+const handleOpenOrder = (order) => {
+    if (!order?.documentId) return;
+    currentOrderDocId.value = order.documentId;
+    showOrderDetail.value = true;
+};
+
+const handleCheckout = (order) => {
+    checkoutOrder.value = order;
+    showCheckout.value = true;
+};
+
+const onOrderUpdated = async () => {
+    await loadData({ silent: true });
+};
+
+const onOpenAddItem = ({ orderDocumentId, lockVersion }) => {
+    addItemOrderDocId.value = orderDocumentId;
+    addItemLockVersion.value = lockVersion;
+    showAddItem.value = true;
+};
+
+const onAddItem = async (payload) => {
+    try {
+        await addOrderItem(addItemOrderDocId.value, payload, token.value);
+        showAddItem.value = false;
+        if (orderDetailRef.value) await orderDetailRef.value.onItemAdded();
+        await loadData({ silent: true });
+    } catch (err) {
+        if (err?.code === 'STALE_ORDER') {
+            showAddItem.value = false;
+            if (orderDetailRef.value) await orderDetailRef.value.silentReload();
+            showToast('error', 'Dati obsoleti, aggiornati. Riprova.');
+        } else {
+            showToast('error', orderErrorMessage(err));
+        }
+    }
+};
+
+const onOpenCheckoutFromDetail = (order) => {
+    checkoutOrder.value = order;
+    showCheckout.value = true;
+};
+
+const onConfirmCheckout = async (payload) => {
+    if (!checkoutOrder.value) return;
+    try {
+        const result = await closeOrder(checkoutOrder.value.documentId, payload, token.value);
+        showCheckout.value = false;
+        showOrderDetail.value = false;
+        currentOrderDocId.value = null;
+        showToast('success', `Conto chiuso. Rif: ${result.payment?.transactionId || 'OK'}`);
+        await loadData({ silent: true });
+    } catch (err) {
+        if (err?.code === 'STALE_ORDER') {
+            showCheckout.value = false;
+            if (orderDetailRef.value) await orderDetailRef.value.silentReload();
+            showToast('error', 'Dati obsoleti, aggiornati. Riprova il pagamento.');
+        } else {
+            showToast('error', orderErrorMessage(err));
+        }
+    }
 };
 
 const onCreated = (created) => {
     if (created && created.documentId) {
-        // Aggiunge alla lista; il prossimo polling riordinerà.
         reservations.value = [...reservations.value, created].sort((a, b) => {
             return new Date(a.datetime) - new Date(b.datetime);
         });
@@ -160,13 +270,13 @@ const onCreated = (created) => {
     showToast('success', 'Prenotazione creata con successo.');
 };
 
-// Polling controllato dalla visibilità della tab
+// --- Polling ---
 let pollHandle = null;
 const startPolling = () => {
     stopPolling();
     pollHandle = setInterval(() => {
         if (document.visibilityState === 'visible') {
-            loadReservations({ silent: true });
+            loadData({ silent: true });
         }
     }, POLL_INTERVAL_MS);
 };
@@ -176,13 +286,13 @@ const stopPolling = () => {
 
 const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-        loadReservations({ silent: true });
+        loadData({ silent: true });
     }
 };
 
 onMounted(() => {
     nextTick(() => { document.title = 'Prenotazioni'; });
-    loadReservations();
+    loadData();
     startPolling();
     document.addEventListener('visibilitychange', onVisibilityChange);
 });
@@ -207,7 +317,7 @@ onBeforeUnmount(() => {
                                 {{ pendingCount }}
                             </span>
                         </h1>
-                        <p class="res-subtitle">Monitora richieste, conferme e coperti in sala in tempo reale.</p>
+                        <p class="res-subtitle">Host/hostess: accogli clienti, assegna tavoli e gestisci il servizio.</p>
                     </div>
                     <div class="res-header-actions">
                         <div class="res-date-filter">
@@ -218,21 +328,37 @@ onBeforeUnmount(() => {
                                 type="date"
                                 v-model="fromDate"
                                 class="ds-input date-filter-input"
-                                @change="loadReservations()"
+                                @change="loadData()"
                             >
                         </div>
                         <button
                             type="button"
                             class="ds-btn ds-btn-secondary"
-                            @click="loadReservations({ silent: true })"
+                            @click="loadData({ silent: true })"
                             :disabled="loading || refreshing"
-                            aria-label="Ricarica prenotazioni"
+                            aria-label="Ricarica"
                         >
                             <span v-if="refreshing" class="ds-spinner" aria-hidden="true"></span>
                             <template v-else>
                                 <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
                                 <span>Aggiorna</span>
                             </template>
+                        </button>
+                        <button
+                            type="button"
+                            class="ds-btn ds-btn-secondary"
+                            @click="showTableManager = true"
+                        >
+                            <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                            <span>Gestisci tavoli</span>
+                        </button>
+                        <button
+                            type="button"
+                            class="ds-btn ds-btn-accent"
+                            @click="showWalkinModal = true"
+                        >
+                            <i class="bi bi-person-plus" aria-hidden="true"></i>
+                            <span>Walk-in</span>
                         </button>
                         <button
                             type="button"
@@ -317,6 +443,7 @@ onBeforeUnmount(() => {
                         :busy-ids="busyIds"
                         empty-message="Nessuna richiesta in attesa."
                         @action="handleAction"
+                        @seat="handleSeatIntent"
                     />
                     <ReservationColumn
                         class="res-board-col col-confirmed"
@@ -327,6 +454,7 @@ onBeforeUnmount(() => {
                         :busy-ids="busyIds"
                         empty-message="Nessuna prenotazione confermata."
                         @action="handleAction"
+                        @seat="handleSeatIntent"
                     />
                     <section
                         class="res-col res-board-col col-at-restaurant"
@@ -338,27 +466,29 @@ onBeforeUnmount(() => {
                                 <span class="res-col-icon" aria-hidden="true">
                                     <i class="bi bi-people-fill"></i>
                                 </span>
-                                <h3 id="res-col-occupied-title" class="res-col-title">Tavoli occupati</h3>
+                                <h3 id="res-col-occupied-title" class="res-col-title">In sala</h3>
                             </div>
-                            <span class="res-col-count" aria-label="Numero tavoli occupati">
+                            <span class="res-col-count" aria-label="Numero tavoli in sala">
                                 {{ occupiedTotalCount }}
                             </span>
                         </header>
                         <div class="res-col-body">
                             <template v-if="occupiedTotalCount">
                                 <div class="res-col-list">
-                                    <ReservationCard
-                                        v-for="r in atRestaurantList"
-                                        :key="`resv-${r.documentId}`"
-                                        :reservation="r"
-                                        :busy="busyIds.has(r.documentId)"
-                                        @action="handleAction"
-                                    />
                                     <OccupiedOrderCard
                                         v-for="o in occupiedOrders"
                                         :key="`ord-${o.documentId}`"
                                         :order="o"
                                         @open="handleOpenOrder"
+                                        @checkout="handleCheckout"
+                                    />
+                                    <ReservationCard
+                                        v-for="r in orphanReservations"
+                                        :key="`resv-${r.documentId}`"
+                                        :reservation="r"
+                                        :busy="busyIds.has(r.documentId)"
+                                        @action="handleAction"
+                                        @seat="handleSeatIntent"
                                     />
                                 </div>
                             </template>
@@ -366,7 +496,7 @@ onBeforeUnmount(() => {
                                 <div class="ds-empty-icon">
                                     <i class="bi bi-people-fill" aria-hidden="true"></i>
                                 </div>
-                                <p class="ds-empty-description">Nessun tavolo attualmente occupato.</p>
+                                <p class="ds-empty-description">Nessun tavolo attualmente in servizio.</p>
                             </div>
                         </div>
                     </section>
@@ -383,6 +513,7 @@ onBeforeUnmount(() => {
                                     :reservation="r"
                                     :busy="busyIds.has(r.documentId)"
                                     @action="handleAction"
+                                    @seat="handleSeatIntent"
                                 />
                             </TransitionGroup>
                         </div>
@@ -400,6 +531,7 @@ onBeforeUnmount(() => {
                                     :reservation="r"
                                     :busy="busyIds.has(r.documentId)"
                                     @action="handleAction"
+                                    @seat="handleSeatIntent"
                                 />
                             </TransitionGroup>
                         </div>
@@ -410,33 +542,88 @@ onBeforeUnmount(() => {
                     </template>
                     <template v-else>
                         <div v-if="occupiedTotalCount" class="res-mobile-list">
-                            <ReservationCard
-                                v-for="r in atRestaurantList"
-                                :key="`m-resv-${r.documentId}`"
-                                :reservation="r"
-                                :busy="busyIds.has(r.documentId)"
-                                @action="handleAction"
-                            />
                             <OccupiedOrderCard
                                 v-for="o in occupiedOrders"
                                 :key="`m-ord-${o.documentId}`"
                                 :order="o"
                                 @open="handleOpenOrder"
+                                @checkout="handleCheckout"
+                            />
+                            <ReservationCard
+                                v-for="r in orphanReservations"
+                                :key="`m-resv-${r.documentId}`"
+                                :reservation="r"
+                                :busy="busyIds.has(r.documentId)"
+                                @action="handleAction"
+                                @seat="handleSeatIntent"
                             />
                         </div>
                         <div v-else class="ds-empty">
                             <div class="ds-empty-icon"><i class="bi bi-people-fill"></i></div>
-                            <p class="ds-empty-description">Nessun tavolo attualmente occupato.</p>
+                            <p class="ds-empty-description">Nessun tavolo attualmente in servizio.</p>
                         </div>
                     </template>
                 </div>
             </div>
 
+            <!-- Modals -->
             <ReservationCreateModal
                 :show="showCreateModal"
                 :token="token"
                 @close="showCreateModal = false"
                 @created="onCreated"
+            />
+
+            <SeatReservationModal
+                :show="showSeatModal"
+                :reservation="seatTargetReservation"
+                :tables="tables"
+                :token="token"
+                @close="showSeatModal = false"
+                @seated="onSeated"
+            />
+
+            <WalkinModal
+                :show="showWalkinModal"
+                :tables="tables"
+                :token="token"
+                @close="showWalkinModal = false"
+                @created="onWalkinCreated"
+            />
+
+            <TableManagerModal
+                :show="showTableManager"
+                :token="token"
+                :tables="tables"
+                :editing-table="null"
+                @close="showTableManager = false"
+                @updated="onTableManagerUpdated"
+            />
+
+            <OrderDetailModal
+                ref="orderDetailRef"
+                :show="showOrderDetail"
+                :order-document-id="currentOrderDocId"
+                :token="token"
+                @close="showOrderDetail = false"
+                @order-updated="onOrderUpdated"
+                @open-add-item="onOpenAddItem"
+                @open-checkout="onOpenCheckoutFromDetail"
+            />
+
+            <AddItemModal
+                :show="showAddItem"
+                :order-document-id="addItemOrderDocId"
+                :lock-version="addItemLockVersion"
+                @close="showAddItem = false"
+                @add="onAddItem"
+            />
+
+            <CheckoutModal
+                :show="showCheckout"
+                :order="checkoutOrder"
+                @close="showCheckout = false"
+                @confirm="onConfirmCheckout"
             />
         </div>
     </AppLayout>
@@ -581,13 +768,11 @@ onBeforeUnmount(() => {
     max-height: calc(100vh - 220px);
 }
 
-/* Evidenziazione colonna pending */
 .col-pending {
     border-color: var(--color-warning);
     box-shadow: 0 0 0 1px var(--color-warning-light);
 }
 
-/* Stili colonna inline "Tavoli occupati" (allineati a ReservationColumn) */
 .res-col {
     display: flex;
     flex-direction: column;
@@ -734,7 +919,6 @@ onBeforeUnmount(() => {
     gap: var(--space-3);
 }
 
-/* Visually hidden */
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -747,7 +931,6 @@ onBeforeUnmount(() => {
     border: 0;
 }
 
-/* Responsive — tablet e mobile passano a tab layout */
 @media (max-width: 991px) {
     .res-board { display: none; }
     .res-tabs { display: flex; }

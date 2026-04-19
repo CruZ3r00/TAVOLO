@@ -232,7 +232,7 @@ onMounted(async () => {
                   <div class="ds-badge ds-badge-accent">Configurato</div>
                   <p class="site-url-label">URL del tuo sito menu:</p>
                   <a :href="siteUrl" target="_blank" class="site-url-link">{{ siteUrl }}</a>
-                  <button @click="router.push('/site-config')" class="ds-btn ds-btn-secondary site-action-btn">
+                  <button @click="router.push({ path: '/profile/show', query: { section: 'sito' } })" class="ds-btn ds-btn-secondary site-action-btn">
                     <i class="bi bi-gear"></i>
                     <span>Gestisci configurazione</span>
                   </button>
@@ -240,7 +240,7 @@ onMounted(async () => {
                 <div v-else class="site-status site-status-empty">
                   <div class="ds-badge ds-badge-warning">Da configurare</div>
                   <p class="site-url-label">Configura il tuo sito web per renderlo visibile ai clienti.</p>
-                  <button @click="router.push('/site-config')" class="ds-btn ds-btn-primary site-action-btn">
+                  <button @click="router.push({ path: '/profile/show', query: { section: 'sito' } })" class="ds-btn ds-btn-primary site-action-btn">
                     <i class="bi bi-plus-lg"></i>
                     <span>Configura ora</span>
                   </button>
@@ -258,7 +258,7 @@ onMounted(async () => {
                 <span class="action-label">Gestisci Menu</span>
                 <i class="bi bi-arrow-right action-arrow"></i>
               </button>
-              <button @click="router.push('/site-config')" class="action-card ds-card">
+              <button @click="router.push({ path: '/profile/show', query: { section: 'sito' } })" class="action-card ds-card">
                 <i class="bi bi-globe2 action-icon" style="color: var(--color-accent);"></i>
                 <span class="action-label">Configurazione Sito</span>
                 <i class="bi bi-arrow-right action-arrow"></i>

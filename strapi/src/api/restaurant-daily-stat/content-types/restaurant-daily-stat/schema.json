@@ -1,0 +1,59 @@
+{
+  "kind": "collectionType",
+  "collectionName": "restaurant_daily_stats",
+  "info": {
+    "singularName": "restaurant-daily-stat",
+    "pluralName": "restaurant-daily-stats",
+    "displayName": "RestaurantDailyStat",
+    "description": "Aggregazione giornaliera per ristorante (ordini, coperti, revenue)"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "date": {
+      "type": "date",
+      "required": true
+    },
+    "orders_count": {
+      "type": "integer",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "customers_count": {
+      "type": "integer",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "revenue": {
+      "type": "decimal",
+      "default": 0,
+      "required": true
+    },
+    "items_sold": {
+      "type": "integer",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "walkin_count": {
+      "type": "integer",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "reservation_count": {
+      "type": "integer",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

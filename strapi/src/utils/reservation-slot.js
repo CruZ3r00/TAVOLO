@@ -51,7 +51,11 @@ function computeSlotEnd(datetimeInput) {
 
 /**
  * Compone un ISO datetime a partire da date (YYYY-MM-DD) e time (HH:MM o HH:MM:SS).
- * Il risultato è interpretato come UTC (coerente con `slot_start`).
+ * La coppia date/time viene interpretata come ora LOCALE del server (che deve
+ * coincidere con il fuso del ristorante), e poi convertita in ISO UTC per
+ * storage/query. Motivazione: il cliente inserisce orari "naive" nel proprio
+ * fuso (es. "20:00") senza passare alcun offset; trattarli come UTC produce
+ * uno shift visibile quando il frontend ri-formatta il datetime in locale.
  */
 function composeDatetime(dateISO, timeISO) {
   if (typeof dateISO !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) {
@@ -61,8 +65,9 @@ function composeDatetime(dateISO, timeISO) {
     throw new Error('composeDatetime: time non valida (atteso HH:MM o HH:MM:SS).');
   }
   const timePart = timeISO.length === 5 ? `${timeISO}:00` : timeISO;
-  const composed = `${dateISO}T${timePart}.000Z`;
-  const parsed = new Date(composed);
+  const [y, m, d] = dateISO.split('-').map((s) => parseInt(s, 10));
+  const [hh, mm, ss] = timePart.split(':').map((s) => parseInt(s, 10));
+  const parsed = new Date(y, m - 1, d, hh, mm, ss || 0, 0);
   if (Number.isNaN(parsed.getTime())) {
     throw new Error('composeDatetime: combinazione date/time non parseable.');
   }

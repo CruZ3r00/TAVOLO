@@ -7,7 +7,7 @@ const props = defineProps({
     busy: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['action']);
+const emit = defineEmits(['action', 'seat']);
 
 const notesExpanded = ref(false);
 
@@ -47,19 +47,21 @@ const actions = computed(() => {
             ];
         case 'confirmed':
             return [
-                { key: 'arrived', label: 'Arrivato', icon: 'bi-door-open', cls: 'ds-btn-accent', next: 'at_restaurant' },
+                { key: 'seat', label: 'Fai accomodare', icon: 'bi-door-open', cls: 'ds-btn-accent', intent: 'seat' },
                 { key: 'cancel', label: 'Annulla', icon: 'bi-x-lg', cls: 'ds-btn-ghost', next: 'cancelled' },
             ];
         case 'at_restaurant':
-            return [
-                { key: 'complete', label: 'Chiudi', icon: 'bi-check2-all', cls: 'ds-btn-primary', next: 'completed' },
-            ];
+            return [];
         default:
             return [];
     }
 });
 
 const handleAction = (action) => {
+    if (action.intent === 'seat') {
+        emit('seat', props.reservation);
+        return;
+    }
     emit('action', { documentId: props.reservation.documentId, next: action.next, key: action.key });
 };
 

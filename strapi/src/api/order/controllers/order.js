@@ -23,6 +23,7 @@ const {
 } = require('../../../utils/db-lock');
 
 const paymentService = require('../../../services/payment');
+const statsService = require('../../../services/stats');
 
 const { ApplicationError } = errors;
 
@@ -119,6 +120,14 @@ function serializeOrder(order, includeItems) {
       area: order.fk_table.area,
       status: order.fk_table.status,
     } : null,
+    reservation: order.fk_reservation ? {
+      documentId: order.fk_reservation.documentId,
+      customer_name: order.fk_reservation.customer_name,
+      number_of_people: order.fk_reservation.number_of_people,
+      is_walkin: !!order.fk_reservation.is_walkin,
+      status: order.fk_reservation.status,
+      notes: order.fk_reservation.notes || null,
+    } : null,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
   };
@@ -161,7 +170,12 @@ async function beginImmediate(trx, dialect) {
  * Se non trovato col filtro, discrimina 404 vs 403 con una query DB minima.
  */
 async function loadOrder(documentId, userId, { populate } = {}) {
-  const pop = populate || ['fk_items', 'fk_table', 'fk_user'];
+  const pop = populate || {
+    fk_items: { populate: ['fk_element'] },
+    fk_table: true,
+    fk_user: true,
+    fk_reservation: true,
+  };
   const results = await strapi.documents('api::order.order').findMany({
     filters: {
       documentId: { $eq: documentId },
@@ -348,10 +362,17 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         if (to) filters.opened_at.$lt = to;
       }
 
+      const linkedRaw = typeof q.linked_reservation === 'string' ? q.linked_reservation.trim() : null;
+      if (linkedRaw === 'true' || linkedRaw === '1') {
+        filters.fk_reservation = { id: { $notNull: true } };
+      } else if (linkedRaw === 'false' || linkedRaw === '0') {
+        filters.fk_reservation = { id: { $null: true } };
+      }
+
       const [results, total] = await Promise.all([
         strapi.documents('api::order.order').findMany({
           filters,
-          populate: ['fk_table', 'fk_items'],
+          populate: ['fk_table', 'fk_items', 'fk_reservation'],
           sort: ['opened_at:desc'],
           pagination: { page, pageSize },
         }),
@@ -733,15 +754,13 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
       const dialect = getDialect(strapi);
 
-      // Chiusura atomica: ordine + tavolo
+      // Chiusura atomica: ordine + tavolo + reservation + archive + stats
       await withRetry(async () => {
         return strapi.db.transaction(async ({ trx }) => {
           await beginImmediate(trx, dialect);
 
-          // Lock ordine
           await lockOrderRow(trx, order.id, dialect);
 
-          // Re-check status (potrebbe essere cambiato durante il pagamento)
           const orderRows = await trx('orders')
             .where({ id: order.id })
             .select('status', 'lock_version');
@@ -749,12 +768,13 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
           }
 
-          // Aggiorna ordine
+          const closedAtISO = new Date().toISOString();
+
           await strapi.documents('api::order.order').update({
             documentId,
             data: {
               status: 'closed',
-              closed_at: new Date().toISOString(),
+              closed_at: closedAtISO,
               total_amount: totalResult.total,
               payment_status: 'paid',
               payment_reference: paymentResult.transactionId,
@@ -762,12 +782,82 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             },
           });
 
-          // Rilascia tavolo
           if (order.fk_table) {
             await strapi.documents('api::table.table').update({
               documentId: order.fk_table.documentId,
               data: { status: 'free' },
             });
+          }
+
+          // Se l'ordine e' legato a una prenotazione, promuove a completed.
+          // Le transizioni ammesse escludono at_restaurant -> ..., quindi qui
+          // chiudiamo sempre se la reservation non e' gia terminale.
+          if (order.fk_reservation && order.fk_reservation.documentId) {
+            const resStatus = order.fk_reservation.status;
+            if (resStatus !== 'completed' && resStatus !== 'cancelled') {
+              await strapi.documents('api::reservation.reservation').update({
+                documentId: order.fk_reservation.documentId,
+                data: { status: 'completed' },
+              });
+            }
+          }
+
+          // Archive + stats: fail-soft (log ma non rollback ordine chiuso).
+          // NB: essendo nella stessa tx, un fail qui rolla TUTTO. Per questo
+          // catturiamo sotto (fuori della tx) e reinvochiamo best-effort se
+          // serve. Qui dentro vogliamo consistency forte: se fallisce,
+          // abbiamo fatto rollback e possiamo ritentare.
+          try {
+            const closedOrder = {
+              documentId,
+              opened_at: order.opened_at,
+              closed_at: closedAtISO,
+              total_amount: totalResult.total,
+              covers: order.covers || null,
+            };
+            const reservation = order.fk_reservation || null;
+            const table = order.fk_table || null;
+
+            await statsService.archiveClosedOrder(strapi, {
+              order: closedOrder,
+              items,
+              reservation,
+              table,
+              paymentMethod,
+              paymentReference: paymentResult.transactionId,
+              userId: user.id,
+              isWalkin: reservation ? !!reservation.is_walkin : false,
+            });
+
+            const dateKey = statsService.dateKeyUTC(closedAtISO);
+            const customersCount = (order.covers
+              ? parseInt(order.covers, 10)
+              : (reservation ? parseInt(reservation.number_of_people, 10) : 0)) || 0;
+            const itemsCount = (items || []).reduce(
+              (s, it) => s + (parseInt(it.quantity, 10) || 0), 0
+            );
+
+            await statsService.updateDailyStat(strapi, {
+              userId: user.id,
+              dateKey,
+              revenue: totalResult.total,
+              customers: customersCount,
+              items: itemsCount,
+              isWalkin: reservation ? !!reservation.is_walkin : false,
+              hasReservation: !!reservation && !reservation.is_walkin,
+            });
+
+            await statsService.updateElementStats(strapi, {
+              userId: user.id,
+              items,
+              timestamp: closedAtISO,
+            });
+          } catch (statsErr) {
+            // Se le stats falliscono, rolliamo l'intera tx. La source of
+            // truth (orders + items) resta in DB quando la tx si apre di
+            // nuovo su retry. Se persiste, loggamo e rilanciamo.
+            strapi.log.error('stats/archive failure durante close order', statsErr);
+            throw statsErr;
           }
         });
       }, { maxAttempts: 3 }).catch((err) => {

@@ -8,9 +8,8 @@ import KitchenBoard from '@/components/KitchenBoard.vue';
 import OrderDetailModal from '@/components/OrderDetailModal.vue';
 import AddItemModal from '@/components/AddItemModal.vue';
 import CheckoutModal from '@/components/CheckoutModal.vue';
-import TableManagerModal from '@/components/TableManagerModal.vue';
 import {
-    fetchTables, fetchOrders, openOrder, closeOrder,
+    fetchTables, fetchOrders, closeOrder,
     addOrderItem, updateItemStatus, orderErrorMessage,
 } from '@/utils';
 
@@ -36,8 +35,6 @@ const setMode = (m) => {
 };
 
 // Modals
-const showTableManager = ref(false);
-const editingTable = ref(null);
 const showOrderDetail = ref(false);
 const currentOrderDocId = ref(null);
 const showAddItem = ref(false);
@@ -79,38 +76,10 @@ const showToast = (type, message) => {
 };
 
 // --- Table actions ---
-const handleOpenOrder = async (table) => {
-    try {
-        const created = await openOrder({ table_id: table.documentId }, token.value);
-        showToast('success', `Ordine aperto per tavolo ${table.number}.`);
-        // Aggiorna dati
-        await loadData({ silent: true });
-        // Apri dettaglio dell'ordine appena creato
-        currentOrderDocId.value = created.documentId;
-        showOrderDetail.value = true;
-    } catch (err) {
-        showToast('error', orderErrorMessage(err));
-    }
-};
-
 const handleViewOrder = (order) => {
+    if (!order?.documentId) return;
     currentOrderDocId.value = order.documentId;
     showOrderDetail.value = true;
-};
-
-const handleEditTable = (table) => {
-    editingTable.value = table;
-    showTableManager.value = true;
-};
-
-const handleDeleteTable = async (table) => {
-    // La conferma e gestita dal TableManagerModal, qui apriamo il manager
-    editingTable.value = null;
-    showTableManager.value = true;
-};
-
-const onTableManagerUpdated = async () => {
-    await loadData({ silent: true });
 };
 
 // --- Order detail events ---
@@ -254,11 +223,6 @@ onBeforeUnmount(() => {
     stopPolling();
     document.removeEventListener('visibilitychange', onVisibilityChange);
 });
-
-const openTableManagerNew = () => {
-    editingTable.value = null;
-    showTableManager.value = true;
-};
 </script>
 
 <template>
@@ -313,15 +277,6 @@ const openTableManagerNew = () => {
                             </template>
                         </button>
 
-                        <button
-                            v-if="mode === 'cameriere'"
-                            type="button"
-                            class="ds-btn ds-btn-primary"
-                            @click="openTableManagerNew"
-                        >
-                            <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
-                            <span>Gestisci tavoli</span>
-                        </button>
                     </div>
                 </header>
 
@@ -359,10 +314,7 @@ const openTableManagerNew = () => {
                         <OrdersTableGrid
                             :tables="tables"
                             :orders="orders"
-                            @open-order="handleOpenOrder"
                             @view-order="handleViewOrder"
-                            @edit-table="handleEditTable"
-                            @delete-table="handleDeleteTable"
                         />
                     </div>
 
@@ -378,15 +330,6 @@ const openTableManagerNew = () => {
             </div>
 
             <!-- Modals -->
-            <TableManagerModal
-                :show="showTableManager"
-                :token="token"
-                :tables="tables"
-                :editing-table="editingTable"
-                @close="showTableManager = false"
-                @updated="onTableManagerUpdated"
-            />
-
             <OrderDetailModal
                 ref="orderDetailRef"
                 :show="showOrderDetail"

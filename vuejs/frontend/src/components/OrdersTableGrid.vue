@@ -6,7 +6,7 @@ defineProps({
     orders: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['open-order', 'view-order', 'edit-table', 'delete-table']);
+const emit = defineEmits(['view-order']);
 
 /**
  * Trova l'ordine attivo per un dato tavolo.
@@ -26,15 +26,14 @@ function activeOrderForTable(table, orders) {
             :key="t.documentId"
             :table="t"
             :active-order="activeOrderForTable(t, orders)"
-            @open-order="(tbl) => emit('open-order', tbl)"
             @view-order="(ord) => emit('view-order', ord)"
-            @edit-table="(tbl) => emit('edit-table', tbl)"
-            @delete-table="(tbl) => emit('delete-table', tbl)"
         />
     </div>
     <div v-else class="otg-empty">
         <div class="ds-empty-icon"><i class="bi bi-grid-3x3-gap"></i></div>
-        <p class="ds-empty-description">Nessun tavolo configurato. Aggiungi il primo tavolo per iniziare.</p>
+        <p class="ds-empty-description">
+            Nessun tavolo configurato. Vai alla scheda Prenotazioni per aggiungere tavoli.
+        </p>
     </div>
 </template>
 

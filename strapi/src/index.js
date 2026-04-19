@@ -261,6 +261,8 @@ async function grantImportPermissions(strapi) {
       'api::reservation.reservation.createAuthenticated',
       'api::reservation.reservation.list',
       'api::reservation.reservation.updateStatus',
+      'api::reservation.reservation.walkin',
+      'api::reservation.reservation.seat',
       'api::table.table.list',
       'api::table.table.create',
       'api::table.table.update',
