@@ -72,13 +72,15 @@ const updatePasswordCheck = async () => {
 </script>
 
 <template>
-    <div class="ds-card">
-        <div class="ds-card-header">
-            <i class="bi bi-key" style="color: var(--color-primary);"></i>
-            <h3 class="section-title">Cambio password</h3>
+    <div class="profile-section">
+        <div class="section-header">
+            <div class="section-icon"><i class="bi bi-key"></i></div>
+            <div>
+                <h3 class="section-title">Cambio password</h3>
+                <p class="section-description">Aggiorna la tua password per mantenere sicuro il tuo account.</p>
+            </div>
         </div>
-        <div class="ds-card-body">
-            <p class="section-description">Aggiorna la tua password per mantenere sicuro il tuo account.</p>
+        <div class="section-body">
 
             <Transition name="fade">
                 <div v-if="isError" class="ds-alert ds-alert-error">
@@ -159,10 +161,82 @@ const updatePasswordCheck = async () => {
 </template>
 
 <style scoped>
-.section-title { font-size: var(--text-base); font-weight: 600; margin: 0; }
-.section-description { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 var(--space-5) 0; }
+.profile-section {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    overflow: hidden;
+}
+.section-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: var(--s-5);
+    border-bottom: 1px solid var(--line);
+}
+.section-icon {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    background: color-mix(in oklab, var(--ac) 10%, var(--paper));
+    color: var(--ac);
+    border-radius: var(--r-sm);
+    font-size: 16px;
+    flex-shrink: 0;
+}
+.section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+}
+.section-description {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin: 0;
+    line-height: 1.5;
+}
+.section-body { padding: var(--s-5); }
+.section-body form { display: flex; flex-direction: column; gap: var(--s-4); }
+.section-body :deep(.ds-alert) { margin-bottom: var(--s-3); }
 .password-field { position: relative; }
+.password-field :deep(.input),
 .password-field :deep(.ds-input) { padding-right: 44px; }
-.password-toggle { position: absolute; right: var(--space-3); top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--color-text-muted); cursor: pointer; padding: var(--space-1); display: flex; align-items: center; transition: color var(--transition-fast); }
-.password-toggle:hover { color: var(--color-text); }
+.password-toggle {
+    position: absolute;
+    right: 10px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: var(--ink-3);
+    cursor: pointer;
+    padding: 4px;
+    display: flex; align-items: center;
+    transition: color 120ms;
+}
+.password-toggle:hover { color: var(--ink); }
+.section-body :deep(.ds-btn-primary) {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--paper);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background 120ms, transform 120ms;
+}
+.section-body :deep(.ds-btn-primary:hover) {
+    background: color-mix(in oklab, var(--ink) 90%, var(--ac));
+    transform: translateY(-1px);
+}
+.section-body :deep(.ds-btn-primary:disabled) {
+    opacity: 0.6; cursor: not-allowed; transform: none;
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>

@@ -26,11 +26,12 @@ const submit = () => {
 
 <template>
   <AuthenticationCard>
-    <div class="auth-brand">
-      <div class="auth-brand-icon"><i class="bi bi-shop"></i></div>
-      <span class="auth-brand-name">MenuCMS</span>
-    </div>
+    <router-link to="/" class="auth-brand">
+      <div class="auth-brand-icon" aria-hidden="true"><i class="bi bi-envelope-check"></i></div>
+      <span class="auth-brand-name">Tavolo</span>
+    </router-link>
 
+    <p class="auth-overline">Email</p>
     <h1 class="auth-title">Verifica email</h1>
     <p class="auth-subtitle">
       Prima di continuare, verifica il tuo indirizzo email cliccando sul link che ti abbiamo inviato. Se non hai ricevuto l'email, te ne invieremo un'altra.
@@ -62,36 +63,50 @@ const submit = () => {
 <style scoped>
 .auth-brand {
   display: flex; align-items: center; justify-content: center;
-  gap: var(--space-3); margin-bottom: var(--space-8);
+  gap: 10px; margin-bottom: var(--s-6); text-decoration: none;
 }
 .auth-brand-icon {
-  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
-  background: var(--color-primary); color: var(--color-text-inverse);
-  border-radius: var(--radius-lg); font-size: var(--text-xl);
+  width: 36px; height: 36px; display: grid; place-items: center;
+  background: var(--ink); color: var(--paper); border-radius: 10px;
+  font-size: 16px;
 }
 .auth-brand-name {
-  font-size: var(--text-xl); font-weight: 700;
-  color: var(--color-text); letter-spacing: var(--tracking-tight);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 18px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em;
+}
+.auth-overline {
+  font-family: var(--f-mono, 'Geist Mono', monospace);
+  font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.14em; color: var(--ink-3);
+  text-align: center; margin: 0 0 6px;
 }
 .auth-title {
-  font-size: var(--text-2xl); font-weight: 700; color: var(--color-text);
-  text-align: center; margin: 0 0 var(--space-2) 0;
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 26px; font-weight: 700; color: var(--ink);
+  text-align: center; margin: 0 0 6px 0; letter-spacing: -0.02em;
 }
 .auth-subtitle {
-  font-size: var(--text-sm); color: var(--color-text-muted);
-  text-align: center; margin: 0 0 var(--space-6) 0; line-height: var(--leading-relaxed);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 14px; color: var(--ink-3);
+  text-align: center; margin: 0 0 var(--s-5) 0; line-height: 1.55;
 }
 .verify-actions {
   display: flex; align-items: center; justify-content: space-between;
-  gap: var(--space-4); flex-wrap: wrap;
+  gap: var(--s-4); flex-wrap: wrap;
 }
 .verify-links {
-  display: flex; gap: var(--space-4);
+  display: flex; gap: var(--s-4);
 }
 .auth-link {
-  font-size: var(--text-sm); color: var(--color-primary);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 13px; color: var(--ac);
   text-decoration: none; font-weight: 500;
-  transition: color var(--transition-fast);
+  transition: color 120ms;
 }
-.auth-link:hover { color: var(--color-primary-hover); }
+.auth-link:hover {
+  color: color-mix(in oklab, var(--ac) 80%, var(--ink));
+  text-decoration: underline;
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>

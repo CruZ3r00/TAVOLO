@@ -44,14 +44,24 @@ logout();
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg);
+  background: var(--bg);
+  font-family: var(--f-sans, 'Geist', sans-serif);
 }
 .logout-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  gap: var(--s-4);
+  color: var(--ink-3);
+  font-size: 14px;
 }
+.logout-loading :deep(.ds-spinner) {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--line);
+  border-top-color: var(--ac);
+  border-radius: 50%;
+  animation: lo-spin 650ms linear infinite;
+}
+@keyframes lo-spin { to { transform: rotate(360deg); } }
 </style>

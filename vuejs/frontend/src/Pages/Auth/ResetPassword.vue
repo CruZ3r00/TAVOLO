@@ -76,13 +76,14 @@
 
 <template>
     <AuthenticationCard>
-        <div class="auth-brand">
-            <div class="auth-brand-icon"><i class="bi bi-shop"></i></div>
-            <span class="auth-brand-name">MenuCMS</span>
-        </div>
+        <router-link to="/" class="auth-brand">
+            <div class="auth-brand-icon" aria-hidden="true">T</div>
+            <span class="auth-brand-name">Tavolo</span>
+        </router-link>
 
+        <p class="auth-overline">Nuova password</p>
         <h1 class="auth-title">Reimposta password</h1>
-        <p class="auth-subtitle">Inserisci la tua nuova password.</p>
+        <p class="auth-subtitle">Scegli una nuova password sicura per il tuo account.</p>
 
         <Transition name="fade">
             <div v-if="errorMessage.value" class="ds-alert ds-alert-error">
@@ -117,25 +118,48 @@
 <style scoped>
 .auth-brand {
   display: flex; align-items: center; justify-content: center;
-  gap: var(--space-3); margin-bottom: var(--space-8);
+  gap: 10px; margin-bottom: var(--s-6); text-decoration: none;
 }
 .auth-brand-icon {
-  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
-  background: var(--color-primary); color: var(--color-text-inverse);
-  border-radius: var(--radius-lg); font-size: var(--text-xl);
+  width: 36px; height: 36px; display: grid; place-items: center;
+  background: var(--ink); color: var(--paper); border-radius: 10px;
+  font-family: var(--f-mono, 'Geist Mono', monospace);
+  font-weight: 700; font-size: 16px; letter-spacing: -0.02em;
 }
 .auth-brand-name {
-  font-size: var(--text-xl); font-weight: 700;
-  color: var(--color-text); letter-spacing: var(--tracking-tight);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 18px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em;
+}
+.auth-overline {
+  font-family: var(--f-mono, 'Geist Mono', monospace);
+  font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.14em; color: var(--ink-3);
+  text-align: center; margin: 0 0 6px;
 }
 .auth-title {
-  font-size: var(--text-2xl); font-weight: 700; color: var(--color-text);
-  text-align: center; margin: 0 0 var(--space-2) 0; letter-spacing: var(--tracking-tight);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 26px; font-weight: 700; color: var(--ink);
+  text-align: center; margin: 0 0 6px 0; letter-spacing: -0.02em;
 }
 .auth-subtitle {
-  font-size: var(--text-sm); color: var(--color-text-muted);
-  text-align: center; margin: 0 0 var(--space-6) 0;
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 14px; color: var(--ink-3);
+  text-align: center; margin: 0 0 var(--s-5) 0;
 }
-.auth-form { display: flex; flex-direction: column; }
-.auth-submit { width: 100%; }
+.auth-form { display: flex; flex-direction: column; gap: var(--s-4); }
+.auth-submit {
+  width: 100%; height: 46px;
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--paper); background: var(--ink);
+  border: 1px solid var(--ink); border-radius: var(--r-md);
+  cursor: pointer; transition: transform 120ms, background 120ms;
+  margin-top: var(--s-2);
+}
+.auth-submit:hover {
+  background: color-mix(in oklab, var(--ink) 90%, var(--ac));
+  transform: translateY(-1px);
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>

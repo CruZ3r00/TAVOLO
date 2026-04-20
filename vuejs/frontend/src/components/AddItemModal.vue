@@ -317,71 +317,79 @@ const onClose = () => {
 .modal-title-wrap {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    color: var(--color-primary);
+    gap: 10px;
+}
+.modal-title-wrap i {
+    font-size: 18px;
+    color: var(--ac);
 }
 .modal-title {
     margin: 0;
-    font-size: var(--text-md);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 16px;
     font-weight: 600;
-    color: var(--color-text);
+    color: var(--ink);
+    letter-spacing: -0.01em;
 }
 
 .aim-tabs {
     display: flex;
-    gap: var(--space-1);
-    padding: var(--space-1);
-    background: var(--color-bg-subtle);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-4);
+    gap: 2px;
+    padding: 4px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    margin-bottom: var(--s-4);
 }
 .aim-tab {
     flex: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--space-1);
-    padding: var(--space-2) var(--space-3);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
+    gap: 6px;
+    padding: 8px 12px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 13px;
     font-weight: 500;
-    color: var(--color-text-secondary);
+    color: var(--ink-2);
     background: transparent;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--r-sm);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: background 120ms, color 120ms, box-shadow 120ms;
 }
-.aim-tab:hover { color: var(--color-text); }
+.aim-tab:hover { color: var(--ink); }
 .aim-tab.active {
-    background: var(--color-bg-elevated);
-    color: var(--color-text);
-    box-shadow: var(--shadow-xs);
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
 }
 
 .aim-loading {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 10px;
     justify-content: center;
-    padding: var(--space-8);
-    color: var(--color-text-muted);
+    padding: var(--s-7);
+    color: var(--ink-3);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
 }
 
 .aim-search {
     position: relative;
-    margin-bottom: var(--space-3);
+    margin-bottom: var(--s-3);
 }
 .aim-search-icon {
     position: absolute;
-    left: var(--space-3);
+    left: 12px;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--color-text-muted);
+    color: var(--ink-3);
     pointer-events: none;
 }
 .aim-search-input {
-    padding-left: calc(var(--space-3) + 20px);
+    padding-left: 36px;
 }
 
 .aim-list {
@@ -390,15 +398,20 @@ const onClose = () => {
     display: flex;
     flex-direction: column;
     gap: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--paper);
 }
 .aim-category {
-    font-size: var(--text-xs);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 10px;
     font-weight: 600;
-    color: var(--color-text-muted);
+    color: var(--ink-3);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: var(--space-2) var(--space-2) var(--space-1);
-    background: var(--color-bg-subtle);
+    letter-spacing: 0.12em;
+    padding: 10px 14px 6px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
     position: sticky;
     top: 0;
     z-index: 1;
@@ -407,92 +420,102 @@ const onClose = () => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-2) var(--space-3);
+    padding: 10px 14px;
     background: none;
     border: none;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--line);
     cursor: pointer;
-    font-family: var(--font-family);
-    transition: background var(--transition-fast);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    transition: background 120ms, color 120ms;
     text-align: left;
     width: 100%;
 }
 .aim-element:hover {
-    background: var(--color-bg-subtle);
+    background: color-mix(in oklab, var(--ac) 6%, var(--paper));
 }
 .aim-el-name {
-    font-size: var(--text-sm);
+    font-size: 14px;
     font-weight: 500;
-    color: var(--color-text);
+    color: var(--ink);
 }
 .aim-el-price {
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--color-text-secondary);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ac);
     flex-shrink: 0;
 }
 
 .aim-no-results {
-    padding: var(--space-6);
+    padding: var(--s-6);
     text-align: center;
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
+    color: var(--ink-3);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
 }
 
 .aim-selected {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: var(--s-4);
 }
 .aim-back {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: 6px;
     background: none;
     border: none;
     padding: 0;
-    color: var(--color-primary);
-    font-size: var(--text-sm);
+    color: var(--ac);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    font-family: var(--font-family);
 }
 .aim-back:hover { text-decoration: underline; }
 .aim-selected-info {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: var(--space-2);
-    padding: var(--space-3);
-    background: var(--color-bg-subtle);
-    border-radius: var(--radius-md);
+    gap: var(--s-2);
+    padding: 14px 16px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
 }
 .aim-selected-name {
-    font-size: var(--text-base);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 15px;
     font-weight: 600;
-    color: var(--color-text);
+    color: var(--ink);
+    letter-spacing: -0.01em;
 }
 .aim-selected-price {
-    font-size: var(--text-md);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 16px;
     font-weight: 700;
-    color: var(--color-primary);
+    color: var(--ac);
+    letter-spacing: -0.01em;
 }
 
 .form-row-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
+    gap: var(--s-4);
 }
 .form-actions {
     display: flex;
     justify-content: flex-end;
-    gap: var(--space-3);
-    padding-top: var(--space-2);
-    border-top: 1px solid var(--color-border);
-    margin-top: var(--space-2);
+    gap: var(--s-3);
+    padding-top: var(--s-3);
+    border-top: 1px solid var(--line);
+    margin-top: var(--s-2);
 }
 .aim-err {
-    color: var(--color-destructive);
+    color: var(--dan);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
+    margin-top: 4px;
 }
 
 @media (max-width: 640px) {
@@ -503,7 +526,7 @@ const onClose = () => {
     .form-actions {
         flex-direction: column-reverse;
     }
-    .form-actions .ds-btn {
+    .form-actions :deep(.ds-btn) {
         width: 100%;
     }
 }

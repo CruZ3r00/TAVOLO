@@ -1,16 +1,11 @@
 <script setup>
-import { defineProps } from 'vue';
-
-const props = defineProps({
-    type: {
-        type: String,
-        default: 'submit',
-    },
+defineProps({
+    type: { type: String, default: 'submit' },
 });
 </script>
 
 <template>
-    <button :type="props.type" class="ds-btn ds-btn-primary">
+    <button :type="type" class="btn btn-primary">
         <slot />
     </button>
 </template>

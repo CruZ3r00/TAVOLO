@@ -22,7 +22,7 @@ const meta = computed(() => META[props.status] || META.taken);
 </script>
 
 <template>
-    <span :class="['ds-badge', meta.cls, 'order-status-badge']">
+    <span :class="['order-status-badge', `osb-${status}`]">
         <i :class="['bi', meta.icon]" aria-hidden="true"></i>
         <span>{{ meta.label }}</span>
     </span>
@@ -30,10 +30,51 @@ const meta = computed(() => META[props.status] || META.taken);
 
 <style scoped>
 .order-status-badge {
-    gap: var(--space-1);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 10px;
     font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink-2);
+    white-space: nowrap;
 }
-.order-status-badge i {
-    font-size: 0.75rem;
+.order-status-badge i { font-size: 10px; }
+
+.osb-taken {
+    background: color-mix(in oklab, var(--ink) 6%, var(--paper));
+    color: var(--ink-2);
+    border-color: color-mix(in oklab, var(--ink) 16%, transparent);
+}
+.osb-preparing {
+    background: color-mix(in oklab, var(--warn) 12%, var(--paper));
+    color: var(--warn);
+    border-color: color-mix(in oklab, var(--warn) 28%, transparent);
+}
+.osb-ready {
+    background: color-mix(in oklab, var(--ok) 12%, var(--paper));
+    color: var(--ok);
+    border-color: color-mix(in oklab, var(--ok) 28%, transparent);
+}
+.osb-served {
+    background: color-mix(in oklab, var(--info) 12%, var(--paper));
+    color: var(--info);
+    border-color: color-mix(in oklab, var(--info) 28%, transparent);
+}
+.osb-active {
+    background: color-mix(in oklab, var(--ac) 12%, var(--paper));
+    color: var(--ac);
+    border-color: color-mix(in oklab, var(--ac) 28%, transparent);
+}
+.osb-closed {
+    background: color-mix(in oklab, var(--ink) 6%, var(--paper));
+    color: var(--ink-3);
+    border-color: var(--line);
 }
 </style>

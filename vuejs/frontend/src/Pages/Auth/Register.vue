@@ -134,15 +134,14 @@ const submit = async () => {
 <template>
   <AuthenticationCard>
     <!-- Brand -->
-    <div class="auth-brand">
-      <div class="auth-brand-icon">
-        <i class="bi bi-shop"></i>
-      </div>
-      <span class="auth-brand-name">MenuCMS</span>
-    </div>
+    <router-link to="/" class="auth-brand">
+      <div class="auth-brand-icon" aria-hidden="true">T</div>
+      <span class="auth-brand-name">Tavolo</span>
+    </router-link>
 
+    <p class="auth-overline">Registrazione</p>
     <h1 class="auth-title">Crea il tuo account</h1>
-    <p class="auth-subtitle">Inizia a gestire il menu del tuo ristorante</p>
+    <p class="auth-subtitle">Inizia a gestire il tuo ristorante in pochi secondi</p>
 
     <!-- Error -->
     <Transition name="fade">
@@ -253,138 +252,202 @@ const submit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-6);
+  gap: 10px;
+  margin-bottom: var(--s-5);
+  text-decoration: none;
 }
 
 .auth-brand-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-xl);
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 10px;
+  font-family: var(--f-mono, 'Geist Mono', monospace);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.02em;
 }
 
 .auth-brand-name {
-  font-size: var(--text-xl);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 18px;
   font-weight: 700;
-  color: var(--color-text);
-  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+
+.auth-overline {
+  font-family: var(--f-mono, 'Geist Mono', monospace);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  text-align: center;
+  margin: 0 0 6px;
 }
 
 .auth-title {
-  font-size: var(--text-2xl);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 26px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--ink);
   text-align: center;
-  margin: 0 0 var(--space-2) 0;
-  letter-spacing: var(--tracking-tight);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.02em;
 }
 
 .auth-subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 14px;
+  color: var(--ink-3);
   text-align: center;
-  margin: 0 0 var(--space-6) 0;
+  margin: 0 0 var(--s-5) 0;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
+  gap: var(--s-4);
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
+  gap: var(--s-4);
 }
 
 .password-field {
   position: relative;
 }
 
-.password-field :deep(.ds-input) {
+.password-field :deep(.input) {
   padding-right: 44px;
 }
 
 .password-toggle {
   position: absolute;
-  right: var(--space-3);
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: var(--color-text-muted);
+  color: var(--ink-3);
   cursor: pointer;
-  padding: var(--space-1);
+  padding: 6px;
   display: flex;
   align-items: center;
-  transition: color var(--transition-fast);
+  border-radius: var(--r-sm);
+  transition: color 120ms, background 120ms;
 }
 
 .password-toggle:hover {
-  color: var(--color-text);
+  color: var(--ink);
+  background: color-mix(in oklab, var(--ink) 6%, transparent);
 }
 
 .terms-field {
-  margin-bottom: var(--space-5);
+  margin: var(--s-2) 0 0;
 }
 
 .terms-label {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
+  gap: 10px;
   cursor: pointer;
 }
 
 .terms-text {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  line-height: var(--leading-normal);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.5;
 }
 
 .auth-link {
-  color: var(--color-primary);
+  color: var(--ac);
   text-decoration: none;
   font-weight: 500;
-  transition: color var(--transition-fast);
+  transition: color 120ms;
 }
 
 .auth-link:hover {
-  color: var(--color-primary-hover);
+  color: color-mix(in oklab, var(--ac) 80%, var(--ink));
+  text-decoration: underline;
 }
 
 .auth-submit {
   width: 100%;
-  margin-bottom: var(--space-5);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--paper);
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: transform 120ms, background 120ms;
+  margin-top: var(--s-2);
 }
+
+.auth-submit:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--ink) 90%, var(--ac));
+  transform: translateY(-1px);
+}
+
+.auth-submit:active:not(:disabled) { transform: translateY(0); }
+
+.auth-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-submit .ds-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in oklab, var(--paper) 30%, transparent);
+  border-top-color: var(--paper);
+  border-radius: 50%;
+  animation: reg-spin 650ms linear infinite;
+}
+
+@keyframes reg-spin { to { transform: rotate(360deg); } }
 
 .auth-footer-text {
   text-align: center;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  margin: 0;
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 14px;
+  color: var(--ink-3);
+  margin: var(--s-5) 0 0;
 }
 
 .auth-link-bold {
-  color: var(--color-primary);
+  color: var(--ink);
   text-decoration: none;
   font-weight: 600;
-  transition: color var(--transition-fast);
+  transition: color 120ms;
 }
 
 .auth-link-bold:hover {
-  color: var(--color-primary-hover);
+  color: var(--ac);
 }
 
-@media (max-width: 480px) {
+.fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
+
+@media (max-width: 520px) {
   .form-row {
     grid-template-columns: 1fr;
-    gap: 0;
+    gap: var(--s-4);
   }
 }
 </style>

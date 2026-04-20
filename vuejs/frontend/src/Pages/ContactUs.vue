@@ -72,52 +72,75 @@
 
 <style scoped>
 .contact-page {
-    padding: var(--space-10) 0 var(--space-16);
+    padding: var(--s-8) 0 var(--s-9);
+    background: var(--bg);
+    min-height: calc(100vh - 64px);
+    font-family: var(--f-sans, 'Geist', sans-serif);
 }
 
 .contact-container {
-    max-width: 640px;
+    max-width: 720px;
     margin: 0 auto;
-    padding: 0 var(--space-6);
+    padding: 0 var(--s-6);
+}
+
+.text-overline {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-3);
+    margin: 0 0 6px;
 }
 
 .contact-title {
-    font-size: var(--text-3xl);
-    font-weight: 800;
-    color: var(--color-text);
-    margin: var(--space-2) 0;
-    letter-spacing: var(--tracking-tight);
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--s-3) 0;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
 }
 
 .contact-subtitle {
-    font-size: var(--text-md);
-    color: var(--color-text-muted);
-    margin: 0 0 var(--space-8) 0;
+    font-size: 15px;
+    color: var(--ink-3);
+    margin: 0 0 var(--s-7) 0;
+    line-height: 1.55;
 }
 
 .contact-cards {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--s-4);
 }
 
 .contact-card {
     display: flex;
     align-items: flex-start;
-    gap: var(--space-5);
-    padding: var(--space-6);
+    gap: var(--s-4);
+    padding: var(--s-5);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    transition: border-color 160ms, transform 160ms;
+}
+.contact-card:hover {
+    border-color: color-mix(in oklab, var(--ac) 30%, var(--line));
+    transform: translateY(-2px);
 }
 
 .contact-avatar {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-primary-light);
-    color: var(--color-primary);
-    border-radius: var(--radius-full);
-    font-size: var(--text-lg);
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 50%;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 15px;
     font-weight: 700;
     flex-shrink: 0;
 }
@@ -125,27 +148,41 @@
 .contact-info {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
 }
 
 .contact-name {
-    font-size: var(--text-md);
-    font-weight: 600;
-    color: var(--color-text);
-    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
 }
 
 .contact-detail {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
-    color: var(--color-text-secondary);
+    gap: 8px;
+    font-size: 13px;
+    color: var(--ink-2);
     text-decoration: none;
-    transition: color var(--transition-fast);
+    transition: color 120ms;
+    word-break: break-all;
+}
+.contact-detail i {
+    color: var(--ink-3);
+    flex-shrink: 0;
+}
+.contact-detail:hover {
+    color: var(--ac);
+}
+.contact-detail:hover i {
+    color: var(--ac);
 }
 
-.contact-detail:hover {
-    color: var(--color-primary);
+@media (max-width: 640px) {
+    .contact-container { padding: 0 var(--s-4); }
 }
 </style>

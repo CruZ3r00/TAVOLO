@@ -232,139 +232,150 @@
 
 <style scoped>
 .menu-tabs-wrapper {
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg);
-    padding: 0 var(--space-6);
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+    padding: 0 var(--s-6);
+    position: sticky;
+    top: 64px;
+    z-index: 20;
+    backdrop-filter: saturate(1.2) blur(8px);
+    background: color-mix(in oklab, var(--bg) 82%, transparent);
 }
-
 .menu-tabs {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     display: flex;
     gap: 0;
 }
-
 .menu-tab {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-3) var(--space-5);
-    font-size: var(--text-sm);
+    gap: 8px;
+    padding: 14px 22px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
     font-weight: 500;
-    color: var(--color-text-muted);
+    color: var(--ink-3);
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
     cursor: pointer;
-    transition: color var(--transition-fast), border-color var(--transition-fast);
+    transition: color 140ms, border-color 140ms;
     margin-bottom: -1px;
+    letter-spacing: -0.01em;
 }
-
-.menu-tab:hover {
-    color: var(--color-text);
-}
-
+.menu-tab i { font-size: 15px; opacity: 0.85; }
+.menu-tab:hover { color: var(--ink); }
 .menu-tab--active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
+    color: var(--ink);
+    border-bottom-color: var(--ac);
 }
+.menu-tab--active i { color: var(--ac); opacity: 1; }
 
 @media (max-width: 640px) {
-    .menu-tabs-wrapper {
-        padding: 0 var(--space-4);
-    }
-
-    .menu-tab {
-        flex: 1;
-        justify-content: center;
-        padding: var(--space-3) var(--space-3);
-    }
+    .menu-tabs-wrapper { padding: 0 var(--s-4); top: 64px; }
+    .menu-tab { flex: 1; justify-content: center; padding: 12px 10px; }
 }
 
-/* Overlay loading import */
+/* Import overlay */
 .import-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.78);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: color-mix(in oklab, var(--ink) 85%, transparent);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     z-index: 2000;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 24px;
+    animation: fadeIn 240ms ease;
 }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .import-overlay-spinner {
-    width: 4rem;
-    height: 4rem;
+    width: 56px; height: 56px;
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top-color: #fff;
+    border-radius: 999px;
+    animation: spin 900ms linear infinite;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 .import-overlay-title {
     color: #fff;
-    font-size: 1.5rem;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 22px;
     font-weight: 700;
-    margin: 24px 0 8px;
+    letter-spacing: -0.02em;
+    margin: 22px 0 6px;
     text-align: center;
 }
 .import-overlay-subtitle {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 0.95rem;
-    margin: 0 0 16px;
+    color: rgba(255,255,255,0.72);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 13px;
+    margin: 0 0 20px;
     min-height: 1.5em;
     text-align: center;
-    transition: opacity 0.3s ease;
+    letter-spacing: 0.02em;
 }
 .import-overlay-progress {
-    width: 280px;
+    width: 320px;
     max-width: 80vw;
-    height: 6px;
-    background: rgba(255, 255, 255, 0.2);
+    height: 5px;
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 999px;
     overflow: hidden;
+    position: relative;
 }
+.import-overlay-progress .progress-bar {
+    background: linear-gradient(90deg, transparent, var(--ac), transparent) !important;
+    background-size: 200% 100% !important;
+    animation: shimmer 1.8s linear infinite;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .import-overlay-warn {
-    color: #fde68a;
-    margin: 28px 0 0;
-    font-size: 0.875rem;
+    color: color-mix(in oklab, var(--warn) 60%, #fff);
+    margin: 26px 0 0;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
     text-align: center;
     display: flex;
     align-items: center;
     gap: 8px;
+    letter-spacing: 0.02em;
 }
-.import-overlay-warn i {
-    font-size: 1rem;
-}
+.import-overlay-warn i { font-size: 14px; }
 
 /* Toast */
 .import-toast {
     position: fixed;
-    top: 24px;
+    top: 80px;
     right: 24px;
     z-index: 2200;
     max-width: 420px;
-    padding: 14px 18px;
-    border-radius: 10px;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+    padding: 12px 16px;
+    border-radius: var(--r-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 0.9rem;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
     line-height: 1.4;
+    font-weight: 500;
 }
 .import-toast-success {
-    background: #ecfdf5;
-    color: #065f46;
-    border: 1px solid #6ee7b7;
+    background: color-mix(in oklab, var(--ok) 12%, var(--paper));
+    color: var(--ok);
+    border: 1px solid color-mix(in oklab, var(--ok) 30%, transparent);
 }
 .import-toast-error {
-    background: #fef2f2;
-    color: #991b1b;
-    border: 1px solid #fca5a5;
+    background: color-mix(in oklab, var(--dan) 12%, var(--paper));
+    color: var(--dan);
+    border: 1px solid color-mix(in oklab, var(--dan) 30%, transparent);
 }
-.import-toast i {
-    font-size: 1.1rem;
-    flex-shrink: 0;
-}
+.import-toast i { font-size: 18px; flex-shrink: 0; }
 .import-toast-close {
     margin-left: auto;
     background: none;
@@ -372,26 +383,17 @@
     color: inherit;
     cursor: pointer;
     padding: 2px 4px;
-    opacity: 0.7;
+    opacity: 0.6;
     transition: opacity 0.15s;
 }
-.import-toast-close:hover {
-    opacity: 1;
-}
+.import-toast-close:hover { opacity: 1; }
 
-.toast-enter-active,
-.toast-leave-active {
-    transition: opacity 0.25s, transform 0.25s;
-}
-.toast-enter-from,
-.toast-leave-to {
-    opacity: 0;
-    transform: translateY(-10px);
-}
+.toast-enter-active, .toast-leave-active { transition: opacity 240ms, transform 240ms; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(-10px); }
 
 @media (max-width: 640px) {
     .import-toast {
-        top: 12px;
+        top: 76px;
         right: 12px;
         left: 12px;
         max-width: none;

@@ -40,8 +40,8 @@ function activeOrderForTable(table, orders) {
 <style scoped>
 .otg {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--s-4);
 }
 
 .otg-empty {
@@ -50,15 +50,31 @@ function activeOrderForTable(table, orders) {
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: var(--space-12) var(--space-4);
-    gap: var(--space-3);
-    color: var(--color-text-muted);
+    padding: var(--s-9) var(--s-4);
+    gap: var(--s-3);
+    color: var(--ink-3);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
+    background: var(--paper);
+    border: 1px dashed var(--line);
+    border-radius: var(--r-lg);
+}
+
+.otg-empty :deep(.ds-empty-icon) {
+    width: 56px;
+    height: 56px;
+    display: grid;
+    place-items: center;
+    background: var(--bg-2);
+    border-radius: 50%;
+    font-size: 22px;
+    color: var(--ink-3);
 }
 
 @media (max-width: 768px) {
     .otg {
         grid-template-columns: repeat(2, 1fr);
-        gap: var(--space-3);
+        gap: var(--s-3);
     }
 }
 </style>

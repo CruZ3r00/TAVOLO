@@ -219,93 +219,120 @@ const onClose = () => {
 .modal-title-wrap {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    color: var(--color-primary);
+    gap: 10px;
+}
+.modal-title-wrap i {
+    font-size: 18px;
+    color: var(--ac);
 }
 .modal-title {
     margin: 0;
-    font-size: var(--text-md);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 16px;
     font-weight: 600;
-    color: var(--color-text);
+    color: var(--ink);
+    letter-spacing: -0.01em;
 }
 
 .tmm {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: var(--s-4);
+    font-family: var(--f-sans, 'Geist', sans-serif);
 }
 
 .tmm-section-title {
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--color-text-secondary);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-3);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin: 0 0 var(--space-2) 0;
+    letter-spacing: 0.12em;
+    margin: 0 0 var(--s-2) 0;
 }
 .tmm-section-list {
-    padding-top: var(--space-3);
-    border-top: 1px solid var(--color-border);
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--line);
+    margin-top: var(--s-2);
 }
 
 .form-row-3 {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: var(--space-4);
+    gap: var(--s-4);
 }
 
 .form-actions {
     display: flex;
     justify-content: flex-end;
-    gap: var(--space-3);
-    padding-top: var(--space-2);
-    margin-top: var(--space-2);
+    gap: var(--s-3);
+    padding-top: var(--s-3);
+    border-top: 1px solid var(--line);
+    margin-top: var(--s-2);
 }
 
 .tmm-err {
-    color: var(--color-destructive);
+    color: var(--dan);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
+    margin-top: 4px;
 }
 
 .tmm-table-list {
     display: flex;
     flex-direction: column;
     gap: 0;
-    max-height: 240px;
+    max-height: 260px;
     overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--paper);
 }
 .tmm-table-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-2) var(--space-1);
-    border-bottom: 1px solid var(--color-border);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
 }
+.tmm-table-row:last-child { border-bottom: none; }
 .tmm-table-info {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 12px;
 }
 .tmm-table-num {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
     font-weight: 700;
-    font-size: var(--text-sm);
-    color: var(--color-text);
+    font-size: 14px;
+    color: var(--ink);
+    min-width: 30px;
+    letter-spacing: -0.01em;
 }
 .tmm-table-meta {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
+    color: var(--ink-3);
 }
 .tmm-table-actions {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--s-2);
 }
 .tmm-occupied-label {
-    font-size: var(--text-xs);
-    color: var(--color-warning);
-    font-weight: 500;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 10px;
+    color: var(--warn);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    background: color-mix(in oklab, var(--warn) 10%, var(--paper));
+    border: 1px solid color-mix(in oklab, var(--warn) 28%, transparent);
+    border-radius: 999px;
 }
 .ds-btn-destructive-ghost {
-    color: var(--color-destructive);
+    color: var(--dan);
 }
 
 @media (max-width: 640px) {
@@ -316,7 +343,7 @@ const onClose = () => {
     .form-actions {
         flex-direction: column-reverse;
     }
-    .form-actions .ds-btn {
+    .form-actions :deep(.ds-btn) {
         width: 100%;
     }
 }

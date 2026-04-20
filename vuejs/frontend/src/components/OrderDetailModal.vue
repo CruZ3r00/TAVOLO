@@ -324,140 +324,163 @@ defineExpose({ onItemAdded, silentReload });
 .modal-title-wrap {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    color: var(--color-primary);
+    gap: 10px;
+}
+.modal-title-wrap i {
+    font-size: 18px;
+    color: var(--ac);
 }
 .modal-title {
     margin: 0;
-    font-size: var(--text-md);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 16px;
     font-weight: 600;
-    color: var(--color-text);
+    color: var(--ink);
+    letter-spacing: -0.01em;
 }
 
 .odm {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: var(--s-4);
     min-height: 200px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
 }
 
 .odm-loading {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: 10px;
     justify-content: center;
-    padding: var(--space-8);
-    color: var(--color-text-muted);
+    padding: var(--s-7);
+    color: var(--ink-3);
+    font-size: 14px;
 }
 
 .odm-toast {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: var(--r-sm);
+    font-size: 13px;
     font-weight: 500;
 }
+.odm-toast i { font-size: 14px; }
 .odm-toast-success {
-    background: var(--color-accent-light);
-    color: var(--color-accent);
-    border: 1px solid rgba(5, 150, 105, 0.2);
+    background: color-mix(in oklab, var(--ok) 10%, var(--paper));
+    color: var(--ok);
+    border: 1px solid color-mix(in oklab, var(--ok) 28%, transparent);
 }
 .odm-toast-error {
-    background: var(--color-destructive-light);
-    color: var(--color-destructive);
-    border: 1px solid rgba(220, 38, 38, 0.2);
+    background: color-mix(in oklab, var(--dan) 10%, var(--paper));
+    color: var(--dan);
+    border: 1px solid color-mix(in oklab, var(--dan) 28%, transparent);
 }
 
 .odm-info {
     display: flex;
-    gap: var(--space-4);
-    padding: var(--space-3);
-    background: var(--color-bg-subtle);
-    border-radius: var(--radius-md);
+    gap: var(--s-5);
+    padding: 14px 16px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
 }
 .odm-info-item {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
 }
 .odm-info-label {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 10px;
+    color: var(--ink-3);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.12em;
+    font-weight: 500;
 }
 .odm-info-value {
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--color-text);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.01em;
 }
 
 .odm-items {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-2);
     max-height: 360px;
     overflow-y: auto;
+    padding-right: 4px;
 }
 .odm-empty {
-    padding: var(--space-6);
+    padding: var(--s-6);
     text-align: center;
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
+    color: var(--ink-3);
+    font-size: 14px;
+    background: var(--bg-2);
+    border: 1px dashed var(--line);
+    border-radius: var(--r-md);
 }
 
 .odm-footer {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    border-top: 1px solid var(--color-border);
-    padding-top: var(--space-3);
+    gap: var(--s-3);
+    border-top: 1px solid var(--line);
+    padding-top: var(--s-4);
 }
 .odm-total {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
 }
 .odm-total-label {
-    font-size: var(--text-base);
-    font-weight: 700;
-    color: var(--color-text);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-3);
 }
 .odm-total-value {
-    font-size: var(--text-xl, 1.25rem);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 22px;
     font-weight: 700;
-    color: var(--color-primary);
+    color: var(--ink);
+    letter-spacing: -0.02em;
 }
 
 .odm-actions {
     display: flex;
-    gap: var(--space-3);
+    gap: var(--s-3);
 }
-.odm-actions .ds-btn {
+.odm-actions :deep(.ds-btn) {
     flex: 1;
 }
 
 .odm-closed-info {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
+    gap: 8px;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
+    color: var(--ink-3);
 }
 .odm-ref {
     margin-left: auto;
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
+    font-size: 11px;
+    color: var(--ink-3);
 }
 
 @media (max-width: 640px) {
-    .odm-actions {
-        flex-direction: column;
-    }
-    .odm-info {
-        flex-wrap: wrap;
-    }
+    .odm-actions { flex-direction: column; }
+    .odm-info { flex-wrap: wrap; }
 }
 </style>

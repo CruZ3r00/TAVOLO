@@ -93,116 +93,89 @@
 
 <style scoped>
 .profile-page {
-    padding: var(--space-8) 0 var(--space-12);
+    padding: var(--s-8) 0 var(--s-9);
+    background: var(--bg);
+    min-height: calc(100vh - 64px);
 }
-
 .profile-container {
-    max-width: 1000px;
+    max-width: 1100px;
     margin: 0 auto;
-    padding: 0 var(--space-6);
+    padding: 0 var(--s-6);
 }
-
 .profile-header {
-    margin-bottom: var(--space-8);
+    margin-bottom: var(--s-7);
 }
-
+.text-overline {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-3);
+    margin: 0 0 6px;
+}
 .profile-title {
-    font-size: var(--text-2xl);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: clamp(28px, 3.5vw, 40px);
     font-weight: 700;
-    color: var(--color-text);
-    margin: var(--space-2) 0 0;
-    letter-spacing: var(--tracking-tight);
+    color: var(--ink);
+    margin: 0;
+    letter-spacing: -0.02em;
 }
-
 .profile-layout {
     display: grid;
-    grid-template-columns: 220px 1fr;
-    gap: var(--space-8);
+    grid-template-columns: 240px 1fr;
+    gap: var(--s-7);
     align-items: start;
 }
-
-/* Sidebar */
 .profile-sidebar {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: 2px;
     position: sticky;
-    top: 80px;
+    top: 84px;
+    padding: 6px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
 }
-
 .sidebar-item {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
+    gap: 12px;
+    padding: 10px 14px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
     font-weight: 500;
-    color: var(--color-text-secondary);
+    color: var(--ink-2);
     background: none;
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--r-sm);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: background 120ms, color 120ms;
     text-align: left;
 }
+.sidebar-item i { font-size: 16px; opacity: 0.8; }
+.sidebar-item:hover { background: color-mix(in oklab, var(--ink) 6%, transparent); color: var(--ink); }
+.sidebar-item-active { background: color-mix(in oklab, var(--ac) 12%, transparent); color: var(--ac); }
+.sidebar-item-active i { color: var(--ac); opacity: 1; }
+.sidebar-item-danger { color: var(--ink-3); }
+.sidebar-item-danger:hover { color: var(--dan); background: color-mix(in oklab, var(--dan) 10%, transparent); }
+.sidebar-item-danger.sidebar-item-active { color: var(--dan); background: color-mix(in oklab, var(--dan) 12%, transparent); }
+.profile-content { min-height: 400px; }
 
-.sidebar-item:hover {
-    background: var(--color-bg-subtle);
-    color: var(--color-text);
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 200ms, transform 200ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(8px); }
 
-.sidebar-item-active {
-    background: var(--color-primary-subtle);
-    color: var(--color-primary);
-}
-
-.sidebar-item-danger {
-    color: var(--color-text-muted);
-}
-
-.sidebar-item-danger:hover {
-    color: var(--color-destructive);
-    background: var(--color-destructive-light);
-}
-
-.sidebar-item-danger.sidebar-item-active {
-    color: var(--color-destructive);
-    background: var(--color-destructive-light);
-}
-
-/* Content */
-.profile-content {
-    min-height: 400px;
-}
-
-.profile-section-title {
-    font-size: var(--text-base);
-    font-weight: 600;
-    margin: 0;
-}
-
-@media (max-width: 768px) {
-    .profile-layout {
-        grid-template-columns: 1fr;
-        gap: var(--space-4);
-    }
-
+@media (max-width: 820px) {
+    .profile-layout { grid-template-columns: 1fr; gap: var(--s-4); }
     .profile-sidebar {
         flex-direction: row;
         overflow-x: auto;
         position: static;
-        gap: var(--space-1);
-        padding-bottom: var(--space-2);
+        gap: 2px;
     }
-
-    .sidebar-item {
-        white-space: nowrap;
-        flex-shrink: 0;
-    }
-
-    .profile-container {
-        padding: 0 var(--space-4);
-    }
+    .sidebar-item { white-space: nowrap; flex-shrink: 0; }
+    .profile-container { padding: 0 var(--s-4); }
 }
 </style>

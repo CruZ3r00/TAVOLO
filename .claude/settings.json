@@ -4,22 +4,24 @@
       {
         "matcher": "Edit|Write|Bash",
         "hooks": [
-        	{
-        	"type":"command",
-        	 "command": "echo 'piocru' | sudo -S code-review-graph update --skip-flows"
-		}
-	]
+          {
+            "type": "command",
+            "command": "code-review-graph update --skip-flows",
+            "timeout": 30
+          }
+        ]
       }
     ],
-    "SessionStart":[
+    "SessionStart": [
       {
-      	"matcher" : "",
-      	"hooks":[
-      	{
-      		"type":"command",
-        	"command": "echo 'piocru' | sudo -S code-review-graph status"
-	}
-	]
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "code-review-graph status",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }

@@ -1,26 +1,51 @@
 <script setup>
-    import AppLayout from '@/Layouts/AppLayout.vue';
-    import { onMounted, nextTick } from 'vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
+import { onMounted, nextTick } from 'vue';
 
-    onMounted(async () => {
-        nextTick(() => {
-            document.title = 'Aggiungi metodo di pagamento';
-        });
+onMounted(async () => {
+    nextTick(() => {
+        document.title = 'Aggiungi metodo di pagamento';
     });
+});
+
+const methods = [
+    { icon: 'bi-credit-card', title: 'Carta di credito', desc: 'Visa, Mastercard, American Express' },
+    { icon: 'bi-bank', title: 'Addebito SEPA', desc: 'Bonifico diretto dal tuo conto bancario' },
+    { icon: 'bi-apple', title: 'Apple Pay', desc: 'Paga con Touch ID o Face ID' },
+    { icon: 'bi-google', title: 'Google Pay', desc: 'Paga con il tuo account Google' },
+];
 </script>
 
 <template>
     <AppLayout>
-        <div class="placeholder-page">
-            <div class="placeholder-container">
-                <div class="ds-card">
-                    <div class="ds-card-body">
-                        <div class="ds-empty">
-                            <div class="ds-empty-icon"><i class="bi bi-credit-card"></i></div>
-                            <p class="ds-empty-title">Metodo di pagamento</p>
-                            <p class="ds-empty-description">Questa funzionalità sarà disponibile prossimamente.</p>
+        <div class="payment-page">
+            <div class="payment-container">
+                <header class="payment-head">
+                    <p class="text-overline">Pagamenti</p>
+                    <h1 class="payment-title">Aggiungi metodo di pagamento</h1>
+                    <p class="payment-subtitle">
+                        Collega un metodo di pagamento per gestire il tuo abbonamento. I tuoi dati sono protetti e cifrati.
+                    </p>
+                </header>
+
+                <section class="payment-methods">
+                    <article v-for="m in methods" :key="m.title" class="method-card">
+                        <div class="method-icon"><i :class="['bi', m.icon]" aria-hidden="true"></i></div>
+                        <div class="method-body">
+                            <h3 class="method-title">{{ m.title }}</h3>
+                            <p class="method-desc">{{ m.desc }}</p>
                         </div>
-                    </div>
+                        <div class="method-cta">
+                            <span class="method-badge">Presto</span>
+                        </div>
+                    </article>
+                </section>
+
+                <div class="payment-note">
+                    <i class="bi bi-shield-check"></i>
+                    <p>
+                        I pagamenti sono elaborati da provider PCI DSS certificati. Tavolo non memorizza i dati della tua carta.
+                    </p>
                 </div>
             </div>
         </div>
@@ -28,12 +53,145 @@
 </template>
 
 <style scoped>
-.placeholder-page {
-  padding: var(--space-10) 0 var(--space-16);
+.payment-page {
+    padding: var(--s-8) 0 var(--s-9);
+    background: var(--bg);
+    min-height: calc(100vh - 64px);
+    font-family: var(--f-sans, 'Geist', sans-serif);
 }
-.placeholder-container {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 0 var(--space-6);
+
+.payment-container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 var(--s-6);
+}
+
+.text-overline {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-3);
+    margin: 0 0 6px;
+}
+
+.payment-head {
+    margin-bottom: var(--s-7);
+}
+
+.payment-title {
+    font-size: clamp(26px, 3.5vw, 34px);
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--s-3) 0;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+}
+
+.payment-subtitle {
+    font-size: 15px;
+    color: var(--ink-3);
+    margin: 0;
+    line-height: 1.55;
+    max-width: 560px;
+}
+
+.payment-methods {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    margin-bottom: var(--s-6);
+}
+
+.method-card {
+    display: flex;
+    align-items: center;
+    gap: var(--s-4);
+    padding: var(--s-4) var(--s-5);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    transition: border-color 160ms, transform 160ms;
+}
+.method-card:hover {
+    border-color: color-mix(in oklab, var(--ac) 25%, var(--line));
+    transform: translateY(-1px);
+}
+
+.method-icon {
+    width: 44px; height: 44px;
+    display: grid;
+    place-items: center;
+    background: color-mix(in oklab, var(--ac) 10%, var(--paper));
+    color: var(--ac);
+    border-radius: var(--r-md);
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.method-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.method-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+}
+
+.method-desc {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin: 0;
+    line-height: 1.45;
+}
+
+.method-cta {
+    flex-shrink: 0;
+}
+
+.method-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-3);
+    background: var(--bg-2, color-mix(in oklab, var(--ink) 5%, var(--paper)));
+    border: 1px solid var(--line);
+    border-radius: 999px;
+}
+
+.payment-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: var(--s-4);
+    background: color-mix(in oklab, var(--ac) 5%, var(--paper));
+    border: 1px solid color-mix(in oklab, var(--ac) 18%, var(--line));
+    border-radius: var(--r-md);
+}
+.payment-note i {
+    color: var(--ac);
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.payment-note p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-2);
+    line-height: 1.55;
+}
+
+@media (max-width: 640px) {
+    .payment-container { padding: 0 var(--s-4); }
+    .method-card { padding: var(--s-4); }
 }
 </style>

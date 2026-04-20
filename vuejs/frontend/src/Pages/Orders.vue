@@ -227,7 +227,7 @@ onBeforeUnmount(() => {
 
 <template>
     <AppLayout>
-        <div class="ord-page">
+        <div class="ord-page" :data-role="mode === 'cucina' ? 'cucina' : 'cameriere'">
             <div class="ord-container">
                 <!-- Header -->
                 <header class="ord-header">
@@ -361,22 +361,33 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .ord-page {
-    padding: var(--space-8) 0 var(--space-12);
+    padding: var(--s-7) 0 var(--s-9);
+    background: var(--bg);
+    min-height: calc(100vh - 64px);
 }
 
 .ord-container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 var(--space-6);
+    padding: 0 var(--s-6);
 }
 
-/* Header */
+.text-overline {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-3);
+    margin: 0 0 6px;
+}
+
 .ord-header {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: var(--space-4);
-    margin-bottom: var(--space-6);
+    gap: var(--s-4);
+    margin-bottom: var(--s-6);
     flex-wrap: wrap;
 }
 
@@ -386,111 +397,121 @@ onBeforeUnmount(() => {
 }
 
 .ord-title {
-    font-size: var(--text-2xl);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: clamp(28px, 3.5vw, 36px);
     font-weight: 700;
-    color: var(--color-text);
-    margin: var(--space-2) 0;
-    letter-spacing: var(--tracking-tight);
+    color: var(--ink);
+    margin: 0 0 4px;
+    letter-spacing: -0.02em;
 }
 
 .ord-subtitle {
-    font-size: var(--text-base);
-    color: var(--color-text-muted);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
+    color: var(--ink-3);
     margin: 0;
 }
 
 .ord-header-actions {
     display: flex;
-    gap: var(--space-3);
+    gap: var(--s-3);
     align-items: center;
     flex-wrap: wrap;
 }
 
-/* Mode toggle */
 .ord-mode-toggle {
     display: flex;
-    gap: var(--space-1);
-    padding: var(--space-1);
-    background: var(--color-bg-subtle);
-    border-radius: var(--radius-md);
+    gap: 2px;
+    padding: 4px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
 }
 .ord-mode-btn {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
-    padding: var(--space-2) var(--space-3);
-    font-family: var(--font-family);
-    font-size: var(--text-sm);
+    gap: 6px;
+    padding: 8px 14px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 13px;
     font-weight: 500;
-    color: var(--color-text-secondary);
+    color: var(--ink-2);
     background: transparent;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--r-sm);
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: background 120ms, color 120ms, box-shadow 120ms;
 }
+.ord-mode-btn i { font-size: 15px; }
 .ord-mode-btn:hover {
-    color: var(--color-text);
+    color: var(--ink);
+    background: color-mix(in oklab, var(--ink) 4%, transparent);
 }
 .ord-mode-btn.active {
-    background: var(--color-bg-elevated);
-    color: var(--color-text);
-    box-shadow: var(--shadow-xs);
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
 }
 
-/* Toast */
 .ord-toast {
     position: fixed;
-    top: 72px;
-    right: var(--space-6);
-    z-index: var(--z-toast);
+    top: 80px;
+    right: var(--s-5);
+    z-index: 60;
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    font-size: var(--text-sm);
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--r-md);
+    box-shadow: 0 12px 32px -8px color-mix(in oklab, var(--ink) 24%, transparent);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
     font-weight: 500;
-    max-width: 400px;
+    max-width: 420px;
+    background: var(--paper);
+    border: 1px solid var(--line);
 }
+.ord-toast i { font-size: 16px; flex-shrink: 0; }
 .ord-toast-success {
-    background: var(--color-accent-light);
-    color: var(--color-accent);
-    border: 1px solid rgba(5, 150, 105, 0.2);
+    background: color-mix(in oklab, var(--ok) 10%, var(--paper));
+    color: var(--ok);
+    border-color: color-mix(in oklab, var(--ok) 30%, transparent);
 }
 .ord-toast-error {
-    background: var(--color-destructive-light);
-    color: var(--color-destructive);
-    border: 1px solid rgba(220, 38, 38, 0.2);
+    background: color-mix(in oklab, var(--dan) 10%, var(--paper));
+    color: var(--dan);
+    border-color: color-mix(in oklab, var(--dan) 30%, transparent);
 }
 
 .ord-error-banner {
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--s-4);
 }
 
-/* Loading */
 .ord-loading {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--space-3);
-    padding: var(--space-12);
-    color: var(--color-text-muted);
+    gap: var(--s-3);
+    padding: var(--s-9);
+    color: var(--ink-3);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
 }
 
-/* Responsive */
+.fade-enter-active, .fade-leave-active { transition: opacity 200ms, transform 200ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-6px); }
+
 @media (max-width: 640px) {
-    .ord-container { padding: 0 var(--space-4); }
+    .ord-container { padding: 0 var(--s-4); }
     .ord-header { align-items: flex-start; }
-    .ord-header-actions {
-        width: 100%;
-    }
+    .ord-header-actions { width: 100%; }
+    .ord-mode-toggle { flex: 1; }
+    .ord-mode-btn { flex: 1; justify-content: center; }
     .ord-toast {
-        top: 60px;
-        right: var(--space-3);
-        left: var(--space-3);
+        top: 68px;
+        right: var(--s-3);
+        left: var(--s-3);
         max-width: none;
     }
 }

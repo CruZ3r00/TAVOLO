@@ -63,17 +63,23 @@ const closeModal = () => {
 </script>
 
 <template>
-    <div class="ds-card">
-        <div class="ds-card-header">
-            <i class="bi bi-trash" style="color: var(--color-destructive);"></i>
-            <h3 class="section-title">Elimina account</h3>
+    <div class="profile-section danger-section">
+        <div class="section-header">
+            <div class="section-icon danger"><i class="bi bi-trash"></i></div>
+            <div>
+                <h3 class="section-title">Elimina account</h3>
+                <p class="section-description">Azione irreversibile. I dati saranno cancellati permanentemente.</p>
+            </div>
         </div>
-        <div class="ds-card-body">
-            <p class="section-description">
-                Una volta eliminato il tuo account, tutti i dati e le risorse saranno cancellati permanentemente. Prima di procedere, scarica eventuali dati che desideri conservare.
-            </p>
-
-            <button @click="confirmUserDeletion" class="ds-btn ds-btn-danger">
+        <div class="section-body">
+            <div class="danger-notice">
+                <i class="bi bi-exclamation-triangle"></i>
+                <p>
+                    Una volta eliminato il tuo account, tutti i dati e le risorse saranno cancellati
+                    permanentemente. Prima di procedere, scarica eventuali dati che desideri conservare.
+                </p>
+            </div>
+            <button @click="confirmUserDeletion" class="danger-btn">
                 <i class="bi bi-trash"></i>
                 <span>Elimina account</span>
             </button>
@@ -121,10 +127,157 @@ const closeModal = () => {
 </template>
 
 <style scoped>
-.section-title { font-size: var(--text-base); font-weight: 600; margin: 0; }
-.section-description { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0 0 var(--space-5) 0; line-height: var(--leading-relaxed); }
-.modal-danger-title { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-lg); font-weight: 600; color: var(--color-destructive); margin: 0; }
-.modal-description { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0 0 var(--space-5) 0; line-height: var(--leading-relaxed); }
-.field-error { font-size: var(--text-sm); color: var(--color-destructive); margin: var(--space-1) 0 0; }
-.modal-actions { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+.profile-section {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    overflow: hidden;
+}
+.danger-section {
+    border-color: color-mix(in oklab, var(--dan) 25%, var(--line));
+}
+.section-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: var(--s-5);
+    border-bottom: 1px solid var(--line);
+}
+.section-icon {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    background: color-mix(in oklab, var(--ac) 10%, var(--paper));
+    color: var(--ac);
+    border-radius: var(--r-sm);
+    font-size: 16px;
+    flex-shrink: 0;
+}
+.section-icon.danger {
+    background: color-mix(in oklab, var(--dan) 12%, var(--paper));
+    color: var(--dan);
+}
+.section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+}
+.section-description {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin: 0;
+    line-height: 1.5;
+}
+.section-body { padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); }
+.danger-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: var(--s-4);
+    background: color-mix(in oklab, var(--dan) 6%, var(--paper));
+    border: 1px solid color-mix(in oklab, var(--dan) 20%, var(--line));
+    border-radius: var(--r-md);
+}
+.danger-notice i {
+    color: var(--dan);
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.danger-notice p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-2);
+    line-height: 1.55;
+}
+.danger-btn {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--paper);
+    background: var(--dan);
+    border: 1px solid var(--dan);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background 120ms, transform 120ms;
+}
+.danger-btn:hover {
+    background: color-mix(in oklab, var(--dan) 88%, var(--ink));
+    transform: translateY(-1px);
+}
+
+/* Modal overrides */
+.modal-danger-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--dan);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+.modal-description {
+    font-size: 14px;
+    color: var(--ink-2);
+    margin: 0 0 var(--s-4) 0;
+    line-height: 1.6;
+}
+.field-error {
+    font-size: 13px;
+    color: var(--dan);
+    margin: 6px 0 0;
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s-3);
+    margin-top: var(--s-5);
+    padding-top: var(--s-4);
+    border-top: 1px solid var(--line);
+}
+.modal-actions :deep(.ds-btn) {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background 120ms, transform 120ms;
+    border: 1px solid transparent;
+}
+.modal-actions :deep(.ds-btn-secondary) {
+    color: var(--ink-2);
+    background: var(--paper);
+    border-color: var(--line);
+}
+.modal-actions :deep(.ds-btn-secondary:hover) {
+    background: color-mix(in oklab, var(--ink) 5%, var(--paper));
+    color: var(--ink);
+}
+.modal-actions :deep(.ds-btn-danger) {
+    color: var(--paper);
+    background: var(--dan);
+    border-color: var(--dan);
+}
+.modal-actions :deep(.ds-btn-danger:hover) {
+    background: color-mix(in oklab, var(--dan) 88%, var(--ink));
+    transform: translateY(-1px);
+}
+.modal-actions :deep(.ds-btn-danger:disabled) {
+    opacity: 0.55; cursor: not-allowed; transform: none;
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>

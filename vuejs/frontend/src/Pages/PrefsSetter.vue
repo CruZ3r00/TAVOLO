@@ -184,57 +184,135 @@
 
 <style scoped>
 .prefs-page {
-  padding: var(--space-10) 0 var(--space-16);
+    padding: var(--s-8) 0 var(--s-9);
+    background: var(--bg);
+    min-height: calc(100vh - 64px);
+    font-family: var(--f-sans, 'Geist', sans-serif);
 }
 .prefs-container {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 var(--space-6);
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 var(--s-6);
+}
+.text-overline {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-3);
+    margin: 0 0 6px;
 }
 .prefs-title {
-  font-size: var(--text-3xl);
-  font-weight: 800;
-  color: var(--color-text);
-  margin: var(--space-2) 0;
-  letter-spacing: var(--tracking-tight);
+    font-size: clamp(26px, 3.5vw, 34px);
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--s-2) 0;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
 }
 .prefs-subtitle {
-  font-size: var(--text-md);
-  color: var(--color-text-muted);
-  margin: 0 0 var(--space-8) 0;
-  line-height: var(--leading-relaxed);
+    font-size: 15px;
+    color: var(--ink-3);
+    margin: 0 0 var(--s-7) 0;
+    line-height: 1.55;
 }
 .prefs-card {
-  margin-bottom: var(--space-10);
+    margin-bottom: var(--s-7);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+}
+.prefs-card :deep(.ds-card-body) {
+    padding: var(--s-5);
 }
 .prefs-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+}
+.prefs-form :deep(.ds-label) {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-3);
+    margin-bottom: 6px;
+    display: block;
+}
+.prefs-form :deep(.ds-select) {
+    width: 100%;
+    padding: 10px 12px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    transition: border-color 120ms, box-shadow 120ms;
+}
+.prefs-form :deep(.ds-select:focus) {
+    outline: none;
+    border-color: var(--ac);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ac) 18%, transparent);
 }
 .prefs-colors {
-  display: flex;
-  gap: var(--space-3);
+    display: flex;
+    gap: var(--s-3);
 }
 .prefs-color-swatch {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  border: 2px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--line);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+.prefs-form :deep(.ds-btn-primary) {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--paper);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background 120ms, transform 120ms;
+}
+.prefs-form :deep(.ds-btn-primary:hover) {
+    background: color-mix(in oklab, var(--ink) 90%, var(--ac));
+    transform: translateY(-1px);
+}
+.prefs-form :deep(.ds-btn-primary:disabled) {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
 }
 .prefs-preview {
-  margin-top: var(--space-6);
+    margin-top: var(--s-6);
 }
 .prefs-preview-title {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0 0 var(--space-4) 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--s-3) 0;
+    letter-spacing: -0.01em;
 }
 .prefs-preview-frame {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    background: var(--paper);
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
+
+@media (max-width: 640px) {
+    .prefs-container { padding: 0 var(--s-4); }
 }
 </style>

@@ -101,109 +101,120 @@ const actionIcon = computed(() => {
 .kic {
     display: flex;
     flex-direction: column;
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xs);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
     overflow: hidden;
-    transition: box-shadow var(--transition-fast), opacity var(--transition-fast);
+    position: relative;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    transition: box-shadow 160ms, opacity 160ms, transform 160ms;
 }
 .kic:hover {
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 6px 16px -8px color-mix(in oklab, var(--ink) 18%, transparent);
+    transform: translateY(-1px);
 }
 .kic-busy {
     opacity: 0.6;
     pointer-events: none;
 }
 
-.kic-taken {
-    border-left: 3px solid var(--color-text-muted);
+.kic::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--ink-3);
 }
-.kic-preparing {
-    border-left: 3px solid var(--color-warning);
-}
-.kic-ready {
-    border-left: 3px solid var(--color-accent);
-}
+.kic-taken::before { background: var(--ink-3); }
+.kic-preparing::before { background: var(--warn); }
+.kic-ready::before { background: var(--ok); }
 
 .kic-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-3);
-    border-bottom: 1px solid var(--color-border);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-2);
 }
 .kic-table {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
-    font-size: var(--text-xs);
+    gap: 6px;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
     font-weight: 600;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    color: var(--ink-2);
+    letter-spacing: 0.04em;
 }
+.kic-table i { font-size: 11px; }
 
 .kic-body {
-    padding: var(--space-3);
+    padding: 14px;
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: 10px;
 }
 .kic-dish {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: var(--space-2);
+    gap: var(--s-2);
 }
 .kic-name {
     font-weight: 600;
-    font-size: var(--text-base);
-    color: var(--color-text);
+    font-size: 15px;
+    color: var(--ink);
+    letter-spacing: -0.01em;
 }
 .kic-qty {
-    font-size: var(--text-sm);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 14px;
     font-weight: 700;
-    color: var(--color-text-muted);
+    color: var(--ac);
     flex-shrink: 0;
 }
 
 .kic-notes {
     display: flex;
     align-items: flex-start;
-    gap: var(--space-1);
-    font-size: var(--text-xs);
-    color: var(--color-text-secondary);
-    padding: var(--space-2);
-    background: var(--color-bg-subtle);
-    border-radius: var(--radius-sm);
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-2);
+    padding: 8px 10px;
+    background: var(--bg-2);
+    border-radius: var(--r-sm);
+    border: 1px solid var(--line);
     margin: 0;
+    line-height: 1.4;
 }
 .kic-notes i {
-    margin-top: 1px;
+    margin-top: 2px;
     flex-shrink: 0;
+    color: var(--ink-3);
 }
 
 .kic-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-2) var(--space-3);
-    border-top: 1px solid var(--color-border);
-    background: var(--color-bg-subtle);
+    padding: 10px 14px;
+    border-top: 1px solid var(--line);
+    background: var(--bg-2);
 }
 .kic-timer {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
+    gap: 4px;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    color: var(--ink-3);
+    letter-spacing: 0.03em;
 }
 
-/* Bottoni grandi per touch cucina */
-.kic-footer .ds-btn {
-    min-height: 36px;
-    padding: var(--space-2) var(--space-3);
+.kic-footer :deep(.ds-btn) {
+    min-height: 38px;
+    padding: 6px 14px;
 }
 </style>

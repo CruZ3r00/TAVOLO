@@ -84,68 +84,71 @@ const areaLabel = computed(() => {
 .otc {
     display: flex;
     flex-direction: column;
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xs);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
     overflow: hidden;
-    transition: box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+    transition: box-shadow 160ms, border-color 160ms, transform 160ms;
     position: relative;
+    font-family: var(--f-sans, 'Geist', sans-serif);
 }
-.otc-occupied {
-    cursor: pointer;
-}
+.otc-occupied { cursor: pointer; }
 .otc-occupied:hover {
-    box-shadow: var(--shadow-sm);
-    border-color: var(--color-border-hover);
-    transform: translateY(-1px);
+    box-shadow: 0 10px 24px -12px color-mix(in oklab, var(--ac) 40%, transparent);
+    border-color: color-mix(in oklab, var(--ac) 40%, var(--line));
+    transform: translateY(-2px);
 }
 .otc-free {
     cursor: default;
-    opacity: 0.85;
+    opacity: 0.92;
 }
 .otc:focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--ac);
     outline-offset: 2px;
 }
 
-.otc-occupied {
-    border-left: 3px solid var(--color-primary);
+.otc::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--ok);
 }
-.otc-free {
-    border-left: 3px solid var(--color-accent);
-}
+.otc-occupied::before { background: var(--ac); }
 
 .otc-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    padding: var(--space-3) var(--space-3) var(--space-2);
+    padding: var(--s-4) var(--s-4) var(--s-2);
 }
 
 .otc-number {
     display: flex;
     flex-direction: column;
+    gap: 2px;
 }
 .otc-number-label {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 10px;
+    color: var(--ink-3);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.12em;
     font-weight: 500;
 }
 .otc-number-value {
-    font-size: var(--text-2xl);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 32px;
     font-weight: 700;
-    color: var(--color-text);
-    letter-spacing: var(--tracking-tight);
+    color: var(--ink);
+    letter-spacing: -0.03em;
     line-height: 1;
 }
 
 .otc-badges {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--s-2);
 }
 
 .otc-ready-badge {
@@ -153,104 +156,97 @@ const areaLabel = computed(() => {
     align-items: center;
     gap: 4px;
     padding: 2px 8px;
-    background: var(--color-accent-light);
-    color: var(--color-accent);
+    background: color-mix(in oklab, var(--ok) 14%, var(--paper));
+    color: var(--ok);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
     font-size: 11px;
     font-weight: 700;
-    border-radius: var(--radius-full);
-    animation: pulse-ready 1.5s ease-in-out infinite;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--ok) 30%, transparent);
+    animation: pulse-ready 1.6s ease-in-out infinite;
 }
+.otc-ready-badge i { font-size: 10px; }
 
 @keyframes pulse-ready {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.72; transform: scale(1.05); }
 }
 
 .otc-status-dot {
     width: 10px;
     height: 10px;
-    border-radius: var(--radius-full);
+    border-radius: 999px;
 }
 .dot-occupied {
-    background: var(--color-primary);
+    background: var(--ac);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ac) 22%, transparent);
 }
 .dot-free {
-    background: var(--color-accent);
+    background: var(--ok);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--ok) 22%, transparent);
 }
 
 .otc-body {
-    padding: 0 var(--space-3) var(--space-3);
+    padding: 0 var(--s-4) var(--s-4);
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--s-3);
 }
 
 .otc-meta {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
+    gap: var(--s-3);
+    font-size: 12px;
+    color: var(--ink-3);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
 }
 .otc-seats {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
+}
+.otc-seats i { font-size: 13px; }
+.otc-area {
+    padding: 2px 8px;
+    background: var(--bg-2);
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 .otc-order-info {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-2);
-    background: var(--color-bg-subtle);
-    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    background: var(--bg-2);
+    border-radius: var(--r-sm);
+    border: 1px solid var(--line);
 }
 .otc-items-count {
-    font-size: var(--text-xs);
-    color: var(--color-text-secondary);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
+    color: var(--ink-2);
 }
 .otc-total {
-    font-size: var(--text-sm);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 15px;
     font-weight: 700;
-    color: var(--color-text);
+    color: var(--ink);
+    letter-spacing: -0.01em;
 }
 
 .otc-free-label {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
-    font-size: var(--text-xs);
-    color: var(--color-accent);
+    gap: 6px;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
+    color: var(--ink-3);
     font-weight: 500;
 }
-
-.otc-actions {
-    display: flex;
-    gap: var(--space-1);
-    padding: 0 var(--space-3) var(--space-2);
-}
-.otc-action-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: var(--color-bg-subtle);
-    color: var(--color-text-muted);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: var(--text-xs);
-    transition: all var(--transition-fast);
-}
-.otc-action-btn:hover {
-    background: var(--color-bg-muted);
-    color: var(--color-text);
-}
-.otc-action-danger:hover {
-    background: var(--color-destructive-light);
-    color: var(--color-destructive);
-}
+.otc-free-label i { font-size: 12px; }
 </style>

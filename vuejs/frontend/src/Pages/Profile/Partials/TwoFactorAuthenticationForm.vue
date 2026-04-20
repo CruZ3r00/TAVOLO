@@ -124,12 +124,15 @@ onMounted(loadStatus);
 </script>
 
 <template>
-    <div class="ds-card">
-        <div class="ds-card-header">
-            <i class="bi bi-shield-lock" style="color: var(--color-primary);"></i>
-            <h3 class="section-title">Autenticazione a due fattori</h3>
+    <div class="profile-section">
+        <div class="section-header">
+            <div class="section-icon"><i class="bi bi-shield-lock"></i></div>
+            <div>
+                <h3 class="section-title">Autenticazione a due fattori</h3>
+                <p class="section-description">Proteggi l'accesso al tuo account con un secondo fattore.</p>
+            </div>
         </div>
-        <div class="ds-card-body">
+        <div class="section-body">
             <Transition name="fade">
                 <div v-if="errorMsg" class="ds-alert ds-alert-error">
                     <i class="bi bi-exclamation-circle"></i><span>{{ errorMsg }}</span>
@@ -206,15 +209,172 @@ onMounted(loadStatus);
 </template>
 
 <style scoped>
-.section-title { font-size: var(--text-base); font-weight: 600; margin: 0; }
-.tfa-status { margin-bottom: var(--space-5); }
-.tfa-qr-section { margin-bottom: var(--space-5); }
-.tfa-instruction { font-size: var(--text-sm); color: var(--color-text-secondary); margin: 0 0 var(--space-4) 0; }
-.tfa-qr-wrapper { display: inline-flex; padding: var(--space-4); background: var(--color-bg-elevated); border: 1px solid var(--color-border); border-radius: var(--radius-lg); margin-bottom: var(--space-3); }
-.tfa-setup-key { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
-.setup-key-code { font-family: var(--font-mono); font-size: var(--text-sm); padding: var(--space-1) var(--space-2); background: var(--color-bg-subtle); border-radius: var(--radius-sm); }
-.recovery-section { margin: var(--space-4) 0; padding: var(--space-4); background: var(--color-bg-subtle); border-radius: var(--radius-md); }
-.recovery-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
-.recovery-list code { font-family: var(--font-mono); font-size: var(--text-sm); }
-.tfa-actions-row { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-5); }
+.profile-section {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    overflow: hidden;
+}
+.section-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: var(--s-5);
+    border-bottom: 1px solid var(--line);
+}
+.section-icon {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    background: color-mix(in oklab, var(--ac) 10%, var(--paper));
+    color: var(--ac);
+    border-radius: var(--r-sm);
+    font-size: 16px;
+    flex-shrink: 0;
+}
+.section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+}
+.section-description {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin: 0;
+    line-height: 1.5;
+}
+.section-body {
+    padding: var(--s-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+}
+.tfa-status { display: contents; }
+.tfa-qr-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    padding: var(--s-4);
+    background: var(--bg-2, color-mix(in oklab, var(--ink) 3%, var(--paper)));
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+}
+.tfa-instruction {
+    font-size: 13px;
+    color: var(--ink-2);
+    margin: 0;
+    line-height: 1.55;
+}
+.tfa-qr-wrapper {
+    display: inline-flex;
+    padding: var(--s-4);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    align-self: flex-start;
+}
+.tfa-setup-key {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.tfa-setup-key :deep(.ds-label) {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-3);
+    margin: 0;
+}
+.setup-key-code {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 13px;
+    padding: 3px 8px;
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    letter-spacing: 0.04em;
+}
+.recovery-section {
+    padding: var(--s-4);
+    background: color-mix(in oklab, var(--warn) 6%, var(--paper));
+    border: 1px solid color-mix(in oklab, var(--warn) 22%, var(--line));
+    border-radius: var(--r-md);
+}
+.recovery-section .tfa-instruction { margin-bottom: var(--s-3); }
+.recovery-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+.recovery-list code {
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
+    padding: 4px 8px;
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    display: block;
+    letter-spacing: 0.03em;
+}
+.tfa-actions-row {
+    display: flex;
+    gap: var(--s-3);
+    flex-wrap: wrap;
+    margin-top: var(--s-2);
+}
+.tfa-actions-row :deep(.ds-btn) {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background 120ms, transform 120ms;
+    border: 1px solid transparent;
+}
+.tfa-actions-row :deep(.ds-btn-primary) {
+    color: var(--paper);
+    background: var(--ink);
+    border-color: var(--ink);
+}
+.tfa-actions-row :deep(.ds-btn-primary:hover) {
+    background: color-mix(in oklab, var(--ink) 90%, var(--ac));
+    transform: translateY(-1px);
+}
+.tfa-actions-row :deep(.ds-btn-secondary) {
+    color: var(--ink-2);
+    background: var(--paper);
+    border-color: var(--line);
+}
+.tfa-actions-row :deep(.ds-btn-secondary:hover) {
+    background: color-mix(in oklab, var(--ink) 5%, var(--paper));
+    color: var(--ink);
+}
+.tfa-actions-row :deep(.ds-btn-danger) {
+    color: var(--paper);
+    background: var(--dan);
+    border-color: var(--dan);
+}
+.tfa-actions-row :deep(.ds-btn-danger:hover) {
+    background: color-mix(in oklab, var(--dan) 88%, var(--ink));
+    transform: translateY(-1px);
+}
+.tfa-actions-row :deep(.ds-btn:disabled) {
+    opacity: 0.55; cursor: not-allowed; transform: none;
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>

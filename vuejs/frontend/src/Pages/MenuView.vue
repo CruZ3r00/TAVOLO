@@ -149,54 +149,51 @@
 
 <style scoped>
 .menu-hero {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 60vh;
-  overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    min-height: 380px;
+    overflow: hidden;
 }
 .menu-hero-particles {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
 }
 .menu-hero-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.1);
-  z-index: 1;
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.22) 100%);
+    z-index: 1;
 }
 .menu-hero-content {
-  position: relative;
-  z-index: 2;
-  text-align: center;
-  color: #fff;
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    color: #fff;
+    padding: 0 var(--s-6, 24px);
 }
 .menu-hero-title {
-  font-size: var(--text-3xl);
-  font-weight: 800;
-  letter-spacing: var(--tracking-tight);
-  margin: 0 0 var(--space-3) 0;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: clamp(40px, 8vw, 72px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin: 0 0 var(--s-3, 12px) 0;
+    line-height: 1;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.25);
 }
 .menu-hero-subtitle {
-  font-size: var(--text-lg);
-  opacity: 0.9;
-  margin: 0;
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: clamp(15px, 2vw, 19px);
+    opacity: 0.92;
+    margin: 0;
+    font-weight: 400;
+    letter-spacing: -0.01em;
 }
 
 @media (max-width: 768px) {
-  .menu-hero {
-    height: 40vh;
-  }
-  .menu-hero-title {
-    font-size: var(--text-2xl);
-  }
+    .menu-hero { height: 45vh; min-height: 300px; }
 }
 </style>

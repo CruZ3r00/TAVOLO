@@ -93,13 +93,15 @@ const lineTotal = computed(() => {
 .oi-row {
     display: flex;
     flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-elevated);
-    transition: opacity var(--transition-fast);
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--paper);
+    transition: opacity 160ms, border-color 160ms;
+    font-family: var(--f-sans, 'Geist', sans-serif);
 }
+.oi-row:hover { border-color: color-mix(in oklab, var(--ink) 16%, var(--line)); }
 .oi-row-busy {
     opacity: 0.6;
     pointer-events: none;
@@ -109,48 +111,53 @@ const lineTotal = computed(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-2);
+    gap: 10px;
 }
 
 .oi-info {
     display: flex;
     align-items: baseline;
-    gap: var(--space-2);
+    gap: 10px;
     min-width: 0;
 }
 .oi-name {
     font-weight: 600;
-    font-size: var(--text-sm);
-    color: var(--color-text);
+    font-size: 14px;
+    color: var(--ink);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    letter-spacing: -0.01em;
 }
 .oi-price {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 12px;
+    color: var(--ink-3);
     flex-shrink: 0;
 }
 
 .oi-notes {
     display: flex;
     align-items: flex-start;
-    gap: var(--space-1);
-    font-size: var(--text-xs);
-    color: var(--color-text-secondary);
-    padding: var(--space-1) var(--space-2);
-    background: var(--color-bg-subtle);
-    border-radius: var(--radius-sm);
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-2);
+    padding: 6px 10px;
+    background: var(--bg-2);
+    border-radius: var(--r-sm);
+    border: 1px solid var(--line);
+    line-height: 1.4;
 }
 .oi-notes i {
-    margin-top: 1px;
+    margin-top: 2px;
     flex-shrink: 0;
+    color: var(--ink-3);
 }
 
 .oi-actions {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: 12px;
     flex-wrap: wrap;
 }
 
@@ -158,54 +165,59 @@ const lineTotal = computed(() => {
     display: inline-flex;
     align-items: center;
     gap: 0;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
     overflow: hidden;
+    background: var(--paper);
 }
 .oi-qty-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border: none;
-    background: var(--color-bg-subtle);
-    color: var(--color-text);
+    background: var(--bg-2);
+    color: var(--ink);
     cursor: pointer;
-    transition: background var(--transition-fast);
-    font-size: var(--text-md);
+    transition: background 120ms, color 120ms;
+    font-size: 14px;
 }
 .oi-qty-btn:hover:not(:disabled) {
-    background: var(--color-bg-muted);
+    background: color-mix(in oklab, var(--ac) 12%, var(--paper));
+    color: var(--ac);
 }
 .oi-qty-btn:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
 }
 .oi-qty {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 32px;
-    height: 32px;
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--color-text);
-    background: var(--color-bg-elevated);
+    min-width: 34px;
+    height: 30px;
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    background: var(--paper);
 }
 
 .oi-line-total {
-    font-size: var(--text-sm);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 14px;
     font-weight: 700;
-    color: var(--color-text);
+    color: var(--ink);
+    letter-spacing: -0.01em;
     margin-left: auto;
 }
 
 .oi-btns {
     display: flex;
-    gap: var(--space-1);
+    gap: 6px;
 }
 .oi-action-btn {
-    padding: var(--space-1) var(--space-2);
+    padding: 6px 10px;
 }
 </style>

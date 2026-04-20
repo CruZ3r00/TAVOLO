@@ -56,11 +56,12 @@
 
 <template>
     <AuthenticationCard>
-        <div class="auth-brand">
-            <div class="auth-brand-icon"><i class="bi bi-shield-lock"></i></div>
-            <span class="auth-brand-name">MenuCMS</span>
-        </div>
+        <router-link to="/" class="auth-brand">
+            <div class="auth-brand-icon" aria-hidden="true"><i class="bi bi-shield-lock"></i></div>
+            <span class="auth-brand-name">Tavolo</span>
+        </router-link>
 
+        <p class="auth-overline">2FA</p>
         <h1 class="auth-title">Verifica a due fattori</h1>
         <p class="auth-subtitle">
             <template v-if="!recovery">
@@ -118,34 +119,47 @@
 <style scoped>
 .auth-brand {
   display: flex; align-items: center; justify-content: center;
-  gap: var(--space-3); margin-bottom: var(--space-8);
+  gap: 10px; margin-bottom: var(--s-6); text-decoration: none;
 }
 .auth-brand-icon {
-  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
-  background: var(--color-primary); color: var(--color-text-inverse);
-  border-radius: var(--radius-lg); font-size: var(--text-xl);
+  width: 36px; height: 36px; display: grid; place-items: center;
+  background: var(--ink); color: var(--paper); border-radius: 10px;
+  font-size: 16px;
 }
 .auth-brand-name {
-  font-size: var(--text-xl); font-weight: 700;
-  color: var(--color-text); letter-spacing: var(--tracking-tight);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 18px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em;
+}
+.auth-overline {
+  font-family: var(--f-mono, 'Geist Mono', monospace);
+  font-size: 11px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.14em; color: var(--ink-3);
+  text-align: center; margin: 0 0 6px;
 }
 .auth-title {
-  font-size: var(--text-2xl); font-weight: 700; color: var(--color-text);
-  text-align: center; margin: 0 0 var(--space-2) 0;
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 26px; font-weight: 700; color: var(--ink);
+  text-align: center; margin: 0 0 6px 0; letter-spacing: -0.02em;
 }
 .auth-subtitle {
-  font-size: var(--text-sm); color: var(--color-text-muted);
-  text-align: center; margin: 0 0 var(--space-6) 0;
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 14px; color: var(--ink-3);
+  text-align: center; margin: 0 0 var(--s-5) 0;
 }
-.auth-form { display: flex; flex-direction: column; }
+.auth-form { display: flex; flex-direction: column; gap: var(--s-4); }
 .tfa-actions {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-4); margin-top: var(--s-2);
 }
 .toggle-link {
-  background: none; border: none; font-family: var(--font-family);
-  font-size: var(--text-sm); color: var(--color-primary);
-  cursor: pointer; text-decoration: underline; padding: 0;
-  transition: color var(--transition-fast);
+  background: none; border: none;
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 13px; color: var(--ac);
+  cursor: pointer; padding: 0;
+  transition: color 120ms;
 }
-.toggle-link:hover { color: var(--color-primary-hover); }
+.toggle-link:hover {
+  color: color-mix(in oklab, var(--ac) 80%, var(--ink));
+  text-decoration: underline;
+}
 </style>

@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls d:/programmazione/cms/cms_restaurant/strapi/config/plugins*)"
+      "Bash(ls d:/programmazione/cms/cms_restaurant/strapi/config/plugins*)",
+      "Read(//c/Users/filip/Downloads/**)",
+      "Bash(mkdir -p /tmp/cms-handoff)",
+      "Read(//tmp/**)",
+      "Bash(unzip -o \"c:/Users/filip/Downloads/cms-handoff.zip\")",
+      "Bash(cp *)",
+      "Bash(npm run *)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "code-review-graph"
+  ]
 }
