@@ -1,5 +1,4 @@
-# CMS Restaurant
-
+# TAVOLO
 Piattaforma modulare per la digitalizzazione operativa di un ristorante, costruita come monorepo e composta da:
 
 - un backend `Strapi v5` per dominio, API e logica applicativa;
@@ -338,11 +337,10 @@ cd cms_restaurant
 
 Il progetto nasce con `MySQL` come default applicativo. Per questo, per la prima installazione locale e meglio restare allineati a questa scelta.
 
-#### Opzione consigliata
+#### Opzioni consigliate
 
-1. Installa `MySQL Server 8`.
-2. Avvia il server locale.
-3. Crea database e utente dedicati.
+1. Lasciare strapi installare e settare il database in maniera automatica
+2. In alternativa installare npm install pg --save per avere il gestore postgres e utilizzare un provider di db PostgreSQL come supabase
 
 Esempio SQL:
 
@@ -358,9 +356,8 @@ FLUSH PRIVILEGES;
 
 #### Opzione alternativa
 
-Il backend supporta anche `Postgres` e `SQLite` tramite configurazione, ma:
+Il backend supporta anche `SQLite` tramite configurazione, ma:
 
-- `MySQL` resta la scelta piu coerente con la configurazione attuale della repo;
 - `SQLite` e utile solo per smoke test rapidi, non per simulare in modo credibile la concorrenza di prenotazioni e ordini;
 - il codice stesso scoraggia `SQLite` in produzione.
 
@@ -593,7 +590,7 @@ Verifica benchmark effettuata il `21 aprile 2026`. I prezzi pubblici variano in 
 
 ### Cosa suggerisce il benchmark
 
-- Il vostro prodotto non deve essere prezzato come un semplice website builder.
+- Il nostro prodotto non deve essere prezzato come un semplice website builder.
 - Allo stesso tempo, per il mercato italiano indipendente conviene evitare il modello a commissione/per-cover tipico delle piattaforme piu aggressive.
 - La posizione piu interessante e stare:
   - sopra il puro sito vetrina;
@@ -602,23 +599,24 @@ Verifica benchmark effettuata il `21 aprile 2026`. I prezzi pubblici variano in 
 
 ### Proposta concreta di abbonamento mensile
 
-#### Piano 1 - Start
+#### Piano 1 - Essenziale
 
 - **Prezzo suggerito**: `EUR 39/mese`
 - **Target**: piccoli ristoranti, pizzerie, bistrot, locali mono-sede che vogliono uscire da carta + WhatsApp + Excel
 - **Include**:
   - scheda ristorante e branding base;
-  - sito pubblico/microsito collegato;
+  - sito pubblico/microsito collegato se esistente;
   - menu digitale con immagini, categorie, allergeni;
-  - QR code;
-  - prenotazioni online;
+  - import OCR del menu;
+  - QR code se hanno un sito;
+  - prenotazioni online se hanno un sito o gestione delle prenotazioni;
   - gestione capienza estate/inverno;
   - dashboard base;
-  - supporto email.
+  - supporto via email.
 
 #### Piano 2 - Operativo
 
-- **Prezzo suggerito**: `EUR 89/mese`
+- **Prezzo suggerito**: `EUR 74/mese`
 - **Target**: ristoranti che vogliono un vero gestionale operativo unico
 - **Include tutto lo Start**, piu:
   - tavoli e occupazione sala;
@@ -627,59 +625,24 @@ Verifica benchmark effettuata il `21 aprile 2026`. I prezzi pubblici variano in 
   - walk-in e seating;
   - import OCR del menu;
   - gestione ingredienti non disponibili;
-  - analytics operative;
-  - supporto prioritario.
+  - analytics operative approfondite;
+  - supporto prioritario (mail ci arrivano con priorita piu alta).
 
 ### Costi una tantum consigliati
 
-- **Onboarding e setup iniziale**: `EUR 149 - 249`
+- **Creazione sito-vetrina/menu personalizzata full compatibile** (se richiesto dal ristoratore): `EUR 699 - 1499`
+  - utile per la creazione di un sito personalizzato completamente compatibile con il gestionale e le sue funzioni di entrambi gli abbonamenti
+- **Onboarding e setup iniziale** (se richiesto dal ristoratore): `EUR 149 - 449`
   - utile per coprire configurazione, import dati iniziale, training e posizionare il prodotto come servizio professionale e non commodity.
 
-### Servizio opzionale separato: creazione sito web personalizzato
+
+### Servizio opzionale separato: creazione gestionale personalizzato per ristoratori multi-sede 
 
 Questo va venduto separatamente dal SaaS, perche richiede lavoro creativo, copy, branding e cicli approvativi.
 
-#### Pacchetto Web Smart
-
-- **Prezzo suggerito**: `EUR 1.200 - 1.800` una tantum
-- **Adatto a**: ristorante singolo che vuole una presenza professionale e veloce
-- **Include**:
-  - home brandizzata;
-  - sezione menu collegata al gestionale;
-  - pagina contatti;
-  - integrazione prenotazioni;
-  - adattamento mobile;
-  - SEO base;
-  - analytics base.
-
-#### Pacchetto Web Premium
-
-- **Prezzo suggerito**: `EUR 2.500 - 4.500` una tantum
-- **Adatto a**: locali con forte identita, storytelling o bisogno commerciale piu alto
-- **Include**:
-  - design su misura;
-  - piu pagine;
-  - copywriting strutturato;
-  - galleria media;
-  - eventi/degustazioni;
-  - blog o news;
-  - SEO avanzata;
-  - tracciamenti marketing;
-  - eventuale multilingua iniziale.
-
-#### Manutenzione opzionale sito custom
-
-- **Prezzo suggerito**: `EUR 25 - 49/mese`
-- **Include**:
-  - piccole modifiche contenutistiche;
-  - aggiornamenti periodici;
-  - supporto tecnico leggero;
-  - monitoraggio uptime/form.
-
 ### Perche questa proposta ha senso
-
 - `EUR 39/mese` si colloca sopra il puro sito vetrina ma resta accessibile.
-- `EUR 89/mese` e ancora nettamente sotto molte suite verticali internazionali, ma valorizza la parte operativa reale del vostro prodotto.
+- `EUR 74/mese` e ancora nettamente sotto molte suite verticali internazionali, ma valorizza la parte operativa reale del vostro prodotto.
 - Il sito personalizzato separato evita di sottostimare il lavoro progettuale.
 - L'assenza di fee per cover puo diventare un vantaggio competitivo forte rispetto a modelli piu opachi o variabili [1][3].
 
