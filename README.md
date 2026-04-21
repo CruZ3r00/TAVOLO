@@ -633,7 +633,7 @@ Verifica benchmark effettuata il `21 aprile 2026`. I prezzi pubblici variano in 
 - **Creazione sito-vetrina/menu personalizzata full compatibile** (se richiesto dal ristoratore): `EUR 699 - 1499`
   - utile per la creazione di un sito personalizzato completamente compatibile con il gestionale e le sue funzioni di entrambi gli abbonamenti
 - **Onboarding e setup iniziale** (se richiesto dal ristoratore): `EUR 149 - 449`
-  - utile per coprire configurazione, import dati iniziale, training e posizionare il prodotto come servizio professionale e non commodity.
+  - utile per coprire configurazione, import dati iniziale, training e posizionare il prodotto come servizio professionale e non commodity e allineare il possibile sito menu del ristorante esistente per integrarsi al nostro gestionale.
 
 
 ### Servizio opzionale separato: creazione gestionale personalizzato per ristoratori multi-sede 
