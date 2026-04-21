@@ -270,7 +270,7 @@ onMounted(async () => {
           <div class="container hero-inner">
             <span class="eyebrow fade-up"><span class="dot-pulse"></span> In beta aperta per i ristoranti in Italia</span>
             <h1 class="hero-title fade-up d1">
-              Tutto il tuo ristorante, <em>su un tavolo solo</em>.
+              Tutto il tuo ristorante, su un <em>tavolo</em> solo.
             </h1>
             <p class="hero-lede fade-up d2">
               Tavolo è il gestionale che fa lavorare insieme sala, cucina e cassa.

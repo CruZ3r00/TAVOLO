@@ -83,7 +83,7 @@ export const fetchPublicMenu = async (userDocumentId) => {
 /**
  * URL base delle API Strapi
  */
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:1337';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 /**
  * Invia un file (PDF/immagine) al backend per estrazione OCR + strutturazione LLM.

@@ -7,6 +7,7 @@
     import InputError from '@/components/InputError.vue';
     import InputLabel from '@/components/InputLabel.vue';
     import TextInput from '@/components/TextInput.vue';
+    import { API_BASE } from '@/utils';
 
     useHead({
         title: 'Reset Password',
@@ -51,13 +52,16 @@
 
     const submit = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/password/update', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(form),
+            const response = fetch(`${API_BASE}/api/auth/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: form.code,
+                    password: form.password,
+                    passwordConfirmation: form.password_confirmation,
+                }),
             });
+
 
             if (!response.ok) {
             const data = await response.json();
@@ -94,8 +98,8 @@
 
         <form @submit.prevent="submit" class="auth-form">
             <div class="ds-field">
-                <InputLabel for="email" value="Email" />
-                <TextInput id="email" v-model="form.email" type="email" required autofocus autocomplete="username" placeholder="La tua email" />
+                <InputLabel for="email" value="codice OTP" />
+                <TextInput id="email" v-model="form.code" type="email" required autofocus autocomplete="username" placeholder="La tua email" />
             </div>
 
             <div class="ds-field">

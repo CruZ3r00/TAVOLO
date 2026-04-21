@@ -1,0 +1,2219 @@
+﻿<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- SEO base -->
+  <title>Al Grande — Osteria della Torriana | Ristorante Pizzeria a Serravalle a Po</title>
+  <meta name="description" content="Ristorante Al Grande - Osteria della Torriana: cucina tipica mantovana, menu di lavoro, 50+ pizze e ampio parcheggio gratuito in Via Mantovana 49/1, Torriana di Serravalle a Po (MN).">
+  <meta name="keywords" content="ristorante al grande, osteria della torriana, pizzeria serravalle a po, cucina mantovana, menu di lavoro mantova, pizza da asporto, via mantovana 49 serravalle a po">
+  <link rel="canonical" href="https://www.ristorantealgrande.it/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="restaurant">
+  <meta property="og:title" content="Al Grande — Osteria della Torriana">
+  <meta property="og:description" content="Cucina tipica mantovana, menu di lavoro, pizza tutte le sere e ampio parcheggio gratuito a Serravalle a Po.">
+  <meta property="og:image" content="https://www.ristorantealgrande.it/images/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="https://www.ristorantealgrande.it/">
+  <meta property="og:locale" content="it_IT">
+  <meta property="og:site_name" content="Al Grande Ristorante Pizzeria">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Al Grande — Osteria della Torriana">
+  <meta name="twitter:description" content="Cucina mantovana, menu di lavoro, pizza la sera e ampio parcheggio gratuito.">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <!-- GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+  <style>
+    /* =========================================
+       VARIABILI — Palette trattoria rustica
+       ========================================= */
+    :root {
+      --color-primary:    #C0392B;   /* rosso pomodoro */
+      --color-primary-rgb: 192, 57, 43;
+      --color-secondary:  #4A7C59;   /* verde basilico */
+      --color-accent:     #C0392B;   /* CTA = rosso */
+      --color-accent-rgb: 192, 57, 43;
+      --color-gold:       #C8A96E;   /* oro caldo per dettagli */
+      --color-bg:         #FAF7F0;   /* crema */
+      --color-bg-rgb:     250, 247, 240;
+      --color-bg-dark:    #1C1008;   /* marrone scuro */
+      --color-bg-section: #F2EDE3;   /* crema più scura per sezioni alternate */
+      --color-text:       #2C1810;   /* marrone testo */
+      --color-text-light: #7A6A5A;   /* testo secondario */
+      --color-surface:    rgba(255,255,255,0.88);
+      --color-border:     rgba(192,57,43,0.15);
+
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body:    'Inter', system-ui, sans-serif;
+
+      --text-xs:   0.75rem;
+      --text-sm:   0.875rem;
+      --text-base: 1rem;
+      --text-lg:   1.125rem;
+      --text-xl:   1.25rem;
+      --text-2xl:  1.5rem;
+      --text-3xl:  1.875rem;
+      --text-4xl:  2.25rem;
+      --text-5xl:  3rem;
+      --text-6xl:  4rem;
+
+      --space-2:  0.5rem;
+      --space-3:  0.75rem;
+      --space-4:  1rem;
+      --space-5:  1.25rem;
+      --space-6:  1.5rem;
+      --space-8:  2rem;
+      --space-10: 2.5rem;
+      --space-12: 3rem;
+      --space-16: 4rem;
+      --space-20: 5rem;
+      --space-24: 6rem;
+
+      --radius-sm:  6px;
+      --radius-md:  12px;
+      --radius-lg:  16px;
+      --radius-xl:  24px;
+      --radius-pill: 9999px;
+
+      --shadow-sm:  0 2px 8px rgba(0,0,0,0.06);
+      --shadow-md:  0 4px 24px rgba(0,0,0,0.10);
+      --shadow-lg:  0 8px 40px rgba(0,0,0,0.14);
+      --shadow-xl:  0 16px 60px rgba(0,0,0,0.20);
+
+      --transition-fast:   150ms ease-out;
+      --transition-base:   300ms ease-out;
+      --transition-slow:   500ms ease-out;
+    }
+
+    /* =========================================
+       RESET E BASE
+       ========================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    ul { list-style: none; }
+
+    /* Accessibilità — reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* =========================================
+       UTILITY
+       ========================================= */
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--space-6);
+    }
+
+    .section {
+      padding: var(--space-20) 0;
+    }
+
+    .section--dark {
+      background: var(--color-bg-dark);
+      color: #FAF7F0;
+    }
+
+    .section--alt {
+      background: var(--color-bg-section);
+    }
+
+    /* Etichette di sezione */
+    .section-label {
+      display: inline-block;
+      font-family: var(--font-body);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--color-secondary);
+      margin-bottom: var(--space-3);
+    }
+
+    .section--dark .section-label { color: var(--color-gold); }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(var(--text-3xl), 4vw, var(--text-5xl));
+      font-weight: 700;
+      line-height: 1.15;
+      color: var(--color-text);
+      margin-bottom: var(--space-4);
+    }
+
+    .section--dark .section-title { color: #FAF7F0; }
+
+    .section-subtitle {
+      font-size: var(--text-lg);
+      color: var(--color-text-light);
+      max-width: 560px;
+      line-height: 1.7;
+    }
+
+    .section--dark .section-subtitle { color: rgba(250,247,240,0.7); }
+
+    .section-header {
+      margin-bottom: var(--space-12);
+    }
+
+    .section-header--center {
+      text-align: center;
+    }
+
+    .section-header--center .section-subtitle {
+      margin: 0 auto;
+    }
+
+    /* Separatore decorativo */
+    .divider {
+      width: 60px;
+      height: 3px;
+      background: var(--color-primary);
+      margin: var(--space-4) 0;
+      border-radius: 2px;
+    }
+
+    .divider--center { margin: var(--space-4) auto; }
+    .section--dark .divider { background: var(--color-gold); }
+
+    /* =========================================
+       BOTTONI
+       ========================================= */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-8);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: var(--text-sm);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all var(--transition-base);
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.1);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(var(--color-accent-rgb), 0.35);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: #fff;
+      border-color: rgba(255,255,255,0.7);
+    }
+
+    .btn-outline:hover {
+      background: rgba(255,255,255,0.12);
+      border-color: #fff;
+      transform: translateY(-2px);
+    }
+
+    .btn-outline--dark {
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+    }
+
+    .btn-outline--dark:hover {
+      background: var(--color-primary);
+      color: #fff;
+      transform: translateY(-2px);
+    }
+
+    /* =========================================
+       NAVBAR
+       ========================================= */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      padding: var(--space-5) 0;
+      transition: all var(--transition-base);
+    }
+
+    .navbar.scrolled {
+      background: rgba(var(--color-bg-rgb), 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.10);
+      padding: var(--space-3) 0;
+    }
+
+    .navbar__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-8);
+    }
+
+    /* Logo */
+    .navbar__logo {
+      display: flex;
+      flex-direction: column;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .navbar__logo-main {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: #fff;
+      transition: color var(--transition-base);
+      letter-spacing: 0.02em;
+    }
+
+    .navbar__logo-sub {
+      font-family: var(--font-body);
+      font-size: var(--text-xs);
+      font-weight: 500;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+      transition: color var(--transition-base);
+    }
+
+    .navbar.scrolled .navbar__logo-main { color: var(--color-text); }
+    .navbar.scrolled .navbar__logo-sub  { color: var(--color-text-light); }
+
+    /* Nav links */
+    .navbar__nav {
+      display: flex;
+      align-items: center;
+      gap: var(--space-8);
+    }
+
+    .navbar__link {
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: rgba(255,255,255,0.85);
+      transition: color var(--transition-fast);
+      position: relative;
+      padding-bottom: 2px;
+    }
+
+    .navbar__link::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 100%;
+      height: 2px;
+      background: var(--color-gold);
+      transition: right var(--transition-base);
+    }
+
+    .navbar__link:hover { color: #fff; }
+    .navbar__link:hover::after { right: 0; }
+
+    .navbar.scrolled .navbar__link { color: var(--color-text-light); }
+    .navbar.scrolled .navbar__link:hover { color: var(--color-text); }
+
+    /* CTA prenota */
+    .navbar__cta {
+      padding: var(--space-2) var(--space-5);
+      font-size: var(--text-xs);
+    }
+
+    /* Hamburger */
+    .navbar__hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: var(--space-2);
+      background: none;
+      border: none;
+    }
+
+    .navbar__hamburger span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: #fff;
+      border-radius: 2px;
+      transition: all var(--transition-base);
+    }
+
+    .navbar.scrolled .navbar__hamburger span { background: var(--color-text); }
+
+    .navbar__hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .navbar__hamburger.open span:nth-child(2) { opacity: 0; }
+    .navbar__hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    /* Mobile menu overlay */
+    .mobile-menu {
+      position: fixed;
+      inset: 0;
+      background: rgba(var(--color-bg-rgb), 0.98);
+      backdrop-filter: blur(12px);
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-8);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--transition-base);
+    }
+
+    .mobile-menu.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .mobile-menu__link {
+      font-family: var(--font-display);
+      font-size: var(--text-3xl);
+      font-weight: 600;
+      color: var(--color-text);
+      transition: color var(--transition-fast);
+    }
+
+    .mobile-menu__link:hover { color: var(--color-primary); }
+
+    /* =========================================
+       HERO
+       ========================================= */
+    .hero {
+      position: relative;
+      height: 100dvh;
+      min-height: 600px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    /* Immagine di sfondo hero con parallax */
+    .hero__bg {
+      position: absolute;
+      inset: -20%;
+      background-image: url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1800&q=80');
+      background-size: cover;
+      background-position: center;
+    }
+
+    /* Overlay gradient scuro */
+    .hero__overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(28, 16, 8, 0.55) 0%,
+        rgba(28, 16, 8, 0.70) 50%,
+        rgba(28, 16, 8, 0.80) 100%
+      );
+    }
+
+    .hero__content {
+      position: relative;
+      z-index: 2;
+      max-width: 780px;
+      padding: 0 var(--space-6);
+    }
+
+    .hero__tag {
+      display: inline-block;
+      font-size: var(--text-xs);
+      font-weight: 600;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--color-gold);
+      margin-bottom: var(--space-5);
+      opacity: 0;
+    }
+
+    .hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(var(--text-4xl), 7vw, 5.5rem);
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.1;
+      margin-bottom: var(--space-5);
+      opacity: 0;
+    }
+
+    .hero__title em {
+      font-style: italic;
+      color: var(--color-gold);
+    }
+
+    .hero__subtitle {
+      font-size: clamp(var(--text-base), 2vw, var(--text-xl));
+      color: rgba(255,255,255,0.85);
+      margin-bottom: var(--space-10);
+      max-width: 560px;
+      margin-left: auto;
+      margin-right: auto;
+      opacity: 0;
+    }
+
+    .hero__cta {
+      display: flex;
+      gap: var(--space-4);
+      justify-content: center;
+      flex-wrap: wrap;
+      opacity: 0;
+    }
+
+    /* Scroll indicator */
+    .hero__scroll {
+      position: absolute;
+      bottom: var(--space-8);
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      color: rgba(255,255,255,0.5);
+      font-size: var(--text-xs);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      z-index: 2;
+      opacity: 0;
+    }
+
+    .hero__scroll-line {
+      width: 1px;
+      height: 40px;
+      background: linear-gradient(to bottom, rgba(255,255,255,0.5), transparent);
+      animation: scrollPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes scrollPulse {
+      0%, 100% { opacity: 0.3; transform: scaleY(0.8); }
+      50% { opacity: 1; transform: scaleY(1); }
+    }
+
+    /* =========================================
+       BANNER INFO — striscia sopra i contenuti
+       ========================================= */
+    .banner-info {
+      background: var(--color-primary);
+      color: #fff;
+      padding: var(--space-3) 0;
+      overflow: hidden;
+    }
+
+    .banner-info__inner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: var(--space-10);
+      flex-wrap: wrap;
+    }
+
+    .banner-info__item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .banner-info__icon {
+      font-size: 1.1em;
+    }
+
+    /* Open status badge */
+    .open-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 2px var(--space-3);
+      border-radius: var(--radius-pill);
+      background: rgba(255,255,255,0.2);
+      font-size: var(--text-xs);
+      font-weight: 600;
+    }
+
+    .open-badge__dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+
+    .open-badge--closed .open-badge__dot { background: #f87171; }
+
+    /* =========================================
+       CHI SIAMO
+       ========================================= */
+    .about {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-16);
+      align-items: center;
+    }
+
+    .about__image-wrap {
+      position: relative;
+    }
+
+    .about__image {
+      width: 100%;
+      aspect-ratio: 4/5;
+      object-fit: cover;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-xl);
+    }
+
+    /* Badge decorativo sull'immagine */
+    .about__badge {
+      position: absolute;
+      bottom: -var(--space-6);
+      right: -var(--space-6);
+      bottom: -1.5rem;
+      right: -1.5rem;
+      background: var(--color-primary);
+      color: #fff;
+      border-radius: var(--radius-xl);
+      padding: var(--space-5) var(--space-6);
+      text-align: center;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .about__badge-number {
+      display: block;
+      font-family: var(--font-display);
+      font-size: var(--text-4xl);
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .about__badge-label {
+      display: block;
+      font-size: var(--text-xs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.85;
+      margin-top: 4px;
+    }
+
+    .about__text p {
+      color: var(--color-text-light);
+      line-height: 1.8;
+      margin-bottom: var(--space-5);
+    }
+
+    .about__features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      margin-top: var(--space-8);
+    }
+
+    .about__feature {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+    }
+
+    .about__feature-icon {
+      font-size: 1.4rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .about__feature-label {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--color-text);
+      line-height: 1.3;
+    }
+
+    /* =========================================
+       MENU
+       ========================================= */
+    /* Filtri */
+    .menu-filters {
+      display: flex;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: var(--space-10);
+    }
+
+    .filter-btn {
+      padding: var(--space-2) var(--space-5);
+      border-radius: var(--radius-pill);
+      border: 2px solid var(--color-border);
+      background: transparent;
+      color: var(--color-text-light);
+      font-family: var(--font-body);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition-base);
+      white-space: nowrap;
+    }
+
+    .filter-btn:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .filter-btn.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: #fff;
+    }
+
+    /* Badge menu del giorno */
+    .menu-day-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-4);
+      background: linear-gradient(135deg, var(--color-secondary), #3a6347);
+      color: #fff;
+      border-radius: var(--radius-lg);
+      padding: var(--space-5) var(--space-8);
+      margin-bottom: var(--space-10);
+      flex-wrap: wrap;
+      text-align: center;
+    }
+
+    .menu-day-badge__icon { font-size: 2rem; }
+
+    .menu-day-badge__text strong {
+      display: block;
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .menu-day-badge__text span {
+      font-size: var(--text-sm);
+      opacity: 0.85;
+    }
+
+    .menu-day-badge__price {
+      font-family: var(--font-display);
+      font-size: var(--text-3xl);
+      font-weight: 700;
+      background: rgba(255,255,255,0.2);
+      padding: var(--space-3) var(--space-6);
+      border-radius: var(--radius-md);
+    }
+
+    /* Categorie menu */
+    .menu-category {
+      display: none;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .menu-category.visible { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .menu-category__title {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-bottom: var(--space-6);
+      padding-bottom: var(--space-3);
+      border-bottom: 2px solid var(--color-border);
+    }
+
+    .menu-category__icon { font-size: 1.4rem; }
+
+    /* Grid items */
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-4);
+      margin-bottom: var(--space-12);
+    }
+
+    .menu-item {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: var(--space-5) var(--space-6);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid rgba(0,0,0,0.04);
+      transition: all var(--transition-base);
+      position: relative;
+    }
+
+    .menu-item:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .menu-item__name {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 600;
+      color: var(--color-text);
+      margin-bottom: var(--space-2);
+      line-height: 1.3;
+    }
+
+    .menu-item__desc {
+      font-size: var(--text-sm);
+      color: var(--color-text-light);
+      line-height: 1.6;
+    }
+
+    /* =========================================
+       GALLERY STRIP
+       ========================================= */
+    .gallery-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: 200px 200px;
+      gap: var(--space-3);
+    }
+
+    .gallery-strip__item {
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+    }
+
+    .gallery-strip__item:first-child {
+      grid-row: span 2;
+    }
+
+    .gallery-strip__item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 500ms ease-out;
+    }
+
+    .gallery-strip__item:hover img { transform: scale(1.06); }
+
+    /* =========================================
+       SERVIZI
+       ========================================= */
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: var(--space-6);
+    }
+
+    .service-card {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(8px);
+      border-radius: var(--radius-lg);
+      padding: var(--space-8) var(--space-6);
+      text-align: center;
+      transition: all var(--transition-base);
+    }
+
+    .service-card:hover {
+      background: rgba(255,255,255,0.12);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .service-card__icon {
+      font-size: 2.5rem;
+      margin-bottom: var(--space-4);
+      display: block;
+    }
+
+    .service-card__title {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 600;
+      color: #FAF7F0;
+      margin-bottom: var(--space-2);
+    }
+
+    .service-card__desc {
+      font-size: var(--text-sm);
+      color: rgba(250,247,240,0.6);
+      line-height: 1.6;
+    }
+
+    /* =========================================
+       RECENSIONI
+       ========================================= */
+    .reviews-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-5);
+    }
+
+    .review-card {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid rgba(0,0,0,0.04);
+      transition: all var(--transition-base);
+      position: relative;
+    }
+
+    .review-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .review-card__quote {
+      font-size: 3rem;
+      line-height: 1;
+      color: var(--color-primary);
+      opacity: 0.2;
+      font-family: Georgia, serif;
+      margin-bottom: -var(--space-4);
+      margin-bottom: -1rem;
+    }
+
+    .review-card__stars {
+      display: flex;
+      gap: 3px;
+      margin-bottom: var(--space-3);
+    }
+
+    .star { color: #F59E0B; font-size: 1rem; }
+
+    .review-card__text {
+      font-size: var(--text-base);
+      color: var(--color-text);
+      line-height: 1.65;
+      font-style: italic;
+      margin-bottom: var(--space-4);
+    }
+
+    .review-card__author {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--color-text-light);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .review-card__author::before {
+      content: '';
+      display: block;
+      width: 20px;
+      height: 2px;
+      background: var(--color-primary);
+      border-radius: 1px;
+    }
+
+    .review-source {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: var(--space-8);
+      margin-top: var(--space-10);
+      flex-wrap: wrap;
+    }
+
+    .review-source__item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--color-text-light);
+    }
+
+    .review-source__score {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    /* =========================================
+       PRENOTAZIONE
+       ========================================= */
+    .reservation-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-16);
+      align-items: start;
+    }
+
+    .reservation-info__phone {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5) var(--space-6);
+      margin: var(--space-8) 0;
+      transition: all var(--transition-base);
+    }
+
+    .reservation-info__phone:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .reservation-info__phone-icon { font-size: 2rem; }
+
+    .reservation-info__phone-label {
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: rgba(250,247,240,0.6);
+    }
+
+    .reservation-info__phone-number {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: #FAF7F0;
+    }
+
+    /* Orari */
+    .hours-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .hours-table tr {
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      transition: background var(--transition-fast);
+    }
+
+    .hours-table tr.today {
+      background: rgba(192,57,43,0.2);
+      border-radius: var(--radius-sm);
+    }
+
+    .hours-table td {
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      color: rgba(250,247,240,0.75);
+    }
+
+    .hours-table td:first-child {
+      font-weight: 500;
+      color: #FAF7F0;
+    }
+
+    .hours-table td:last-child {
+      text-align: right;
+      color: var(--color-gold);
+    }
+
+    /* Form prenotazione */
+    .reservation-form {
+      background: #fff;
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      box-shadow: var(--shadow-xl);
+    }
+
+    .reservation-form__title {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--color-text);
+      margin-bottom: var(--space-6);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+    }
+
+    .form-group label {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: var(--space-3) var(--space-4);
+      border: 2px solid #e5e0d8;
+      border-radius: var(--radius-md);
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      color: var(--color-text);
+      background: #fff;
+      transition: border-color var(--transition-fast);
+      outline: none;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--color-primary);
+    }
+
+    .form-group textarea { resize: vertical; min-height: 80px; }
+
+    .form-group--full { grid-column: 1 / -1; }
+
+    .form-submit {
+      width: 100%;
+      justify-content: center;
+      padding: var(--space-4);
+      font-size: var(--text-base);
+    }
+
+    /* Success message */
+    .form-success {
+      display: none;
+      text-align: center;
+      padding: var(--space-8);
+    }
+
+    .form-success__icon { font-size: 3rem; margin-bottom: var(--space-4); }
+
+    .form-success__title {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: var(--color-secondary);
+      margin-bottom: var(--space-3);
+    }
+
+    .form-success__text { color: var(--color-text-light); }
+
+    /* =========================================
+       MAPPA placeholder
+       ========================================= */
+    .map-section {
+      background: var(--color-bg-section);
+    }
+
+    .map-wrap {
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      aspect-ratio: 16/6;
+      position: relative;
+    }
+
+    .map-placeholder {
+      width: 100%;
+      height: 100%;
+      background: #e8e0d0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+      color: var(--color-text-light);
+    }
+
+    .map-placeholder__icon { font-size: 3rem; }
+    .map-placeholder__text { font-size: var(--text-lg); font-weight: 500; }
+    .map-placeholder__sub { font-size: var(--text-sm); }
+
+    .map-info {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--space-6);
+      margin-top: var(--space-8);
+    }
+
+    .map-info__item {
+      display: flex;
+      gap: var(--space-3);
+      align-items: flex-start;
+    }
+
+    .map-info__icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+
+    .map-info__label {
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--color-text-light);
+      margin-bottom: 2px;
+    }
+
+    .map-info__value {
+      font-size: var(--text-base);
+      font-weight: 500;
+      color: var(--color-text);
+    }
+
+    /* =========================================
+       FOOTER
+       ========================================= */
+    .footer {
+      background: var(--color-bg-dark);
+      color: rgba(250,247,240,0.75);
+      padding: var(--space-16) 0 var(--space-8);
+    }
+
+    .footer__grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1.5fr;
+      gap: var(--space-10);
+      padding-bottom: var(--space-10);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: var(--space-8);
+    }
+
+    .footer__logo {
+      font-family: var(--font-display);
+      font-size: var(--text-3xl);
+      font-weight: 700;
+      color: #FAF7F0;
+      margin-bottom: var(--space-3);
+    }
+
+    .footer__claim {
+      font-size: var(--text-sm);
+      line-height: 1.7;
+      margin-bottom: var(--space-6);
+    }
+
+    .footer__social {
+      display: flex;
+      gap: var(--space-3);
+    }
+
+    .social-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      transition: all var(--transition-base);
+      cursor: pointer;
+    }
+
+    .social-btn:hover {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+    }
+
+    .footer__heading {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      font-weight: 600;
+      color: #FAF7F0;
+      margin-bottom: var(--space-5);
+    }
+
+    .footer__links {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .footer__link {
+      font-size: var(--text-sm);
+      transition: color var(--transition-fast);
+    }
+
+    .footer__link:hover { color: var(--color-gold); }
+
+    .footer__hours {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+    }
+
+    .footer__hours-item {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .footer__hours-day { color: rgba(250,247,240,0.6); }
+    .footer__hours-time { color: var(--color-gold); font-weight: 500; }
+
+    .footer__bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-4);
+      font-size: var(--text-xs);
+      color: rgba(250,247,240,0.4);
+    }
+
+    /* Linea decorativa footer */
+    .footer::before {
+      content: '';
+      display: block;
+      height: 3px;
+      background: linear-gradient(90deg, var(--color-primary), var(--color-gold), var(--color-secondary));
+    }
+
+    /* =========================================
+       RESPONSIVE — Tablet (max 900px)
+       ========================================= */
+    @media (max-width: 900px) {
+      .navbar__nav { display: none; }
+      .navbar__cta { display: none; }
+      .navbar__hamburger { display: flex; }
+
+      .about {
+        grid-template-columns: 1fr;
+        gap: var(--space-10);
+      }
+
+      .about__image { aspect-ratio: 16/9; }
+      .about__badge { bottom: -1rem; right: -0.5rem; }
+
+      .reservation-wrap {
+        grid-template-columns: 1fr;
+        gap: var(--space-10);
+      }
+
+      .footer__grid {
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-8);
+      }
+    }
+
+    /* =========================================
+       RESPONSIVE — Mobile (max 600px)
+       ========================================= */
+    @media (max-width: 600px) {
+      .section { padding: var(--space-12) 0; }
+      .container { padding: 0 var(--space-4); }
+
+      .hero__cta { flex-direction: column; align-items: center; }
+      .btn { width: 100%; justify-content: center; max-width: 280px; }
+
+      .gallery-strip {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
+      }
+
+      .gallery-strip__item:first-child { grid-row: span 1; }
+
+      .form-row { grid-template-columns: 1fr; }
+
+      .footer__grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-8);
+      }
+
+      .footer__bottom { flex-direction: column; text-align: center; }
+
+      .banner-info__inner {
+        flex-direction: column;
+        gap: var(--space-3);
+        text-align: center;
+      }
+
+      .about__features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =============================================
+       MOBILE MENU OVERLAY
+       ============================================= -->
+  <div class="mobile-menu" id="mobileMenu" role="dialog" aria-label="Menu navigazione">
+    <a class="mobile-menu__link" href="#chi-siamo" onclick="closeMobileMenu()">Chi Siamo</a>
+    <a class="mobile-menu__link" href="#menu" onclick="closeMobileMenu()">Menu</a>
+    <a class="mobile-menu__link" href="#servizi" onclick="closeMobileMenu()">Servizi</a>
+    <a class="mobile-menu__link" href="#recensioni" onclick="closeMobileMenu()">Recensioni</a>
+    <a class="mobile-menu__link" href="#prenota" onclick="closeMobileMenu()">Prenota</a>
+    <a class="mobile-menu__link" href="#contatti" onclick="closeMobileMenu()">Contatti</a>
+  </div>
+
+  <!-- =============================================
+       NAVBAR
+       ============================================= -->
+  <header class="navbar" id="navbar">
+    <div class="container">
+      <nav class="navbar__inner">
+        <a href="#top" class="navbar__logo" aria-label="Al Grande - Home">
+          <span class="navbar__logo-main">Al Grande</span>
+          <span class="navbar__logo-sub">Ristorante Pizzeria</span>
+        </a>
+
+        <ul class="navbar__nav">
+          <li><a href="#chi-siamo" class="navbar__link">Chi Siamo</a></li>
+          <li><a href="#menu" class="navbar__link">Menu</a></li>
+          <li><a href="#servizi" class="navbar__link">Servizi</a></li>
+          <li><a href="#recensioni" class="navbar__link">Recensioni</a></li>
+          <li><a href="#contatti" class="navbar__link">Contatti</a></li>
+        </ul>
+
+        <a href="#prenota" class="btn btn-primary navbar__cta">Prenota Ora</a>
+
+        <button class="navbar__hamburger" id="hamburger" aria-label="Apri menu" aria-expanded="false">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- =============================================
+       HERO
+       ============================================= -->
+  <section class="hero" id="top" aria-label="Hero - Al Grande Ristorante Pizzeria">
+    <div class="hero__bg" id="heroBg" role="img" aria-label="Interno caldo del ristorante Al Grande con tavoli apparecchiati"></div>
+    <div class="hero__overlay hero-overlay"></div>
+
+    <div class="hero__content">
+      <p class="hero__tag">Osteria della Torriana · Torriana di Serravalle a Po (MN)</p>
+      <h1 class="hero__title hero-title">
+        Al <em>Grande</em>
+      </h1>
+      <p class="hero__subtitle hero-subtitle">
+        Cucina tipica mantovana, menu di lavoro, pizze tutte le sere e ospitalita autentica nel cuore della Bassa
+      </p>
+      <div class="hero__cta hero-cta">
+        <a href="#menu" class="btn btn-primary">Scopri il Menu</a>
+        <a href="#prenota" class="btn btn-outline">Prenota Ora</a>
+      </div>
+    </div>
+
+    <div class="hero__scroll">
+      <span>Scorri</span>
+      <div class="hero__scroll-line"></div>
+    </div>
+  </section>
+
+  <!-- =============================================
+       BANNER INFO (orari + stato apertura)
+       ============================================= -->
+  <div class="banner-info">
+    <div class="container">
+      <div class="banner-info__inner">
+        <div class="banner-info__item">
+          <span class="banner-info__icon">🕐</span>
+          <span>Mar–Ven 06:00–23:30 · Sab 07:00–23:30 · Dom 08:00–23:30</span>
+        </div>
+        <div class="banner-info__item">
+          <span class="banner-info__icon">📞</span>
+          <a href="tel:+390386671141">0386 671141</a>
+        </div>
+        <div class="banner-info__item">
+          <div class="open-badge" id="openBadge">
+            <span class="open-badge__dot"></span>
+            <span id="openText">Verifica orario...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- =============================================
+       CHI SIAMO
+       ============================================= -->
+  <section class="section" id="chi-siamo" aria-labelledby="about-title">
+    <div class="container">
+      <div class="about">
+
+        <!-- Immagine -->
+        <div class="about__image-wrap animate-in">
+          <img
+            src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=700&q=80"
+            alt="Interno accogliente del ristorante Al Grande con tavoli in legno"
+            class="about__image"
+            loading="lazy"
+            width="700"
+            height="875"
+          >
+          <div class="about__badge">
+            <span class="about__badge-number">574</span>
+            <span class="about__badge-label">Recensioni<br>Google</span>
+          </div>
+        </div>
+
+        <!-- Testo -->
+        <div class="about__text animate-in">
+          <span class="section-label">Chi siamo</span>
+          <h2 class="section-title" id="about-title">Tradizione mantovana,<br>accoglienza vera</h2>
+          <div class="divider"></div>
+          <p>
+            Al Grande, conosciuto anche come Osteria della Torriana, e un punto di riferimento a Torriana di Serravalle a Po per chi cerca cucina casalinga, sapori mantovani e un ambiente semplice e accogliente.
+          </p>
+          <p>
+            Dalla mattina presto fino a sera inoltrata accogliamo lavoratori, famiglie, gruppi e viaggiatori di passaggio con menu di lavoro, sala privata, servizio al banco e tavoli dove fermarsi con calma.
+          </p>
+          <p>
+            La cucina tipica mantovana convive con una pizzeria ricca di proposte, aperta tutte le sere, e con servizi pratici come ampio parcheggio, Wi-Fi gratuito, accessibilita completa e doccia per camionisti.
+          </p>
+
+          <div class="about__features">
+            <div class="about__feature">
+              <span class="about__feature-icon">🍝</span>
+              <span class="about__feature-label">Cucina tipica mantovana</span>
+            </div>
+            <div class="about__feature">
+              <span class="about__feature-icon">🍕</span>
+              <span class="about__feature-label">Pizzeria aperta tutte le sere</span>
+            </div>
+            <div class="about__feature">
+              <span class="about__feature-icon">💼</span>
+              <span class="about__feature-label">Menu di lavoro pranzo e cena</span>
+            </div>
+            <div class="about__feature">
+              <span class="about__feature-icon">🚗</span>
+              <span class="about__feature-label">Parcheggio ampio e gratuito</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================
+       MENU
+       ============================================= -->
+  <section class="section section--alt" id="menu" aria-labelledby="menu-title">
+    <div class="container">
+
+      <div class="section-header section-header--center animate-in">
+        <span class="section-label">La nostra cucina</span>
+        <h2 class="section-title" id="menu-title">Il Menu</h2>
+        <div class="divider divider--center"></div>
+        <p class="section-subtitle">Piatti veri della tradizione, pizza, bar e proposte della casa raccontate dai dati reali del locale</p>
+      </div>
+
+      <div class="menu-day-badge animate-in">
+        <span class="menu-day-badge__icon">☀️</span>
+        <div class="menu-day-badge__text">
+          <strong>Menu di Lavoro</strong>
+          <span>Dal lunedi al venerdi a pranzo e cena, con ampia scelta di primi e secondi</span>
+        </div>
+        <div class="menu-day-badge__price">12 – 15 €</div>
+      </div>
+
+      <div class="menu-filters" role="tablist" aria-label="Categorie menu">
+        <button class="filter-btn active" data-filter="all" role="tab" aria-selected="true">Tutto</button>
+        <button class="filter-btn" data-filter="antipasti" role="tab" aria-selected="false">🥗 Antipasti</button>
+        <button class="filter-btn" data-filter="primi" role="tab" aria-selected="false">🍝 Primi</button>
+        <button class="filter-btn" data-filter="secondi" role="tab" aria-selected="false">🥩 Secondi</button>
+        <button class="filter-btn" data-filter="contorni" role="tab" aria-selected="false">🥔 Contorni</button>
+        <button class="filter-btn" data-filter="pizze" role="tab" aria-selected="false">🍕 Pizze</button>
+        <button class="filter-btn" data-filter="dolci" role="tab" aria-selected="false">🍰 Dolci</button>
+        <button class="filter-btn" data-filter="bevande" role="tab" aria-selected="false">🍷 Bevande</button>
+      </div>
+
+      <div class="menu-category visible" data-category="antipasti" id="cat-antipasti">
+        <h3 class="menu-category__title"><span class="menu-category__icon">🥗</span> Antipasti</h3>
+        <div class="menu-grid">
+          <div class="menu-item"><h4 class="menu-item__name">Antipasto formaggi e mostarda</h4><p class="menu-item__desc">Formaggi selezionati serviti con mostarda nostrana, tra i piatti piu apprezzati</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Ravioli</h4><p class="menu-item__desc">Piatto in evidenza nelle foto del locale, preparato in stile trattoria</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Tagliata rucola e grana</h4><p class="menu-item__desc">Carne servita con rucola fresca e scaglie di grana</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Carpaccio</h4><p class="menu-item__desc">Presente sia tra i piatti della cucina sia tra le pizze speciali</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Cappuccino e bar del mattino</h4><p class="menu-item__desc">Il locale apre presto anche con servizio bar e tabacchi</p></div>
+        </div>
+      </div>
+
+      <div class="menu-category visible" data-category="primi" id="cat-primi">
+        <h3 class="menu-category__title"><span class="menu-category__icon">🍝</span> Primi Piatti</h3>
+        <div class="menu-grid">
+          <div class="menu-item"><h4 class="menu-item__name">Tortelloni di zucca burro e salvia</h4><p class="menu-item__desc">Uno dei signature dish della casa e della tradizione mantovana</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Maccheroni allo stracotto d'asino</h4><p class="menu-item__desc">Piatto tipico sostanzioso e molto citato nelle recensioni</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Tagliatelle con la psina piccione</h4><p class="menu-item__desc">Pasta della casa con uno dei condimenti caratteristici presenti nel menu</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Risotto con boccaloni fritti</h4><p class="menu-item__desc">Specialita segnalata nelle foto del locale</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Pennette all'arrabbiata</h4><p class="menu-item__desc">Una proposta semplice e sempre presente tra i primi della casa</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Ridotto con il pescegatto</h4><p class="menu-item__desc">Piatto particolare del territorio, riportato nelle foto Google Maps</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Menu del giorno</h4><p class="menu-item__desc">A pranzo e cena feriale con almeno sei o sette primi tra cui scegliere</p></div>
+        </div>
+      </div>
+
+      <div class="menu-category visible" data-category="secondi" id="cat-secondi">
+        <h3 class="menu-category__title"><span class="menu-category__icon">🥩</span> Secondi Piatti</h3>
+        <div class="menu-grid">
+          <div class="menu-item"><h4 class="menu-item__name">Stracotto d'asino con polenta</h4><p class="menu-item__desc">Tra i secondi piu ricordati dai clienti per gusto e porzioni</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">La vera cotoletta</h4><p class="menu-item__desc">Secondo sostanzioso e casalingo, protagonista tra i piatti in evidenza</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Bistecca di manzo</h4><p class="menu-item__desc">Cottura alla griglia in stile trattoria</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Fiorentina</h4><p class="menu-item__desc">Taglio importante per chi cerca una cena di carne generosa</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Carpaccio</h4><p class="menu-item__desc">Servito con una presentazione semplice e curata</p></div>
+        </div>
+      </div>
+
+      <div class="menu-category visible" data-category="contorni" id="cat-contorni">
+        <h3 class="menu-category__title"><span class="menu-category__icon">🥔</span> Contorni</h3>
+        <div class="menu-grid">
+          <div class="menu-item"><h4 class="menu-item__name">Verdure grigliate</h4><p class="menu-item__desc">Contorno reale presente nelle foto dei piatti</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Tagliata rucola e grana</h4><p class="menu-item__desc">Proposta ricorrente tra piatto unico e accompagnamento</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Polenta</h4><p class="menu-item__desc">L'abbinamento naturale con lo stracotto d'asino</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Patatine fritte</h4><p class="menu-item__desc">Sempre comode per tavolate, famiglie e pasti veloci</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Insalata mista</h4><p class="menu-item__desc">Contorno semplice per accompagnare carne e pizze</p></div>
+        </div>
+      </div>
+
+      <div class="menu-category visible" data-category="pizze" id="cat-pizze">
+        <h3 class="menu-category__title"><span class="menu-category__icon">🍕</span> Pizze</h3>
+        <p style="font-size:var(--text-sm);color:var(--color-text-light);margin-bottom:var(--space-6);font-style:italic;">Oltre 50 proposte di pizza: classiche, speciali e da asporto, con pizzeria aperta tutte le sere</p>
+        <div class="menu-grid">
+          <div class="menu-item"><h4 class="menu-item__name">Margherita</h4><p class="menu-item__desc">Pomodoro e mozzarella</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Prosciutto e funghi</h4><p class="menu-item__desc">Pomodoro, mozzarella, prosciutto e funghi</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Capricciosa</h4><p class="menu-item__desc">Pomodoro, mozzarella, prosciutto cotto, funghi, carciofi, olive, capperi e acciughe</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Quattro Stagioni</h4><p class="menu-item__desc">Pomodoro, mozzarella, prosciutto cotto, funghi, carciofi, olive miste e salsiccia</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Boscaiola</h4><p class="menu-item__desc">Pomodoro, mozzarella, speck, funghi e grana</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Carletto</h4><p class="menu-item__desc">Pomodoro, mozzarella, pancetta, gorgonzola e grana, tutto in forno</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Carpaccio</h4><p class="menu-item__desc">Pomodoro, mozzarella, carne cruda, rucola e grana a scaglie</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Calzone Maruzze</h4><p class="menu-item__desc">Pomodoro, mozzarella, ricotta, prosciutto e melanzane</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Sole</h4><p class="menu-item__desc">Pomodoro, mozzarella, uovo, asparagi e grana</p></div>
+          <div class="menu-item" style="border-color: var(--color-primary); border-width: 2px;"><h4 class="menu-item__name">50+ pizze a menu</h4><p class="menu-item__desc">Classiche, speciali, bianche, rosse e da asporto con supplementi chiari e prezzi popolari</p></div>
+        </div>
+      </div>
+
+      <div class="menu-category visible" data-category="dolci" id="cat-dolci">
+        <h3 class="menu-category__title"><span class="menu-category__icon">🍰</span> Dolci</h3>
+        <div class="menu-grid">
+          <div class="menu-item"><h4 class="menu-item__name">Dolce salame</h4><p class="menu-item__desc">Dessert presente tra le foto del locale</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Mela cigno</h4><p class="menu-item__desc">Dolce artistico che racconta il lato piu creativo della cucina</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Ottimi dessert</h4><p class="menu-item__desc">Uno dei punti messi in evidenza tra i servizi del locale</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Dolci del giorno</h4><p class="menu-item__desc">Proposte che seguono la disponibilita della cucina</p></div>
+        </div>
+      </div>
+
+      <div class="menu-category visible" data-category="bevande" id="cat-bevande">
+        <h3 class="menu-category__title"><span class="menu-category__icon">🍷</span> Bevande</h3>
+        <div class="menu-grid">
+          <div class="menu-item"><h4 class="menu-item__name">Caffe</h4><p class="menu-item__desc">Tra i punti forti del locale insieme al servizio bar del mattino</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Vino</h4><p class="menu-item__desc">Disponibili proposte per accompagnare cucina tipica e pizza</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Birra</h4><p class="menu-item__desc">Per tavolate, pizza e pasti veloci</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Cocktail e superalcolici</h4><p class="menu-item__desc">Il locale serve anche aperitivi e bevande alcoliche</p></div>
+          <div class="menu-item"><h4 class="menu-item__name">Bar e tabacchi</h4><p class="menu-item__desc">Servizio aggiuntivo utile per chi si ferma presto o e di passaggio</p></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =============================================
+       GALLERY STRIP
+       ============================================= -->
+  <section class="section" aria-label="Galleria fotografica">
+    <div class="container">
+      <div class="section-header section-header--center animate-in">
+        <span class="section-label">La nostra cucina</span>
+        <h2 class="section-title">Con gli occhi si mangia prima</h2>
+        <div class="divider divider--center"></div>
+      </div>
+
+      <div class="gallery-strip animate-in">
+        <div class="gallery-strip__item">
+          <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&q=80"
+               alt="Pizza autentica al ristorante Al Grande" loading="lazy" width="600" height="800">
+        </div>
+        <div class="gallery-strip__item">
+          <img src="https://images.unsplash.com/photo-1551183053-bf91798d765f?w=600&q=80"
+               alt="Tagliatelle al ragù fatte in casa" loading="lazy" width="600" height="400">
+        </div>
+        <div class="gallery-strip__item">
+          <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80"
+               alt="Antipasto misto della casa" loading="lazy" width="600" height="400">
+        </div>
+        <div class="gallery-strip__item">
+          <img src="https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80"
+               alt="Grigliata mista di carne" loading="lazy" width="600" height="400">
+        </div>
+        <div class="gallery-strip__item">
+          <img src="https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=600&q=80"
+               alt="Tiramisù della casa" loading="lazy" width="600" height="400">
+        </div>
+        <div class="gallery-strip__item">
+          <img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80"
+               alt="Sala ristorante accogliente" loading="lazy" width="600" height="400">
+        </div>
+        <div class="gallery-strip__item">
+          <img src="https://images.unsplash.com/photo-1498579150354-977475b7ea0b?w=600&q=80"
+               alt="Pizza con ingredienti freschi" loading="lazy" width="600" height="400">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================
+       SERVIZI
+       ============================================= -->
+  <section class="section section--dark" id="servizi" aria-labelledby="services-title">
+    <div class="container">
+      <div class="section-header section-header--center animate-in">
+        <span class="section-label">Perche sceglierci</span>
+        <h2 class="section-title" id="services-title">I Nostri Servizi</h2>
+        <div class="divider divider--center"></div>
+        <p class="section-subtitle">Servizi concreti per chi cerca una trattoria vera, comoda e accogliente</p>
+      </div>
+
+      <div class="services-grid">
+        <div class="service-card animate-in"><span class="service-card__icon">🚗</span><h3 class="service-card__title">Ampio Parcheggio</h3><p class="service-card__desc">Parcheggio gratuito, molti posti auto e sosta comoda anche per chi arriva da fuori o e di passaggio.</p></div>
+        <div class="service-card animate-in"><span class="service-card__icon">🚿</span><h3 class="service-card__title">Doccia per Camionisti</h3><p class="service-card__desc">Un servizio raro e molto apprezzato da chi lavora su strada e ha bisogno di una sosta utile oltre che buona.</p></div>
+        <div class="service-card animate-in"><span class="service-card__icon">💼</span><h3 class="service-card__title">Pranzo di Lavoro</h3><p class="service-card__desc">Menu di lavoro da 12 a 15 euro, disponibile dal lunedi al venerdi a pranzo e cena.</p></div>
+        <div class="service-card animate-in"><span class="service-card__icon">🎉</span><h3 class="service-card__title">Eventi e Cerimonie</h3><p class="service-card__desc">Prenotazioni accettate per feste, cerimonie, pranzi aziendali e cene di gruppo con sala privata.</p></div>
+        <div class="service-card animate-in"><span class="service-card__icon">🍕</span><h3 class="service-card__title">Pizze e Asporto</h3><p class="service-card__desc">Pizzeria aperta tutte le sere con oltre cinquanta varieta e possibilita di asporto.</p></div>
+        <div class="service-card animate-in"><span class="service-card__icon">♿</span><h3 class="service-card__title">Accessibile a Tutti</h3><p class="service-card__desc">Ingresso, bagno, tavoli e parcheggio accessibili in sedia a rotelle, con cani ammessi e Wi-Fi gratuito.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================
+       RECENSIONI
+       ============================================= -->
+  <section class="section section--alt" id="recensioni" aria-labelledby="reviews-title">
+    <div class="container">
+      <div class="section-header section-header--center animate-in">
+        <span class="section-label">Cosa dicono di noi</span>
+        <h2 class="section-title" id="reviews-title">Le Recensioni</h2>
+        <div class="divider divider--center"></div>
+        <p class="section-subtitle">Le recensioni reali parlano di pizza ben farcita, piatti abbondanti e personale cordiale</p>
+      </div>
+
+      <div class="reviews-grid">
+        <article class="review-card animate-in" aria-label="Recensione di Elisabetta Mazzarotto"><div class="review-card__quote">"</div><div class="review-card__stars" aria-label="5 stelle su 5"><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span></div><p class="review-card__text">Pizza ben cotta e farcita, non troppo sottile ne troppo spessa, e anche i primi molto buoni.</p><div class="review-card__author">Elisabetta Mazzarotto — Google</div></article>
+        <article class="review-card animate-in" aria-label="Recensione di Vivana Trezzi"><div class="review-card__quote">"</div><div class="review-card__stars" aria-label="5 stelle su 5"><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span></div><p class="review-card__text">Tortelloni di zucca molto buoni, stracotto d'asino con polenta ottimo, porzioni abbondanti e cani ben accetti.</p><div class="review-card__author">Vivana Trezzi — Google</div></article>
+        <article class="review-card animate-in" aria-label="Recensione di Pierpaolo Laera"><div class="review-card__quote">"</div><div class="review-card__stars" aria-label="4 stelle su 5"><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">☆</span></div><p class="review-card__text">Trattoria accogliente e caratteristica, con menu del giorno ampio, buono e personale gentile e disponibile.</p><div class="review-card__author">Pierpaolo Laera — Google</div></article>
+        <article class="review-card animate-in" aria-label="Sintesi sulle recensioni della pizza"><div class="review-card__quote">"</div><div class="review-card__stars" aria-label="4 stelle su 5"><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">☆</span></div><p class="review-card__text">Tra le parole piu ricorrenti nelle recensioni spiccano pizza, parcheggio, ambiente cordiale e cucina casalinga.</p><div class="review-card__author">Sintesi recensioni — Google</div></article>
+        <article class="review-card animate-in" aria-label="Sintesi sul menu di lavoro"><div class="review-card__quote">"</div><div class="review-card__stars" aria-label="4 stelle su 5"><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">☆</span></div><p class="review-card__text">Il menu del giorno viene segnalato come ampio e conveniente, con almeno sei o sette primi e altrettanti secondi.</p><div class="review-card__author">Sintesi recensioni — Clienti abituali</div></article>
+        <article class="review-card animate-in" aria-label="Sintesi su servizi e atmosfera"><div class="review-card__quote">"</div><div class="review-card__stars" aria-label="4 stelle su 5"><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">☆</span></div><p class="review-card__text">Grande parcheggio, atmosfera tranquilla, personale attento e servizi utili anche per chi viaggia o lavora su strada.</p><div class="review-card__author">Sintesi recensioni — Locale di passaggio e famiglie</div></article>
+      </div>
+
+      <div class="review-source animate-in">
+        <div class="review-source__item"><span style="font-size:1.5rem">🌐</span><div><div class="review-source__score">4.0 / 5</div><div style="font-size:var(--text-xs);color:var(--color-text-light)">Google Reviews</div></div></div>
+        <div style="width:1px;height:40px;background:var(--color-border)"></div>
+        <div class="review-source__item"><span style="font-size:1.5rem">🍴</span><div><div class="review-source__score">10–20 €</div><div style="font-size:var(--text-xs);color:var(--color-text-light)">Fascia di prezzo</div></div></div>
+        <div style="width:1px;height:40px;background:var(--color-border)"></div>
+        <div class="review-source__item"><span style="font-size:1.5rem">💬</span><div><div class="review-source__score">574</div><div style="font-size:var(--text-xs);color:var(--color-text-light)">Recensioni Google</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================
+       PRENOTAZIONE + ORARI
+       ============================================= -->
+  <section class="section section--dark" id="prenota" aria-labelledby="reservation-title">
+    <div class="container">
+      <div class="reservation-wrap">
+
+        <div class="reservation-info animate-in">
+          <span class="section-label">Vieni a trovarci</span>
+          <h2 class="section-title" id="reservation-title">Prenota il<br>tuo tavolo</h2>
+          <div class="divider"></div>
+          <p class="section-subtitle">Compila il modulo oppure chiamaci direttamente per tavoli, gruppi, cerimonie e cene aziendali.</p>
+
+          <a href="tel:+390386671141" class="reservation-info__phone">
+            <span class="reservation-info__phone-icon">📞</span>
+            <div>
+              <div class="reservation-info__phone-label">Chiamaci</div>
+              <div class="reservation-info__phone-number">0386 671141</div>
+            </div>
+          </a>
+
+          <table class="hours-table" aria-label="Orari di apertura">
+            <tbody id="hoursTable">
+              <tr><td>Lunedì</td><td>Chiuso</td></tr>
+              <tr><td>Martedì</td><td>06:00–23:30</td></tr>
+              <tr><td>Mercoledì</td><td>06:00–23:30</td></tr>
+              <tr><td>Giovedì</td><td>06:00–23:30</td></tr>
+              <tr><td>Venerdì</td><td>06:00–23:30</td></tr>
+              <tr><td>Sabato</td><td>07:00–23:30</td></tr>
+              <tr><td>Domenica</td><td>08:00–23:30</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="animate-in">
+          <form class="reservation-form" id="reservationForm" novalidate aria-labelledby="form-title">
+            <h3 class="reservation-form__title" id="form-title">Scegli data e orario</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="res-name">Nome e Cognome *</label>
+                <input type="text" id="res-name" name="name" required autocomplete="name" placeholder="Mario Rossi">
+              </div>
+              <div class="form-group">
+                <label for="res-phone">Telefono *</label>
+                <input type="tel" id="res-phone" name="phone" required autocomplete="tel" placeholder="+39 333 0000000">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="res-date">Data *</label>
+                <input type="date" id="res-date" name="date" required>
+              </div>
+              <div class="form-group">
+                <label for="res-time">Orario *</label>
+                <select id="res-time" name="time" required>
+                  <option value="">Seleziona orario</option>
+                  <optgroup label="Pranzo">
+                    <option value="12:00">12:00</option>
+                    <option value="12:30">12:30</option>
+                    <option value="13:00">13:00</option>
+                    <option value="13:30">13:30</option>
+                    <option value="14:00">14:00</option>
+                  </optgroup>
+                  <optgroup label="Cena">
+                    <option value="19:00">19:00</option>
+                    <option value="19:30">19:30</option>
+                    <option value="20:00">20:00</option>
+                    <option value="20:30">20:30</option>
+                    <option value="21:00">21:00</option>
+                    <option value="21:30">21:30</option>
+                    <option value="22:00">22:00</option>
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="res-guests">Numero coperti *</label>
+              <select id="res-guests" name="guests" required>
+                <option value="1">1 persona</option>
+                <option value="2" selected>2 persone</option>
+                <option value="3">3 persone</option>
+                <option value="4">4 persone</option>
+                <option value="5">5 persone</option>
+                <option value="6">6 persone</option>
+                <option value="7">7 persone</option>
+                <option value="8">8 persone</option>
+                <option value="10+">10+ persone (contattaci)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="res-notes">Note o richieste speciali</label>
+              <textarea id="res-notes" name="notes" rows="3" placeholder="Allergie, occasioni speciali, richieste particolari..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary form-submit">
+              ✓ &nbsp; Conferma Prenotazione
+            </button>
+          </form>
+          <div class="reservation-form form-success" id="formSuccess" style="display:none;">
+            <div class="form-success__icon">✅</div>
+            <h3 class="form-success__title">Prenotazione ricevuta!</h3>
+            <p class="form-success__text">Ti ricontatteremo al numero indicato per confermare il tavolo. A presto da Al Grande!</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================
+       MAPPA + CONTATTI
+       ============================================= -->
+  <section class="section map-section" id="contatti" aria-labelledby="contacts-title">
+    <div class="container">
+      <div class="section-header section-header--center animate-in">
+        <span class="section-label">Dove siamo</span>
+        <h2 class="section-title" id="contacts-title">Contatti e Mappa</h2>
+        <div class="divider divider--center"></div>
+      </div>
+      <div class="map-wrap animate-in">
+        <iframe title="Mappa Ristorante Al Grande" src="https://maps.google.com/maps?q=45.0666514,11.0827336&z=15&output=embed" width="100%" height="420" style="border:0;border-radius:24px;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+      <div class="map-info animate-in">
+        <div class="map-info__item"><span class="map-info__icon">📍</span><div><div class="map-info__label">Indirizzo</div><div class="map-info__value">Via Mantovana, 49/1<br>46030 Torriana di Serravalle a Po (MN)</div></div></div>
+        <div class="map-info__item"><span class="map-info__icon">📞</span><div><div class="map-info__label">Telefono</div><div class="map-info__value"><a href="tel:+390386671141" style="color:inherit">0386 671141</a></div></div></div>
+        <div class="map-info__item"><span class="map-info__icon">🕐</span><div><div class="map-info__label">Orari</div><div class="map-info__value">Lunedì chiuso<br>Mar–Ven 06:00–23:30 · Sab 07:00–23:30 · Dom 08:00–23:30</div></div></div>
+        <div class="map-info__item"><span class="map-info__icon">👥</span><div><div class="map-info__label">Facebook</div><div class="map-info__value"><a href="https://www.facebook.com/OSTERIADELLATORRIANA" style="color:inherit" target="_blank" rel="noopener noreferrer">facebook.com/OSTERIADELLATORRIANA</a></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =============================================
+       FOOTER
+       ============================================= -->
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer__grid">
+        <div>
+          <div class="footer__logo">Al Grande</div>
+          <p class="footer__claim">Osteria della Torriana: cucina tipica mantovana, menu di lavoro, pizza la sera e atmosfera familiare nel cuore della Bassa.</p>
+          <div class="footer__social">
+            <a href="https://www.facebook.com/OSTERIADELLATORRIANA" class="social-btn" aria-label="Pagina Facebook Al Grande" target="_blank" rel="noopener noreferrer">f</a>
+            <a href="tel:+390386671141" class="social-btn" aria-label="Chiama Al Grande">tel</a>
+            <a href="https://maps.google.com/?q=45.0666514,11.0827336" class="social-btn" aria-label="Apri la mappa di Al Grande" target="_blank" rel="noopener noreferrer">map</a>
+          </div>
+        </div>
+        <div>
+          <h4 class="footer__heading">Menu</h4>
+          <ul class="footer__links">
+            <li><a href="#chi-siamo" class="footer__link">Chi Siamo</a></li>
+            <li><a href="#menu" class="footer__link">Il Menu</a></li>
+            <li><a href="#servizi" class="footer__link">Servizi</a></li>
+            <li><a href="#recensioni" class="footer__link">Recensioni</a></li>
+            <li><a href="#prenota" class="footer__link">Prenota Tavolo</a></li>
+            <li><a href="#contatti" class="footer__link">Contatti</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="footer__heading">Orari</h4>
+          <div class="footer__hours">
+            <div class="footer__hours-item"><span class="footer__hours-day">Lunedì</span><span class="footer__hours-time">Chiuso</span></div>
+            <div class="footer__hours-item"><span class="footer__hours-day">Mar – Ven</span><span class="footer__hours-time">06:00 – 23:30</span></div>
+            <div class="footer__hours-item"><span class="footer__hours-day">Sab – Dom</span><span class="footer__hours-time">07:00/08:00 – 23:30</span></div>
+          </div>
+        </div>
+        <div>
+          <h4 class="footer__heading">Contatti</h4>
+          <ul class="footer__links">
+            <li><a href="tel:+390386671141" class="footer__link">📞 0386 671141</a></li>
+            <li><a href="https://www.facebook.com/OSTERIADELLATORRIANA" class="footer__link" target="_blank" rel="noopener noreferrer">👥 Facebook Osteria della Torriana</a></li>
+            <li class="footer__link">📍 Via Mantovana, 49/1, 46030 Torriana di Serravalle a Po (MN)</li>
+            <li style="margin-top: var(--space-4)"><a href="#prenota" class="btn btn-primary" style="font-size:var(--text-xs);padding:var(--space-2) var(--space-5)">Prenota Ora</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer__bottom">
+        <span>© <span id="footerYear"></span> Al Grande — Ristorante Pizzeria. Tutti i diritti riservati.</span>
+        <span>Via Mantovana, 49/1 · Torriana di Serravalle a Po (MN) · <a href="https://maps.google.com/?q=45.0666514,11.0827336" style="color:inherit;" target="_blank" rel="noopener noreferrer">Apri in Google Maps</a></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- =============================================
+       SCHEMA.ORG — Restaurant markup
+       ============================================= -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    "name": "Ristorante AL GRANDE",
+    "alternateName": "Osteria della Torriana - Pizzeria e Cucina Tipica Mantovana",
+    "description": "Ristorante, trattoria e pizzeria con cucina tipica mantovana, menu di lavoro, pizza la sera e ampio parcheggio gratuito a Torriana di Serravalle a Po.",
+    "url": "https://www.ristorantealgrande.it",
+    "telephone": "+390386671141",
+    "image": ["https://www.ristorantealgrande.it/images/og-image.jpg"],
+    "priceRange": "10-20 EUR",
+    "servesCuisine": ["Italiana", "Pizzeria", "Cucina mantovana"],
+    "menu": "https://www.ristorantealgrande.it/#menu",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Via Mantovana, 49/1",
+      "addressLocality": "Torriana di Serravalle a Po",
+      "addressRegion": "MN",
+      "postalCode": "46030",
+      "addressCountry": "IT"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 45.0666514,
+      "longitude": 11.0827336
+    },
+    "openingHoursSpecification": [
+      {"@type": "OpeningHoursSpecification", "dayOfWeek": ["Tuesday", "Wednesday", "Thursday", "Friday"], "opens": "06:00", "closes": "23:30"},
+      {"@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "07:00", "closes": "23:30"},
+      {"@type": "OpeningHoursSpecification", "dayOfWeek": "Sunday", "opens": "08:00", "closes": "23:30"}
+    ],
+    "sameAs": ["https://www.facebook.com/OSTERIADELLATORRIANA"],
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.0",
+      "reviewCount": "574",
+      "bestRating": "5"
+    }
+  }
+  </script>
+
+  <!-- =============================================
+       JAVASCRIPT
+       ============================================= -->
+  <script>
+    // -----------------------------------------------
+    // Registrazione GSAP plugins
+    // -----------------------------------------------
+    gsap.registerPlugin(ScrollTrigger);
+    gsap.defaults({ ease: "power2.out", duration: 0.6 });
+
+    // Controlla prefers-reduced-motion
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // -----------------------------------------------
+    // Navbar: cambia stile allo scroll
+    // -----------------------------------------------
+    const navbar = document.getElementById("navbar");
+
+    ScrollTrigger.create({
+      start: "top -80",
+      onEnter:     () => navbar.classList.add("scrolled"),
+      onLeaveBack: () => navbar.classList.remove("scrolled")
+    });
+
+    // -----------------------------------------------
+    // Hamburger / Mobile menu
+    // -----------------------------------------------
+    const hamburger   = document.getElementById("hamburger");
+    const mobileMenu  = document.getElementById("mobileMenu");
+
+    hamburger.addEventListener("click", () => {
+      const isOpen = mobileMenu.classList.toggle("open");
+      hamburger.classList.toggle("open", isOpen);
+      hamburger.setAttribute("aria-expanded", isOpen);
+      document.body.style.overflow = isOpen ? "hidden" : "";
+    });
+
+    function closeMobileMenu() {
+      mobileMenu.classList.remove("open");
+      hamburger.classList.remove("open");
+      hamburger.setAttribute("aria-expanded", "false");
+      document.body.style.overflow = "";
+    }
+
+    // Chiudi menu toccando lo sfondo
+    mobileMenu.addEventListener("click", e => {
+      if (e.target === mobileMenu) closeMobileMenu();
+    });
+
+    // -----------------------------------------------
+    // Animazioni GSAP — solo se reduced motion non attivo
+    // -----------------------------------------------
+    if (!prefersReduced) {
+
+      // --- Hero: sequenza di entrata ---
+      const heroTl = gsap.timeline({ delay: 0.3 });
+      heroTl
+        .from(".hero-overlay",   { opacity: 0, duration: 1.2 })
+        .from(".hero__tag",      { opacity: 0, y: 20, duration: 0.7 }, "-=0.6")
+        .from(".hero-title",     { opacity: 0, y: 60, duration: 0.8 }, "-=0.4")
+        .from(".hero-subtitle",  { opacity: 0, y: 30, duration: 0.6 }, "-=0.4")
+        .from(".hero-cta",       { opacity: 0, y: 20, duration: 0.5 }, "-=0.3")
+        .from(".hero__scroll",   { opacity: 0, duration: 0.5 }, "-=0.2");
+
+      // --- Parallax hero bg ---
+      gsap.to("#heroBg", {
+        scrollTrigger: {
+          trigger: ".hero",
+          start: "top top",
+          end:   "bottom top",
+          scrub: true
+        },
+        y: "25%",
+        ease: "none"
+      });
+
+      // --- Elementi on-scroll (stagger su gruppi) ---
+      document.querySelectorAll(".animate-in").forEach(el => {
+        gsap.from(el, {
+          scrollTrigger: {
+            trigger: el,
+            start: "top 88%",
+            toggleActions: "play none none none"
+          },
+          opacity: 0,
+          y: 40,
+          duration: 0.65
+        });
+      });
+
+    } else {
+      // Se reduced motion: rendi tutto visibile subito
+      document.querySelectorAll(".hero__tag,.hero-title,.hero-subtitle,.hero-cta,.hero__scroll,.animate-in").forEach(el => {
+        el.style.opacity = "1";
+      });
+    }
+
+    // -----------------------------------------------
+    // Menu: filtri per categoria
+    // -----------------------------------------------
+    const filterBtns   = document.querySelectorAll(".filter-btn");
+    const menuCategories = document.querySelectorAll(".menu-category");
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        // Aggiorna stato bottoni
+        filterBtns.forEach(b => {
+          b.classList.remove("active");
+          b.setAttribute("aria-selected", "false");
+        });
+        btn.classList.add("active");
+        btn.setAttribute("aria-selected", "true");
+
+        const filter = btn.dataset.filter;
+
+        // Mostra/nascondi categorie
+        menuCategories.forEach(cat => {
+          const show = filter === "all" || cat.dataset.category === filter;
+          cat.classList.toggle("visible", show);
+        });
+      });
+    });
+
+    // -----------------------------------------------
+    // Stato apertura dinamico
+    // -----------------------------------------------
+    function checkOpenStatus() {
+      const now  = new Date();
+      const h    = now.getHours() + now.getMinutes() / 60;
+      // Aperto pranzo 11:30–14:30 e cena 18:30–23:00
+      const isOpen = (h >= 11.5 && h < 14.5) || (h >= 18.5 && h < 23);
+
+      const badge  = document.getElementById("openBadge");
+      const text   = document.getElementById("openText");
+
+      if (isOpen) {
+        text.textContent  = "Aperto ora";
+        badge.classList.remove("open-badge--closed");
+      } else {
+        text.textContent  = "Attualmente chiusi";
+        badge.classList.add("open-badge--closed");
+      }
+    }
+
+    checkOpenStatus();
+    setInterval(checkOpenStatus, 60000); // Aggiorna ogni minuto
+
+    // -----------------------------------------------
+    // Orari: evidenzia il giorno corrente
+    // -----------------------------------------------
+    (function highlightToday() {
+      const dayNames = ["Domenica","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato"];
+      const today    = dayNames[new Date().getDay()];
+      const rows     = document.querySelectorAll("#hoursTable tr");
+      rows.forEach(row => {
+        if (row.cells[0] && row.cells[0].textContent.trim() === today) {
+          row.classList.add("today");
+          row.setAttribute("aria-current", "date");
+        }
+      });
+    })();
+
+    // -----------------------------------------------
+    // Anno copyright dinamico
+    // -----------------------------------------------
+    document.getElementById("footerYear").textContent = new Date().getFullYear();
+
+    // -----------------------------------------------
+    // Data minima nel form prenotazione = oggi
+    // -----------------------------------------------
+    const dateInput = document.getElementById("res-date");
+    if (dateInput) {
+      const today = new Date().toISOString().split("T")[0];
+      dateInput.min = today;
+      dateInput.value = today;
+    }
+
+    // -----------------------------------------------
+    // Form prenotazione: validazione e submit
+    // -----------------------------------------------
+    const reservationForm = document.getElementById("reservationForm");
+    const formSuccess     = document.getElementById("formSuccess");
+
+    if (reservationForm) {
+      reservationForm.addEventListener("submit", e => {
+        e.preventDefault();
+
+        // Validazione base
+        const requiredFields = reservationForm.querySelectorAll("[required]");
+        let valid = true;
+
+        requiredFields.forEach(field => {
+          if (!field.value.trim()) {
+            field.style.borderColor = "#E53E3E";
+            valid = false;
+            field.addEventListener("input", () => {
+              field.style.borderColor = "";
+            }, { once: true });
+          }
+        });
+
+        if (!valid) return;
+
+        // Simula invio (qui si integrerebbe con backend reale)
+        reservationForm.style.display    = "none";
+        formSuccess.style.display        = "block";
+
+        // Scroll al form success
+        formSuccess.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+
+    // -----------------------------------------------
+    // Smooth scroll per tutti i link ancora interni
+    // -----------------------------------------------
+    document.querySelectorAll('a[href^="#"]').forEach(link => {
+      link.addEventListener("click", e => {
+        const target = document.querySelector(link.getAttribute("href"));
+        if (target) {
+          e.preventDefault();
+          const navbarH = navbar.offsetHeight;
+          const top     = target.getBoundingClientRect().top + window.scrollY - navbarH - 16;
+          window.scrollTo({ top, behavior: "smooth" });
+        }
+      });
+    });
+
+  </script>
+
+</body>
+</html>
+
+
+
+
+
+

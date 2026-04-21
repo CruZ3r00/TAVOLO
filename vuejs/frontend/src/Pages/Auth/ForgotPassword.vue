@@ -7,6 +7,7 @@ import InputError from '@/components/InputError.vue';
 import InputLabel from '@/components/InputLabel.vue';
 import TextInput from '@/components/TextInput.vue';
 import { ref } from 'vue';
+import { API_BASE } from '@/utils';
 
 const errorMessage = ref('');
 const successMessage = ref('');
@@ -45,16 +46,12 @@ const submit = handleSubmit(async () => {
   errorMessage.value = '';
   successMessage.value = '';
   try {
-    const response = await fetch('http://localhost:8000/forgotten_password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: values.username,
-        email: values.email,
-      }),
-    });
+    const response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: values.email }),
+        });
+
 
     if (!response.ok) {
       const data = await response.json();
@@ -97,11 +94,6 @@ const submit = handleSubmit(async () => {
     </Transition>
 
     <form @submit.prevent="submit" class="auth-form">
-      <div class="ds-field">
-        <InputLabel for="username" value="Username" />
-        <TextInput id="username" v-model="values.username" type="text" required autofocus autocomplete="username" placeholder="Il tuo username" />
-        <InputError :message="errors.username" />
-      </div>
 
       <div class="ds-field">
         <InputLabel for="email" value="Email" />
