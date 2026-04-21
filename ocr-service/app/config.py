@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     OLLAMA_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "qwen2.5:7b"
     OLLAMA_TIMEOUT_SECONDS: int = 120
+    LLM_ENRICH_TIMEOUT_SECONDS: int = 45
 
     OCR_LANG: str = "it"
     PADDLE_USE_GPU: bool = False

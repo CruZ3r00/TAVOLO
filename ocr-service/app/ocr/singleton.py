@@ -14,6 +14,24 @@ _instance: Any = None
 _lock = threading.Lock()
 
 
+def _cuda_available() -> tuple[bool, str]:
+    """Verifica disponibilita' CUDA lato Paddle (se importabile)."""
+
+    try:
+        import paddle  # type: ignore
+    except Exception as exc:  # pragma: no cover - dipende dall'ambiente runtime
+        return False, f"paddle import error: {exc}"
+
+    try:
+        available = bool(paddle.device.is_compiled_with_cuda())
+    except Exception as exc:  # pragma: no cover - difensivo
+        return False, f"cuda probe error: {exc}"
+
+    if available:
+        return True, "compiled_with_cuda=true"
+    return False, "compiled_with_cuda=false"
+
+
 def init_paddle_singleton() -> Any:
     """Inizializza l'istanza PaddleOCR se non esiste. Thread-safe."""
 
@@ -26,20 +44,57 @@ def init_paddle_singleton() -> Any:
             return _instance
 
         settings = get_settings()
-        logger.info(
-            "PaddleOCR init",
-            extra={"lang": settings.OCR_LANG, "use_gpu": settings.PADDLE_USE_GPU},
-        )
+        requested_gpu = bool(settings.PADDLE_USE_GPU)
+        use_gpu = requested_gpu
+        effective_device = "cpu"
+        fallback_reason = ""
 
         from paddleocr import PaddleOCR  # import tardivo: evita costo al parse
 
-        _instance = PaddleOCR(
-            lang=settings.OCR_LANG,
-            use_angle_cls=True,
-            use_gpu=settings.PADDLE_USE_GPU,
-            show_log=False,
+        if requested_gpu:
+            cuda_ok, reason = _cuda_available()
+            if not cuda_ok:
+                use_gpu = False
+                fallback_reason = reason
+                logger.warning(
+                    "PaddleOCR GPU richiesto ma non disponibile: fallback CPU",
+                    extra={"fallback_reason": reason},
+                )
+
+        if use_gpu:
+            try:
+                _instance = PaddleOCR(
+                    lang=settings.OCR_LANG,
+                    use_angle_cls=True,
+                    use_gpu=True,
+                    show_log=False,
+                )
+                effective_device = "gpu"
+            except Exception as exc:
+                fallback_reason = f"gpu init error: {exc}"
+                logger.warning(
+                    "PaddleOCR init GPU fallita: fallback CPU",
+                    extra={"fallback_reason": fallback_reason},
+                )
+
+        if _instance is None:
+            _instance = PaddleOCR(
+                lang=settings.OCR_LANG,
+                use_angle_cls=True,
+                use_gpu=False,
+                show_log=False,
+            )
+            effective_device = "cpu"
+
+        logger.info(
+            "PaddleOCR pronto",
+            extra={
+                "lang": settings.OCR_LANG,
+                "requested_gpu": requested_gpu,
+                "effective_device": effective_device,
+                "fallback_reason": fallback_reason or None,
+            },
         )
-        logger.info("PaddleOCR pronto")
         return _instance
 
 

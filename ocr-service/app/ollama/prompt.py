@@ -4,72 +4,106 @@ from __future__ import annotations
 
 from app.models.requests import RestaurantContext
 
-EXTRACTION_PROMPT: str = """Sei un assistente che riceve il testo OCR estratto da un menu di ristorante (italiano).
-Il testo e' grezzo, puo' contenere errori OCR e marker speciali.
+EXTRACTION_PROMPT: str = """Sei un sistema di estrazione strutturata per menu di ristorante.
 
-MARKER SPECIALI:
-- "[IMMAGINEPIATTO coords=top_right:(X,Y) bottom_left:(X,Y)]" indica la posizione di una foto del piatto.
-  Associa l'immagine al piatto descritto vicino.
+Ricevi testo OCR rumoroso proveniente da un menu (spesso disposto su più colonne).
+Il testo può contenere errori OCR, righe spezzate e elementi vicini ma NON correlati.
 
-ISTRUZIONI:
-1. Identifica OGNI piatto/bevanda presente nel testo. Estrai TUTTI gli elementi, non fermarti al primo.
-   Un menu tipico contiene 10-50 voci: se ne estrai solo 1-2 hai sbagliato.
-2. Per ciascuno restituisci: name, price, category, ingredients, allergens, image_coords (se disponibile).
-3. Categorie suggerite: Antipasti, Primi, Secondi, Pizze classiche, Pizze bianche, Pizze rosse,
-   Primi di pesce, Secondi di pesce, Contorni, Dessert, Bevande. Usa il titolo della sezione del menu se diverso.
-4. price: numero in euro (es. 7.50). null se non presente. Non inventare.
-5. ingredients: array di stringhe con gli ingredienti elencati esplicitamente. [] se non presenti.
-6. allergens: array con allergeni (glutine, lattosio, uova, frutta a guscio, pesce, crostacei, soia, sesamo,
-   solfiti, sedano, senape, arachidi, molluschi, lupino). Deducili dagli ingredienti se ovvi, altrimenti [].
-7. Rispondi SOLO con JSON valido conforme allo schema indicato. Nessun testo aggiuntivo.
+OBIETTIVO:
+Estrarre ogni voce del menu come elemento separato, senza errori di fusione.
 
-ESEMPIO (input → output atteso):
+REGOLE CRITICHE (OBBLIGATORIE):
 
-Input OCR:
+1. UNA VOCE = UN ELEMENTO
+- Ogni piatto deve essere un elemento separato.
+- NON unire mai due nomi consecutivi.
+- Esempio SBAGLIATO: "CRUDO MANTOVANA VIENNESE"
+- Esempio CORRETTO: 3 elementi separati
+
+2. ASSOCIAZIONE PREZZO
+- Il prezzo appartiene SOLO alla voce sulla stessa riga o immediatamente accanto.
+- Se non sei sicuro → usa null.
+- NON indovinare mai il prezzo.
+
+3. INGREDIENTI
+- Usa SOLO ingredienti presenti esplicitamente nel testo.
+- NON inventare ingredienti.
+- Se non presenti → []
+
+4. ALLERGENI
+- Derivali SOLO da ingredienti certi.
+- Se non sicuro → []
+- NON inventare.
+
+5. CATEGORIA
+- Usa categoria solo se chiaramente deducibile (es. titolo sezione).
+- Se non chiara → "Altro"
+
+6. STRUTTURA MENU (IMPORTANTISSIMO)
+- Il testo può essere su più colonne.
+- NON collegare righe verticalmente.
+- Ogni riga è indipendente.
+- NON combinare elementi di colonne diverse.
+
+7. ERRORI OCR
+- Correggi errori evidenti (es. "CPOLLA" → "cipolla")
+- NON modificare il significato
+
+8. OUTPUT
+- SOLO JSON valido
+- NESSUN testo extra
+- NESSUN markdown
+- DEVE iniziare con { e finire con }
+
+9. RICONOSCIMENTO STRUTTURA (FONDAMENTALE)
+
+Ogni voce del menu segue questo pattern:
+
+- Riga 1: NOME + PREZZO (es. "MARGHERITA € 4,00")
+- Riga 2 (opzionale): ingredienti tra parentesi
+
+REGOLE:
+
+- Una nuova voce INIZIA SOLO quando trovi un prezzo (€ o numero con virgola)
+- Le righe SENZA prezzo appartengono alla voce precedente (ingredienti)
+- NON creare voci da righe senza prezzo
+- NON usare ingredienti come nomi
+
+ESEMPIO:
+
+Input:
+MARGHERITA € 4,00
+(pomodoro, mozzarella)
+
+Output:
+→ UNA voce
+
+10. VALIDAZIONE NOMI
+
+- Il nome di un piatto NON può essere:
+  "pomodoro", "mozzarella", "cipolla", ecc.
+
+Se una riga contiene solo ingredienti → NON è un piatto.
 ---
-ANTIPASTI
-Bruschetta al pomodoro 5.00
-pomodoro, aglio, basilico, pane
 
-Tartare di manzo 14.50
-manzo crudo, capperi, senape
+11. SEZIONE PRE-PARSATA (SE PRESENTE)
 
-PRIMI
-Spaghetti alle vongole 13.00
-spaghetti, vongole, aglio, prezzemolo
+- Se trovi il blocco "VOCI_PREPARSE", considera `name` e `price` come affidabili.
+- In quel caso NON cambiare l'associazione nome/prezzo.
+- Puoi solo normalizzare typo evidenti (senza cambiare significato)
+  e completare category/ingredients/allergens se possibile.
 
-Risotto ai funghi porcini 12.50
-riso, funghi porcini, burro, parmigiano
-
-SECONDI
-Tagliata di manzo 18.00
-manzo, rucola, scaglie di grana
-
-DOLCI
-Tiramisu 6.00
----
-
-Output atteso:
-{
-  "elements": [
-    {"name": "Bruschetta al pomodoro", "price": 5.00, "category": "Antipasti", "ingredients": ["pomodoro","aglio","basilico","pane"], "allergens": ["glutine"], "image_coords": null},
-    {"name": "Tartare di manzo", "price": 14.50, "category": "Antipasti", "ingredients": ["manzo crudo","capperi","senape"], "allergens": ["senape"], "image_coords": null},
-    {"name": "Spaghetti alle vongole", "price": 13.00, "category": "Primi", "ingredients": ["spaghetti","vongole","aglio","prezzemolo"], "allergens": ["glutine","molluschi"], "image_coords": null},
-    {"name": "Risotto ai funghi porcini", "price": 12.50, "category": "Primi", "ingredients": ["riso","funghi porcini","burro","parmigiano"], "allergens": ["lattosio"], "image_coords": null},
-    {"name": "Tagliata di manzo", "price": 18.00, "category": "Secondi", "ingredients": ["manzo","rucola","scaglie di grana"], "allergens": ["lattosio"], "image_coords": null},
-    {"name": "Tiramisu", "price": 6.00, "category": "Dolci", "ingredients": [], "allergens": [], "image_coords": null}
-  ]
-}
-
-Nota dall'esempio: 6 elementi nel testo → 6 elementi nel JSON. Mai meno.
+CONTESTO:
+Ristorante: __RESTAURANT_NAME__
+Tipo cucina: __CUISINE_HINT__
 
 ---
 
-CONTESTO RISTORANTE: __RESTAURANT_NAME__ (__CUISINE_HINT__)
-
-TESTO OCR DA ANALIZZARE:
+TESTO OCR:
 ---
 __OCR_TEXT__
+---
+
 ---
 
 SCHEMA OUTPUT:
@@ -81,12 +115,38 @@ SCHEMA OUTPUT:
       "category": "string",
       "ingredients": ["string"],
       "allergens": ["string"],
-      "image_coords": { "top_right": [x, y], "bottom_left": [x, y] } | null
+      "image_coords": null
     }
   ]
 }
 
-Rispondi ora con il JSON contenente TUTTI gli elementi del TESTO OCR DA ANALIZZARE sopra (non dell'esempio).
+---
+
+ESEMPIO IMPORTANTE:
+
+Input:
+MARGHERITA 4.00
+pomodoro mozzarella
+
+MARINARA 4.50
+pomodoro aglio
+
+Output:
+{
+  "elements": [
+    {"name": "Margherita", "price": 4.00, "category": "Altro", "ingredients": ["pomodoro","mozzarella"], "allergens": ["lattosio"], "image_coords": null},
+    {"name": "Marinara", "price": 4.50, "category": "Altro", "ingredients": ["pomodoro","aglio"], "allergens": [], "image_coords": null}
+  ]
+}
+
+---
+
+IMPORTANTE:
+- Non perdere elementi
+- Non unirli
+- Se incerto → lascia campi vuoti, NON inventare
+
+Rispondi ora SOLO con JSON valido.
 """
 
 _REINFORCEMENT_SUFFIX: str = (
