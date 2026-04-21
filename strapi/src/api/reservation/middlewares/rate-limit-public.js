@@ -29,7 +29,8 @@ function getMax() {
 }
 
 function extractClientIp(ctx) {
-  const xff = ctx.request.headers['x-forwarded-for'];
+  const trustProxy = process.env.TRUST_PROXY === 'true';
+  const xff = trustProxy ? ctx.request.headers['x-forwarded-for'] : null;
   if (xff && typeof xff === 'string') {
     const first = xff.split(',')[0].trim();
     if (first) return first;

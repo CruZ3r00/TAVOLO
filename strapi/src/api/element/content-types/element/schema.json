@@ -44,6 +44,11 @@
       "type": "boolean",
       "default": true,
       "required": false
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
     }
   }
 }

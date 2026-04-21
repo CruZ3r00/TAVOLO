@@ -1,3 +1,11 @@
+const parseCorsOrigins = () => {
+  const raw = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || 'http://localhost:5174';
+  return raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+};
+
 module.exports = [
   'strapi::logger',
   'strapi::errors',
@@ -20,7 +28,7 @@ module.exports = [
   {
     name: 'strapi::cors',
     config: {
-      origin: '*',
+      origin: parseCorsOrigins(),
       headers: '*',
     },
   },

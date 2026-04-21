@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import logging
 import os
 import re
@@ -47,10 +48,16 @@ _SUPPORTED_EXT: frozenset[str] = frozenset({".pdf", ".png", ".jpg", ".jpeg", ".w
 def _verify_internal_token(header_token: str | None) -> None:
     settings = get_settings()
     expected = (settings.INTERNAL_API_TOKEN or "").strip()
+    if settings.REQUIRE_INTERNAL_API_TOKEN and not expected:
+        logger.error("INTERNAL_API_TOKEN richiesto ma non configurato")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="INTERNAL_API_TOKEN non configurato.",
+        )
     if not expected:
         return
     received = (header_token or "").strip()
-    if received != expected:
+    if not hmac.compare_digest(received, expected):
         logger.warning("rifiutato: X-Internal-Token invalido")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

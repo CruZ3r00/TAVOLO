@@ -3,6 +3,15 @@
 const path = require('path');
 const fs = require('fs');
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * Middleware che serve i siti-menu personalizzati dei ristoranti.
  * Route: GET /sites/:username
@@ -19,6 +28,7 @@ module.exports = (config, { strapi }) => {
     }
 
     const username = match[1];
+    const safeUsername = escapeHtml(username);
     const filePath = path.join(sitesDir, `${username}.html`);
 
     // Previeni path traversal
@@ -51,7 +61,7 @@ module.exports = (config, { strapi }) => {
         <div class="text-center">
             <h1 class="display-1 fw-bold text-muted">404</h1>
             <h3 class="mb-3">Sito menu non ancora disponibile</h3>
-            <p class="text-muted mb-4">Il sito menu per <strong>${username}</strong> non e' ancora stato creato.</p>
+            <p class="text-muted mb-4">Il sito menu per <strong>${safeUsername}</strong> non e' ancora stato creato.</p>
             <a href="/" class="btn btn-primary">Torna alla home</a>
         </div>
     </div>

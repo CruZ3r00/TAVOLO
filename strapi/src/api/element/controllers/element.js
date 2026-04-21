@@ -134,7 +134,10 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
 
     try {
       const created = await strapi.documents('api::element.element').create({
-        data: parsed.data,
+        data: {
+          ...parsed.data,
+          fk_user: { connect: [{ id: user.id }] },
+        },
         status: 'published',
       });
 

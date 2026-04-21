@@ -3,6 +3,16 @@
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const { validateProductionConfig } = require('./utils/production-checks');
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 module.exports = {
   /**
@@ -136,13 +146,14 @@ module.exports = {
           if (!fs.existsSync(sitesDir)) {
             fs.mkdirSync(sitesDir, { recursive: true });
           }
+          const safeUsername = escapeHtml(result.username);
           const filePath = path.join(sitesDir, `${result.username}.html`);
           const htmlContent = `<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${result.username} - Sito in costruzione</title>
+    <title>${safeUsername} - Sito in costruzione</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -155,7 +166,7 @@ module.exports = {
     <div class="card shadow-sm construction-card">
         <div class="construction-icon"><i class="bi bi-tools"></i></div>
         <h1 class="h3 mb-3">Sito in costruzione</h1>
-        <p class="text-muted mb-4">Il sito menu di <strong>${result.username}</strong> è in fase di preparazione. Torna a trovarci presto!</p>
+        <p class="text-muted mb-4">Il sito menu di <strong>${safeUsername}</strong> è in fase di preparazione. Torna a trovarci presto!</p>
         <div class="d-flex justify-content-center gap-2">
             <a href="/" class="btn btn-outline-secondary">Torna alla home</a>
         </div>
@@ -169,12 +180,17 @@ module.exports = {
         }
 
         try {
-          const notificationEmail = 'site.alerts@outlook.com';
+          const notificationEmail = process.env.NEW_USER_NOTIFICATION_EMAIL || '';
           const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
 
+          if (!notificationEmail) {
+            strapi.log.info('Email di notifica nuovo utente non configurata, skip.');
+            return;
+          }
+
           await strapi.plugin('email').service('email').send({
-            to: 'site.alerts@outlook.com',
-            from:  'no-reply@test-zkq340er7p3gd796.mlsender.net',
+            to: notificationEmail,
+            from: process.env.SMTP_DEFAULT_FROM || 'no-reply@example.com',
             subject: `Nuovo ristoratore registrato: ${result.username}`,
             text: [
               'Un nuovo ristoratore si e\' registrato sul CMS!',
@@ -195,10 +211,10 @@ module.exports = {
               <h2>Nuovo ristoratore registrato</h2>
               <p>Un nuovo ristoratore si e' registrato sul CMS!</p>
               <table style="border-collapse:collapse;width:100%;max-width:500px;">
-                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Username</td><td style="padding:8px;border:1px solid #ddd;">${result.username}</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Email</td><td style="padding:8px;border:1px solid #ddd;">${result.email}</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Nome</td><td style="padding:8px;border:1px solid #ddd;">${result.name || 'Non specificato'}</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Cognome</td><td style="padding:8px;border:1px solid #ddd;">${result.surname || 'Non specificato'}</td></tr>
+                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Username</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(result.username)}</td></tr>
+                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Email</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(result.email)}</td></tr>
+                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Nome</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(result.name || 'Non specificato')}</td></tr>
+                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Cognome</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(result.surname || 'Non specificato')}</td></tr>
                 <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Data registrazione</td><td style="padding:8px;border:1px solid #ddd;">${new Date().toLocaleString('it-IT')}</td></tr>
               </table>
               <p style="margin-top:20px;"><a href="${siteBaseUrl}/admin">Vai al pannello admin</a></p>
@@ -222,8 +238,12 @@ module.exports = {
    * run jobs, or perform some special logic.
    */
   async bootstrap({ strapi }) {
+    validateProductionConfig(strapi);
+
     // Seed data: crea utente demo e dati di test se non esistono
-    await seedDemoData(strapi);
+    if (process.env.SEED_DEMO_DATA === 'true') {
+      await seedDemoData(strapi);
+    }
     // Concede permission alle action custom (menu import, account, ingredient,
     // reservation) per il ruolo Authenticated, e la create pubblica delle
     // prenotazioni per il ruolo Public (usato dal sito vetrina esterno).
@@ -322,7 +342,7 @@ async function seedDemoData(strapi) {
     const existingUsers = await strapi.db
       .query('plugin::users-permissions.user')
       .findMany({
-        where: { email: 'demo@restaurant.com' },
+        where: { email: process.env.DEMO_USER_EMAIL || 'demo@restaurant.com' },
         limit: 1,
       });
 
@@ -345,14 +365,21 @@ async function seedDemoData(strapi) {
       return;
     }
 
+    const demoEmail = process.env.DEMO_USER_EMAIL || 'demo@restaurant.com';
+    const demoPassword = process.env.DEMO_USER_PASSWORD;
+    if (!demoPassword) {
+      strapi.log.warn('Seed: DEMO_USER_PASSWORD non impostata, skip seed.');
+      return;
+    }
+
     // 2. Crea l'utente demo
     const demoUser = await strapi.db
       .query('plugin::users-permissions.user')
       .create({
         data: {
           username: 'demo_restaurant',
-          email: 'demo@restaurant.com',
-          password: await bcrypt.hash('DemoPass123!', 10),
+          email: demoEmail,
+          password: await bcrypt.hash(demoPassword, 10),
           confirmed: true,
           blocked: false,
           role: authenticatedRole.id,
@@ -431,7 +458,10 @@ async function seedDemoData(strapi) {
     const createdElements = [];
     for (const el of demoElements) {
       const created = await strapi.documents('api::element.element').create({
-        data: el,
+        data: {
+          ...el,
+          fk_user: { connect: [{ id: demoUser.id }] },
+        },
         status: 'published',
       });
       createdElements.push(created);
@@ -475,7 +505,7 @@ async function seedDemoData(strapi) {
 
     strapi.log.info(`Seed: ${demoTables.length} tavoli demo creati`);
     strapi.log.info('Seed: dati demo creati con successo!');
-    strapi.log.info('Seed: credenziali demo -> email: demo@restaurant.com, password: DemoPass123!');
+    strapi.log.info(`Seed: credenziali demo -> email: ${demoEmail}, password da DEMO_USER_PASSWORD`);
   } catch (error) {
     strapi.log.error('Seed: errore durante la creazione dei dati demo:', error);
   }

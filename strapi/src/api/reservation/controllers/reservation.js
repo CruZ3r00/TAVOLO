@@ -406,7 +406,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
         targetUserId: targetUser.id,
         payload,
         status: 'pending',
-        enforceCapacity: false,
+        enforceCapacity: process.env.PUBLIC_RESERVATIONS_ENFORCE_CAPACITY !== 'false',
       });
 
       ctx.status = 201;

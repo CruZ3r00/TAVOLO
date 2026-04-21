@@ -17,17 +17,17 @@ module.exports = () => ({
     config: {
       provider: 'nodemailer',
       providerOptions: {
-        host: 'smtp.mailersend.net',
-        port: 587,
-        secure: false,
+        host: process.env.SMTP_HOST || 'smtp.mailersend.net',
+        port: parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: process.env.SMTP_SECURE === 'true',
         auth:{
-          user: 'MS_aoKERo@test-zkq340er7p3gd796.mlsender.net',
-          pass: 'mssp.zym3IXI.vywj2lp28opg7oqz.kgdwenE', //mssp.zym3lXl.vywj2lp28opg7oqz.kgdwenE
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
         }
       },
       settings: {
-        defaultFrom: 'no-reply@test-zkq340er7p3gd796.mlsender.net',
-        defaultReplyTo: 'support@test-zkq340er7p3gd796.mlsender.net',
+        defaultFrom: process.env.SMTP_DEFAULT_FROM || 'no-reply@example.com',
+        defaultReplyTo: process.env.SMTP_DEFAULT_REPLY_TO || 'support@example.com',
       },
     },
   },

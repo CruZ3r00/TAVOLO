@@ -194,6 +194,26 @@ async function loadOrder(documentId, userId, { populate } = {}) {
   throw appError('ORDER_NOT_FOUND', 'Ordine non trovato.');
 }
 
+/**
+ * Carica un elemento menu solo se appartiene al menu pubblicato dell'utente.
+ * Element non ha fk_user diretto, quindi l'ownership passa dalla relazione Menu.
+ */
+async function loadOwnedMenuElement(documentId, userId) {
+  const menus = await strapi.documents('api::menu.menu').findMany({
+    filters: {
+      fk_user: { id: { $eq: userId } },
+    },
+    populate: { fk_elements: true },
+    status: 'published',
+    limit: 1,
+  });
+  const menu = menus && menus.length > 0 ? menus[0] : null;
+  const element = (menu && Array.isArray(menu.fk_elements) ? menu.fk_elements : [])
+    .find((item) => item && item.documentId === documentId);
+  if (!element) throw appError('INVALID_PAYLOAD', 'Elemento menu non trovato.');
+  return element;
+}
+
 /** Verifica lock_version (optimistic locking). */
 function assertLockVersion(order, clientVersion) {
   if (clientVersion === undefined || clientVersion === null) return; // Non fornito = skip
@@ -463,13 +483,8 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       let itemName, itemPrice;
 
       if (body.element_id) {
-        // Da menu: carica l'Element per prendere name e price
-        const elements = await strapi.documents('api::element.element').findMany({
-          filters: { documentId: { $eq: body.element_id } },
-          limit: 1,
-        });
-        const el = elements && elements.length > 0 ? elements[0] : null;
-        if (!el) throw appError('INVALID_PAYLOAD', 'Elemento menu non trovato.');
+        // Da menu: carica l'Element solo se appartiene al menu dell'utente.
+        const el = await loadOwnedMenuElement(body.element_id, user.id);
         itemName = el.name;
         itemPrice = el.price;
       } else {
@@ -502,14 +517,8 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       };
 
       if (body.element_id) {
-        // Cerca l'id interno dell'element
-        const elRows = await strapi.documents('api::element.element').findMany({
-          filters: { documentId: { $eq: body.element_id } },
-          limit: 1,
-        });
-        if (elRows && elRows.length > 0) {
-          itemData.fk_element = { connect: [{ id: elRows[0].id }] };
-        }
+        const el = await loadOwnedMenuElement(body.element_id, user.id);
+        itemData.fk_element = { connect: [{ id: el.id }] };
       }
 
       const createdItem = await strapi.documents('api::order-item.order-item').create({

@@ -5,6 +5,7 @@
     import { ref } from 'vue';
     import { useRoute } from 'vue-router';
     import qs from 'qs';
+    import { API_BASE } from '@/utils';
 
     const route = useRoute();
     const restaurant = ref(route.params.restaurant);
@@ -24,7 +25,7 @@
                 },
                 populate: "*",
             });
-            const fetchuser = await fetch(`http://localhost:1337/api/users?${query}`,{
+            const fetchuser = await fetch(`${API_BASE}/api/users?${query}`,{
                 method: "GET",
                 headers: {
                     "Content-Type" : "application/json",

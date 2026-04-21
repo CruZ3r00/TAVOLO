@@ -2,7 +2,7 @@
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { ref, onMounted, nextTick, watch } from 'vue';
     import { useStore } from 'vuex';
-    import { colorCalculator } from '@/utils';
+    import { API_BASE, colorCalculator } from '@/utils';
     import MenuViewComponent from '@/components/MenuViewComponent.vue';
 
     const store = useStore();
@@ -20,7 +20,7 @@
 
     const fetchPrefs = async () => {
         try {
-            const response = await fetch(`http://localhost:1337/api/users/me?populate=*`,{
+            const response = await fetch(`${API_BASE}/api/users/me?populate=*`,{
                 method: "GET",
                 headers: {
                     "Authorization" : `Bearer ${tkn}`,
@@ -46,7 +46,7 @@
     const submit = async () => {
         saving.value = true;
         try {
-            const update = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
+            const update = await fetch(`${API_BASE}/api/users/${userid.value}`,{
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -62,7 +62,7 @@
             });
 
             if (update.ok){
-                const del = await fetch(`http://localhost:1337/api/preferences/${id.value}`,{
+                const del = await fetch(`${API_BASE}/api/preferences/${id.value}`,{
                     method: "DELETE",
                     headers: {
                         "Authorization": `Bearer ${tkn}`
@@ -70,7 +70,7 @@
                 });
 
                 if (del.ok){
-                    const response = await fetch(`http://localhost:1337/api/preferences`,{
+                    const response = await fetch(`${API_BASE}/api/preferences`,{
                         method: "POST",
                         headers: {
                             "Authorization" : `Bearer ${tkn}`,
@@ -89,7 +89,7 @@
                     if(response.ok){
                         const data = await response.json();
                         const id_ = data.data;
-                        const reconnect = await fetch(`http://localhost:1337/api/users/${userid.value}`,{
+                        const reconnect = await fetch(`${API_BASE}/api/users/${userid.value}`,{
                             method: 'PUT',
                             headers:{
                                 'Content-Type': 'application/json',

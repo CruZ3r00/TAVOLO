@@ -1,7 +1,7 @@
 <script setup>
     import { useRoute } from 'vue-router';
     import { ref, onMounted, watch } from 'vue';
-    import { fetchMenuElements } from '@/utils';
+    import { API_BASE, fetchMenuElements } from '@/utils';
     import { useStore } from 'vuex';
 
     const props = defineProps({
@@ -50,7 +50,7 @@
             if(restaurant.value){
                 data.value = await fetchMenuElements(restaurant.value);
             }else{
-                const response = await fetch(`http://localhost:1337/api/users/me`,{
+                const response = await fetch(`${API_BASE}/api/users/me`,{
                     method: "GET",
                     headers: {
                         "Authorization" : `Bearer ${tkn}`,
@@ -78,7 +78,7 @@
     });
 
     const getImageUrl = (image) => {
-        return `http://localhost:1337${image.url}`;
+        return `${API_BASE}${image.url}`;
     }
 
     onMounted(async () => {

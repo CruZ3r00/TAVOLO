@@ -583,6 +583,7 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
               category: el.category,
               ingredients: el.ingredients,
               allergens: el.allergens,
+              fk_user: { connect: [{ id: user.id }] },
             },
             status: 'published',
           });
