@@ -4,7 +4,8 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 const { validateProductionConfig } = require('./utils/production-checks');
-
+console.log("STARTING STRAPI...");
+console.log("PORT:", process.env.PORT);
 function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
