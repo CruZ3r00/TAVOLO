@@ -28,7 +28,7 @@ module.exports = [
   {
     name: 'strapi::cors',
     config: {
-      origin: parseCorsOrigins(),
+      origin: *,
       headers: '*',
     },
   },
