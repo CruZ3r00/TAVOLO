@@ -591,8 +591,8 @@ onMounted(async () => {
               </div>
             </div>
             <div class="foot-bottom">
-              <div>&copy; {{ new Date().getFullYear() }} Tavolo S.r.l. · P.IVA 04123456789</div>
-              <div>Bologna · Milano · Assistenza: ciao@tavolo.app</div>
+              <div>&copy; {{ new Date().getFullYear() }} Tavolo S.r.l. (fittizia) · P.IVA *da inserire*</div>
+              <div>Mantova · Milano · Assistenza: site-alerts@outlook.com</div>
             </div>
           </div>
         </footer>
