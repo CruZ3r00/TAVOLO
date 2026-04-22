@@ -49,8 +49,8 @@ module.exports = [
   'strapi::favicon',
   'strapi::public',
   // Middleware per servire i siti-menu personalizzati su /sites/:username
-  {
-    name: 'global::restaurant-sites',
-    config: {},
-  },
+  // {
+  //   name: 'global::restaurant-sites',
+  //   config: {},
+  // },
 ];
