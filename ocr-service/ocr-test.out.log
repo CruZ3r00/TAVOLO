@@ -1,0 +1,7 @@
+{"timestamp": "2026-04-24T14:50:03.004483+00:00", "level": "INFO", "logger": "app.main", "msg": "ocr-service boot", "extra": {"host": "127.0.0.1", "port": 8001, "ollama_url": "http://localhost:11434", "ollama_model": "llama3.1:8b", "ocr_lang": "it", "allowed_input_dir": "C:\\Users\\matti\\Desktop\\p1\\cms_restaurant\\strapi\\.menu-upload"}}
+{"timestamp": "2026-04-24T14:50:11.471710+00:00", "level": "INFO", "logger": "uvicorn.error", "msg": "Application startup complete."}
+{"timestamp": "2026-04-24T14:50:11.471710+00:00", "level": "INFO", "logger": "uvicorn.error", "msg": "Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)", "extra": {"color_message": "Uvicorn running on \u001b[1m%s://%s:%d\u001b[0m (Press CTRL+C to quit)"}}
+{"timestamp": "2026-04-24T14:50:27.529924+00:00", "level": "INFO", "logger": "uvicorn.access", "msg": "127.0.0.1:51608 - \"GET /health HTTP/1.1\" 200"}
+{"timestamp": "2026-04-24T14:50:28.217247+00:00", "level": "INFO", "logger": "uvicorn.access", "msg": "127.0.0.1:51609 - \"GET /ready HTTP/1.1\" 200"}
+{"timestamp": "2026-04-24T14:50:40.195894+00:00", "level": "WARNING", "logger": "app.api.process", "msg": "path traversal rifiutato", "extra": {"file_path": "C:\\Windows\\win.ini"}}
+{"timestamp": "2026-04-24T14:50:40.195894+00:00", "level": "INFO", "logger": "uvicorn.access", "msg": "127.0.0.1:51612 - \"POST /process HTTP/1.1\" 403"}

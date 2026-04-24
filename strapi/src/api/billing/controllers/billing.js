@@ -1,0 +1,270 @@
+'use strict';
+
+const Stripe = require('stripe');
+
+const PLAN_CONFIG = {
+  starter: { name: 'Starter', priceEnv: 'STRIPE_PRICE_STARTER' },
+  pro: { name: 'Pro', priceEnv: 'STRIPE_PRICE_PRO' },
+};
+
+let stripeClient = null;
+
+function getStripe() {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    const err = new Error('STRIPE_SECRET_KEY non configurata.');
+    err.status = 503;
+    throw err;
+  }
+  if (!stripeClient) {
+    stripeClient = new Stripe(secretKey);
+  }
+  return stripeClient;
+}
+
+function getFrontendUrl() {
+  const explicit = process.env.FRONTEND_URL || process.env.STRIPE_FRONTEND_URL;
+  if (explicit && explicit.trim()) return explicit.trim().replace(/\/+$/, '');
+
+  const cors = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || 'http://localhost:5174';
+  return cors.split(',')[0].trim().replace(/\/+$/, '') || 'http://localhost:5174';
+}
+
+function getPlan(planKey) {
+  const key = String(planKey || '').toLowerCase();
+  const plan = PLAN_CONFIG[key];
+  if (!plan) return null;
+  const priceId = (process.env[plan.priceEnv] || '').trim();
+  if (!priceId || priceId === 'price_...' || !priceId.startsWith('price_')) {
+    const err = new Error(`${plan.priceEnv} non configurata.`);
+    err.status = 503;
+    throw err;
+  }
+  return { key, ...plan, priceId };
+}
+
+function normalizePlanKey(value) {
+  const key = String(value || '').toLowerCase();
+  return PLAN_CONFIG[key] ? key : null;
+}
+
+function safeUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    subscription_status: user.subscription_status || null,
+    subscription_plan: user.subscription_plan || null,
+    subscription_current_period_end: user.subscription_current_period_end || user.end_subscription || null,
+    subscription_cancel_at_period_end: !!user.subscription_cancel_at_period_end,
+  };
+}
+
+function isoFromUnix(timestamp) {
+  return timestamp ? new Date(timestamp * 1000).toISOString() : null;
+}
+
+function dateOnlyFromUnix(timestamp) {
+  return timestamp ? new Date(timestamp * 1000).toISOString().slice(0, 10) : null;
+}
+
+async function updateUserSubscription(userId, data) {
+  if (!userId) return null;
+  const clean = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) clean[key] = value;
+  }
+  return strapi.db.query('plugin::users-permissions.user').update({
+    where: { id: userId },
+    data: clean,
+  });
+}
+
+async function findUserByStripe({ customerId, subscriptionId }) {
+  if (subscriptionId) {
+    const bySubscription = await strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { stripe_subscription_id: subscriptionId },
+    });
+    if (bySubscription) return bySubscription;
+  }
+  if (customerId) {
+    return strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { stripe_customer_id: customerId },
+    });
+  }
+  return null;
+}
+
+async function subscriptionSnapshot(stripe, subscriptionOrId) {
+  if (!subscriptionOrId) return {};
+  const subscription = typeof subscriptionOrId === 'string'
+    ? await stripe.subscriptions.retrieve(subscriptionOrId)
+    : subscriptionOrId;
+  const priceId = subscription.items?.data?.[0]?.price?.id || null;
+  const planEntry = Object.entries(PLAN_CONFIG).find(([, plan]) => process.env[plan.priceEnv] === priceId);
+  const metadataPlan = normalizePlanKey(subscription.metadata?.plan);
+
+  return {
+    stripe_subscription_id: subscription.id,
+    subscription_status: subscription.status,
+    subscription_plan: metadataPlan || (planEntry ? planEntry[0] : null),
+    subscription_current_period_end: isoFromUnix(subscription.current_period_end),
+    subscription_cancel_at_period_end: !!subscription.cancel_at_period_end,
+    end_subscription: dateOnlyFromUnix(subscription.current_period_end),
+  };
+}
+
+function getRawBody(ctx) {
+  const unparsed = ctx.request.body && ctx.request.body[Symbol.for('unparsedBody')];
+  if (unparsed) return Buffer.isBuffer(unparsed) ? unparsed : Buffer.from(String(unparsed));
+  if (ctx.request.rawBody) return Buffer.from(ctx.request.rawBody);
+  return null;
+}
+
+async function requireBillingUser(ctx) {
+  if (ctx.state.user?.id) return ctx.state.user;
+
+  const header = ctx.request.headers.authorization || '';
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+
+  try {
+    const payload = await strapi.plugin('users-permissions').service('jwt').verify(match[1]);
+    if (!payload?.id) return null;
+    return strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: payload.id },
+    });
+  } catch (err) {
+    strapi.log.warn(`Billing JWT non valido: ${err.message}`);
+    return null;
+  }
+}
+
+module.exports = {
+  async status(ctx) {
+    const user = await requireBillingUser(ctx);
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    return ctx.send({ data: safeUser(user) });
+  },
+
+  async createCheckoutSession(ctx) {
+    const user = await requireBillingUser(ctx);
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    const { plan: requestedPlan } = ctx.request.body || {};
+    try {
+      const plan = getPlan(requestedPlan || 'pro');
+      if (!plan) return ctx.badRequest('Piano non valido.');
+
+      const stripe = getStripe();
+      const frontendUrl = getFrontendUrl();
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: user.stripe_customer_id || undefined,
+        customer_email: user.stripe_customer_id ? undefined : user.email,
+        client_reference_id: String(user.id),
+        line_items: [{ price: plan.priceId, quantity: 1 }],
+        allow_promotion_codes: true,
+        success_url: `${frontendUrl}/renew-sub?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${frontendUrl}/renew-sub?checkout=cancelled`,
+        subscription_data: {
+          metadata: {
+            user_id: String(user.id),
+            plan: plan.key,
+          },
+        },
+        metadata: {
+          user_id: String(user.id),
+          plan: plan.key,
+        },
+      });
+
+      return ctx.send({ data: { id: session.id, url: session.url } });
+    } catch (err) {
+      const status = err.status || err.statusCode || 500;
+      strapi.log.error(`Stripe checkout failed: ${err.message}`);
+      ctx.status = status;
+      return ctx.send({
+        error: {
+          message: err.message || 'Impossibile creare la sessione Stripe Checkout.',
+        },
+      });
+    }
+  },
+
+  async createPortalSession(ctx) {
+    const user = await requireBillingUser(ctx);
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    if (!user.stripe_customer_id) {
+      return ctx.badRequest('Nessun cliente Stripe associato a questo account.');
+    }
+
+    const session = await getStripe().billingPortal.sessions.create({
+      customer: user.stripe_customer_id,
+      return_url: `${getFrontendUrl()}/renew-sub`,
+    });
+
+    return ctx.send({ data: { url: session.url } });
+  },
+
+  async webhook(ctx) {
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!endpointSecret) return ctx.internalServerError('STRIPE_WEBHOOK_SECRET non configurato.');
+
+    const stripe = getStripe();
+    const rawBody = getRawBody(ctx);
+    if (!rawBody) return ctx.badRequest('Raw body webhook non disponibile.');
+
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(rawBody, ctx.request.headers['stripe-signature'], endpointSecret);
+    } catch (err) {
+      strapi.log.warn(`Stripe webhook signature non valida: ${err.message}`);
+      return ctx.badRequest('Webhook signature non valida.');
+    }
+
+    try {
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        if (session.mode === 'subscription') {
+          const userId = session.metadata?.user_id || session.client_reference_id;
+          const snapshot = await subscriptionSnapshot(stripe, session.subscription);
+          await updateUserSubscription(userId, {
+            stripe_customer_id: session.customer,
+            ...snapshot,
+            subscription_plan: normalizePlanKey(session.metadata?.plan) || snapshot.subscription_plan,
+          });
+        }
+      }
+
+      if (
+        event.type === 'customer.subscription.updated' ||
+        event.type === 'customer.subscription.deleted' ||
+        event.type === 'invoice.payment_failed' ||
+        event.type === 'invoice.payment_succeeded'
+      ) {
+        const object = event.data.object;
+        const subscriptionId = object.object === 'invoice' ? object.subscription : object.id;
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const user = await findUserByStripe({
+            customerId: subscription.customer,
+            subscriptionId: subscription.id,
+          });
+          await updateUserSubscription(user?.id, {
+            stripe_customer_id: subscription.customer,
+            ...(await subscriptionSnapshot(stripe, subscription)),
+          });
+        }
+      }
+    } catch (err) {
+      strapi.log.error(`Stripe webhook processing failed: ${err.message}`);
+      return ctx.internalServerError('Errore processamento webhook Stripe.');
+    }
+
+    return ctx.send({ received: true });
+  },
+};

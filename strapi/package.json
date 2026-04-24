@@ -16,16 +16,17 @@
     "upgrade:dry": "npx @strapi/upgrade latest --dry"
   },
   "dependencies": {
-    "@strapi/plugin-cloud": "5.11.0",
-    "@strapi/plugin-users-permissions": "5.11.0",
+    "@strapi/plugin-cloud": "^5.43.0",
+    "@strapi/plugin-users-permissions": "^5.43.0",
     "@strapi/provider-email-nodemailer": "^5.42.0",
-    "@strapi/strapi": "5.11.0",
+    "@strapi/strapi": "^5.43.0",
     "better-sqlite3": "^11.9.1",
     "mysql2": "3.9.8",
     "pg": "^8.20.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-router-dom": "^6.0.0",
+    "stripe": "^22.1.0",
     "styled-components": "^6.0.0"
   },
   "engines": {

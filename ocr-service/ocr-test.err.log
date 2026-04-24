@@ -1,0 +1,4 @@
+INFO:     Started server process [3352]
+INFO:     Waiting for application startup.
+C:\Users\matti\AppData\Local\Programs\Python\Python311\Lib\site-packages\paddle\base\framework.py:688: UserWarning: You are using GPU version Paddle, but your CUDA device is not set properly. CPU device will be used by default.
+  warnings.warn(

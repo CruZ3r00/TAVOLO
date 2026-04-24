@@ -39,6 +39,7 @@ module.exports = [
   {
     name: 'strapi::body',
     config: {
+      includeUnparsed: true,
       formLimit: '24mb',
       jsonLimit: '24mb',
       textLimit: '24mb',
@@ -48,6 +49,7 @@ module.exports = [
     },
   },
   'strapi::session',
+  'global::subscription-gate',
   'strapi::favicon',
   'strapi::public',
   // Middleware per servire i siti-menu personalizzati su /sites/:username
