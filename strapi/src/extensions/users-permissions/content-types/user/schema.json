@@ -77,6 +77,27 @@
       "type": "json",
       "required": false
     },
+    "stripe_customer_id": {
+      "type": "string",
+      "private": true
+    },
+    "stripe_subscription_id": {
+      "type": "string",
+      "private": true
+    },
+    "subscription_status": {
+      "type": "string"
+    },
+    "subscription_plan": {
+      "type": "string"
+    },
+    "subscription_current_period_end": {
+      "type": "datetime"
+    },
+    "subscription_cancel_at_period_end": {
+      "type": "boolean",
+      "default": false
+    },
     "fk_prefs": {
       "type": "relation",
       "relation": "oneToOne",

@@ -134,6 +134,61 @@ export const importMenuBulk = async ({ mode, elements }, token) => {
  * Costruisce un Error arricchito con code/status/details per gestire in UI
  * i vari scenari (OVERBOOKING, CAPACITY_NOT_CONFIGURED, ecc).
  */
+// ============================================================================
+// Billing API (Stripe SaaS subscriptions)
+// ============================================================================
+
+const buildBillingError = (resp, payload) => {
+    const err = new Error(payload?.error?.message || payload?.message || `Richiesta fallita (HTTP ${resp.status})`);
+    err.status = resp.status;
+    err.code = payload?.error?.code || null;
+    return err;
+};
+
+export const fetchBillingStatus = async (token) => {
+    const resp = await fetch(`${API_BASE}/api/billing/status`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildBillingError(resp, payload);
+    return payload.data;
+};
+
+export const createBillingCheckoutSession = async (plan, token) => {
+    const resp = await fetch(`${API_BASE}/api/billing/checkout`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ plan }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildBillingError(resp, payload);
+    return payload.data;
+};
+
+export const createBillingPortalSession = async (token) => {
+    const resp = await fetch(`${API_BASE}/api/billing/portal`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildBillingError(resp, payload);
+    return payload.data;
+};
+
+// ============================================================================
+// Reservations API
+// ============================================================================
+
 const buildReservationError = (resp, payload) => {
     const err = new Error(payload?.error?.message || `Richiesta fallita (HTTP ${resp.status})`);
     err.status = resp.status;

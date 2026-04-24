@@ -39,6 +39,7 @@ module.exports = [
   {
     name: 'strapi::body',
     config: {
+      includeUnparsed: true,
       formLimit: '24mb',
       jsonLimit: '24mb',
       textLimit: '24mb',
