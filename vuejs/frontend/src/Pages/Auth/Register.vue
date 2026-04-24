@@ -6,7 +6,8 @@ import Checkbox from '@/components/Checkbox.vue';
 import InputLabel from '@/components/InputLabel.vue';
 import TextInput from '@/components/TextInput.vue';
 import { ref } from 'vue';
-import { API_BASE } from '@/utils';
+import { useStore } from 'vuex';
+import { API_BASE, createBillingCheckoutSession } from '@/utils';
 
 // Page title
 useHead({
@@ -26,6 +27,7 @@ const password_confirmation= ref('');
 const terms = ref(false);
 const copertiInvernali = ref('');
 const copertiEstivi = ref('');
+const selectedPlan = ref('pro');
 
 const isError = ref(false);
 const isLoading = ref(false);
@@ -33,6 +35,22 @@ const errorMessage = ref('');
 const showPassword = ref(false);
 
 const router = useRouter();
+const store = useStore();
+
+const plans = [
+  {
+    key: 'starter',
+    name: 'Starter',
+    price: 'EUR 39,99',
+    desc: 'Menu digitale, QR e prenotazioni.',
+  },
+  {
+    key: 'pro',
+    name: 'Professionale',
+    price: 'EUR 74,99',
+    desc: 'Sala, ordini e import menu via OCR.',
+  },
+];
 
 // Registra l'utente in un'unica chiamata: dati anagrafici e WebsiteConfig
 // vengono persistiti server-side durante il flusso di signup.
@@ -66,7 +84,7 @@ const createUser = async () => {
       return false;
     }
 
-    return true;
+    return await response.json();
   } catch (error) {
     console.error('Errore di rete:', error.message);
     errorMessage.value = 'Errore di rete durante la registrazione.';
@@ -78,6 +96,12 @@ const createUser = async () => {
 const submit = async () => {
   isError.value = false;
   errorMessage.value = '';
+
+  if (!terms.value) {
+    errorMessage.value = 'Devi accettare i termini del servizio e la politica di privacy.';
+    isError.value = true;
+    return;
+  }
 
   // Validazione coperti invernali (obbligatori)
   const cInv = parseInt(copertiInvernali.value, 10);
@@ -116,8 +140,17 @@ const submit = async () => {
     isLoading.value = true;
     try {
       const created = await createUser();
-      if (created) {
-        router.push({ path: '/login', query: { registered: '1' } });
+      if (created?.jwt && created?.user) {
+        store.dispatch('login', { user: created.user, token: created.jwt });
+        localStorage.setItem('user', JSON.stringify(created.user));
+        localStorage.setItem('token', created.jwt);
+
+        const session = await createBillingCheckoutSession(selectedPlan.value, created.jwt);
+        if (session?.url) {
+          window.location.href = session.url;
+          return;
+        }
+        router.push('/renew-sub');
       }
     } finally {
       isLoading.value = false;
@@ -151,7 +184,7 @@ const submit = async () => {
       </div>
     </Transition>
 
-    <form @submit.prevent="submit" class="auth-form">
+    <form @submit.prevent="submit" class="auth-form" novalidate>
       <div class="ds-field">
         <InputLabel for="username" value="Username" />
         <TextInput id="username" v-model="username" type="text" placeholder="Il tuo username" required />
@@ -223,9 +256,30 @@ const submit = async () => {
         </div>
       </div>
 
+      <div class="ds-field">
+        <InputLabel value="Piano" />
+        <div class="plan-options">
+          <label
+            v-for="plan in plans"
+            :key="plan.key"
+            class="plan-option"
+            :class="{ 'plan-option-active': selectedPlan === plan.key }"
+          >
+            <input v-model="selectedPlan" type="radio" name="plan" :value="plan.key" />
+            <span class="plan-option-body">
+              <span class="plan-option-head">
+                <strong>{{ plan.name }}</strong>
+                <span>{{ plan.price }}</span>
+              </span>
+              <span class="plan-option-desc">{{ plan.desc }}</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
       <div class="terms-field">
         <label class="terms-label">
-          <Checkbox id="terms" v-model:checked="terms" name="terms" required />
+          <Checkbox id="terms" v-model:checked="terms" name="terms" />
           <span class="terms-text">
             Ho letto e accetto i
             <router-link to="/terms" class="auth-link">termini del servizio</router-link> e la
@@ -234,9 +288,16 @@ const submit = async () => {
         </label>
       </div>
 
+      <Transition name="fade">
+        <div v-if="isError" class="inline-error">
+          <i class="bi bi-exclamation-circle"></i>
+          <span>{{ errorMessage }}</span>
+        </div>
+      </Transition>
+
       <button type="submit" class="ds-btn ds-btn-primary ds-btn-lg auth-submit" :disabled="isLoading">
         <span v-if="isLoading" class="ds-spinner"></span>
-        <span v-else>Registrati</span>
+        <span v-else>Registrati e vai al pagamento</span>
       </button>
 
       <p class="auth-footer-text">
@@ -353,6 +414,59 @@ const submit = async () => {
   margin: var(--s-2) 0 0;
 }
 
+.plan-options {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.plan-option {
+  display: flex;
+  gap: 10px;
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.plan-option-active {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+.plan-option input {
+  margin-top: 3px;
+}
+
+.plan-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.plan-option-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.plan-option-head span {
+  font-family: var(--f-mono, 'Geist Mono', monospace);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.plan-option-desc {
+  font-size: 13px;
+  color: var(--ink-3);
+  line-height: 1.4;
+}
+
 .terms-label {
   display: flex;
   align-items: flex-start;
@@ -365,6 +479,19 @@ const submit = async () => {
   font-size: 13px;
   color: var(--ink-2);
   line-height: 1.5;
+}
+
+.inline-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: var(--s-3);
+  color: var(--danger-ink, #b42318);
+  background: var(--danger-bg, #fff1f0);
+  border: 1px solid color-mix(in oklab, var(--danger, #d92d20) 30%, var(--line));
+  border-radius: var(--r-md);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .auth-link {

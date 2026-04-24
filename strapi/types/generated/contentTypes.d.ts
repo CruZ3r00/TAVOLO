@@ -1568,6 +1568,13 @@ export interface PluginUsersPermissionsUser
       'manyToOne',
       'plugin::users-permissions.role'
     >;
+    stripe_customer_id: Schema.Attribute.String & Schema.Attribute.Private;
+    stripe_subscription_id: Schema.Attribute.String & Schema.Attribute.Private;
+    subscription_cancel_at_period_end: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    subscription_current_period_end: Schema.Attribute.DateTime;
+    subscription_plan: Schema.Attribute.String;
+    subscription_status: Schema.Attribute.String;
     surname: Schema.Attribute.String & Schema.Attribute.Required;
     two_factor_enabled: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<false>;
