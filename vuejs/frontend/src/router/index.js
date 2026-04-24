@@ -17,19 +17,16 @@ const routes = [
         path: '/', // Path to the dash
         name: 'Dashboard',
         component: () => import('../Pages/Dashboard.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
       path: '/home', // Path to the dash
       name: 'home',
       component: () => import('../Pages/Dashboard.vue'),
-      meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
         path: '/dashboard', // Path to the dash
         name: 'dashboard',
         component: () => import('../Pages/Dashboard.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
         path: '/terms', // Route to the Terms of Service
