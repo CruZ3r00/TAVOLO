@@ -197,6 +197,10 @@ const buildReservationError = (resp, payload) => {
     return err;
 };
 
+export const isSubscriptionRequiredError = (err) => (
+    err?.status === 402 || err?.code === 'SUBSCRIPTION_REQUIRED'
+);
+
 /**
  * Lista paginata delle prenotazioni del ristoratore corrente.
  * params: { status?, from?, to?, page?, pageSize? }

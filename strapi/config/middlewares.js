@@ -49,6 +49,7 @@ module.exports = [
     },
   },
   'strapi::session',
+  'global::subscription-gate',
   'strapi::favicon',
   'strapi::public',
   // Middleware per servire i siti-menu personalizzati su /sites/:username

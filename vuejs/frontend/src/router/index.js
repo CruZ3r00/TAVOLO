@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { store } from '@/store'; //usato per storage di jwt
+import { fetchBillingStatus } from '@/utils';
 
 const routes = [
     { //non protetta
@@ -13,19 +14,22 @@ const routes = [
         component: () => import('../Pages/Auth/Login.vue'),
     },
     { //non protetta
-      path: '/', // Path to the dash
-      name: 'Dashboard',
-      component: () => import('../Pages/Dashboard.vue'),
+        path: '/', // Path to the dash
+        name: 'Dashboard',
+        component: () => import('../Pages/Dashboard.vue'),
+        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
       path: '/home', // Path to the dash
       name: 'home',
       component: () => import('../Pages/Dashboard.vue'),
+      meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
         path: '/dashboard', // Path to the dash
         name: 'dashboard',
         component: () => import('../Pages/Dashboard.vue'),
+        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
         path: '/terms', // Route to the Terms of Service
@@ -52,25 +56,25 @@ const routes = [
         path: '/menu-handler',
         name: 'Menu setter',
         component: () => import('../Pages/MenuSetter.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //protetta
         path: '/profile/show', // Path to profile
         name: 'Your profile',
         component: () => import('../Pages/Profile/Show.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //protetta - Gestione prenotazioni
         path: '/reservations',
         name: 'Prenotazioni',
         component: () => import('../Pages/Reservations.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //protetta - Gestione ordinazioni
         path: '/orders',
         name: 'Ordinazioni',
         component: () => import('../Pages/Orders.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
         path: '/who-are-us', // Route per pagina chi siamo
@@ -108,13 +112,31 @@ const router = createRouter({
 });
 
 // Protected route management (auth)
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
     const isAuthenticated = store.getters.isAuthenticated;
     if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
         next({ name: 'login' });
-    } else {
-        next();
+        return;
     }
-  });
+
+    if (isAuthenticated && to.matched.some(record => record.meta.requiresSubscription)) {
+        try {
+            const billing = await fetchBillingStatus(store.getters.getToken);
+            const user = { ...(store.getters.getUser || {}), ...billing };
+            store.commit('setUser', user);
+            localStorage.setItem('user', JSON.stringify(user));
+
+            if (!['active', 'trialing'].includes(billing?.subscription_status)) {
+                next({ path: '/renew-sub', query: { checkout: 'retry' } });
+                return;
+            }
+        } catch (_err) {
+            next({ path: '/renew-sub', query: { checkout: 'retry' } });
+            return;
+        }
+    }
+
+    next();
+});
 
 export default router
