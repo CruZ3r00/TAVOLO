@@ -145,12 +145,18 @@ const submit = async () => {
         localStorage.setItem('user', JSON.stringify(created.user));
         localStorage.setItem('token', created.jwt);
 
-        const session = await createBillingCheckoutSession(selectedPlan.value, created.jwt);
-        if (session?.url) {
-          window.location.href = session.url;
-          return;
+        try {
+          const session = await createBillingCheckoutSession(selectedPlan.value, created.jwt);
+          if (session?.url) {
+            window.location.href = session.url;
+            return;
+          }
+        } catch (checkoutError) {
+          console.error('Stripe checkout non avviato:', checkoutError);
+          errorMessage.value = checkoutError.message || 'Account creato, ma il checkout Stripe non si e avviato.';
+          isError.value = true;
         }
-        router.push('/renew-sub');
+        router.push({ path: '/renew-sub', query: { checkout: 'retry', plan: selectedPlan.value } });
       }
     } finally {
       isLoading.value = false;

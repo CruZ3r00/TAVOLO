@@ -48,6 +48,9 @@ const checkoutNotice = computed(() => {
     if (route.query.checkout === 'success') {
         return 'Pagamento completato. Lo stato si aggiorna appena Stripe invia il webhook.';
     }
+    if (route.query.checkout === 'retry') {
+        return 'Account creato. Scegli di nuovo il piano per completare il pagamento.';
+    }
     if (route.query.checkout === 'cancelled') {
         return 'Checkout annullato. Puoi riprendere quando vuoi.';
     }
@@ -108,6 +111,11 @@ onMounted(() => {
         document.title = 'Rinnova abbonamento';
     });
     loadBillingStatus();
+    const requestedPlan = typeof route.query.plan === 'string' ? route.query.plan : '';
+    const plan = plans.find((p) => p.key === requestedPlan && !p.disabled);
+    if (route.query.checkout === 'retry' && plan) {
+        subscribe(plan);
+    }
 });
 </script>
 
