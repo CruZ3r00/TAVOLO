@@ -24,9 +24,9 @@ const routes = [
         component: () => import('../Pages/Dashboard.vue'),
     },
     { //non protetta
-        path: '/home',
-        name: 'home',
-        component: () => import('../Pages/Dashboard.vue'),
+      path: '/home', // Path to the dash
+      name: 'home',
+      component: () => import('../Pages/Dashboard.vue'),
     },
     { //non protetta
         path: '/dashboard',
