@@ -63,6 +63,7 @@
 [data-theme="light"] {
   --bg: oklch(0.995 0.002 95);
   --bg-elev: #ffffff;
+  --paper: var(--bg-elev);
   --bg-sunk: oklch(0.972 0.003 95);
   --bg-hover: oklch(0.955 0.003 95);
   --bg-active: oklch(0.93 0.003 95);
@@ -106,6 +107,7 @@
 [data-theme="dark"] {
   --bg: oklch(0.18 0.005 265);
   --bg-elev: oklch(0.22 0.006 265);
+  --paper: var(--bg-elev);
   --bg-sunk: oklch(0.155 0.005 265);
   --bg-hover: oklch(0.26 0.006 265);
   --bg-active: oklch(0.3 0.007 265);

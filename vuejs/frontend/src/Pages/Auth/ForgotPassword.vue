@@ -120,7 +120,7 @@ const submit = handleSubmit(async () => {
 }
 .auth-brand-icon {
   width: 36px; height: 36px; display: grid; place-items: center;
-  background: var(--ink); color: var(--paper); border-radius: 10px;
+  background: var(--ink); color: var(--bg); border-radius: 10px;
   font-family: var(--f-mono, 'Geist Mono', monospace);
   font-weight: 700; font-size: 16px; letter-spacing: -0.02em;
 }
@@ -151,7 +151,7 @@ const submit = handleSubmit(async () => {
   gap: 8px; height: 46px;
   font-family: var(--f-sans, 'Geist', sans-serif);
   font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
-  color: var(--paper); background: var(--ink);
+  color: var(--bg); background: var(--ink);
   border: 1px solid var(--ink); border-radius: var(--r-md);
   cursor: pointer; transition: transform 120ms, background 120ms;
   margin-top: var(--s-2);
@@ -163,8 +163,8 @@ const submit = handleSubmit(async () => {
 .auth-submit:disabled { opacity: 0.7; cursor: not-allowed; }
 .auth-submit .ds-spinner {
   width: 16px; height: 16px;
-  border: 2px solid color-mix(in oklab, var(--paper) 30%, transparent);
-  border-top-color: var(--paper); border-radius: 50%;
+  border: 2px solid color-mix(in oklab, var(--bg) 30%, transparent);
+  border-top-color: var(--bg); border-radius: 50%;
   animation: fpspin 650ms linear infinite;
 }
 @keyframes fpspin { to { transform: rotate(360deg); } }

@@ -157,7 +157,7 @@ const submit = async () => {
   display: grid;
   place-items: center;
   background: var(--ink);
-  color: var(--paper);
+  color: var(--bg);
   border-radius: 10px;
   font-family: var(--f-mono, 'Geist Mono', monospace);
   font-weight: 700;
@@ -268,7 +268,7 @@ const submit = async () => {
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--paper);
+  color: var(--bg);
   background: var(--ink);
   border: 1px solid var(--ink);
   border-radius: var(--r-md);
@@ -294,8 +294,8 @@ const submit = async () => {
 .auth-submit .ds-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid color-mix(in oklab, var(--paper) 30%, transparent);
-  border-top-color: var(--paper);
+  border: 2px solid color-mix(in oklab, var(--bg) 30%, transparent);
+  border-top-color: var(--bg);
   border-radius: 50%;
   animation: auth-spin 650ms linear infinite;
 }

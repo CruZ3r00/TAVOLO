@@ -88,7 +88,7 @@
 }
 .auth-brand-icon {
   width: 36px; height: 36px; display: grid; place-items: center;
-  background: var(--ink); color: var(--paper); border-radius: 10px;
+  background: var(--ink); color: var(--bg); border-radius: 10px;
   font-size: 16px;
 }
 .auth-brand-name {
@@ -116,7 +116,7 @@
   width: 100%; height: 46px;
   font-family: var(--f-sans, 'Geist', sans-serif);
   font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
-  color: var(--paper); background: var(--ink);
+  color: var(--bg); background: var(--ink);
   border: 1px solid var(--ink); border-radius: var(--r-md);
   cursor: pointer; transition: transform 120ms, background 120ms;
   margin-top: var(--s-2);

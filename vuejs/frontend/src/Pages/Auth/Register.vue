@@ -6,8 +6,6 @@ import Checkbox from '@/components/Checkbox.vue';
 import InputLabel from '@/components/InputLabel.vue';
 import TextInput from '@/components/TextInput.vue';
 import { ref } from 'vue';
-import { useStore } from 'vuex';
-import { API_BASE, createBillingCheckoutSession } from '@/utils';
 
 // Page title
 useHead({
@@ -27,7 +25,6 @@ const password_confirmation= ref('');
 const terms = ref(false);
 const copertiInvernali = ref('');
 const copertiEstivi = ref('');
-const selectedPlan = ref('pro');
 
 const isError = ref(false);
 const isLoading = ref(false);
@@ -35,65 +32,11 @@ const errorMessage = ref('');
 const showPassword = ref(false);
 
 const router = useRouter();
-const store = useStore();
 
-const plans = [
-  {
-    key: 'starter',
-    name: 'Starter',
-    price: 'EUR 39,99',
-    desc: 'Menu digitale, QR e prenotazioni.',
-  },
-  {
-    key: 'pro',
-    name: 'Professionale',
-    price: 'EUR 74,99',
-    desc: 'Sala, ordini e import menu via OCR.',
-  },
-];
-
-// Registra l'utente in un'unica chiamata: dati anagrafici e WebsiteConfig
-// vengono persistiti server-side durante il flusso di signup.
-const createUser = async () => {
-  try {
-    const payload = {
-      username: username.value,
-      email: email.value,
-      password: password.value,
-      name: name.value,
-      surname: surname.value,
-      birth_date: birth_date.value,
-      coperti_invernali: parseInt(copertiInvernali.value, 10),
-      restaurant_name: username.value,
-    };
-    if (copertiEstivi.value !== '' && copertiEstivi.value != null) {
-      payload.coperti_estivi = parseInt(copertiEstivi.value, 10);
-    }
-    const response = await fetch(`${API_BASE}/api/auth/local/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      errorMessage.value = errorData?.error?.message || 'Errore durante la registrazione.';
-      isError.value = true;
-      return false;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Errore di rete:', error.message);
-    errorMessage.value = 'Errore di rete durante la registrazione.';
-    isError.value = true;
-    return false;
-  }
-};
-
-const submit = async () => {
+// Step 1: validazione e parcheggio dati in sessionStorage. Nessun utente viene
+// creato nel DB finchè il piano non è scelto in /choose-plan e completato il
+// checkout Stripe.
+const submit = () => {
   isError.value = false;
   errorMessage.value = '';
 
@@ -103,23 +46,23 @@ const submit = async () => {
     return;
   }
 
-  // Validazione coperti invernali (obbligatori)
   const cInv = parseInt(copertiInvernali.value, 10);
   if (!Number.isFinite(cInv) || cInv < 1 || cInv > 10000) {
     errorMessage.value = 'Inserisci i coperti invernali (intero tra 1 e 10000).';
     isError.value = true;
     return;
   }
+  let cEst = null;
   if (copertiEstivi.value !== '' && copertiEstivi.value != null) {
-    const cEst = parseInt(copertiEstivi.value, 10);
-    if (!Number.isFinite(cEst) || cEst < 1 || cEst > 10000) {
+    const parsed = parseInt(copertiEstivi.value, 10);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 10000) {
       errorMessage.value = 'Coperti estivi non validi (intero tra 1 e 10000).';
       isError.value = true;
       return;
     }
+    cEst = parsed;
   }
 
-  // Validazione data di nascita
   if (birth_date.value) {
     const bd = new Date(birth_date.value);
     const today = new Date();
@@ -136,37 +79,30 @@ const submit = async () => {
     }
   }
 
-  if( password.value === password_confirmation.value ){
-    isLoading.value = true;
-    try {
-      const created = await createUser();
-      if (created?.jwt && created?.user) {
-        store.dispatch('login', { user: created.user, token: created.jwt });
-        localStorage.setItem('user', JSON.stringify(created.user));
-        localStorage.setItem('token', created.jwt);
-
-        try {
-          const session = await createBillingCheckoutSession(selectedPlan.value, created.jwt);
-          if (session?.url) {
-            window.location.href = session.url;
-            return;
-          }
-        } catch (checkoutError) {
-          console.error('Stripe checkout non avviato:', checkoutError);
-          errorMessage.value = checkoutError.message || 'Account creato, ma il checkout Stripe non si e avviato.';
-          isError.value = true;
-        }
-        router.push({ path: '/renew-sub', query: { checkout: 'retry', plan: selectedPlan.value } });
-      }
-    } finally {
-      isLoading.value = false;
-    }
-  }else{
+  if (password.value !== password_confirmation.value) {
     errorMessage.value = 'Le due password devono coincidere';
     isError.value = true;
-    isLoading.value = false;
+    return;
   }
 
+  isLoading.value = true;
+  try {
+    const pending = {
+      username: username.value,
+      email: email.value,
+      password: password.value,
+      name: name.value,
+      surname: surname.value,
+      birth_date: birth_date.value,
+      coperti_invernali: cInv,
+      restaurant_name: username.value,
+    };
+    if (cEst != null) pending.coperti_estivi = cEst;
+    sessionStorage.setItem('pending_registration', JSON.stringify(pending));
+    router.push('/choose-plan');
+  } finally {
+    isLoading.value = false;
+  }
 };
 </script>
 
@@ -262,27 +198,6 @@ const submit = async () => {
         </div>
       </div>
 
-      <div class="ds-field">
-        <InputLabel value="Piano" />
-        <div class="plan-options">
-          <label
-            v-for="plan in plans"
-            :key="plan.key"
-            class="plan-option"
-            :class="{ 'plan-option-active': selectedPlan === plan.key }"
-          >
-            <input v-model="selectedPlan" type="radio" name="plan" :value="plan.key" />
-            <span class="plan-option-body">
-              <span class="plan-option-head">
-                <strong>{{ plan.name }}</strong>
-                <span>{{ plan.price }}</span>
-              </span>
-              <span class="plan-option-desc">{{ plan.desc }}</span>
-            </span>
-          </label>
-        </div>
-      </div>
-
       <div class="terms-field">
         <label class="terms-label">
           <Checkbox id="terms" v-model:checked="terms" name="terms" />
@@ -303,7 +218,10 @@ const submit = async () => {
 
       <button type="submit" class="ds-btn ds-btn-primary ds-btn-lg auth-submit" :disabled="isLoading">
         <span v-if="isLoading" class="ds-spinner"></span>
-        <span v-else>Registrati e vai al pagamento</span>
+        <template v-else>
+          <span>Scegli il piano</span>
+          <i class="bi bi-arrow-right" aria-hidden="true"></i>
+        </template>
       </button>
 
       <p class="auth-footer-text">
@@ -418,59 +336,6 @@ const submit = async () => {
 
 .terms-field {
   margin: var(--s-2) 0 0;
-}
-
-.plan-options {
-  display: grid;
-  gap: var(--s-3);
-}
-
-.plan-option {
-  display: flex;
-  gap: 10px;
-  padding: var(--s-4);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--paper);
-  cursor: pointer;
-}
-
-.plan-option-active {
-  border-color: var(--ink);
-  box-shadow: 0 0 0 1px var(--ink);
-}
-
-.plan-option input {
-  margin-top: 3px;
-}
-
-.plan-option-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-}
-
-.plan-option-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 14px;
-  color: var(--ink);
-}
-
-.plan-option-head span {
-  font-family: var(--f-mono, 'Geist Mono', monospace);
-  font-size: 12px;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
-.plan-option-desc {
-  font-size: 13px;
-  color: var(--ink-3);
-  line-height: 1.4;
 }
 
 .terms-label {

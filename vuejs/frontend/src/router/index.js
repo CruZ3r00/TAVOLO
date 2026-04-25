@@ -13,23 +13,25 @@ const routes = [
         name: 'login',
         component: () => import('../Pages/Auth/Login.vue'),
     },
-    { //non protetta
-        path: '/', // Path to the dash
+    { //non protetta - step 2 della registrazione (scelta piano + redirect Stripe)
+        path: '/choose-plan',
+        name: 'choose-plan',
+        component: () => import('../Pages/ChoosePlan.vue'),
+    },
+    { //non protetta — landing pubblica (Dashboard.vue gestisce v-if isLoggedIn)
+        path: '/',
         name: 'Dashboard',
         component: () => import('../Pages/Dashboard.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
-      path: '/home', // Path to the dash
-      name: 'home',
-      component: () => import('../Pages/Dashboard.vue'),
-      meta: { requiresAuth: true, requiresSubscription: true },
+        path: '/home',
+        name: 'home',
+        component: () => import('../Pages/Dashboard.vue'),
     },
     { //non protetta
-        path: '/dashboard', // Path to the dash
+        path: '/dashboard',
         name: 'dashboard',
         component: () => import('../Pages/Dashboard.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
         path: '/terms', // Route to the Terms of Service
@@ -70,11 +72,17 @@ const routes = [
         component: () => import('../Pages/Reservations.vue'),
         meta: { requiresAuth: true, requiresSubscription: true },
     },
-    { //protetta - Gestione ordinazioni
+    { //protetta - Gestione ordinazioni (sala)
         path: '/orders',
-        name: 'Ordinazioni',
+        name: 'Sala',
         component: () => import('../Pages/Orders.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true },
+        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cameriere' },
+    },
+    { //protetta - Vista cucina
+        path: '/kitchen',
+        name: 'Cucina',
+        component: () => import('../Pages/Orders.vue'),
+        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina' },
     },
     { //non protetta
         path: '/who-are-us', // Route per pagina chi siamo

@@ -70,13 +70,17 @@ function dateOnlyFromUnix(timestamp) {
 }
 
 async function updateUserSubscription(userId, data) {
-  if (!userId) return null;
+  const numericId = Number.parseInt(userId, 10);
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    strapi.log.warn(`updateUserSubscription: userId non valido (${userId})`);
+    return null;
+  }
   const clean = {};
   for (const [key, value] of Object.entries(data)) {
     if (value !== undefined) clean[key] = value;
   }
   return strapi.db.query('plugin::users-permissions.user').update({
-    where: { id: userId },
+    where: { id: numericId },
     data: clean,
   });
 }
@@ -190,6 +194,55 @@ module.exports = {
         error: {
           message: err.message || 'Impossibile creare la sessione Stripe Checkout.',
         },
+      });
+    }
+  },
+
+  // Sync esplicito da chiamare dopo il return da Stripe Checkout (success_url
+   // contiene session_id={CHECKOUT_SESSION_ID}). Recupera la session da Stripe
+   // e aggiorna l'utente immediatamente, senza dipendere dal webhook (utile in
+   // dev/stage dove Stripe non raggiunge localhost senza tunnel).
+  async syncCheckoutSession(ctx) {
+    const user = await requireBillingUser(ctx);
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    const { session_id: sessionId } = ctx.request.body || {};
+    if (!sessionId || typeof sessionId !== 'string') {
+      return ctx.badRequest('session_id mancante.');
+    }
+
+    try {
+      const stripe = getStripe();
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['subscription'],
+      });
+
+      // Sicurezza: la session deve appartenere all'utente autenticato.
+      const sessionUserId = session.metadata?.user_id || session.client_reference_id;
+      if (sessionUserId && Number.parseInt(sessionUserId, 10) !== user.id) {
+        return ctx.forbidden('Sessione non appartiene a questo utente.');
+      }
+
+      if (session.mode !== 'subscription' || !session.subscription) {
+        return ctx.badRequest('Session non valida o senza subscription.');
+      }
+
+      const snapshot = await subscriptionSnapshot(stripe, session.subscription);
+      await updateUserSubscription(user.id, {
+        stripe_customer_id: session.customer,
+        ...snapshot,
+        subscription_plan: normalizePlanKey(session.metadata?.plan) || snapshot.subscription_plan,
+      });
+
+      const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: user.id },
+      });
+      return ctx.send({ data: safeUser(refreshed) });
+    } catch (err) {
+      strapi.log.error(`Stripe sync-checkout failed: ${err.message}`);
+      ctx.status = err.status || err.statusCode || 500;
+      return ctx.send({
+        error: { message: err.message || 'Sync della sessione Stripe fallito.' },
       });
     }
   },
