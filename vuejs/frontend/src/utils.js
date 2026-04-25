@@ -172,6 +172,24 @@ export const createBillingCheckoutSession = async (plan, token) => {
     return payload.data;
 };
 
+// Sync esplicito post-checkout: chiama il backend con il session_id ricevuto
+// dal success_url di Stripe Checkout. Il backend recupera la session da Stripe
+// e aggiorna i campi subscription_* dell'utente immediatamente (senza
+// dipendere dal webhook).
+export const syncBillingCheckout = async (sessionId, token) => {
+    const resp = await fetch(`${API_BASE}/api/billing/sync-checkout`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ session_id: sessionId }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildBillingError(resp, payload);
+    return payload.data;
+};
+
 export const createBillingPortalSession = async (token) => {
     const resp = await fetch(`${API_BASE}/api/billing/portal`, {
         method: 'POST',

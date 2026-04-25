@@ -27,12 +27,8 @@ const refreshing = ref(false);
 const errorMessage = ref('');
 const toast = ref(null);
 
-// Modalita: cameriere | cucina
-const mode = ref(localStorage.getItem('orders_mode') || 'cameriere');
-const setMode = (m) => {
-    mode.value = m;
-    localStorage.setItem('orders_mode', m);
-};
+// Modalita: cameriere | cucina (driven by route meta — /orders vs /kitchen)
+const mode = computed(() => (route.meta?.ordersMode === 'cucina' ? 'cucina' : 'cameriere'));
 
 // Modals
 const showOrderDetail = ref(false);
@@ -212,7 +208,7 @@ const openOrderFromQuery = () => {
 };
 
 onMounted(async () => {
-    document.title = 'Ordinazioni';
+    document.title = mode.value === 'cucina' ? 'Cucina' : 'Sala';
     await loadData();
     startPolling();
     document.addEventListener('visibilitychange', onVisibilityChange);
@@ -233,36 +229,12 @@ onBeforeUnmount(() => {
                 <header class="ord-header">
                     <div class="ord-header-left">
                         <p class="text-overline">Gestione</p>
-                        <h1 class="ord-title">Ordinazioni</h1>
+                        <h1 class="ord-title">{{ mode === 'cameriere' ? 'Sala' : 'Cucina' }}</h1>
                         <p class="ord-subtitle">
                             {{ mode === 'cameriere' ? 'Gestisci tavoli e ordini in sala.' : 'Visualizza e lavora i piatti in cucina.' }}
                         </p>
                     </div>
                     <div class="ord-header-actions">
-                        <!-- Toggle cameriere / cucina -->
-                        <div class="ord-mode-toggle" role="tablist" aria-label="Modalita vista">
-                            <button
-                                type="button"
-                                role="tab"
-                                :aria-selected="mode === 'cameriere'"
-                                :class="['ord-mode-btn', { active: mode === 'cameriere' }]"
-                                @click="setMode('cameriere')"
-                            >
-                                <i class="bi bi-person-badge" aria-hidden="true"></i>
-                                Cameriere
-                            </button>
-                            <button
-                                type="button"
-                                role="tab"
-                                :aria-selected="mode === 'cucina'"
-                                :class="['ord-mode-btn', { active: mode === 'cucina' }]"
-                                @click="setMode('cucina')"
-                            >
-                                <i class="bi bi-fire" aria-hidden="true"></i>
-                                Cucina
-                            </button>
-                        </div>
-
                         <button
                             type="button"
                             class="ds-btn ds-btn-secondary"
@@ -419,40 +391,6 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
 }
 
-.ord-mode-toggle {
-    display: flex;
-    gap: 2px;
-    padding: 4px;
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-}
-.ord-mode-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    font-family: var(--f-sans, 'Geist', sans-serif);
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--ink-2);
-    background: transparent;
-    border: none;
-    border-radius: var(--r-sm);
-    cursor: pointer;
-    transition: background 120ms, color 120ms, box-shadow 120ms;
-}
-.ord-mode-btn i { font-size: 15px; }
-.ord-mode-btn:hover {
-    color: var(--ink);
-    background: color-mix(in oklab, var(--ink) 4%, transparent);
-}
-.ord-mode-btn.active {
-    background: var(--paper);
-    color: var(--ink);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
-}
-
 .ord-toast {
     position: fixed;
     top: 80px;
@@ -506,8 +444,6 @@ onBeforeUnmount(() => {
     .ord-container { padding: 0 var(--s-4); }
     .ord-header { align-items: flex-start; }
     .ord-header-actions { width: 100%; }
-    .ord-mode-toggle { flex: 1; }
-    .ord-mode-btn { flex: 1; justify-content: center; }
     .ord-toast {
         top: 68px;
         right: var(--s-3);

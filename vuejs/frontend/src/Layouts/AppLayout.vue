@@ -85,7 +85,7 @@ const userInitial = computed(() => (username.value || 'U').charAt(0).toUpperCase
 
 const roles = [
   { key: 'sala', label: 'Sala', path: '/orders', icon: 'bi-grid-3x3-gap' },
-  { key: 'cucina', label: 'Cucina', path: '/orders?mode=kitchen', icon: 'bi-fire' },
+  { key: 'cucina', label: 'Cucina', path: '/kitchen', icon: 'bi-fire' },
   { key: 'prenotazioni', label: 'Prenotazioni', path: '/reservations', icon: 'bi-calendar-check' },
   { key: 'menu', label: 'Menu', path: '/menu-handler', icon: 'bi-journal-text' },
   { key: 'manager', label: 'Manager', path: '/dashboard', icon: 'bi-speedometer2' },
@@ -93,6 +93,7 @@ const roles = [
 
 const activeRole = computed(() => {
   const p = route.path;
+  if (p.startsWith('/kitchen')) return 'cucina';
   if (p.startsWith('/orders')) return 'sala';
   if (p.startsWith('/reservations')) return 'prenotazioni';
   if (p.startsWith('/menu-handler')) return 'menu';

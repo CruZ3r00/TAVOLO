@@ -123,7 +123,7 @@
 }
 .auth-brand-icon {
   width: 36px; height: 36px; display: grid; place-items: center;
-  background: var(--ink); color: var(--paper); border-radius: 10px;
+  background: var(--ink); color: var(--bg); border-radius: 10px;
   font-size: 16px;
 }
 .auth-brand-name {

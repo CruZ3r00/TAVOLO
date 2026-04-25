@@ -16,6 +16,12 @@ module.exports = {
     },
     {
       method: 'POST',
+      path: '/billing/sync-checkout',
+      handler: 'billing.syncCheckoutSession',
+      config: { auth: false, policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
       path: '/billing/portal',
       handler: 'billing.createPortalSession',
       config: { auth: false, policies: [], middlewares: [] },

@@ -464,7 +464,7 @@ onMounted(async () => {
               <article class="price-card">
                 <h3>Essenziale</h3>
                 <p class="price-sub">Per bistrot e trattorie con un servizio singolo.</p>
-                <div class="price">€49<span class="price-suffix">/mese</span></div>
+                <div class="price">€39,99<span class="price-suffix">/mese</span></div>
                 <div class="price-note">IVA esclusa · Fatturato mensilmente</div>
                 <ul>
                   <li><i class="bi bi-check2"></i>Vista Sala, Cucina, Cassa</li>
@@ -478,7 +478,7 @@ onMounted(async () => {
                 <span class="price-flag">Più scelto</span>
                 <h3>Professionale</h3>
                 <p class="price-sub">Per ristoranti con sala e dehors attivi tutto l'anno.</p>
-                <div class="price">€89<span class="price-suffix">/mese</span></div>
+                <div class="price">€74,99<span class="price-suffix">/mese</span></div>
                 <div class="price-note">IVA esclusa · Fatturato mensilmente</div>
                 <ul>
                   <li><i class="bi bi-check2"></i>Tutto di Essenziale</li>
