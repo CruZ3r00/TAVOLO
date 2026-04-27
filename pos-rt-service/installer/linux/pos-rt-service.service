@@ -1,0 +1,40 @@
+[Unit]
+Description=pos-rt-service — bridge Strapi ↔ POS/RT fiscali
+Documentation=https://github.com/your-org/cms_restaurant/tree/master/pos-rt-service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=posrt
+Group=posrt
+# Path al binario pkg-compilato o al runtime node
+ExecStart=/usr/local/bin/pos-rt-service
+# In alternativa con Node:
+# ExecStart=/usr/bin/node /opt/pos-rt-service/src/main.js
+
+Environment="NODE_ENV=production"
+Environment="LOG_LEVEL=info"
+Environment="APP_DATA_DIR=/var/lib/pos-rt-service"
+
+WorkingDirectory=/var/lib/pos-rt-service
+Restart=always
+RestartSec=5
+# Log su journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pos-rt-service
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/pos-rt-service
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=false
+# PrivateDevices=false perché potremmo avere USB verso stampanti/RT
+
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

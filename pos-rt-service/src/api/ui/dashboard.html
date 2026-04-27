@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pos-rt-service — Dashboard</title>
+    <style>
+      :root {
+        --bg: #0f1419; --panel: #1a1f26; --border: #2a3038;
+        --text: #e6e6e6; --muted: #9aa5b1;
+        --accent: #00c896; --danger: #ff6b6b; --warn: #f0b400;
+      }
+      * { box-sizing: border-box; }
+      body {
+        background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        margin: 0; padding: 1.5rem; min-height: 100vh;
+      }
+      .header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 1.5rem;
+      }
+      h1 { margin: 0; font-size: 1.4rem; }
+      .pin-gate {
+        max-width: 420px; margin: 3rem auto;
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 10px; padding: 2rem;
+      }
+      .pin-gate input {
+        width: 100%; padding: .7rem; background: #0b0f13;
+        border: 1px solid var(--border); color: var(--text);
+        border-radius: 6px; margin: 1rem 0; font-size: 1.2rem;
+        letter-spacing: .3rem; text-align: center;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1rem;
+      }
+      .panel {
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 8px; padding: 1rem;
+      }
+      .panel h2 {
+        margin: 0 0 .8rem 0; font-size: .85rem;
+        text-transform: uppercase; letter-spacing: .1rem;
+        color: var(--muted);
+      }
+      .kv { display: flex; justify-content: space-between; padding: .3rem 0; font-size: .9rem; }
+      .kv .k { color: var(--muted); }
+      .kv .v { font-family: 'SF Mono', Monaco, Consolas, monospace; }
+      .badge {
+        display: inline-block; padding: .2rem .5rem;
+        border-radius: 4px; font-size: .75rem; font-weight: 600;
+      }
+      .b-ok { background: rgba(0,200,150,.2); color: var(--accent); }
+      .b-err { background: rgba(255,107,107,.2); color: var(--danger); }
+      .b-warn { background: rgba(240,180,0,.2); color: var(--warn); }
+      button {
+        background: var(--accent); color: #0b0f13; border: 0;
+        padding: .6rem 1rem; border-radius: 6px; font-weight: 600;
+        cursor: pointer; font-size: .9rem;
+      }
+      button.danger { background: var(--danger); color: #fff; }
+      button:disabled { opacity: .5; cursor: wait; }
+      .actions { margin-top: 1rem; display: flex; gap: .5rem; flex-wrap: wrap; }
+      .error {
+        background: rgba(255,107,107,.1); border: 1px solid var(--danger);
+        color: var(--danger); padding: .7rem; border-radius: 6px;
+        margin: 1rem 0; font-size: .9rem;
+      }
+      table {
+        width: 100%; border-collapse: collapse; font-size: .85rem;
+        margin-top: .5rem;
+      }
+      th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--border); }
+      th { color: var(--muted); font-weight: 500; font-size: .75rem; text-transform: uppercase; }
+      .muted { color: var(--muted); font-size: .85rem; }
+    </style>
+  </head>
+  <body>
+    <div id="gate" class="pin-gate">
+      <h1>Accesso pannello</h1>
+      <p class="muted">Inserisci il PIN locale generato durante il pairing.</p>
+      <input type="password" id="pin" maxlength="6" inputmode="numeric" placeholder="••••••" />
+      <button id="unlock" style="width:100%">Entra</button>
+      <div id="gateErr" class="error" style="display:none"></div>
+    </div>
+
+    <div id="dash" style="display:none">
+      <div class="header">
+        <h1>pos-rt-service</h1>
+        <div>
+          <button onclick="refresh()">Aggiorna</button>
+          <button class="danger" onclick="unpair()">Unpair</button>
+        </div>
+      </div>
+
+      <div id="err" class="error" style="display:none"></div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Dispositivo</h2>
+          <div id="device"></div>
+        </div>
+        <div class="panel">
+          <h2>WebSocket</h2>
+          <div id="ws"></div>
+        </div>
+        <div class="panel">
+          <h2>Coda Job</h2>
+          <div id="queue"></div>
+        </div>
+        <div class="panel">
+          <h2>Driver</h2>
+          <div id="drivers"></div>
+          <div class="actions">
+            <button onclick="testPrint()">Stampa di test</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Audit</h2>
+          <div id="audit"></div>
+          <div class="actions">
+            <button onclick="verifyAudit()">Verifica integrità</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:1rem">
+        <h2>Ultimi eventi audit</h2>
+        <table>
+          <thead><tr><th>ID</th><th>Timestamp</th><th>Kind</th><th>Event</th></tr></thead>
+          <tbody id="auditRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      let PIN = sessionStorage.getItem('localPin') || '';
+
+      document.getElementById('unlock').addEventListener('click', async () => {
+        const pin = document.getElementById('pin').value.trim();
+        if (!pin) return;
+        PIN = pin;
+        try {
+          const r = await authedFetch('/admin/jobs?limit=1');
+          if (!r.ok) throw new Error('PIN errato');
+          sessionStorage.setItem('localPin', PIN);
+          document.getElementById('gate').style.display = 'none';
+          document.getElementById('dash').style.display = 'block';
+          refresh();
+        } catch (err) {
+          document.getElementById('gateErr').textContent = err.message;
+          document.getElementById('gateErr').style.display = 'block';
+        }
+      });
+
+      if (PIN) {
+        // tenta direttamente
+        authedFetch('/admin/jobs?limit=1').then((r) => {
+          if (r.ok) {
+            document.getElementById('gate').style.display = 'none';
+            document.getElementById('dash').style.display = 'block';
+            refresh();
+          }
+        });
+      }
+
+      async function authedFetch(path, opts = {}) {
+        const headers = Object.assign({}, opts.headers || {}, { 'X-Local-Pin': PIN });
+        if (opts.body && typeof opts.body === 'object') {
+          headers['Content-Type'] = 'application/json';
+          opts.body = JSON.stringify(opts.body);
+        }
+        return fetch(path, { ...opts, headers });
+      }
+
+      async function refresh() {
+        showErr(null);
+        try {
+          const [statusRes, auditRes] = await Promise.all([
+            fetch('/status').then((r) => r.json()),
+            authedFetch('/admin/audit?limit=10').then((r) => r.json()),
+          ]);
+          renderStatus(statusRes);
+          renderAudit(auditRes.data || []);
+        } catch (err) {
+          showErr(err.message);
+        }
+      }
+
+      // Costruzione DOM lato client SOLO via createElement + textContent.
+      // Mai innerHTML / template-literal con dati dinamici (XSS hardening).
+      function el(tag, opts = {}, ...children) {
+        const node = document.createElement(tag);
+        if (opts.class) node.className = opts.class;
+        if (opts.text != null) node.textContent = String(opts.text);
+        for (const c of children) {
+          if (c == null) continue;
+          node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+        }
+        return node;
+      }
+
+      function kvNode(k, v) {
+        const valNode = v instanceof Node ? v : el('span', { class: 'v', text: v == null ? '-' : v });
+        if (v instanceof Node) {
+          // wrappa in span.v se non lo è già
+          if (!(v.classList && v.classList.contains('v'))) {
+            const w = el('span', { class: 'v' });
+            w.appendChild(v);
+            return el('div', { class: 'kv' }, el('span', { class: 'k', text: k }), w);
+          }
+        }
+        return el('div', { class: 'kv' }, el('span', { class: 'k', text: k }), valNode);
+      }
+
+      function badgeNode(ok, text) {
+        return el('span', { class: 'badge ' + (ok ? 'b-ok' : 'b-err'), text });
+      }
+
+      function composeNode(...parts) {
+        const frag = document.createDocumentFragment();
+        for (const p of parts) {
+          if (p == null) continue;
+          frag.appendChild(typeof p === 'string' ? document.createTextNode(p) : p);
+        }
+        return frag;
+      }
+
+      function replaceChildren(target, ...nodes) {
+        target.textContent = '';
+        for (const n of nodes) target.appendChild(n);
+      }
+
+      function renderStatus(s) {
+        const dev = s.device || {};
+        replaceChildren(
+          document.getElementById('device'),
+          kvNode('Paired', badgeNode(s.paired, s.paired ? 'yes' : 'no')),
+          kvNode('Name', dev.name || '-'),
+          kvNode('URL', dev.strapi_url || '-'),
+          kvNode('Last sync', dev.last_sync_at || '-'),
+        );
+
+        replaceChildren(
+          document.getElementById('ws'),
+          kvNode('Connected', badgeNode(s.ws.connected, s.ws.connected ? 'yes' : 'no')),
+          kvNode('State', s.ws.state),
+        );
+
+        replaceChildren(
+          document.getElementById('queue'),
+          kvNode('Pending', s.queue.pending),
+          kvNode('In progress', s.queue.in_progress),
+          kvNode('Done', s.queue.done),
+          kvNode('DLQ', s.queue.dead_letter),
+          kvNode('Total', s.queue.total),
+        );
+
+        const dp = s.drivers?.printer || {};
+        const dq = s.drivers?.payment || {};
+        replaceChildren(
+          document.getElementById('drivers'),
+          kvNode('Printer', composeNode((dp.name || '-') + ' ', badgeNode(dp.online, dp.online ? 'online' : 'offline'))),
+          kvNode('Payment', composeNode((dq.name || '-') + ' ', badgeNode(dq.online, dq.online ? 'online' : 'offline'))),
+        );
+
+        replaceChildren(document.getElementById('audit'), kvNode('Eventi', s.audit?.count ?? 0));
+      }
+
+      function renderAudit(rows) {
+        const tbody = document.getElementById('auditRows');
+        tbody.textContent = '';
+        for (const r of rows) {
+          const tr = el('tr');
+          tr.appendChild(el('td', { text: r.id }));
+          tr.appendChild(el('td', { text: r.ts }));
+          tr.appendChild(el('td', { text: r.kind }));
+          tr.appendChild(el('td', { class: 'muted', text: r.event_id || '' }));
+          tbody.appendChild(tr);
+        }
+      }
+
+      async function testPrint() {
+        try {
+          const r = await authedFetch('/admin/test-print', { method: 'POST', body: {} });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.message);
+          alert('OK: scontrino ' + d.data.receipt_no);
+        } catch (err) {
+          alert('Errore: ' + err.message);
+        }
+      }
+
+      async function verifyAudit() {
+        const r = await authedFetch('/admin/audit/verify');
+        const d = await r.json();
+        alert(d.data.valid ? 'Audit chain integra ✓' : 'CORROTTA: ' + d.data.reason);
+      }
+
+      async function unpair() {
+        if (!confirm('Unpair: il dispositivo verrà scollegato da Strapi. Confermi?')) return;
+        try {
+          const r = await authedFetch('/pair/unpair', { method: 'POST', body: {} });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.message);
+          sessionStorage.removeItem('localPin');
+          window.location.href = '/ui/pair.html';
+        } catch (err) {
+          alert('Errore: ' + err.message);
+        }
+      }
+
+      function showErr(msg) {
+        const el = document.getElementById('err');
+        if (msg) {
+          el.textContent = msg;
+          el.style.display = 'block';
+        } else {
+          el.style.display = 'none';
+        }
+      }
+
+      setInterval(() => {
+        if (document.getElementById('dash').style.display !== 'none') refresh();
+      }, 5000);
+    </script>
+  </body>
+</html>

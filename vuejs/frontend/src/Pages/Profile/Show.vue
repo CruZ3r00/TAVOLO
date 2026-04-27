@@ -5,6 +5,7 @@
     import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
     import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
     import WebsiteConfigForm from '@/Pages/Profile/Partials/WebsiteConfigForm.vue';
+    import PosCassaForm from '@/Pages/Profile/Partials/PosCassaForm.vue';
     import AppLayout from '@/Layouts/AppLayout.vue';
     import { useStore } from 'vuex';
     import { useRoute } from 'vue-router';
@@ -18,6 +19,7 @@
         { key: 'cambiopsw', label: 'Password', icon: 'bi-key' },
         { key: 'duefattori', label: 'Due fattori', icon: 'bi-shield-lock' },
         { key: 'sito', label: 'Sito web', icon: 'bi-globe2' },
+        { key: 'poscassa', label: 'POS / Cassa fiscale', icon: 'bi-credit-card-2-front' },
         { key: 'delete', label: 'Elimina account', icon: 'bi-trash', danger: true },
     ];
 
@@ -82,6 +84,7 @@
                             <UpdatePasswordForm v-else-if="activeSection === 'cambiopsw'" :id="userinfo.id" :key="'password'" />
                             <TwoFactorAuthenticationForm v-else-if="activeSection === 'duefattori'" :requires-confirmation="confirmsTwoFactorAuthentication" :key="'2fa'" />
                             <WebsiteConfigForm v-else-if="activeSection === 'sito'" :key="'sito'" />
+                            <PosCassaForm v-else-if="activeSection === 'poscassa'" :key="'poscassa'" />
                             <DeleteUserForm v-else-if="activeSection === 'delete'" :key="'delete'" />
                         </Transition>
                     </div>

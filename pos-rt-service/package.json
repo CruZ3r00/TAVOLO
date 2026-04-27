@@ -1,0 +1,60 @@
+{
+  "name": "pos-rt-service",
+  "version": "1.0.0",
+  "description": "Bridge service between Strapi CMS and local POS / fiscal register (RT) devices. Outbound-only, multi-platform.",
+  "private": true,
+  "license": "UNLICENSED",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "pos-rt-service": "src/main.js"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "dev": "NODE_ENV=development node src/main.js",
+    "migrate": "node scripts/migrate.js",
+    "test": "node --test tests/unit/*.test.js tests/unit/drivers/*.test.js",
+    "lint": "eslint src/ scripts/ tests/",
+    "format": "prettier --write \"src/**/*.{js,json,html}\" \"scripts/**/*.js\" \"tests/**/*.js\"",
+    "build": "node scripts/build.js",
+    "pack:linux": "pkg . --targets node20-linux-x64 --out-path dist/linux --compress Brotli",
+    "pack:macos": "pkg . --targets node20-macos-x64,node20-macos-arm64 --out-path dist/macos --compress Brotli",
+    "pack:win": "pkg . --targets node20-win-x64 --out-path dist/win --compress Brotli",
+    "pack:all": "pkg . --targets node20-linux-x64,node20-macos-x64,node20-macos-arm64,node20-win-x64 --out-path dist --compress Brotli"
+  },
+  "pkg": {
+    "scripts": [
+      "src/**/*.js"
+    ],
+    "assets": [
+      "src/api/ui/**/*",
+      "src/storage/migrations/**/*"
+    ],
+    "outputPath": "dist"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "keytar": "^7.9.0",
+    "node-cron": "^3.0.3",
+    "p-queue": "^8.0.1",
+    "pino": "^9.5.0",
+    "pino-pretty": "^11.3.0",
+    "pino-roll": "^2.0.0",
+    "ulid": "^2.3.0",
+    "ws": "^8.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^5.16.1",
+    "eslint": "^9.13.0",
+    "prettier": "^3.3.3"
+  },
+  "optionalDependencies": {
+    "serialport": "^12.0.0"
+  }
+}

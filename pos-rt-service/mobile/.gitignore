@@ -1,0 +1,27 @@
+node_modules
+dist
+.env
+.env.local
+*.log
+.DS_Store
+
+# Capacitor native projects (rigenerati da `cap add android` / `cap add ios`)
+# Contengono file generati ma anche customizzazioni: includere SOLO i file
+# manualmente modificati (plugin custom, manifest patch, ecc).
+android/.idea/
+android/.gradle/
+android/build/
+android/captures/
+android/app/build/
+android/app/release/
+android/local.properties
+ios/.gradle/
+ios/Pods/
+ios/build/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+
+# IDE
+.vscode/
+.idea/
+*.swp

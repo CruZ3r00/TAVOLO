@@ -1,0 +1,37 @@
+{
+  "kind": "collectionType",
+  "collectionName": "pos_pairing_tokens",
+  "info": {
+    "singularName": "pos-pairing-token",
+    "pluralName": "pos-pairing-tokens",
+    "displayName": "POS Pairing Token",
+    "description": "Token single-use per accoppiare un nuovo pos-rt-service (PC/mobile) al user. Generato dalla pagina profilo, consumato dall'endpoint register-by-token."
+  },
+  "options": { "draftAndPublish": false },
+  "attributes": {
+    "token_hash": {
+      "type": "string",
+      "required": true,
+      "private": true,
+      "maxLength": 128,
+      "unique": true
+    },
+    "expires_at": {
+      "type": "datetime",
+      "required": true
+    },
+    "consumed_at": {
+      "type": "datetime"
+    },
+    "created_ip": {
+      "type": "string",
+      "maxLength": 64,
+      "private": true
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

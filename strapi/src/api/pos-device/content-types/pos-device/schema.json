@@ -1,0 +1,62 @@
+{
+  "kind": "collectionType",
+  "collectionName": "pos_devices",
+  "info": {
+    "singularName": "pos-device",
+    "pluralName": "pos-devices",
+    "displayName": "POS/RT Device",
+    "description": "Dispositivo pos-rt-service installato presso il ristoratore. Comunica con Strapi via HTTP + WebSocket outbound."
+  },
+  "options": { "draftAndPublish": false },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "maxLength": 120
+    },
+    "device_token_hash": {
+      "type": "string",
+      "required": true,
+      "private": true,
+      "maxLength": 128
+    },
+    "fingerprint": {
+      "type": "string",
+      "required": true,
+      "maxLength": 128
+    },
+    "last_seen": {
+      "type": "datetime"
+    },
+    "revoked_at": {
+      "type": "datetime"
+    },
+    "version": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "platform": {
+      "type": "enumeration",
+      "enum": ["windows", "macos", "linux", "ios", "android", "other"],
+      "default": "other"
+    },
+    "apns_token": {
+      "type": "string",
+      "private": true,
+      "maxLength": 200
+    },
+    "apns_token_updated_at": {
+      "type": "datetime",
+      "private": true
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

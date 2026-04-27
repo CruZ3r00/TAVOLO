@@ -1,0 +1,69 @@
+{
+  "kind": "collectionType",
+  "collectionName": "pos_jobs",
+  "info": {
+    "singularName": "pos-job",
+    "pluralName": "pos-jobs",
+    "displayName": "POS Job",
+    "description": "Coda server-side dei job inviati al pos-rt-service (stampa/pagamento). Consumati via HTTP pull o push su WebSocket."
+  },
+  "options": { "draftAndPublish": false },
+  "attributes": {
+    "event_id": {
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "maxLength": 64
+    },
+    "kind": {
+      "type": "enumeration",
+      "enum": ["order.close", "print.receipt", "payment.charge", "payment.refund"],
+      "required": true
+    },
+    "payload": {
+      "type": "json",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "dispatched", "acked_success", "acked_failure", "cancelled"],
+      "default": "pending",
+      "required": true
+    },
+    "priority": {
+      "type": "integer",
+      "default": 100
+    },
+    "outcome": {
+      "type": "json"
+    },
+    "error_code": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "error_message": {
+      "type": "text"
+    },
+    "dispatched_at": {
+      "type": "datetime"
+    },
+    "acked_at": {
+      "type": "datetime"
+    },
+    "fk_device": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::pos-device.pos-device"
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "fk_order": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::order.order"
+    }
+  }
+}
