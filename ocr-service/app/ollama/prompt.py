@@ -24,11 +24,13 @@ REGOLE CRITICHE (OBBLIGATORIE):
 - Il prezzo appartiene SOLO alla voce sulla stessa riga o immediatamente accanto.
 - Se non sei sicuro → usa null.
 - NON indovinare mai il prezzo.
+- Usa solo prezzi presenti nel testo OCR o nella sezione VOCI_PREPARSE.
 
 3. INGREDIENTI
 - Usa SOLO ingredienti presenti esplicitamente nel testo.
 - NON inventare ingredienti.
 - Se non presenti → []
+- NON spostare ingredienti o descrizioni nel nome del piatto.
 
 4. ALLERGENI
 - Derivali SOLO da ingredienti certi.
@@ -41,7 +43,8 @@ REGOLE CRITICHE (OBBLIGATORIE):
 
 6. STRUTTURA MENU (IMPORTANTISSIMO)
 - Il testo può essere su più colonne.
-- NON collegare righe verticalmente.
+- Rispetta marcatori "PAGINA" e "COLONNA": non mischiare colonne diverse.
+- NON collegare righe verticalmente se appartengono a colonne diverse.
 - Ogni riga è indipendente.
 - NON combinare elementi di colonne diverse.
 
@@ -145,6 +148,8 @@ IMPORTANTE:
 - Non perdere elementi
 - Non unirli
 - Se incerto → lascia campi vuoti, NON inventare
+- Se una voce è ambigua mantieni solo name/prezzo certi e usa category "Altro",
+  ingredients [], allergens [].
 
 Rispondi ora SOLO con JSON valido.
 """

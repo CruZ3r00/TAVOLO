@@ -10,6 +10,68 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+def extract_pdf_text_layout(pdf_path: str) -> list[dict]:
+    """Estrae testo selezionabile da PDF con coordinate, senza OCR.
+
+    Ritorna una pagina per elemento con ``blocks`` e ``lines`` gia' ordinati
+    top-to-bottom / left-to-right. Se il PDF e' scansionato, le linee saranno
+    vuote o quasi vuote e il chiamante potra' usare OCR.
+    """
+
+    pages: list[dict] = []
+    doc = fitz.open(pdf_path)
+    try:
+        for page_idx, page in enumerate(doc):
+            page_dict = page.get_text("dict")
+            blocks: list[dict] = []
+            lines: list[dict] = []
+
+            for block in page_dict.get("blocks", []):
+                if block.get("type") != 0:
+                    continue
+                block_lines: list[dict] = []
+                for line in block.get("lines", []):
+                    spans = line.get("spans", [])
+                    text = " ".join(
+                        str(span.get("text", "")).strip()
+                        for span in spans
+                        if str(span.get("text", "")).strip()
+                    )
+                    text = " ".join(text.split())
+                    if not text:
+                        continue
+                    bbox = [float(v) for v in line.get("bbox", [0, 0, 0, 0])]
+                    item = {
+                        "text": text,
+                        "bbox": bbox,
+                        "confidence": 1.0,
+                    }
+                    block_lines.append(item)
+                    lines.append(item)
+                if block_lines:
+                    blocks.append(
+                        {
+                            "bbox": [float(v) for v in block.get("bbox", [0, 0, 0, 0])],
+                            "lines": block_lines,
+                        }
+                    )
+
+            lines.sort(key=lambda ln: (ln["bbox"][1], ln["bbox"][0]))
+            pages.append(
+                {
+                    "page": page_idx + 1,
+                    "width": float(page.rect.width),
+                    "height": float(page.rect.height),
+                    "blocks": blocks,
+                    "lines": lines,
+                }
+            )
+    finally:
+        doc.close()
+
+    return pages
+
+
 def pdf_to_images(pdf_path: str, dpi: int = 300) -> list[np.ndarray]:
     """Apre ``pdf_path`` e ritorna una lista di immagini BGR uint8, una per pagina.
 

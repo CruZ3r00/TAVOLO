@@ -23,6 +23,7 @@ from app.models.extraction import ExtractedElement, ExtractionResult
 from app.models.requests import ProcessRequest
 from app.ocr.menu_parser import (
     build_menu_items,
+    group_tokens_by_visual_layout,
     group_ocr_lines,
     is_price_line,
 )
@@ -35,7 +36,7 @@ from app.ollama.client import (
 )
 from app.ollama.prompt import build_prompt
 from app.preprocessing.cleanup import clean_image
-from app.preprocessing.pdf_to_image import pdf_to_images
+from app.preprocessing.pdf_to_image import extract_pdf_text_layout, pdf_to_images
 from app.utils.path_security import validate_input_path
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,77 @@ def _parse_extraction(raw: str) -> ExtractionResult | None:
         return None
 
 
+def _coerce_price(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        parsed = float(value)
+    elif isinstance(value, str):
+        stripped = value.strip().replace(",", ".").replace("€", "")
+        if not stripped:
+            return None
+        try:
+            parsed = float(stripped)
+        except ValueError:
+            return None
+    else:
+        return None
+    if not (0 <= parsed <= 1000):
+        return None
+    return round(parsed, 2)
+
+
+def _sanitize_extraction(extraction: ExtractionResult, warnings: list[str]) -> ExtractionResult:
+    """Validazione finale: contratto stabile e niente campi extra."""
+
+    elements: list[ExtractedElement] = []
+    seen: set[tuple[str, int | None]] = set()
+
+    for el in extraction.elements:
+        name = _normalize_name(str(el.name or ""))
+        if not name:
+            warnings.append("elemento scartato: nome vuoto")
+            continue
+        if len(name) <= 2:
+            warnings.append(f"nome corto/illeggibile scartato: {name}")
+            continue
+
+        price = _coerce_price(el.price)
+        category = (el.category or "").strip() or "Altro"
+        ingredients = [
+            str(x).strip().lower()
+            for x in (el.ingredients or [])
+            if str(x).strip()
+        ]
+        allergens = [
+            str(x).strip().lower()
+            for x in (el.allergens or [])
+            if str(x).strip()
+        ]
+
+        key = (
+            re.sub(r"[^a-z0-9]", "", name.lower()),
+            None if price is None else int(round(price * 100)),
+        )
+        if key in seen:
+            warnings.append(f"elemento duplicato scartato: {name}")
+            continue
+        seen.add(key)
+
+        elements.append(
+            ExtractedElement(
+                name=name,
+                price=price,
+                category=category,
+                ingredients=list(dict.fromkeys(ingredients)),
+                allergens=list(dict.fromkeys(allergens)),
+                image_coords=el.image_coords,
+            )
+        )
+
+    return ExtractionResult(elements=elements)
+
+
 async def _run_llm(prompt: str, model: str, reinforced: bool) -> str:
     """Wrapper sull'LLM che traduce le eccezioni in ``HTTPException``."""
     try:
@@ -149,6 +221,13 @@ def _normalize_ocr_text(text: str) -> str:
 
 def _normalize_name(name: str) -> str:
     text = re.sub(r"\s+", " ", name).strip(" .:-")
+    text = re.sub(r"\[[^\]]*\]", " ", text)
+    text = text.strip(" _•-")
+    words_for_spaced = text.split()
+    if len(words_for_spaced) >= 3 and all(len(w) == 1 and w.isalpha() for w in words_for_spaced):
+        text = "".join("I" if w == "l" else w for w in words_for_spaced)
+    text = re.sub(r"(?i)([a-z])0([a-z])", r"\1O\2", text)
+    text = re.sub(r"(?i)\bdl([a-z])", r"DI\1", text)
     text = re.sub(r"(?i)\befunghi\b", " e funghi", text)
     text = re.sub(r"(?i)efunghi\b", " e funghi", text)
     text = re.sub(r"(?i)^(\d)([A-Za-z])", r"\1 \2", text)
@@ -197,6 +276,27 @@ def _render_preparsed_items(items: list[dict[str, Any]]) -> str:
             row = f"{row} | details={details_str}"
         lines.append(row)
     return "\n".join(lines)
+
+
+def _text_layout_to_ocr_text(layout_pages: list[dict[str, Any]]) -> str:
+    page_texts: list[str] = []
+    for page in layout_pages:
+        lines = [str(line.get("text", "")).strip() for line in page.get("lines", [])]
+        lines = [line for line in lines if line]
+        if lines:
+            page_texts.append(f"===== PAGINA {page.get('page', 1)} =====\n" + "\n".join(lines))
+    return "\n\n".join(page_texts).strip()
+
+
+def _layout_line_count(layout_pages: list[dict[str, Any]]) -> int:
+    return sum(len(page.get("lines", [])) for page in layout_pages)
+
+
+def _has_useful_pdf_text(layout_pages: list[dict[str, Any]]) -> bool:
+    text = _text_layout_to_ocr_text(layout_pages)
+    alpha_count = sum(1 for ch in text if ch.isalpha())
+    price_count = sum(1 for line in text.splitlines() if is_price_line(line))
+    return alpha_count >= 30 and price_count >= 1
 
 
 def _missing_ingredients_ratio(extraction: ExtractionResult) -> float:
@@ -252,6 +352,118 @@ def _extract_rule_items_from_cleaned_lines(cleaned_lines: list[str]) -> list[dic
         "rule parser from cleaned lines",
         extra={"lines_count": len(candidate_lines), "items_count": len(items)},
     )
+    return items
+
+
+def _focus_menu_lines(lines: list[str]) -> tuple[list[str], bool]:
+    """Riduce PDF testuali lunghi alla sezione menu piu' probabile."""
+
+    normalized = [ln for ln in lines if (ln or "").strip()]
+    if not normalized:
+        return lines, False
+
+    start_markers = (
+        "MENU GASTRONOMIA",
+        "MENU PIZZERIA",
+        "MENU RISTORANTE",
+        "MENU COMPLETO",
+        "MENU PIZZE",
+        "ANTIPASTI",
+        "PRIMI PIATTI",
+        "SECONDI PIATTI",
+        "CONTORNI",
+        "PIZZE CLASSICHE",
+        "LE NOSTRE PIZZE",
+        "PIZZE ROSSE",
+        "PIZZERIA",
+        "PIZZE",
+        "PIZZA A SCELTA",
+    )
+    stop_markers = (
+        "PROGRAMMA",
+        "SPONSOR",
+    )
+
+    focused: list[str] = []
+    in_section = False
+    seen_price_lines = 0
+
+    for line in normalized:
+        upper = line.upper().strip(" :-")
+        starts_menu = any(marker in upper for marker in start_markers)
+
+        if not in_section and starts_menu:
+            in_section = True
+            seen_price_lines = 0
+
+        if not in_section:
+            continue
+
+        if seen_price_lines >= 4 and re.search(
+            r"(?i)\b(tel|cell|fax|via|hotel|centralino|email)\b|www\.|@|\d{3}[.\s]\d{6,}",
+            line,
+        ):
+            in_section = False
+            seen_price_lines = 0
+            continue
+        if any(upper.startswith(marker) for marker in stop_markers):
+            in_section = False
+            seen_price_lines = 0
+            continue
+
+        focused.append(line)
+        if is_price_line(line):
+            seen_price_lines += 1
+
+    return focused if focused else lines, True
+
+
+def _merge_price_continuation_lines(lines: list[str]) -> list[str]:
+    """Unisce righe menu spezzate dove il prezzo e' finito nella riga sotto."""
+
+    merged: list[str] = []
+    idx = 0
+    while idx < len(lines):
+        current = (lines[idx] or "").strip()
+        if (
+            current
+            and idx + 1 < len(lines)
+            and not is_price_line(current)
+            and is_price_line(lines[idx + 1])
+            and ("(" in current or re.match(r"^\s*[-_*•]", current))
+        ):
+            nxt = (lines[idx + 1] or "").strip()
+            if re.search(r"[€]|EUR|\.\s*\.", nxt, flags=re.IGNORECASE):
+                merged.append(f"{current} {nxt}")
+                idx += 2
+                continue
+        merged.append(current)
+        idx += 1
+    return merged
+
+
+def _extract_priceless_pdf_items(lines: list[str]) -> list[dict[str, Any]]:
+    """Estrae opzioni menu senza prezzo, tipiche di PDF turistici o pacchetti."""
+
+    items: list[dict[str, Any]] = []
+    for raw in lines:
+        line = re.sub(r"\s+", " ", (raw or "")).strip()
+        if not line or is_price_line(line):
+            continue
+        match = re.match(r"^(?:[-_*•]+\s*)?(.+?)(?:\(([^)]*)\))\s*$", line)
+        if not match:
+            continue
+        name = _normalize_name(match.group(1))
+        if not name or len(name) < 3:
+            continue
+        if name.upper().startswith(("PIZZA A SCELTA", "MENU", "PIZZERIA")):
+            continue
+        ingredients = [
+            part.strip().lower()
+            for part in re.split(r"[,;]| e ", match.group(2) or "")
+            if part.strip()
+        ]
+        items.append({"name": name, "price": None, "ingredients": ingredients})
     return items
 
 
@@ -449,7 +661,7 @@ def _split_page_into_columns(page: np.ndarray, expected_columns: int = 3) -> lis
     smooth = np.convolve(ink_per_col, kernel, mode="same")
 
     # Colonne "vuote" = possibili separatori.
-    low_threshold = max(2.0, float(np.percentile(smooth, 20)) * 0.55)
+    low_threshold = max(2.0, float(np.percentile(smooth, 20)))
     blank_mask = smooth <= low_threshold
 
     separators: list[tuple[int, int]] = []
@@ -458,10 +670,10 @@ def _split_page_into_columns(page: np.ndarray, expected_columns: int = 3) -> lis
         if is_blank and start is None:
             start = i
         elif not is_blank and start is not None:
-            if i - start >= max(10, w // 80):
+            if i - start >= max(8, w // 140):
                 separators.append((start, i))
             start = None
-    if start is not None and (w - start) >= max(10, w // 80):
+    if start is not None and (w - start) >= max(8, w // 140):
         separators.append((start, w))
 
     # Centro dei separatori lontani dai bordi.
@@ -473,16 +685,7 @@ def _split_page_into_columns(page: np.ndarray, expected_columns: int = 3) -> lis
             sep_centers.append(center)
 
     if not sep_centers:
-        # Fallback: split uniforme
-        step = w // expected_columns
-        crops = []
-        for i in range(expected_columns):
-            x1 = i * step
-            x2 = w if i == expected_columns - 1 else (i + 1) * step
-            crop = page[:, x1:x2]
-            if crop.size > 0:
-                crops.append(crop)
-        return crops if crops else [page]
+        return [page]
 
     # Se ci sono troppi separatori, prendiamo quelli piÃ¹ plausibili per 3 colonne.
     # Cerchiamo fino a expected_columns-1 separatori.
@@ -526,7 +729,8 @@ def _extract_structured_text_from_page(
     page: np.ndarray,
     page_idx: int,
     warnings: list[str],
-) -> tuple[list[OcrToken], str, list[str], list[dict[str, Any]]]:
+    settings: Any,
+) -> tuple[list[OcrToken], str, list[str], list[dict[str, Any]], dict[str, Any]]:
     """
     Esegue OCR pagina per pagina ma separando per colonne.
     Restituisce:
@@ -538,13 +742,33 @@ def _extract_structured_text_from_page(
     column_texts: list[str] = []
     image_markers: list[str] = []
     parsed_items: list[dict[str, Any]] = []
+    page_layout = {
+        "page": page_idx + 1,
+        "width": int(page.shape[1]) if page is not None and page.size else 0,
+        "height": int(page.shape[0]) if page is not None and page.size else 0,
+        "blocks": [],
+        "lines": [],
+    }
 
-    columns = _split_page_into_columns(page, expected_columns=3)
+    columns = (
+        _split_page_into_columns(page, expected_columns=3)
+        if settings.LAYOUT_COLUMN_DETECTION
+        else [page]
+    )
 
     for col_idx, crop in enumerate(columns):
         cleaned = crop
         try:
-            cleaned = clean_image(crop)
+            cleaned = (
+                clean_image(
+                    crop,
+                    adaptive_threshold=settings.ENABLE_ADAPTIVE_THRESHOLD,
+                    document_crop=settings.ENABLE_DOCUMENT_CROP,
+                    noisy_image_threshold=settings.NOISY_IMAGE_THRESHOLD,
+                )
+                if settings.ENABLE_IMAGE_PREPROCESSING
+                else crop
+            )
         except Exception as exc:
             warnings.append(
                 f"pagina {page_idx + 1}, colonna {col_idx + 1}: preprocessing fallito ({exc})"
@@ -562,6 +786,9 @@ def _extract_structured_text_from_page(
         best_tokens: list[OcrToken] = []
         best_lines: list[str] = []
         best_items: list[dict[str, Any]] = []
+        best_blocks: list[dict[str, Any]] = []
+        best_layout_lines: list[dict[str, Any]] = []
+        best_layout_warnings: list[str] = []
         best_source = "cleaned"
         best_score = (-1, -1, -1)
 
@@ -569,7 +796,15 @@ def _extract_structured_text_from_page(
             tokens = run_ocr(source_img)
             if not tokens:
                 continue
-            lines = group_ocr_lines(tokens, y_threshold=10)
+            blocks, layout_lines, layout_warnings = group_tokens_by_visual_layout(
+                tokens,
+                page_width=float(source_img.shape[1]) if source_img is not None and source_img.size else None,
+                y_threshold=10,
+                detect_columns=False,
+            )
+            lines = [str(line.get("text", "")).strip() for line in layout_lines if str(line.get("text", "")).strip()]
+            if not lines:
+                lines = group_ocr_lines(tokens, y_threshold=10)
             items = build_menu_items(lines)
             price_lines = sum(1 for ln in lines if is_price_line(ln))
             # score: più item, poi più linee con prezzo, poi più linee totali
@@ -578,6 +813,9 @@ def _extract_structured_text_from_page(
                 best_tokens = tokens
                 best_lines = lines
                 best_items = items
+                best_blocks = blocks
+                best_layout_lines = layout_lines
+                best_layout_warnings = layout_warnings
                 best_source = source_name
                 best_score = score
 
@@ -586,6 +824,9 @@ def _extract_structured_text_from_page(
 
         all_page_tokens.extend(best_tokens)
         parsed_items.extend(best_items)
+        page_layout["blocks"].extend(best_blocks)
+        page_layout["lines"].extend(best_layout_lines)
+        warnings.extend(best_layout_warnings)
         logger.debug(
             "ocr column parsed",
             extra={
@@ -609,7 +850,7 @@ def _extract_structured_text_from_page(
         if markers:
             image_markers.append(markers)
 
-    return all_page_tokens, "\n\n".join(column_texts).strip(), image_markers, parsed_items
+    return all_page_tokens, "\n\n".join(column_texts).strip(), image_markers, parsed_items, page_layout
 
 
 @router.post("/process")
@@ -649,8 +890,114 @@ async def process_file(
 
     warnings: list[str] = []
     total_start = time.perf_counter()
+    input_type = "pdf" if ext == ".pdf" else "image"
+    method = "ocr"
+    layout: dict[str, Any] = {
+        "inputType": input_type,
+        "method": method,
+        "pages": [],
+        "warnings": warnings,
+    }
 
-    # 4. Carica pagine.
+    logger.info("process input rilevato", extra={"input_type": input_type, "ext": ext})
+
+    # 4a. PDF con testo selezionabile: usa PyMuPDF diretto, niente OCR.
+    pdf_text_layout: list[dict[str, Any]] = []
+    if ext == ".pdf" and settings.ENABLE_PDF_TEXT_EXTRACTION:
+        try:
+            pdf_text_layout = extract_pdf_text_layout(real_path)
+            if _has_useful_pdf_text(pdf_text_layout):
+                method = "pdf_text"
+                layout["method"] = method
+                layout["pages"] = pdf_text_layout
+                raw_pdf_lines = _text_layout_to_ocr_text(pdf_text_layout).splitlines()
+                focused_lines, focused = _focus_menu_lines(raw_pdf_lines)
+                if focused:
+                    warnings.append("PDF text: parsing limitato alla sezione menu/pizzeria rilevata.")
+                focused_lines = _merge_price_continuation_lines(focused_lines)
+                cleaned_lines = filter_noise(focused_lines)
+                final_text = "\n".join(cleaned_lines).strip()
+                parsed_items = _extract_rule_items_from_cleaned_lines(cleaned_lines)
+                if not parsed_items:
+                    parsed_items = _extract_priceless_pdf_items(cleaned_lines)
+                    if parsed_items:
+                        warnings.append("PDF text: estratte voci senza prezzo, prezzo impostato a null.")
+                if not parsed_items:
+                    warnings.append("PDF text extraction senza item: parser fallback richiesto.")
+
+                logger.info(
+                    "pdf text extraction usata",
+                    extra={
+                        "pages": len(pdf_text_layout),
+                        "lines": _layout_line_count(pdf_text_layout),
+                        "items": len(parsed_items),
+                    },
+                )
+
+                base_extraction = _to_rule_extraction(parsed_items)
+                extraction: ExtractionResult | None = base_extraction if base_extraction.elements else None
+                raw_response: str | None = None
+                ollama_start = time.perf_counter()
+                if extraction is not None:
+                    prep_text = _render_preparsed_items(parsed_items)
+                    llm_input = f"{final_text}\n\n{prep_text}".strip() if prep_text else final_text
+                    try:
+                        enrich_timeout = max(1, int(settings.LLM_ENRICH_TIMEOUT_SECONDS))
+                        prompt = _build_fast_enrichment_prompt(base_extraction, llm_input)
+                        raw_response = await asyncio.wait_for(
+                            _run_llm(prompt, settings.OLLAMA_MODEL, reinforced=False),
+                            timeout=float(enrich_timeout),
+                        )
+                        extraction = _merge_llm_details(base_extraction, _parse_extraction(raw_response))
+                        warnings.append("LLM usato solo per arricchimento leggero su output pdf_text.")
+                    except asyncio.TimeoutError:
+                        warnings.append(
+                            f"LLM arricchimento timeout ({settings.LLM_ENRICH_TIMEOUT_SECONDS}s): usato output pdf_text."
+                        )
+                    except HTTPException as exc:
+                        warnings.append(f"LLM non disponibile per arricchimento: {exc.detail}")
+
+                    ollama_ms = int((time.perf_counter() - ollama_start) * 1000)
+                    total_ms = int((time.perf_counter() - total_start) * 1000)
+                    extraction = _sanitize_extraction(extraction, warnings)
+                    elements_payload = [el.model_dump() for el in extraction.elements]
+                    if not elements_payload:
+                        raise HTTPException(
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail="PDF text extraction completata ma nessun piatto valido estratto.",
+                        )
+                    logger.info(
+                        "process completato",
+                        extra={
+                            "input_type": input_type,
+                            "method": method,
+                            "elements": len(elements_payload),
+                            "lines": len(cleaned_lines),
+                            "warnings": len(warnings),
+                            "ollama_ms": ollama_ms,
+                            "total_ms": total_ms,
+                        },
+                    )
+                    return {
+                        "elements": elements_payload,
+                        "ocr_confidence": 1.0,
+                        "warnings": warnings,
+                        "layout": layout,
+                        "raw_ollama_response": raw_response if payload.options.include_raw else None,
+                        "metrics": {
+                            "pdf_pages": len(pdf_text_layout),
+                            "ocr_ms": 0,
+                            "ollama_ms": ollama_ms,
+                            "total_ms": total_ms,
+                        },
+                    }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            warnings.append(f"PDF text extraction non riuscita: {exc}")
+            logger.warning("pdf text extraction fallita", extra={"err": str(exc)})
+
+    # 4b. Carica pagine per OCR.
     try:
         pages = _load_pages(real_path, ext, settings.PDF_RENDER_DPI)
     except HTTPException:
@@ -662,6 +1009,8 @@ async def process_file(
             detail=f"File non leggibile: {exc}",
         ) from exc
 
+    layout["method"] = "ocr"
+
     # 5. OCR + image detection per pagina, segmentando per colonne.
     ocr_start = time.perf_counter()
     all_tokens: list[OcrToken] = []
@@ -670,11 +1019,13 @@ async def process_file(
     parsed_items: list[dict[str, Any]] = []
 
     for page_idx, page in enumerate(pages):
-        page_tokens, page_text, page_markers, page_items = _extract_structured_text_from_page(
+        page_tokens, page_text, page_markers, page_items, page_layout = _extract_structured_text_from_page(
             page=page,
             page_idx=page_idx,
             warnings=warnings,
+            settings=settings,
         )
+        layout["pages"].append(page_layout)
 
         if not page_tokens:
             warnings.append(f"pagina {page_idx + 1}: nessun testo riconosciuto")
@@ -683,7 +1034,7 @@ async def process_file(
         all_tokens.extend(page_tokens)
 
         page_confidence = _avg_confidence(page_tokens)
-        if page_confidence < 0.6:
+        if page_confidence < settings.OCR_MIN_CONFIDENCE:
             warnings.append(
                 f"pagina {page_idx + 1}: bassa qualita' OCR (confidence {page_confidence})"
             )
@@ -784,12 +1135,19 @@ async def process_file(
     total_ms = int((time.perf_counter() - total_start) * 1000)
     confidence = _avg_confidence(all_tokens)
 
+    extraction = _sanitize_extraction(extraction, warnings)
     elements_payload = [el.model_dump() for el in extraction.elements]
+    layout["warnings"] = warnings
 
     logger.info(
         "process completato",
         extra={
+            "input_type": input_type,
+            "method": method,
             "elements": len(elements_payload),
+            "lines": len(cleaned_lines),
+            "tokens": len(all_tokens),
+            "warnings": len(warnings),
             "ocr_ms": ocr_ms,
             "ollama_ms": ollama_ms,
             "total_ms": total_ms,
@@ -802,6 +1160,7 @@ async def process_file(
         "elements": elements_payload,
         "ocr_confidence": confidence,
         "warnings": warnings,
+        "layout": layout,
         "raw_ollama_response": raw_response if payload.options.include_raw else None,
         "metrics": {
             "pdf_pages": len(pages) if ext == ".pdf" else 1,

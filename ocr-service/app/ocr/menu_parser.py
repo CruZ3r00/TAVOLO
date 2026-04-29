@@ -12,7 +12,11 @@ from app.ocr.paddle_runner import OcrToken
 logger = logging.getLogger(__name__)
 
 _WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ']+")
-_PRICE_FIND_RE = re.compile(r"(?:€\s*)?(\d{1,3}(?:[.,]\d{1,2})?)\s*(?:€)?")
+_CURRENCY_RE = r"(?:€|EUR|C)"
+_PRICE_FIND_RE = re.compile(
+    rf"(?:{_CURRENCY_RE}\s*)?(\d{{1,3}}(?:[.,]\s*\d{{1,2}})?)\s*(?:{_CURRENCY_RE})?",
+    re.IGNORECASE,
+)
 _PRICE_SANITY_MIN = 0.5
 _PRICE_SANITY_MAX = 150.0
 
@@ -62,12 +66,15 @@ _INGREDIENT_PATTERN_MAP: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"pomo|pomod"), "pomodoro"),
     (re.compile(r"mozz|moza|mozar|mzar"), "mozzarella"),
     (re.compile(r"pros|prosc"), "prosciutto"),
+    (re.compile(r"\bsalamo\b"), "salame"),
     (re.compile(r"sals|salic"), "salsiccia"),
     (re.compile(r"cipol|cpol|cipo"), "cipolla"),
+    (re.compile(r"basit|basil"), "basilico"),
     (re.compile(r"acciu|accug|aoci"), "acciughe"),
     (re.compile(r"capper"), "capperi"),
     (re.compile(r"wurst|wrstel|wurstel"), "wurstel"),
     (re.compile(r"caci"), "cacio"),
+    (re.compile(r"peperon"), "peperoncino"),
     (re.compile(r"piccant"), "piccante"),
     (re.compile(r"fungh"), "funghi"),
     (re.compile(r"agli"), "aglio"),
@@ -101,6 +108,36 @@ def _bbox_center_y(token: OcrToken) -> float:
 def _bbox_center_x(token: OcrToken) -> float:
     xs = [p[0] for p in token.bbox]
     return sum(xs) / len(xs)
+
+
+def _bbox_width(token: OcrToken) -> float:
+    xs = [p[0] for p in token.bbox]
+    return max(xs) - min(xs)
+
+
+def _bbox_height(token: OcrToken) -> float:
+    ys = [p[1] for p in token.bbox]
+    return max(ys) - min(ys)
+
+
+def _normalize_ocr_price_fragments(text: str) -> str:
+    """Normalizza prezzi OCR tipo ``6 50`` / ``490`` / ``1300`` a decimali."""
+
+    def spaced_repl(match: re.Match[str]) -> str:
+        return f"{match.group(1)}.{match.group(2)}"
+
+    normalized = re.sub(r"\b(\d{1,2})\s+(\d{2})\b", spaced_repl, text)
+
+    def compact_repl(match: re.Match[str]) -> str:
+        prefix = match.group(1)
+        digits = match.group(2)
+        if len(digits) == 3:
+            value = f"{digits[0]}.{digits[1:]}"
+        else:
+            value = f"{digits[:-2]}.{digits[-2:]}"
+        return f"{prefix}{value}"
+
+    return re.sub(r"(^|[A-Za-zÀ-ÖØ-öø-ÿ]\s+)(\d{3,4})\b", compact_repl, normalized)
 
 
 def _coerce_tokens_from_ocr_output(ocr_output: Any) -> list[OcrToken]:
@@ -181,8 +218,108 @@ def group_ocr_lines(ocr_output: Any, y_threshold: float = 10) -> list[str]:
     return lines
 
 
+def group_tokens_by_visual_layout(
+    tokens: list[OcrToken],
+    *,
+    page_width: float | None = None,
+    y_threshold: float = 10,
+    detect_columns: bool = True,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+    """Raggruppa token OCR in colonne/righe usando bbox e ordine visivo."""
+
+    if not tokens:
+        return [], [], []
+
+    usable_tokens = [tok for tok in tokens if tok.text and tok.text.strip()]
+    if not usable_tokens:
+        return [], [], []
+
+    warnings: list[str] = []
+    min_x = min(min(p[0] for p in tok.bbox) for tok in usable_tokens)
+    max_x = max(max(p[0] for p in tok.bbox) for tok in usable_tokens)
+    width = page_width or max(1.0, max_x - min_x)
+    avg_token_width = sum(max(1.0, _bbox_width(tok)) for tok in usable_tokens) / len(usable_tokens)
+
+    columns: list[tuple[float, float]] = [(min_x, max_x)]
+    if detect_columns and len(usable_tokens) >= 6 and width >= 420:
+        centers = sorted(_bbox_center_x(tok) for tok in usable_tokens)
+        gaps = [
+            (centers[idx + 1] - centers[idx], centers[idx], centers[idx + 1])
+            for idx in range(len(centers) - 1)
+        ]
+        gap_threshold = max(avg_token_width * 2.8, width * 0.10)
+        separators = [
+            (left + right) / 2.0
+            for gap, left, right in gaps
+            if gap >= gap_threshold and (min_x + width * 0.12) < left < (min_x + width * 0.88)
+        ]
+        separators = sorted(separators)[:2]
+        if separators:
+            bounds = [min_x - 1.0] + separators + [max_x + 1.0]
+            columns = [(bounds[idx], bounds[idx + 1]) for idx in range(len(bounds) - 1)]
+
+    blocks: list[dict[str, Any]] = []
+    all_lines: list[dict[str, Any]] = []
+    for col_idx, (x1, x2) in enumerate(columns, start=1):
+        col_tokens = [tok for tok in usable_tokens if x1 <= _bbox_center_x(tok) <= x2]
+        if not col_tokens:
+            continue
+
+        sorted_tokens = sorted(col_tokens, key=_bbox_center_y)
+        rows: list[list[OcrToken]] = []
+        current_row: list[OcrToken] = []
+        current_y: float | None = None
+        for tok in sorted_tokens:
+            y = _bbox_center_y(tok)
+            dynamic_y = max(y_threshold, _bbox_height(tok) * 0.65)
+            if current_y is None or abs(y - current_y) <= dynamic_y:
+                current_row.append(tok)
+                current_y = sum(_bbox_center_y(t) for t in current_row) / len(current_row)
+                continue
+            rows.append(current_row)
+            current_row = [tok]
+            current_y = y
+        if current_row:
+            rows.append(current_row)
+
+        block_lines: list[dict[str, Any]] = []
+        for row in rows:
+            ordered = sorted(row, key=_bbox_center_x)
+            text = " ".join(t.text.strip() for t in ordered if t.text and t.text.strip())
+            text = re.sub(r"\s+", " ", text).strip().replace("Ã¢â€šÂ¬", "€")
+            text = _normalize_ocr_price_fragments(text)
+            if not text:
+                continue
+            xs = [p[0] for t in ordered for p in t.bbox]
+            ys = [p[1] for t in ordered for p in t.bbox]
+            prices = [p for p in _find_prices(text) if p.value is not None]
+            if len(prices) > 1:
+                warnings.append(f"riga con piu' prezzi vicini: {text[:80]}")
+            line = {
+                "text": text,
+                "bbox": [min(xs), min(ys), max(xs), max(ys)],
+                "confidence": round(sum(t.confidence for t in ordered) / len(ordered), 4),
+                "column": col_idx,
+            }
+            block_lines.append(line)
+            all_lines.append(line)
+
+        if block_lines:
+            xs = [coord for ln in block_lines for coord in (ln["bbox"][0], ln["bbox"][2])]
+            ys = [coord for ln in block_lines for coord in (ln["bbox"][1], ln["bbox"][3])]
+            blocks.append(
+                {
+                    "column": col_idx,
+                    "bbox": [min(xs), min(ys), max(xs), max(ys)],
+                    "lines": block_lines,
+                }
+            )
+
+    return blocks, all_lines, warnings
+
+
 def _to_price(raw: str, has_currency: bool) -> float | None:
-    normalized = raw.replace(",", ".")
+    normalized = raw.replace(" ", "").replace(",", ".")
     # Senza simbolo valuta, valori a 3+ cifre intere sono spesso rumore OCR (es. 0993).
     if not has_currency and "." not in normalized and len(normalized) >= 3:
         return None
@@ -202,11 +339,33 @@ def _find_prices(text: str) -> list[_PriceMatch]:
     for match in _PRICE_FIND_RE.finditer(normalized):
         if match.start() > 0 and normalized[match.start() - 1].isdigit():
             continue
-        if match.end() < len(normalized) and normalized[match.end()].isdigit():
+        if (
+            match.end() < len(normalized)
+            and normalized[match.end()].isalnum()
+            and not normalized[match.end() - 1].isspace()
+        ):
+            continue
+        if match.start() > 0 and normalized[match.start() - 1] in "[(":
+            continue
+        if match.end() < len(normalized) and normalized[match.end()] in "])":
             continue
         raw_value = match.group(1)
         span_text = normalized[match.start() : match.end()]
-        has_currency = "€" in span_text
+        span_lower = span_text.lower()
+        has_currency = "€" in span_text or "eur" in span_lower
+        prev_open = normalized.rfind("[", 0, match.start())
+        prev_close = normalized.rfind("]", 0, match.start())
+        next_close = normalized.find("]", match.end())
+        if prev_open > prev_close and next_close != -1:
+            continue
+        if not has_currency and "." not in raw_value and "," not in raw_value:
+            next_non_space = ""
+            for ch in normalized[match.end() :]:
+                if not ch.isspace():
+                    next_non_space = ch
+                    break
+            if next_non_space and next_non_space.isalpha():
+                continue
         found.append(
             _PriceMatch(
                 value=_to_price(raw_value, has_currency=has_currency),
@@ -282,6 +441,13 @@ def looks_like_name(text: str) -> bool:
 
 def _clean_name(text: str) -> str:
     cleaned = re.sub(r"\s+", " ", text).strip(" .,:;|-")
+    cleaned = re.sub(r"\[[^\]]*\]", " ", cleaned)
+    cleaned = cleaned.strip(" _•-")
+    words_for_spaced = cleaned.split()
+    if len(words_for_spaced) >= 3 and all(len(w) == 1 and w.isalpha() for w in words_for_spaced):
+        cleaned = "".join("I" if w == "l" else w for w in words_for_spaced)
+    cleaned = re.sub(r"(?i)([a-z])0([a-z])", r"\1O\2", cleaned)
+    cleaned = re.sub(r"(?i)\bdl([a-z])", r"DI\1", cleaned)
     if "(" in cleaned:
         cleaned = cleaned.split("(", maxsplit=1)[0].strip(" .,:;|-")
 
@@ -381,6 +547,14 @@ def _extract_inline_ingredient_hints_from_price_line(line: str, name: str) -> li
         working = working[: prices[0].start]
 
     name_clean = (name or "").strip()
+    if (
+        name_clean
+        and _clean_name(working).lower() == name_clean.lower()
+        and "," not in working
+        and "." not in working
+        and len(working.split()) <= 2
+    ):
+        return []
     if name_clean and working.lower().startswith(name_clean.lower()):
         working = working[len(name_clean) :]
 
@@ -459,6 +633,7 @@ def _infer_ingredients_from_lines(lines: list[str]) -> list[str]:
 
     for line in lines:
         lowered = line.lower().replace("â‚¬", "€")
+        lowered = lowered.replace("\ufb01", "fi")
         lowered = re.sub(r"[()]", " ", lowered)
         if "," not in lowered and " o " in lowered:
             lowered = lowered.replace(" o ", ", ")
@@ -471,6 +646,10 @@ def _infer_ingredients_from_lines(lines: list[str]) -> list[str]:
                 or token in _CONNECTORS
                 or len(token) < 3
             ):
+                continue
+            if len(token) <= 4 and token not in _INGREDIENT_TERMS:
+                continue
+            if token.startswith("__") or token.startswith("pizze") or " pizze " in token:
                 continue
             if token.startswith("ingredienti"):
                 token = token.replace("ingredienti", "").strip(" :-")

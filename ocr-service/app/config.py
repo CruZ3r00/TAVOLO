@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     OCR_LANG: str = "it"
     PADDLE_USE_GPU: bool = False
     PDF_RENDER_DPI: int = 300
+    OCR_MIN_CONFIDENCE: float = 0.60
+    ENABLE_IMAGE_PREPROCESSING: bool = True
+    ENABLE_PDF_TEXT_EXTRACTION: bool = True
+    ENABLE_ADAPTIVE_THRESHOLD: bool = False
+    ENABLE_DOCUMENT_CROP: bool = False
+    NOISY_IMAGE_THRESHOLD: float = 0.42
+    LAYOUT_COLUMN_DETECTION: bool = True
 
     ALLOWED_INPUT_DIR: str = Field(..., min_length=1)
     INTERNAL_API_TOKEN: str = ""

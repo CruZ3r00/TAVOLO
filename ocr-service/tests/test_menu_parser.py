@@ -5,6 +5,7 @@ import unittest
 from app.ocr.menu_parser import (
     build_menu_items,
     extract_price,
+    group_tokens_by_visual_layout,
     group_ocr_lines,
     is_price_line,
     looks_like_ingredients,
@@ -36,12 +37,17 @@ class MenuParserTests(unittest.TestCase):
     def test_extract_price_formats(self) -> None:
         self.assertEqual(extract_price("€ 4,50"), 4.5)
         self.assertEqual(extract_price("4,50 €"), 4.5)
+        self.assertEqual(extract_price("EUR 4,50"), 4.5)
+        self.assertEqual(extract_price("€ 7, 00"), 7.0)
         self.assertEqual(extract_price("4.50"), 4.5)
         self.assertEqual(extract_price("5"), 5.0)
         self.assertEqual(extract_price("€5.00"), 5.0)
         self.assertIsNone(extract_price("prezzo n.d."))
         self.assertIsNone(extract_price("0993"))
         self.assertIsNone(extract_price("NAPOLI pomodoro mozzarella 0993"))
+        self.assertIsNone(extract_price("allergeni [1,7]"))
+        self.assertIsNone(extract_price("1 pizza o 1 pasta"))
+        self.assertIsNone(extract_price("Nastro Azzurro 20cl"))
 
     def test_detectors(self) -> None:
         self.assertTrue(is_price_line("MARGHERITA € 4,00"))
@@ -126,6 +132,112 @@ class MenuParserTests(unittest.TestCase):
         self.assertEqual(items[0]["price"], 6.5)
         self.assertIn("pomodoro", items[0]["ingredients"])
         self.assertIn("mozzarella", items[0]["ingredients"])
+
+    def test_price_on_right_with_description_below(self) -> None:
+        lines = ["MARGHERITA € 6,50", "pomodoro, mozzarella, basilico"]
+        items = build_menu_items(lines)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["name"], "MARGHERITA")
+        self.assertEqual(items[0]["price"], 6.5)
+        self.assertIn("basilico", items[0]["ingredients"])
+
+    def test_visual_layout_keeps_columns_separate(self) -> None:
+        tokens = [
+            _token("MARGHERITA", 10, 10, 80),
+            _token("€", 125, 10),
+            _token("6,50", 145, 10),
+            _token("pomodoro,", 10, 30, 70),
+            _token("mozzarella", 90, 30, 80),
+            _token("DIAVOLA", 360, 10, 70),
+            _token("€", 475, 10),
+            _token("8,00", 495, 10),
+            _token("salame,", 360, 30, 60),
+            _token("peperoncino", 430, 30, 90),
+        ]
+        _blocks, lines, warnings = group_tokens_by_visual_layout(
+            tokens,
+            page_width=620,
+            detect_columns=True,
+        )
+        self.assertEqual(warnings, [])
+        self.assertEqual([ln["column"] for ln in lines], [1, 1, 2, 2])
+        items = build_menu_items([ln["text"] for ln in lines])
+        self.assertEqual([item["name"] for item in items], ["MARGHERITA", "DIAVOLA"])
+
+    def test_visual_layout_warns_multiple_prices_same_line(self) -> None:
+        tokens = [
+            _token("MARGHERITA", 10, 10, 80),
+            _token("6,50", 110, 10),
+            _token("MARINARA", 180, 10, 75),
+            _token("5,50", 270, 10),
+        ]
+        _blocks, _lines, warnings = group_tokens_by_visual_layout(tokens, page_width=330)
+        self.assertTrue(any("piu' prezzi" in warning for warning in warnings))
+
+    def test_visual_layout_normalizes_menu_board_prices(self) -> None:
+        tokens = [
+            _token("SCONES", 10, 10, 70),
+            _token("490", 120, 10, 35),
+            _token("POPCORN", 10, 30, 80),
+            _token("6", 120, 30, 10),
+            _token("50", 140, 30, 20),
+            _token("PIZZA", 10, 50, 55),
+            _token("15", 120, 50, 20),
+            _token("90", 150, 50, 20),
+        ]
+        _blocks, lines, _warnings = group_tokens_by_visual_layout(
+            tokens,
+            page_width=220,
+            detect_columns=False,
+        )
+        texts = [ln["text"] for ln in lines]
+        self.assertIn("SCONES 4.90", texts)
+        self.assertIn("POPCORN 6.50", texts)
+        self.assertIn("PIZZA 15.90", texts)
+
+    def test_spaced_ocr_letters_in_name_are_collapsed(self) -> None:
+        items = build_menu_items(["P l Z Z A 15.90"])
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["name"], "PIZZA")
+        self.assertEqual(items[0]["price"], 15.9)
+
+    def test_ocr_ingredient_fragments_are_filtered(self) -> None:
+        lines = [
+            "DIAV0LA EUR8.00",
+            "pomodoro, mozzarella, salame, peperon",
+            "ino",
+        ]
+        items = build_menu_items(lines)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["name"], "DIAVOLA")
+        self.assertIn("peperoncino", items[0]["ingredients"])
+        self.assertNotIn("ino", items[0]["ingredients"])
+
+    def test_common_ocr_name_typos_are_normalized(self) -> None:
+        items = build_menu_items(["DlAVOLA € 8,00"])
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["name"], "DIAVOLA")
+
+    def test_price_line_name_typo_not_added_as_ingredient(self) -> None:
+        items = build_menu_items([
+            "DlAVOLA 8,00 ?",
+            "pomodoro, mozzarella, salamo, basitico",
+        ])
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["name"], "DIAVOLA")
+        self.assertNotIn("dlavola", items[0]["ingredients"])
+        self.assertIn("salame", items[0]["ingredients"])
+        self.assertIn("basilico", items[0]["ingredients"])
+
+    def test_pdf_section_markers_are_not_ingredients(self) -> None:
+        items = build_menu_items([
+            "__ Quattro Formaggi (pomodoro, mozzarella, formaggi assortiti) € 7,00",
+            "__ Capro (scamorza, barbozza, spinaci) € 7,00",
+            "Pizze Speciali",
+        ])
+        self.assertEqual(len(items), 2)
+        self.assertNotIn("__ capro scamorza", items[0]["ingredients"])
+        self.assertNotIn("pizze speciali", items[1]["ingredients"])
 
 
 if __name__ == "__main__":
