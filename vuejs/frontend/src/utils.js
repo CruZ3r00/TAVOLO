@@ -641,3 +641,80 @@ export const reservationErrorMessage = (err) => {
             return err.message || 'Si è verificato un errore durante l\'operazione.';
     }
 };
+
+// ──────────────────────────────────────────────────────────────────────
+// POS/Cassa fiscale (Fase 5)
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Genera un pairing-token single-use per accoppiare un nuovo pos-rt-service.
+ * Auth: JWT utente (Bearer). TTL configurabile in minuti (5..1440, default 30).
+ * Il token in chiaro è ritornato UNA VOLTA: l'utente lo deve copiare/scansionare.
+ */
+export const generatePosPairingToken = async (token, ttlMinutes = 30) => {
+    const resp = await fetch(`${API_BASE}/api/pos-devices/me/pairing-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ttl_minutes: ttlMinutes }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+        const err = new Error(payload?.error?.message || `Generazione token fallita (HTTP ${resp.status})`);
+        err.status = resp.status;
+        err.code = payload?.error?.code || null;
+        throw err;
+    }
+    return payload.data; // { token, expires_at, ttl_minutes }
+};
+
+/**
+ * Lista dei device POS collegati all'utente (auth JWT).
+ */
+export const fetchPosDevices = async (token) => {
+    const resp = await fetch(`${API_BASE}/api/pos-devices`, {
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+        const err = new Error(payload?.error?.message || `Impossibile caricare i device (HTTP ${resp.status})`);
+        err.status = resp.status;
+        err.code = payload?.error?.code || null;
+        throw err;
+    }
+    return Array.isArray(payload.data) ? payload.data : [];
+};
+
+/**
+ * Revoca un device POS (setta revoked_at server-side, chiude eventuali WS).
+ */
+export const revokePosDevice = async (documentId, token) => {
+    const resp = await fetch(`${API_BASE}/api/pos-devices/${encodeURIComponent(documentId)}/revoke`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok && resp.status !== 204) {
+        const payload = await resp.json().catch(() => ({}));
+        const err = new Error(payload?.error?.message || `Revoca fallita (HTTP ${resp.status})`);
+        err.status = resp.status;
+        err.code = payload?.error?.code || null;
+        throw err;
+    }
+    return true;
+};
+
+/**
+ * URL di download per installer Windows/Linux/macOS + link store mobile.
+ * Endpoint pubblico (no auth richiesta).
+ */
+export const fetchPosInstallers = async () => {
+    const resp = await fetch(`${API_BASE}/api/pos-devices/installers`, {
+        headers: { Accept: 'application/json' },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+        const err = new Error(payload?.error?.message || `Errore caricamento installer (HTTP ${resp.status})`);
+        err.status = resp.status;
+        throw err;
+    }
+    return payload.data || {};
+};

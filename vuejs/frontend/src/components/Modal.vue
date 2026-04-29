@@ -37,29 +37,54 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <Transition name="scale">
-        <div
-          v-if="show"
-          class="modal-bg"
-          ref="dialog"
-          @click.self="emit('close')"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div class="modal" :class="{ wide, slim }">
-            <div class="modal-h">
-              <slot v-if="showSlot" name="title" />
-              <button type="button" class="modal-close" @click="emit('close')" aria-label="Chiudi">
-                <i class="bi bi-x-lg" aria-hidden="true"></i>
-              </button>
+    <Teleport to="body">
+        <Transition name="scale">
+            <div
+              v-if="show"
+              class="modal-bg modal-bg--centered"
+              ref="dialog"
+              @click.self="emit('close')"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div class="modal" :class="{ wide, slim }">
+                <div class="modal-h">
+                  <slot v-if="showSlot" name="title" />
+                  <button type="button" class="modal-close" @click="emit('close')" aria-label="Chiudi">
+                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                  </button>
+                </div>
+                <div class="modal-b">
+                  <slot v-if="showSlot" name="body"/>
+                </div>
+                <div v-if="$slots.footer" class="modal-f">
+                  <slot v-if="showSlot" name="footer" />
+                </div>
+              </div>
             </div>
-            <div class="modal-b">
-              <slot v-if="showSlot" name="body"/>
-            </div>
-            <div v-if="$slots.footer" class="modal-f">
-              <slot v-if="showSlot" name="footer" />
-            </div>
-          </div>
-        </div>
-    </Transition>
+        </Transition>
+    </Teleport>
 </template>
+
+<style>
+/* Forza il centramento globale: alcuni layout (grid containers) possono
+   creare un containing block per position:fixed quando ci sono filtri
+   o transform sugli ancestor. Questa regola garantisce che il backdrop
+   sia sempre rispetto al viewport. */
+.modal-bg.modal-bg--centered {
+    position: fixed !important;
+    inset: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+    z-index: 800;
+}
+.scale-enter-active, .scale-leave-active {
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+.scale-enter-from, .scale-leave-to {
+    opacity: 0;
+}
+.scale-enter-from .modal, .scale-leave-to .modal {
+    transform: translateY(8px) scale(0.98);
+}
+</style>

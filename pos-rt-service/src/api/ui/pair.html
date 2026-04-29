@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pos-rt-service — Pairing</title>
+    <style>
+      :root {
+        --bg: #0f1419;
+        --panel: #1a1f26;
+        --border: #2a3038;
+        --text: #e6e6e6;
+        --muted: #9aa5b1;
+        --accent: #00c896;
+        --danger: #ff6b6b;
+        --warn: #f0b400;
+      }
+      * { box-sizing: border-box; }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 2rem;
+        width: 100%;
+        max-width: 520px;
+      }
+      h1 { margin: 0 0 .5rem 0; font-size: 1.4rem; }
+      p.sub { color: var(--muted); margin: 0 0 1.5rem 0; font-size: .95rem; }
+      label {
+        display: block;
+        font-size: .85rem;
+        margin-bottom: .4rem;
+        color: var(--muted);
+      }
+      input[type="text"], input[type="email"], input[type="password"], input[type="url"] {
+        width: 100%;
+        padding: .7rem .8rem;
+        background: #0b0f13;
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 6px;
+        font-size: .95rem;
+        margin-bottom: 1rem;
+      }
+      input:focus { outline: none; border-color: var(--accent); }
+      button {
+        background: var(--accent);
+        color: #0b0f13;
+        border: 0;
+        padding: .8rem 1.2rem;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: .95rem;
+        cursor: pointer;
+        width: 100%;
+      }
+      button:disabled { opacity: .5; cursor: wait; }
+      .error {
+        background: rgba(255,107,107,.1);
+        border: 1px solid var(--danger);
+        color: var(--danger);
+        padding: .7rem;
+        border-radius: 6px;
+        margin: 0 0 1rem 0;
+        font-size: .9rem;
+      }
+      .success {
+        background: rgba(0,200,150,.1);
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        padding: 1rem;
+        border-radius: 6px;
+        margin: 0 0 1rem 0;
+      }
+      .pin {
+        font-size: 2rem;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+        letter-spacing: .3rem;
+        text-align: center;
+        background: #0b0f13;
+        padding: 1rem;
+        border-radius: 6px;
+        margin: 1rem 0;
+        border: 1px dashed var(--accent);
+      }
+      .warn-text {
+        color: var(--warn);
+        font-size: .85rem;
+        margin-top: 1rem;
+      }
+      .step {
+        font-size: .75rem;
+        color: var(--muted);
+        margin-bottom: .5rem;
+        text-transform: uppercase;
+        letter-spacing: .1rem;
+      }
+      .tab {
+        flex: 1;
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        padding: .5rem .8rem;
+        border-radius: 6px;
+        font-size: .85rem;
+        cursor: pointer;
+      }
+      .tab-active {
+        background: var(--accent);
+        color: #0b0f13;
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="app">
+      <div class="step">Configurazione iniziale</div>
+      <h1>pos-rt-service</h1>
+      <p class="sub">Collega questo dispositivo al tuo account Strapi per abilitare stampa e pagamenti.</p>
+
+      <div id="error" class="error" style="display:none"></div>
+
+      <div class="mode-tabs" style="display:flex;gap:.5rem;margin-bottom:1rem;">
+        <button type="button" id="tabToken" class="tab tab-active" onclick="switchMode('token')">Token (consigliato)</button>
+        <button type="button" id="tabCreds" class="tab" onclick="switchMode('creds')">Email + password</button>
+      </div>
+
+      <form id="pairForm">
+        <label for="claim_code">Claim-code (anti-hijack)</label>
+        <input type="text" id="claim_code" autocomplete="off" spellcheck="false" required minlength="64" maxlength="64" placeholder="64 caratteri esadecimali" />
+        <p class="sub" id="claimHint" style="font-size:.8rem;margin:-.5rem 0 1rem;">
+          Recupera il codice dal file <code>.claim-code</code> nella cartella dati del servizio
+          (Windows: <code>%ProgramData%\PosRtService</code>; macOS: <code>~/Library/Application Support/PosRtService</code>;
+          Linux: <code>~/.local/share/pos-rt-service</code>).
+        </p>
+
+        <label for="strapi_url">URL Strapi</label>
+        <input type="url" id="strapi_url" placeholder="https://api.example.com" required />
+
+        <!-- Modalità token (default) -->
+        <div id="modeToken">
+          <label for="pairing_token">Token di accoppiamento</label>
+          <input type="text" id="pairing_token" autocomplete="off" spellcheck="false" minlength="64" maxlength="64" placeholder="64 caratteri esadecimali" />
+          <p class="sub" style="font-size:.8rem;margin:-.5rem 0 1rem;">
+            Genera il token dalla pagina profilo del tuo account Strapi → "POS / Cassa fiscale".
+            È usa-e-getta e scade in 30 minuti.
+          </p>
+        </div>
+
+        <!-- Modalità email/password (legacy) -->
+        <div id="modeCreds" style="display:none;">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="you@ristorante.it" />
+          <label for="password">Password</label>
+          <input type="password" id="password" />
+        </div>
+
+        <label for="device_name">Nome dispositivo (opzionale)</label>
+        <input type="text" id="device_name" placeholder="Cassa sala" />
+
+        <button type="submit" id="submitBtn">Avvia pairing</button>
+      </form>
+    </div>
+
+    <template id="successTpl">
+      <div class="card">
+        <div class="step">Pairing completato</div>
+        <h1>Dispositivo registrato</h1>
+        <div class="success">
+          <div><strong>Strapi:</strong> <span id="s_url"></span></div>
+          <div><strong>Dispositivo:</strong> <span id="s_name"></span></div>
+        </div>
+        <p class="sub">Il tuo PIN locale (servirà per accedere al pannello di amministrazione):</p>
+        <div class="pin" id="s_pin"></div>
+        <p class="warn-text">⚠️ Annota il PIN ora. Non verrà mostrato di nuovo.</p>
+        <button onclick="window.location.href='/ui/dashboard.html'">Vai al pannello</button>
+      </div>
+    </template>
+
+    <script>
+      const form = document.getElementById('pairForm');
+      const errorDiv = document.getElementById('error');
+      const btn = document.getElementById('submitBtn');
+      let mode = 'token'; // 'token' | 'creds'
+
+      function switchMode(newMode) {
+        mode = newMode;
+        document.getElementById('modeToken').style.display = mode === 'token' ? '' : 'none';
+        document.getElementById('modeCreds').style.display = mode === 'creds' ? '' : 'none';
+        document.getElementById('tabToken').classList.toggle('tab-active', mode === 'token');
+        document.getElementById('tabCreds').classList.toggle('tab-active', mode === 'creds');
+      }
+
+      // Auto-fill claim-code se passato come ?claim=XXX (es. dall'installer)
+      // Auto-fill pairing-token se passato come ?token=XXX
+      try {
+        const qs = new URLSearchParams(window.location.search);
+        const c = qs.get('claim');
+        if (c && /^[a-f0-9]{64}$/i.test(c)) {
+          document.getElementById('claim_code').value = c;
+          document.getElementById('claimHint').textContent = 'Claim-code rilevato dall’URL.';
+        }
+        const t = qs.get('token');
+        if (t && /^[a-f0-9]{64}$/i.test(t)) {
+          document.getElementById('pairing_token').value = t;
+          switchMode('token');
+        }
+      } catch (_) {}
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorDiv.style.display = 'none';
+        btn.disabled = true;
+        btn.textContent = 'Connessione in corso...';
+        const claim = document.getElementById('claim_code').value.trim();
+        const strapiUrl = document.getElementById('strapi_url').value.trim();
+        const deviceName = document.getElementById('device_name').value.trim() || undefined;
+
+        let endpoint, body;
+        if (mode === 'token') {
+          const tokenVal = document.getElementById('pairing_token').value.trim();
+          if (!/^[a-f0-9]{64}$/i.test(tokenVal)) {
+            errorDiv.textContent = 'Il token deve essere 64 caratteri esadecimali.';
+            errorDiv.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Avvia pairing';
+            return;
+          }
+          endpoint = '/pair/by-token';
+          body = { strapi_url: strapiUrl, pairing_token: tokenVal, device_name: deviceName };
+        } else {
+          endpoint = '/pair';
+          body = {
+            strapi_url: strapiUrl,
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+            device_name: deviceName,
+          };
+        }
+
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Pairing-Claim-Code': claim,
+            },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.message || data.code || `HTTP ${res.status}`);
+          }
+          showSuccess(data.data);
+        } catch (err) {
+          errorDiv.textContent = err.message || String(err);
+          errorDiv.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Riprova';
+        }
+      });
+
+      function showSuccess(d) {
+        const tpl = document.getElementById('successTpl');
+        const node = tpl.content.cloneNode(true);
+        document.getElementById('app').replaceWith(node);
+        document.getElementById('s_url').textContent = d.strapi_url;
+        document.getElementById('s_name').textContent = d.name;
+        document.getElementById('s_pin').textContent = d.local_pin;
+      }
+    </script>
+  </body>
+</html>

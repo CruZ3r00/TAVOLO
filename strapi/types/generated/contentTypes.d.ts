@@ -765,6 +765,183 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiPosDevicePosDevice extends Struct.CollectionTypeSchema {
+  collectionName: 'pos_devices';
+  info: {
+    description: 'Dispositivo pos-rt-service installato presso il ristoratore. Comunica con Strapi via HTTP + WebSocket outbound.';
+    displayName: 'POS/RT Device';
+    pluralName: 'pos-devices';
+    singularName: 'pos-device';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    apns_token: Schema.Attribute.String &
+      Schema.Attribute.Private &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    apns_token_updated_at: Schema.Attribute.DateTime & Schema.Attribute.Private;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    device_token_hash: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 128;
+      }>;
+    fingerprint: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 128;
+      }>;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    last_seen: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::pos-device.pos-device'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    notes: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    platform: Schema.Attribute.Enumeration<
+      ['windows', 'macos', 'linux', 'ios', 'android', 'other']
+    > &
+      Schema.Attribute.DefaultTo<'other'>;
+    publishedAt: Schema.Attribute.DateTime;
+    revoked_at: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    version: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 40;
+      }>;
+  };
+}
+
+export interface ApiPosJobPosJob extends Struct.CollectionTypeSchema {
+  collectionName: 'pos_jobs';
+  info: {
+    description: 'Coda server-side dei job inviati al pos-rt-service (stampa/pagamento). Consumati via HTTP pull o push su WebSocket.';
+    displayName: 'POS Job';
+    pluralName: 'pos-jobs';
+    singularName: 'pos-job';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    acked_at: Schema.Attribute.DateTime;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    dispatched_at: Schema.Attribute.DateTime;
+    error_code: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    error_message: Schema.Attribute.Text;
+    event_id: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 64;
+      }>;
+    fk_device: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::pos-device.pos-device'
+    >;
+    fk_order: Schema.Attribute.Relation<'manyToOne', 'api::order.order'>;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    kind: Schema.Attribute.Enumeration<
+      ['order.close', 'print.receipt', 'payment.charge', 'payment.refund']
+    > &
+      Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::pos-job.pos-job'
+    > &
+      Schema.Attribute.Private;
+    outcome: Schema.Attribute.JSON;
+    payload: Schema.Attribute.JSON & Schema.Attribute.Required;
+    priority: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<100>;
+    publishedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<
+      ['pending', 'dispatched', 'acked_success', 'acked_failure', 'cancelled']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pending'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiPosPairingTokenPosPairingToken
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'pos_pairing_tokens';
+  info: {
+    description: "Token single-use per accoppiare un nuovo pos-rt-service (PC/mobile) al user. Generato dalla pagina profilo, consumato dall'endpoint register-by-token.";
+    displayName: 'POS Pairing Token';
+    pluralName: 'pos-pairing-tokens';
+    singularName: 'pos-pairing-token';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    consumed_at: Schema.Attribute.DateTime;
+    created_ip: Schema.Attribute.String &
+      Schema.Attribute.Private &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 64;
+      }>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    expires_at: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::pos-pairing-token.pos-pairing-token'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    token_hash: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 128;
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
   collectionName: 'preferences';
   info: {
@@ -1611,6 +1788,9 @@ declare module '@strapi/strapi' {
       'api::order-archive.order-archive': ApiOrderArchiveOrderArchive;
       'api::order-item.order-item': ApiOrderItemOrderItem;
       'api::order.order': ApiOrderOrder;
+      'api::pos-device.pos-device': ApiPosDevicePosDevice;
+      'api::pos-job.pos-job': ApiPosJobPosJob;
+      'api::pos-pairing-token.pos-pairing-token': ApiPosPairingTokenPosPairingToken;
       'api::preference.preference': ApiPreferencePreference;
       'api::reservation.reservation': ApiReservationReservation;
       'api::restaurant-daily-stat.restaurant-daily-stat': ApiRestaurantDailyStatRestaurantDailyStat;

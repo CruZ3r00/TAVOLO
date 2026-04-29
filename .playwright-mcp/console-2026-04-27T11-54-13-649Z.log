@@ -1,0 +1,6 @@
+[    1472ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://127.0.0.1:5174/login:0
+[   55255ms] [LOG] {jwt: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MjYsI…TA4fQ.pOoHWOiY98baNXpiBdo3WNEUWmCQ2iSNSdj80KjTkBE, user: Object} @ http://127.0.0.1:5174/src/Pages/Auth/Login.vue:46
+[   56186ms] [ERROR] Failed to load resource: the server responded with a status of 402 (Payment Required) @ http://127.0.0.1:1337/api/users/me:0
+[   56191ms] [ERROR] Failed to load resource: the server responded with a status of 402 (Payment Required) @ http://127.0.0.1:1337/api/users/me?populate=*:0
+[   56283ms] [ERROR] Failed to load resource: the server responded with a status of 402 (Payment Required) @ http://127.0.0.1:1337/api/orders?status=active&pageSize=1:0
+[   56291ms] [ERROR] Failed to load resource: the server responded with a status of 402 (Payment Required) @ http://127.0.0.1:1337/api/reservations?status=pending&pageSize=1:0

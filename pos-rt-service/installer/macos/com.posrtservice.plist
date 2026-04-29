@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.posrtservice</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/pos-rt-service</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>NODE_ENV</key>
+        <string>production</string>
+        <key>LOG_LEVEL</key>
+        <string>info</string>
+        <key>APP_DATA_DIR</key>
+        <string>/Library/Application Support/PosRtService</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>WorkingDirectory</key>
+    <string>/Library/Application Support/PosRtService</string>
+
+    <key>StandardOutPath</key>
+    <string>/Library/Application Support/PosRtService/logs/stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Library/Application Support/PosRtService/logs/stderr.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

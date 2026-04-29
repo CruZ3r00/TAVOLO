@@ -1,0 +1,17 @@
+{
+  "appId": "it.posrtservice.mobile",
+  "appName": "pos-rt-mobile",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": true,
+      "iosIsEncryption": true
+    }
+  }
+}

@@ -2,6 +2,7 @@
     import { onMounted, ref } from 'vue';
     import { useStore } from 'vuex';
     import Modal from '@/components/Modal.vue';
+    import Skeleton from '@/components/Skeleton.vue';
     import { API_BASE } from '@/utils';
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
@@ -12,6 +13,7 @@
     const emit = defineEmits(['AddElement', 'count-changed', 'RequestImport']);
 
     //variabili per il supporto delle richieste fetch
+    const initialLoading = ref(true);
     const modify = ref(false);
     const modalShow = ref(false);
     const toModify = ref();
@@ -96,6 +98,8 @@
             emit('count-changed', list.value.length);
         } catch (error) {
             console.error(error);
+        } finally {
+            initialLoading.value = false;
         }
     }
 
@@ -237,8 +241,26 @@
                 </div>
             </div>
 
+            <!-- Skeleton initial load -->
+            <div v-if="initialLoading" class="elements-grid">
+                <div v-for="n in 6" :key="`sk-mn-${n}`" class="ds-card element-card">
+                    <div class="element-image-wrapper" style="background: var(--bg-sunk, var(--bg-2));">
+                        <Skeleton width="100%" height="100%" radius="0" />
+                    </div>
+                    <div class="element-body">
+                        <div class="element-header">
+                            <Skeleton width="55%" height="16px" />
+                            <Skeleton width="45px" height="14px" />
+                        </div>
+                        <Skeleton width="40%" height="11px" style="margin-top: 8px;" />
+                        <Skeleton width="100%" height="10px" style="margin-top: 12px;" />
+                        <Skeleton width="80%" height="10px" style="margin-top: 4px;" />
+                    </div>
+                </div>
+            </div>
+
             <!-- Empty state -->
-            <div v-if="list.length === 0" class="ds-card">
+            <div v-else-if="list.length === 0" class="ds-card">
                 <div class="ds-empty">
                     <div class="ds-empty-icon">
                         <i class="bi bi-journal-x"></i>
@@ -253,7 +275,7 @@
             </div>
 
             <!-- Element grid -->
-            <div class="elements-grid">
+            <div v-if="!initialLoading && list.length > 0" class="elements-grid">
                 <div v-for="element in filteredList()" :key="element.documentId" class="ds-card element-card" v-motion-slide-visible-bottom>
                     <!-- Image -->
                     <div class="element-image-wrapper">
