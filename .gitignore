@@ -1,4 +1,8 @@
 node_modules
+.runtime/
+*.log
+strapi/.menu-upload/
+strapi/.menu_upload/
 # Added by code-review-graph
 .code-review-graph/
 .claude/*

@@ -9,6 +9,7 @@ import OrderDetailModal from '@/components/OrderDetailModal.vue';
 import AddItemModal from '@/components/AddItemModal.vue';
 import CheckoutModal from '@/components/CheckoutModal.vue';
 import Skeleton from '@/components/Skeleton.vue';
+import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
 import {
   fetchTables, fetchOrders, closeOrder,
   addOrderItem, updateItemStatus, orderErrorMessage,
@@ -17,8 +18,6 @@ import {
 const store = useStore();
 const route = useRoute();
 const token = computed(() => store.getters.getToken);
-
-const POLL_INTERVAL_MS = 20000;
 
 const tables = ref([]);
 const orders = ref([]);
@@ -181,14 +180,43 @@ function statusLabel(status) {
   }
 }
 
-let pollHandle = null;
-const startPolling = () => {
-  if (pollHandle) clearInterval(pollHandle);
-  pollHandle = setInterval(() => {
-    if (document.visibilityState === 'visible') loadData({ silent: true });
-  }, POLL_INTERVAL_MS);
+let realtimeChannel = null;
+let realtimeRefreshHandle = null;
+
+const scheduleRealtimeRefresh = () => {
+  if (document.visibilityState !== 'visible') return;
+  if (realtimeRefreshHandle) clearTimeout(realtimeRefreshHandle);
+  realtimeRefreshHandle = setTimeout(() => {
+    realtimeRefreshHandle = null;
+    loadData({ silent: true });
+  }, 250);
 };
-const stopPolling = () => { if (pollHandle) { clearInterval(pollHandle); pollHandle = null; } };
+
+const stopRealtime = async () => {
+  if (realtimeRefreshHandle) {
+    clearTimeout(realtimeRefreshHandle);
+    realtimeRefreshHandle = null;
+  }
+  if (realtimeChannel && supabase) {
+    await supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+};
+
+const subscribeRealtime = async (userId) => {
+  await stopRealtime();
+  if (!isSupabaseRealtimeConfigured || !supabase || !userId) return;
+
+  realtimeChannel = supabase
+    .channel(`kitchen-orders-${userId}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'order_realtime_events',
+      filter: `user_id=eq.${userId}`,
+    }, scheduleRealtimeRefresh)
+    .subscribe();
+};
 const onVisibilityChange = () => {
   if (document.visibilityState === 'visible') loadData({ silent: true });
 };
@@ -203,13 +231,13 @@ const openOrderFromQuery = () => {
 onMounted(async () => {
   document.title = mode.value === 'cucina' ? 'Cucina · Tavolo' : 'Sala · Tavolo';
   await loadData();
-  startPolling();
+  await subscribeRealtime(store.getters.getUser?.id);
   document.addEventListener('visibilitychange', onVisibilityChange);
   openOrderFromQuery();
 });
 
 onBeforeUnmount(() => {
-  stopPolling();
+  stopRealtime();
   document.removeEventListener('visibilitychange', onVisibilityChange);
 });
 

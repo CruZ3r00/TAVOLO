@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
     "@vueuse/head": "^2.0.0",
     "@vueuse/motion": "^3.0.3",
     "qrcode": "^1.5.4",
