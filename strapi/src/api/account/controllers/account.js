@@ -167,9 +167,13 @@ module.exports = {
       }
     }
 
-    const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
-    const siteUrl =
-      (typeof body.site_url === 'string' && body.site_url.trim()) ||
+  	 const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+       	const siteSlug = String(user.username || '')
+  		 .trim()
+ 		 .replace(/\s+/g, '_');
+	const siteUrl = `${siteBaseUrl.replace(/\/+$/, '')}/sites/${siteSlug}`;
+
+  
       `${siteBaseUrl}/sites/${user.username}`;
     const restaurantName =
       (typeof body.restaurant_name === 'string' && body.restaurant_name.trim()) ||

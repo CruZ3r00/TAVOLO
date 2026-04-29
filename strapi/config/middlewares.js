@@ -74,9 +74,9 @@ module.exports = [
   'global::subscription-gate',
   'strapi::favicon',
   'strapi::public',
-  // Middleware per servire i siti-menu personalizzati su /sites/:username
-  // {
-  //   name: 'global::restaurant-sites',
-  //   config: {},
-  // },
+//   Middleware per servire i siti-menu personalizzati su /sites/:username
+   {
+     name: 'global::restaurant-sites',
+     config: {},
+   },
 ];
