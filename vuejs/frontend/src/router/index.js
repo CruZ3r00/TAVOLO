@@ -2,6 +2,22 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { store } from '@/store'; //usato per storage di jwt
 import { fetchBillingStatus } from '@/utils';
 
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
+const SUBSCRIPTION_CHECK_TIMEOUT_MS = 5000;
+
+const withTimeout = (promise, ms) => {
+    let timeoutId;
+    const timeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+            const err = new Error('Controllo abbonamento non disponibile.');
+            err.code = 'SUBSCRIPTION_CHECK_TIMEOUT';
+            reject(err);
+        }, ms);
+    });
+
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+};
+
 const routes = [
     { //non protetta
       path: '/register',
@@ -18,33 +34,37 @@ const routes = [
         name: 'choose-plan',
         component: () => import('../Pages/ChoosePlan.vue'),
     },
-    { //non protetta — landing pubblica (Dashboard.vue gestisce v-if isLoggedIn)
+    { //non protetta — landing pubblica per ospiti
+        path: '/landing',
+        name: 'landing',
+        component: () => import('../Pages/Landing.vue'),
+    },
+    { //smart-redirect — al loaded user va in dashboard, ai guest in landing
         path: '/',
-        name: 'Dashboard',
-        component: () => import('../Pages/Dashboard.vue'),
+        redirect: () => store.getters.isAuthenticated ? '/dashboard' : '/landing',
     },
-    { //non protetta
-      path: '/home', // Path to the dash
-      name: 'home',
-      component: () => import('../Pages/Dashboard.vue'),
+    { //smart-redirect storico
+        path: '/home',
+        redirect: () => store.getters.isAuthenticated ? '/dashboard' : '/landing',
     },
-    { //non protetta
+    { //protetta — manager dashboard
         path: '/dashboard',
         name: 'dashboard',
         component: () => import('../Pages/Dashboard.vue'),
+        meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //non protetta
-        path: '/terms', // Route to the Terms of Service
+        path: '/terms',
         name: 'terms',
         component: () => import('../Pages/TermsOfService.vue'),
     },
     { //non protetta
-        path: '/privacy-policy', // Path to the Privacy Policy
+        path: '/privacy-policy',
         name: 'privacy-policy',
         component: () => import('../Pages/PrivacyPolicy.vue'),
     },
     { //protetta
-        path: '/logout', // Path to logout
+        path: '/logout',
         name: 'Logging out...',
         component: () => import('../Pages/Auth/Logout.vue'),
         meta: { requiresAuth: true },
@@ -61,7 +81,7 @@ const routes = [
         meta: { requiresAuth: true, requiresSubscription: true },
     },
     { //protetta
-        path: '/profile/show', // Path to profile
+        path: '/profile/show',
         name: 'Your profile',
         component: () => import('../Pages/Profile/Show.vue'),
         meta: { requiresAuth: true, requiresSubscription: true },
@@ -85,61 +105,87 @@ const routes = [
         meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina' },
     },
     { //non protetta
-        path: '/who-are-us', // Route per pagina chi siamo
+        path: '/who-are-us',
         name: 'Chi siamo',
         component: () => import('../Pages/WhoAreUs.vue'),
     },
     { //non protetta
-        path: '/contact-us', // Route for contact page
+        path: '/contact-us',
         name: 'Contattaci',
         component: () => import('../Pages/ContactUs.vue'),
     },
     { // protetta
-        path: '/renew-sub', // Route for renew subscription
+        path: '/renew-sub',
         name: 'Rinnova l\'abbonamento',
         component: () => import('../Pages/RenewSub.vue'),
         meta: { requiresAuth: true },
     },
     { // protetta
-        path: '/add-payment', // Route to add payment method
+        path: '/add-payment',
         name: 'Inserisci dati per il pagamento',
         component: () => import('../Pages/AddPayment.vue'),
         meta: { requiresAuth: true },
     },
     { //non protetta
-        path: '/:pathMatch(.*)*', // Route for 404 errors
+        path: '/:pathMatch(.*)*',
         name: 'NotFound',
         component: () => import('../Pages/NotFound.vue'),
     },
 ];
 
-// Create router
 const router = createRouter({
   history: createWebHistory(),
   routes,
 });
 
-// Protected route management (auth)
 router.beforeEach(async (to, from, next) => {
     const isAuthenticated = store.getters.isAuthenticated;
+
+    // Guest che cerca di entrare in route protetta -> rimanda alla landing
     if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
-        next({ name: 'login' });
+        next({ name: 'landing' });
+        return;
+    }
+
+    // Utente loggato che apre /login o /register -> rimanda alla dashboard
+    if (isAuthenticated && ['login', 'register', 'landing'].includes(to.name)) {
+        next({ name: 'dashboard' });
         return;
     }
 
     if (isAuthenticated && to.matched.some(record => record.meta.requiresSubscription)) {
         try {
-            const billing = await fetchBillingStatus(store.getters.getToken);
-            const user = { ...(store.getters.getUser || {}), ...billing };
-            store.commit('setUser', user);
-            localStorage.setItem('user', JSON.stringify(user));
+            const billing = await withTimeout(
+                fetchBillingStatus(store.getters.getToken),
+                SUBSCRIPTION_CHECK_TIMEOUT_MS
+            );
 
-            if (!['active', 'trialing'].includes(billing?.subscription_status)) {
+            if (billing) {
+                const user = { ...(store.getters.getUser || {}), ...billing };
+                store.commit('setUser', user);
+                localStorage.setItem('user', JSON.stringify(user));
+            }
+
+            if (billing && !ACTIVE_SUBSCRIPTION_STATUSES.has(billing.subscription_status)) {
                 next({ path: '/renew-sub', query: { checkout: 'retry' } });
                 return;
             }
-        } catch (_err) {
-            next({ path: '/renew-sub', query: { checkout: 'retry' } });
+        } catch (err) {
+            if (err?.status === 401 || err?.status === 403) {
+                store.dispatch('logout');
+                localStorage.removeItem('user');
+                localStorage.removeItem('token');
+                next({ name: 'landing' });
+                return;
+            }
+
+            if (err?.status === 402 || err?.code === 'SUBSCRIPTION_REQUIRED') {
+                next({ path: '/renew-sub', query: { checkout: 'retry' } });
+                return;
+            }
+
+            console.warn('Subscription check skipped:', err);
+            next();
             return;
         }
     }

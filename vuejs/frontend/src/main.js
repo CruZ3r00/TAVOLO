@@ -8,6 +8,7 @@ import { MotionPlugin } from '@vueuse/motion';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
 import './assets/design-system.css';
+import './assets/tavolo-screens.css';
 
 const app = createApp(App)
 app.use(store)

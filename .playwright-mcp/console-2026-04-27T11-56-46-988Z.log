@@ -1,0 +1,4 @@
+[    1612ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:1337/api/pos-devices:0
+[   91417ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:1337/api/pos-devices/me/pairing-token:0
+[   96060ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:1337/api/pos-devices/me/pairing-token:0
+[  120518ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://127.0.0.1:1337/api/pos-devices/me/pairing-token:0

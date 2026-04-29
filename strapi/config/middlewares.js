@@ -1,11 +1,33 @@
+const DEFAULT_CORS_ORIGINS = [
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://localhost:5176',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
+  'http://127.0.0.1:5176',
+  'http://192.168.1.216:5174',
+];
+
 const parseCorsOrigins = () => {
-  const raw = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || 'http://localhost:5174';
-  const origins = raw
-    .split(',')
+  const raw = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS;
+  const origins = (raw && raw.trim() ? raw.split(',') : DEFAULT_CORS_ORIGINS)
     .map((origin) => origin.trim())
     .filter(Boolean);
-  console.log(origins);
-  return origins;
+
+  return [...new Set(origins)];
+};
+
+const frontendOrigins = parseCorsOrigins();
+
+const parseFrameAncestors = () => {
+  const raw = process.env.FRAME_ANCESTORS;
+  const ancestors = (raw && raw.trim() ? raw.split(',') : frontendOrigins)
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const uniqueAncestors = new Set(ancestors);
+  uniqueAncestors.delete("'self'");
+
+  return ["'self'", ...uniqueAncestors];
 };
 
 module.exports = [
@@ -22,7 +44,7 @@ module.exports = [
           'img-src': ["'self'", 'data:', 'blob:', 'cdn.jsdelivr.net'],
           'font-src': ["'self'", 'cdn.jsdelivr.net'],
           'connect-src': ["'self'"],
-          'frame-ancestors': ["'self'", "http://localhost:5174"],
+          'frame-ancestors': parseFrameAncestors(),
         },
       },
     },
@@ -30,7 +52,7 @@ module.exports = [
   {
     name: 'strapi::cors',
     config: {
-      origin: parseCorsOrigins(),
+      origin: frontendOrigins,
       headers: '*',
     },
   },

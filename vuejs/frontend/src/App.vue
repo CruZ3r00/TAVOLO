@@ -1,19 +1,13 @@
 <script setup>
-    import { RouterView, useRoute } from 'vue-router';
-    import { computed } from 'vue';
-
-    const route = useRoute();
-    const routeKey = computed(() => route.fullPath);
+    import { RouterView } from 'vue-router';
 </script>
 
 <template>
-    <div id="app">
-      <RouterView v-slot="{ Component }">
-        <Transition name="page" mode="out-in">
-          <component :is="Component" :key="routeKey" />
-        </Transition>
-      </RouterView>
-    </div>
+    <RouterView v-slot="{ Component, route }">
+      <Transition name="page">
+        <component v-if="Component" :is="Component" :key="route.fullPath" />
+      </Transition>
+    </RouterView>
 </template>
 
 <style>
