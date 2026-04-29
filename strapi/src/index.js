@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 const { validateProductionConfig } = require('./utils/production-checks');
+const { createDefaultStaffAccounts } = require('./utils/staff-access');
 console.log("STARTING STRAPI...");
 console.log("PORT:", process.env.PORT);
 function escapeHtml(value) {
@@ -54,6 +55,7 @@ module.exports = {
       // The custom fields survived in ctx.request.body because the
       // original register only _.pick()s allowedKeys without deleting.
       const body = ctx.request.body || {};
+      const ownerPassword = typeof body.password === 'string' ? body.password : '';
       const rawInv = body.coperti_invernali;
       const rawEst = body.coperti_estivi;
       const rawName = body.restaurant_name;
@@ -111,8 +113,16 @@ module.exports = {
           where: { id: createdUser.id },
           data: { url: siteUrl },
         });
+        const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
+          where: { id: createdUser.id },
+        });
+        const staffAccounts = await createDefaultStaffAccounts(strapi, owner || createdUser, ownerPassword);
         if (ctx.body && ctx.body.user) {
           ctx.body.user.url = siteUrl;
+          ctx.body.user.staff_accounts = staffAccounts.map((account) => ({
+            username: account.username,
+            staff_role: account.staff_role,
+          }));
         }
       } catch (error) {
         strapi.log.error(
@@ -140,6 +150,10 @@ module.exports = {
       models: ['plugin::users-permissions.user'],
       async afterCreate(event) {
         const { result } = event;
+        if (result && result.staff_role && result.staff_role !== 'owner') {
+          strapi.log.info(`Staff user creato (${result.staff_role}), skip sito/email: ${result.username}`);
+          return;
+        }
 
         // Genera il file HTML del sito in restaurant-sites/
         try {

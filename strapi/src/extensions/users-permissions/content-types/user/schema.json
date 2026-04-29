@@ -112,6 +112,28 @@
     "url": {
       "type": "string"
     },
+    "staff_role": {
+      "type": "enumeration",
+      "enum": [
+        "owner",
+        "gestione",
+        "cameriere",
+        "cucina"
+      ],
+      "default": "owner"
+    },
+    "fk_owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "staff_members"
+    },
+    "staff_members": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "plugin::users-permissions.user",
+      "mappedBy": "fk_owner"
+    },
     "two_factor_secret": {
       "type": "string",
       "private": true,

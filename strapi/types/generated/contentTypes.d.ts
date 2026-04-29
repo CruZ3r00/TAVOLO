@@ -1721,6 +1721,10 @@ export interface PluginUsersPermissionsUser
         minLength: 6;
       }>;
     end_subscription: Schema.Attribute.Date;
+    fk_owner: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
     fk_prefs: Schema.Attribute.Relation<
       'oneToOne',
       'api::preference.preference'
@@ -1745,6 +1749,14 @@ export interface PluginUsersPermissionsUser
       'manyToOne',
       'plugin::users-permissions.role'
     >;
+    staff_members: Schema.Attribute.Relation<
+      'oneToMany',
+      'plugin::users-permissions.user'
+    >;
+    staff_role: Schema.Attribute.Enumeration<
+      ['owner', 'gestione', 'cameriere', 'cucina']
+    > &
+      Schema.Attribute.DefaultTo<'owner'>;
     stripe_customer_id: Schema.Attribute.String & Schema.Attribute.Private;
     stripe_subscription_id: Schema.Attribute.String & Schema.Attribute.Private;
     subscription_cancel_at_period_end: Schema.Attribute.Boolean &

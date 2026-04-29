@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { store } from '@/store'; //usato per storage di jwt
 import { fetchBillingStatus } from '@/utils';
+import { STAFF_ROLES, canAccessRoute, defaultRouteForUser } from '@/staffAccess';
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
 const SUBSCRIPTION_CHECK_TIMEOUT_MS = 5000;
@@ -41,17 +42,17 @@ const routes = [
     },
     { //smart-redirect — al loaded user va in dashboard, ai guest in landing
         path: '/',
-        redirect: () => store.getters.isAuthenticated ? '/dashboard' : '/landing',
+        redirect: () => store.getters.isAuthenticated ? defaultRouteForUser(store.getters.getUser) : '/landing',
     },
     { //smart-redirect storico
         path: '/home',
-        redirect: () => store.getters.isAuthenticated ? '/dashboard' : '/landing',
+        redirect: () => store.getters.isAuthenticated ? defaultRouteForUser(store.getters.getUser) : '/landing',
     },
     { //protetta — manager dashboard
         path: '/dashboard',
         name: 'dashboard',
         component: () => import('../Pages/Dashboard.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true },
+        meta: { requiresAuth: true, requiresSubscription: true, staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE] },
     },
     { //non protetta
         path: '/terms',
@@ -78,31 +79,31 @@ const routes = [
         path: '/menu-handler',
         name: 'Menu setter',
         component: () => import('../Pages/MenuSetter.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true },
+        meta: { requiresAuth: true, requiresSubscription: true, staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE] },
     },
     { //protetta
         path: '/profile/show',
         name: 'Your profile',
         component: () => import('../Pages/Profile/Show.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true },
+        meta: { requiresAuth: true, requiresSubscription: true, staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE] },
     },
     { //protetta - Gestione prenotazioni
         path: '/reservations',
         name: 'Prenotazioni',
         component: () => import('../Pages/Reservations.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true },
+        meta: { requiresAuth: true, requiresSubscription: true, staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE] },
     },
     { //protetta - Gestione ordinazioni (sala)
         path: '/orders',
         name: 'Sala',
         component: () => import('../Pages/Orders.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cameriere' },
+        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cameriere', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE] },
     },
     { //protetta - Vista cucina
         path: '/kitchen',
         name: 'Cucina',
         component: () => import('../Pages/Orders.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina' },
+        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CUCINA] },
     },
     { //non protetta
         path: '/who-are-us',
@@ -149,7 +150,7 @@ router.beforeEach(async (to, from, next) => {
 
     // Utente loggato che apre /login o /register -> rimanda alla dashboard
     if (isAuthenticated && ['login', 'register', 'landing'].includes(to.name)) {
-        next({ name: 'dashboard' });
+        next(defaultRouteForUser(store.getters.getUser));
         return;
     }
 
@@ -188,6 +189,12 @@ router.beforeEach(async (to, from, next) => {
             next();
             return;
         }
+    }
+
+    if (isAuthenticated && !canAccessRoute(store.getters.getUser, to)) {
+        const fallback = defaultRouteForUser(store.getters.getUser);
+        next(to.path === fallback ? false : fallback);
+        return;
     }
 
     next();

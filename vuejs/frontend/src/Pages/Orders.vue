@@ -8,11 +8,14 @@ import KitchenBoard from '@/components/KitchenBoard.vue';
 import OrderDetailModal from '@/components/OrderDetailModal.vue';
 import AddItemModal from '@/components/AddItemModal.vue';
 import CheckoutModal from '@/components/CheckoutModal.vue';
+import Modal from '@/components/Modal.vue';
 import Skeleton from '@/components/Skeleton.vue';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
+import { effectiveUserId } from '@/staffAccess';
 import {
   fetchTables, fetchOrders, closeOrder,
   addOrderItem, updateItemStatus, orderErrorMessage,
+  createWalkin, reservationErrorMessage,
 } from '@/utils';
 
 const store = useStore();
@@ -36,6 +39,11 @@ const addItemLockVersion = ref(0);
 const showCheckout = ref(false);
 const checkoutOrder = ref(null);
 const busyItemIds = ref(new Set());
+const showWalkin = ref(false);
+const walkinTable = ref(null);
+const walkinSaving = ref(false);
+const walkinForm = ref({ number_of_people: 2, customer_name: 'Walk-in', phone: '', notes: '' });
+const walkinErrors = ref({});
 
 const orderDetailRef = ref(null);
 
@@ -92,6 +100,58 @@ const handleViewOrder = (order) => {
   if (!order?.documentId) return;
   currentOrderDocId.value = order.documentId;
   showOrderDetail.value = true;
+};
+
+const handleOpenTable = async (table) => {
+  if (!table?.documentId || !token.value) return;
+  walkinTable.value = table;
+  walkinForm.value = {
+    number_of_people: Math.max(1, Math.min(parseInt(table.seats, 10) || 2, 12)),
+    customer_name: 'Walk-in',
+    phone: '',
+    notes: '',
+  };
+  walkinErrors.value = {};
+  showWalkin.value = true;
+};
+
+const validateWalkin = () => {
+  const errors = {};
+  const people = parseInt(walkinForm.value.number_of_people, 10);
+  if (!Number.isFinite(people) || people < 1 || people > 1000) {
+    errors.number_of_people = 'Inserisci almeno 1 coperto.';
+  }
+  if (!String(walkinForm.value.customer_name || '').trim()) {
+    errors.customer_name = 'Inserisci un nome.';
+  }
+  walkinErrors.value = errors;
+  return Object.keys(errors).length === 0;
+};
+
+const confirmWalkin = async () => {
+  if (!walkinTable.value?.documentId || !token.value || !validateWalkin()) return;
+  walkinSaving.value = true;
+  try {
+    const result = await createWalkin({
+      table_id: walkinTable.value.documentId,
+      number_of_people: parseInt(walkinForm.value.number_of_people, 10),
+      customer_name: String(walkinForm.value.customer_name || '').trim(),
+      phone: String(walkinForm.value.phone || '').trim() || undefined,
+      notes: String(walkinForm.value.notes || '').trim() || undefined,
+    }, token.value);
+    showWalkin.value = false;
+    await loadData({ silent: true });
+    if (result?.order?.documentId) {
+      currentOrderDocId.value = result.order.documentId;
+      showOrderDetail.value = true;
+    }
+    showToast('success', `Walk-in aperto al tavolo ${walkinTable.value.number}.`);
+  } catch (err) {
+    showToast('error', reservationErrorMessage(err));
+    await loadData({ silent: true });
+  } finally {
+    walkinSaving.value = false;
+  }
 };
 
 const onOrderUpdated = async () => { await loadData({ silent: true }); };
@@ -231,7 +291,7 @@ const openOrderFromQuery = () => {
 onMounted(async () => {
   document.title = mode.value === 'cucina' ? 'Cucina · Tavolo' : 'Sala · Tavolo';
   await loadData();
-  await subscribeRealtime(store.getters.getUser?.id);
+  await subscribeRealtime(effectiveUserId(store.getters.getUser));
   document.addEventListener('visibilitychange', onVisibilityChange);
   openOrderFromQuery();
 });
@@ -320,6 +380,7 @@ const now = computed(() => {
           :tables="tables"
           :orders="orders"
           @view-order="handleViewOrder"
+          @open-table="handleOpenTable"
         />
         <KitchenBoard
           v-else
@@ -355,6 +416,55 @@ const now = computed(() => {
       @close="showCheckout = false"
       @confirm="onConfirmCheckout"
     />
+
+    <Modal :show="showWalkin" slim @close="showWalkin = false">
+      <template #title>
+        <div class="walkin-title">
+          <i class="bi bi-person-walking" aria-hidden="true"></i>
+          <h2>Walk-in tavolo {{ walkinTable?.number }}</h2>
+        </div>
+      </template>
+      <template #body>
+        <form class="walkin-form" @submit.prevent="confirmWalkin">
+          <div class="ds-field">
+            <label class="ds-label" for="walkin-people">Coperti</label>
+            <input
+              id="walkin-people"
+              v-model.number="walkinForm.number_of_people"
+              class="ds-input"
+              type="number"
+              min="1"
+              max="1000"
+              inputmode="numeric"
+            >
+            <p v-if="walkinErrors.number_of_people" class="ds-helper walkin-err">{{ walkinErrors.number_of_people }}</p>
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" for="walkin-name">Nome</label>
+            <input id="walkin-name" v-model="walkinForm.customer_name" class="ds-input" type="text" maxlength="120">
+            <p v-if="walkinErrors.customer_name" class="ds-helper walkin-err">{{ walkinErrors.customer_name }}</p>
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" for="walkin-phone">Telefono</label>
+            <input id="walkin-phone" v-model="walkinForm.phone" class="ds-input" type="tel" maxlength="32" placeholder="Opzionale">
+          </div>
+          <div class="ds-field">
+            <label class="ds-label" for="walkin-notes">Note</label>
+            <input id="walkin-notes" v-model="walkinForm.notes" class="ds-input" type="text" placeholder="Opzionale">
+          </div>
+          <div class="walkin-actions">
+            <button type="button" class="ds-btn ds-btn-ghost" @click="showWalkin = false" :disabled="walkinSaving">
+              Annulla
+            </button>
+            <button type="submit" class="ds-btn ds-btn-primary" :disabled="walkinSaving">
+              <span v-if="walkinSaving" class="spin-icon"></span>
+              <i v-else class="bi bi-door-open" aria-hidden="true"></i>
+              Apri
+            </button>
+          </div>
+        </form>
+      </template>
+    </Modal>
   </AppLayout>
 </template>
 
@@ -422,6 +532,35 @@ const now = computed(() => {
   background: var(--bg-sunk, var(--bg-2));
   border-radius: 8px;
   padding: 12px;
+}
+.walkin-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.walkin-title i {
+  color: var(--ac);
+  font-size: 18px;
+}
+.walkin-title h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.walkin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.walkin-err {
+  color: var(--danger);
+  margin-top: 4px;
+}
+.walkin-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 8px;
 }
 @media (max-width: 1199px) {
   .ord-skel-kitchen { grid-template-columns: 1fr 1fr; }

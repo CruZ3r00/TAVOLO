@@ -1,6 +1,7 @@
 'use strict';
 
 const Stripe = require('stripe');
+const { resolveStaffContext, staffUserPayload, STAFF_ROLES } = require('../../../utils/staff-access');
 
 const PLAN_CONFIG = {
   starter: { name: 'Starter', priceEnv: 'STRIPE_PRICE_STARTER' },
@@ -150,12 +151,23 @@ module.exports = {
     const user = await requireBillingUser(ctx);
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
-    return ctx.send({ data: safeUser(user) });
+    const actor = await resolveStaffContext(strapi, user);
+    const billingUser = actor && actor.owner ? actor.owner : user;
+    return ctx.send({
+      data: {
+        ...safeUser(billingUser),
+        ...staffUserPayload(actor ? actor.actor : user, billingUser),
+      },
+    });
   },
 
   async createCheckoutSession(ctx) {
     const user = await requireBillingUser(ctx);
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+    const actor = await resolveStaffContext(strapi, user);
+    if (actor && ![STAFF_ROLES.OWNER].includes(actor.role)) {
+      return ctx.forbidden('Solo il titolare puo gestire la fatturazione.');
+    }
 
     const { plan: requestedPlan } = ctx.request.body || {};
     try {
@@ -205,6 +217,10 @@ module.exports = {
   async syncCheckoutSession(ctx) {
     const user = await requireBillingUser(ctx);
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+    const actor = await resolveStaffContext(strapi, user);
+    if (actor && ![STAFF_ROLES.OWNER].includes(actor.role)) {
+      return ctx.forbidden('Solo il titolare puo gestire la fatturazione.');
+    }
 
     const { session_id: sessionId } = ctx.request.body || {};
     if (!sessionId || typeof sessionId !== 'string') {
@@ -250,6 +266,10 @@ module.exports = {
   async createPortalSession(ctx) {
     const user = await requireBillingUser(ctx);
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+    const actor = await resolveStaffContext(strapi, user);
+    if (actor && ![STAFF_ROLES.OWNER].includes(actor.role)) {
+      return ctx.forbidden('Solo il titolare puo gestire la fatturazione.');
+    }
 
     if (!user.stripe_customer_id) {
       return ctx.badRequest('Nessun cliente Stripe associato a questo account.');

@@ -1,6 +1,7 @@
 'use strict';
 
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
+const { resolveStaffContext } = require('../utils/staff-access');
 
 const BYPASS_PREFIXES = [
   '/api/auth/',
@@ -25,6 +26,35 @@ function hasValidSubscription(user) {
   return periodEndDate.getTime() >= Date.now();
 }
 
+function isStaffApiAllowed(role, method, path) {
+  if (role === 'owner' || role === 'gestione') return true;
+  if (path === '/api/users/me') return method === 'GET';
+
+  if (role === 'cameriere') {
+    if (path === '/api/tables') return method === 'GET';
+    if (path === '/api/reservations/walkin') return method === 'POST';
+    if (path === '/api/orders') return method === 'GET' || method === 'POST';
+    if (/^\/api\/orders\/[^/]+$/.test(path)) return method === 'GET';
+    if (/^\/api\/orders\/[^/]+\/total$/.test(path)) return method === 'GET';
+    if (/^\/api\/orders\/[^/]+\/items$/.test(path)) return method === 'POST';
+    if (/^\/api\/orders\/[^/]+\/items\/[^/]+$/.test(path)) {
+      return method === 'PATCH' || method === 'DELETE';
+    }
+    if (/^\/api\/orders\/[^/]+\/items\/[^/]+\/status$/.test(path)) return method === 'PATCH';
+    return false;
+  }
+
+  if (role === 'cucina') {
+    if (path === '/api/tables') return method === 'GET';
+    if (path === '/api/orders') return method === 'GET';
+    if (/^\/api\/orders\/[^/]+$/.test(path)) return method === 'GET';
+    if (/^\/api\/orders\/[^/]+\/items\/[^/]+\/status$/.test(path)) return method === 'PATCH';
+    return false;
+  }
+
+  return false;
+}
+
 async function userFromBearer(strapi, authorization) {
   const match = String(authorization || '').match(/^Bearer\s+(.+)$/i);
   if (!match) return null;
@@ -34,12 +64,7 @@ async function userFromBearer(strapi, authorization) {
     if (!payload?.id) return null;
     return strapi.db.query('plugin::users-permissions.user').findOne({
       where: { id: payload.id },
-      select: [
-        'id',
-        'subscription_status',
-        'subscription_current_period_end',
-        'end_subscription',
-      ],
+      populate: { fk_owner: true },
     });
   } catch (_err) {
     return null;
@@ -59,7 +84,21 @@ module.exports = (_config, { strapi }) => {
       return next();
     }
 
-    if (hasValidSubscription(user)) {
+    const actor = await resolveStaffContext(strapi, user);
+    const billingUser = actor && actor.owner ? actor.owner : user;
+
+    if (actor && !isStaffApiAllowed(actor.role, ctx.method, path)) {
+      ctx.status = 403;
+      ctx.body = {
+        error: {
+          code: 'STAFF_ROUTE_FORBIDDEN',
+          message: 'Questo reparto non puo accedere a questa funzione.',
+        },
+      };
+      return;
+    }
+
+    if (hasValidSubscription(billingUser)) {
       return next();
     }
 

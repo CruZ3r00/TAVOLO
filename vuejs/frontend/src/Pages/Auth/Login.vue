@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
 import { API_BASE } from '@/utils';
+import { defaultRouteForUser } from '@/staffAccess';
 
 useHead({
   title: 'Accedi · Tavolo',
@@ -34,10 +35,19 @@ const submit = async () => {
     });
     if (response.ok) {
       const data = await response.json();
-      store.dispatch('login', { user: data.user, token: data.jwt });
-      localStorage.setItem('user', JSON.stringify(data.user));
+      let user = data.user;
+      try {
+        const meResponse = await fetch(`${API_BASE}/api/users/me`, {
+          headers: { Authorization: `Bearer ${data.jwt}` },
+        });
+        if (meResponse.ok) {
+          user = await meResponse.json();
+        }
+      } catch (_err) { /* login resta valido anche se /me non risponde */ }
+      store.dispatch('login', { user, token: data.jwt });
+      localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('token', data.jwt);
-      router.push('/dashboard');
+      router.push(defaultRouteForUser(user));
     } else {
       errorMessage.value = 'Credenziali non valide. Riprova.';
     }

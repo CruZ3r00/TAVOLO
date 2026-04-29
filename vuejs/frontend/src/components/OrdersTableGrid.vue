@@ -9,7 +9,7 @@ const props = defineProps({
   orders: { type: Array, default: () => [] },
 });
 
-const emit = defineEmits(['view-order']);
+const emit = defineEmits(['view-order', 'open-table']);
 
 const filter = ref('all');
 const search = ref('');
@@ -74,6 +74,7 @@ const filtered = computed(() => {
         :table="t"
         :active-order="activeOrderForTable(t)"
         @view-order="(ord) => emit('view-order', ord)"
+        @open-table="(table) => emit('open-table', table)"
       />
     </div>
     <div v-else class="kt-empty" style="padding: 40px 16px;">

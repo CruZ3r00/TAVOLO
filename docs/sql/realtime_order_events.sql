@@ -1,4 +1,4 @@
--- Supabase Realtime bridge for Sala/Cucina.
+-- Supabase Realtime bridge for Sala/Cucina/Cassa.
 --
 -- Do not expose Strapi order tables to the anon key. This table carries only a
 -- minimal "something changed" event; the frontend still refetches through
@@ -47,15 +47,33 @@ begin
       from public.order_items_fk_order_lnk l
      where l.order_item_id = v_source_id
      limit 1;
+  elsif TG_TABLE_NAME = 'tables' then
+    v_source_id := coalesce(NEW.id, OLD.id);
+
+    select l.user_id
+      into v_user_id
+      from public.tables_fk_user_lnk l
+     where l.table_id = v_source_id
+     limit 1;
+  elsif TG_TABLE_NAME = 'reservations' then
+    v_source_id := coalesce(NEW.id, OLD.id);
+
+    select l.user_id
+      into v_user_id
+      from public.reservations_fk_user_lnk l
+     where l.reservation_id = v_source_id
+     limit 1;
   else
     return coalesce(NEW, OLD);
   end if;
 
-  select l.user_id
-    into v_user_id
-    from public.orders_fk_user_lnk l
-   where l.order_id = v_order_id
-   limit 1;
+  if v_user_id is null and v_order_id is not null then
+    select l.user_id
+      into v_user_id
+      from public.orders_fk_user_lnk l
+     where l.order_id = v_order_id
+     limit 1;
+  end if;
 
   if v_user_id is not null then
     insert into public.order_realtime_events (user_id, source_table, source_id, event_type)
@@ -77,6 +95,16 @@ for each row execute function public.emit_order_realtime_event();
 drop trigger if exists order_items_realtime_event_trigger on public.order_items;
 create trigger order_items_realtime_event_trigger
 after insert or update or delete on public.order_items
+for each row execute function public.emit_order_realtime_event();
+
+drop trigger if exists tables_realtime_event_trigger on public.tables;
+create trigger tables_realtime_event_trigger
+after insert or update or delete on public.tables
+for each row execute function public.emit_order_realtime_event();
+
+drop trigger if exists reservations_realtime_event_trigger on public.reservations;
+create trigger reservations_realtime_event_trigger
+after insert or update or delete on public.reservations
 for each row execute function public.emit_order_realtime_event();
 
 do $$

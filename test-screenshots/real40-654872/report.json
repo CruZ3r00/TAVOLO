@@ -1,0 +1,107 @@
+{
+  "runId": "654872",
+  "simulated": {
+    "kitchen": 1,
+    "cassa": 1,
+    "waiters": 3,
+    "customers": 40,
+    "tables": 10,
+    "openedOrders": 10,
+    "addedItems": 40,
+    "closedOrders": 10
+  },
+  "errors": [],
+  "notes": [
+    "Login OK: Trattoria al grande",
+    "5 postazioni browser aperte",
+    "Creati 10/10 tavoli per 40 clienti",
+    "Aperti 10 ordini",
+    "Aggiunte 40 portate con nomi ripetuti: Margherita, Acqua naturale, Caffe, Diavola, Patatine",
+    "Cucina vede 4 card per T554875",
+    "Cucina vede 4 card per T554872",
+    "Cucina: 80 transizioni eseguite",
+    "Sala/Cassa vede stato pronti: SI",
+    "Cassa: chiusi 10/10 conti"
+  ],
+  "metrics": {
+    "cam3:load": {
+      "count": 1,
+      "avgMs": 7500,
+      "p95Ms": 7500,
+      "maxMs": 7500
+    },
+    "cam1:load": {
+      "count": 1,
+      "avgMs": 7673,
+      "p95Ms": 7673,
+      "maxMs": 7673
+    },
+    "cucina:load": {
+      "count": 1,
+      "avgMs": 7686,
+      "p95Ms": 7686,
+      "maxMs": 7686
+    },
+    "cassa:load": {
+      "count": 1,
+      "avgMs": 7865,
+      "p95Ms": 7865,
+      "maxMs": 7865
+    },
+    "cam2:load": {
+      "count": 1,
+      "avgMs": 7842,
+      "p95Ms": 7842,
+      "maxMs": 7842
+    },
+    "api:createTable": {
+      "count": 10,
+      "avgMs": 2559,
+      "p95Ms": 6706,
+      "maxMs": 6706
+    },
+    "api:openOrder": {
+      "count": 10,
+      "avgMs": 1387,
+      "p95Ms": 1645,
+      "maxMs": 1645
+    },
+    "cam2:addItem": {
+      "count": 12,
+      "avgMs": 1695,
+      "p95Ms": 2252,
+      "maxMs": 2252
+    },
+    "cam3:addItem": {
+      "count": 12,
+      "avgMs": 1709,
+      "p95Ms": 2288,
+      "maxMs": 2288
+    },
+    "cam1:addItem": {
+      "count": 16,
+      "avgMs": 1644,
+      "p95Ms": 2347,
+      "maxMs": 2347
+    },
+    "api:kitchenTakenToPreparing": {
+      "count": 40,
+      "avgMs": 1066,
+      "p95Ms": 1430,
+      "maxMs": 1558
+    },
+    "api:kitchenPreparingToReady": {
+      "count": 40,
+      "avgMs": 1034,
+      "p95Ms": 1140,
+      "maxMs": 1208
+    },
+    "api:closeOrder": {
+      "count": 10,
+      "avgMs": 2153,
+      "p95Ms": 2318,
+      "maxMs": 2318
+    }
+  },
+  "screenshotsDir": "test-screenshots\\real40-654872"
+}

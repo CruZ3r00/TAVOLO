@@ -12,6 +12,11 @@
 
 const { createCoreController } = require('@strapi/strapi').factories;
 const { errors } = require('@strapi/utils');
+const {
+  STAFF_ROLES,
+  resolveStaffContext,
+  assertStaffRole,
+} = require('../../../utils/staff-access');
 
 const { ApplicationError } = errors;
 
@@ -67,8 +72,10 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
       const results = await strapi.documents('api::table.table').findMany({
-        filters: { fk_user: { id: { $eq: user.id } } },
+        filters: { fk_user: { id: { $eq: actor.ownerId } } },
         sort: ['number:asc'],
       });
 
@@ -90,6 +97,8 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
       const body = ctx.request.body || {};
 
       const number = parseInt(body.number, 10);
@@ -110,7 +119,7 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
       // Check unicita (number, fk_user)
       const existing = await strapi.documents('api::table.table').findMany({
         filters: {
-          fk_user: { id: { $eq: user.id } },
+          fk_user: { id: { $eq: actor.ownerId } },
           number: { $eq: number },
         },
         limit: 1,
@@ -125,7 +134,7 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
           seats,
           area,
           status: 'free',
-          fk_user: { connect: [{ id: user.id }] },
+          fk_user: { connect: [{ id: actor.ownerId }] },
         },
       });
 
@@ -145,6 +154,8 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
@@ -155,7 +166,7 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
       });
       const table = tables && tables.length > 0 ? tables[0] : null;
       if (!table) throw appError('TABLE_NOT_FOUND', 'Tavolo non trovato.');
-      if (!table.fk_user || table.fk_user.id !== user.id) {
+      if (!table.fk_user || table.fk_user.id !== actor.ownerId) {
         throw appError('NOT_OWNER', 'Non autorizzato.');
       }
       if (table.status === 'occupied') {
@@ -174,7 +185,7 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
         if (number !== table.number) {
           const dup = await strapi.documents('api::table.table').findMany({
             filters: {
-              fk_user: { id: { $eq: user.id } },
+              fk_user: { id: { $eq: actor.ownerId } },
               number: { $eq: number },
             },
             limit: 1,
@@ -225,6 +236,8 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
@@ -235,7 +248,7 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
       });
       const table = tables && tables.length > 0 ? tables[0] : null;
       if (!table) throw appError('TABLE_NOT_FOUND', 'Tavolo non trovato.');
-      if (!table.fk_user || table.fk_user.id !== user.id) {
+      if (!table.fk_user || table.fk_user.id !== actor.ownerId) {
         throw appError('NOT_OWNER', 'Non autorizzato.');
       }
       if (table.status === 'occupied') {

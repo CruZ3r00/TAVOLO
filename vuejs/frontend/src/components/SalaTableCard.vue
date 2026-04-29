@@ -6,7 +6,7 @@ const props = defineProps({
   activeOrder: { type: Object, default: null },
 });
 
-const emit = defineEmits(['view-order']);
+const emit = defineEmits(['view-order', 'open-table']);
 
 const isOccupied = computed(() => props.table.status === 'occupied');
 const isReserved = computed(() => props.table.status === 'reserved');
@@ -45,6 +45,8 @@ const areaLabel = computed(() => {
 const handleClick = () => {
   if (isOccupied.value && props.activeOrder) {
     emit('view-order', props.activeOrder);
+  } else if (!isOccupied.value && !isReserved.value) {
+    emit('open-table', props.table);
   }
 };
 </script>

@@ -1,0 +1,109 @@
+{
+  "runId": "975459",
+  "simulated": {
+    "kitchen": 1,
+    "cassa": 1,
+    "waiters": 3,
+    "customers": 40,
+    "tables": 10,
+    "openedOrders": 10,
+    "addedItems": 40,
+    "closedOrders": 10
+  },
+  "eventStats": {
+    "realtimeKitchenHits": 1,
+    "statusReadyVisibleInSala": 1
+  },
+  "errors": [],
+  "notes": [
+    "Login OK: Trattoria al grande",
+    "5 postazioni browser aperte: cassa, cucina, 3 camerieri",
+    "Creati 10/10 tavoli test per 40 clienti",
+    "Aperti 10/10 ordini",
+    "Aggiunte 40 portate dai 3 camerieri",
+    "Realtime cucina OK: visto Acqua cam1 T775464 #1 SIM975459",
+    "Cucina: 80 transizioni item eseguite",
+    "Cassa: chiusi 10/10 conti con simulatore"
+  ],
+  "metrics": {
+    "cam1:load": {
+      "count": 1,
+      "avgMs": 3929,
+      "p95Ms": 3929,
+      "maxMs": 3929
+    },
+    "cassa:load": {
+      "count": 1,
+      "avgMs": 4084,
+      "p95Ms": 4084,
+      "maxMs": 4084
+    },
+    "cucina:load": {
+      "count": 1,
+      "avgMs": 4078,
+      "p95Ms": 4078,
+      "maxMs": 4078
+    },
+    "cam3:load": {
+      "count": 1,
+      "avgMs": 4246,
+      "p95Ms": 4246,
+      "maxMs": 4246
+    },
+    "cam2:load": {
+      "count": 1,
+      "avgMs": 4300,
+      "p95Ms": 4300,
+      "maxMs": 4300
+    },
+    "api:createTable": {
+      "count": 10,
+      "avgMs": 1446,
+      "p95Ms": 2389,
+      "maxMs": 2389
+    },
+    "api:openOrder": {
+      "count": 10,
+      "avgMs": 2534,
+      "p95Ms": 2850,
+      "maxMs": 2850
+    },
+    "cam2:addItem": {
+      "count": 12,
+      "avgMs": 2519,
+      "p95Ms": 3027,
+      "maxMs": 3027
+    },
+    "cam1:addItem": {
+      "count": 16,
+      "avgMs": 2421,
+      "p95Ms": 3197,
+      "maxMs": 3197
+    },
+    "cam3:addItem": {
+      "count": 12,
+      "avgMs": 2468,
+      "p95Ms": 3149,
+      "maxMs": 3149
+    },
+    "api:kitchenTakenToPreparing": {
+      "count": 40,
+      "avgMs": 1914,
+      "p95Ms": 5435,
+      "maxMs": 5776
+    },
+    "api:kitchenPreparingToReady": {
+      "count": 40,
+      "avgMs": 1688,
+      "p95Ms": 2231,
+      "maxMs": 4502
+    },
+    "api:closeOrder": {
+      "count": 10,
+      "avgMs": 3413,
+      "p95Ms": 4512,
+      "maxMs": 4512
+    }
+  },
+  "screenshotsDir": "test-screenshots\\sim-975459"
+}

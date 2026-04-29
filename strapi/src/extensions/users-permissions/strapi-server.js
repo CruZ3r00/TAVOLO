@@ -24,6 +24,11 @@
 
 const CAPACITY_MIN = 1;
 const CAPACITY_MAX = 10000;
+const {
+  resolveStaffContext,
+  staffUserPayload,
+  createDefaultStaffAccounts,
+} = require('../../utils/staff-access');
 
 function parseCapacity(value) {
   if (value === undefined || value === null || value === '') return null;
@@ -38,9 +43,43 @@ function isValidCapacity(value) {
 
 module.exports = (plugin) => {
   const originalRegister = plugin.controllers.auth.register;
+  const originalCallback = plugin.controllers.auth.callback;
+  const originalMe = plugin.controllers.user.me;
+
+  async function enrichAuthUser(ctx) {
+    const bodyUser = ctx.body && ctx.body.user ? ctx.body.user : null;
+    if (!bodyUser || !bodyUser.id) return;
+
+    try {
+      const actor = await resolveStaffContext(strapi, bodyUser);
+      if (!actor) return;
+      Object.assign(ctx.body.user, staffUserPayload(actor.actor, actor.owner));
+    } catch (err) {
+      strapi.log.warn(`auth user staff enrichment fallita: ${err.message}`);
+    }
+  }
+
+  plugin.controllers.auth.callback = async (ctx) => {
+    await originalCallback(ctx);
+    await enrichAuthUser(ctx);
+  };
+
+  plugin.controllers.user.me = async (ctx) => {
+    await originalMe(ctx);
+    const bodyUser = ctx.body && ctx.body.id ? ctx.body : null;
+    if (!bodyUser) return;
+    try {
+      const actor = await resolveStaffContext(strapi, bodyUser);
+      if (!actor) return;
+      Object.assign(ctx.body, staffUserPayload(actor.actor, actor.owner));
+    } catch (err) {
+      strapi.log.warn(`users/me staff enrichment fallita: ${err.message}`);
+    }
+  };
 
   plugin.controllers.auth.register = async (ctx) => {
     const body = ctx.request.body || {};
+    const ownerPassword = typeof body.password === 'string' ? body.password : '';
 
     const cInv = parseCapacity(body.coperti_invernali);
     if (!isValidCapacity(cInv)) {
@@ -89,8 +128,17 @@ module.exports = (plugin) => {
         where: { id: createdUser.id },
         data: { url: siteUrl },
       });
+      const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: createdUser.id },
+      });
+      const staffAccounts = await createDefaultStaffAccounts(strapi, owner || createdUser, ownerPassword);
       if (ctx.body && ctx.body.user) {
         ctx.body.user.url = siteUrl;
+        Object.assign(ctx.body.user, staffUserPayload(ctx.body.user, ctx.body.user));
+        ctx.body.user.staff_accounts = staffAccounts.map((account) => ({
+          username: account.username,
+          staff_role: account.staff_role,
+        }));
       }
     } catch (error) {
       strapi.log.error(

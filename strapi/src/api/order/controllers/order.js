@@ -24,6 +24,12 @@ const {
 
 const paymentService = require('../../../services/payment');
 const statsService = require('../../../services/stats');
+const {
+  STAFF_ROLES,
+  resolveStaffContext,
+  assertStaffRole,
+  canTransitionItem,
+} = require('../../../utils/staff-access');
 
 const { ApplicationError } = errors;
 
@@ -249,6 +255,9 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const ownerId = actor.ownerId;
       const body = ctx.request.body || {};
       const tableDocId = body.table_id;
       if (!tableDocId) throw appError('INVALID_PAYLOAD', 'table_id obbligatorio.');
@@ -275,7 +284,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             throw appError('TABLE_NOT_FOUND', 'Tavolo non trovato.');
           }
           const tbl = tableRows[0];
-          if (tbl.user_id !== user.id) {
+          if (tbl.user_id !== ownerId) {
             throw appError('NOT_OWNER', 'Non autorizzato.');
           }
 
@@ -291,7 +300,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             .innerJoin('orders_fk_table_lnk as tl', 'tl.order_id', 'o.id')
             .innerJoin('orders_fk_user_lnk as ul', 'ul.order_id', 'o.id')
             .where('tl.table_id', tbl.id)
-            .andWhere('ul.user_id', user.id)
+            .andWhere('ul.user_id', ownerId)
             .andWhere('o.status', 'active')
             .select('o.id as id');
           if (activeOrders.length > 0) {
@@ -308,7 +317,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
               lock_version: 0,
               covers: covers,
               fk_table: { connect: [{ id: tbl.id }] },
-              fk_user: { connect: [{ id: user.id }] },
+              fk_user: { connect: [{ id: ownerId }] },
             },
           });
 
@@ -326,7 +335,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       });
 
       // Ricarica con populate per response completa
-      const full = await loadOrder(created.documentId, user.id);
+      const full = await loadOrder(created.documentId, ownerId);
 
       ctx.status = 201;
       ctx.body = { data: serializeOrder(full, true) };
@@ -344,6 +353,9 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
+      const ownerId = actor.ownerId;
       const q = ctx.request.query || {};
 
       const statusFilter = typeof q.status === 'string' && q.status.trim()
@@ -369,7 +381,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         MAX_PAGE_SIZE
       );
 
-      const filters = { fk_user: { id: { $eq: user.id } } };
+      const filters = { fk_user: { id: { $eq: ownerId } } };
       if (statusFilter && statusFilter.length) {
         filters.status = { $in: statusFilter };
       }
@@ -424,10 +436,12 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
-      const order = await loadOrder(documentId, user.id);
+      const order = await loadOrder(documentId, actor.ownerId);
 
       ctx.body = { data: serializeOrder(order, true) };
     } catch (err) {
@@ -444,10 +458,12 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
-      const order = await loadOrder(documentId, user.id);
+      const order = await loadOrder(documentId, actor.ownerId);
       const items = order.fk_items || [];
       const result = computeTotal({ items });
 
@@ -468,11 +484,13 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
       const body = ctx.request.body || {};
-      const order = await loadOrder(documentId, user.id);
+      const order = await loadOrder(documentId, actor.ownerId);
 
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
@@ -484,7 +502,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
       if (body.element_id) {
         // Da menu: carica l'Element solo se appartiene al menu dell'utente.
-        const el = await loadOwnedMenuElement(body.element_id, user.id);
+        const el = await loadOwnedMenuElement(body.element_id, actor.ownerId);
         itemName = el.name;
         itemPrice = el.price;
       } else {
@@ -517,7 +535,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       };
 
       if (body.element_id) {
-        const el = await loadOwnedMenuElement(body.element_id, user.id);
+        const el = await loadOwnedMenuElement(body.element_id, actor.ownerId);
         itemData.fk_element = { connect: [{ id: el.id }] };
       }
 
@@ -552,13 +570,15 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
       const { documentId, itemDocumentId } = ctx.params;
       if (!documentId || !itemDocumentId) {
         throw appError('INVALID_PAYLOAD', 'documentId e itemDocumentId obbligatori.');
       }
 
       const body = ctx.request.body || {};
-      const order = await loadOrder(documentId, user.id);
+      const order = await loadOrder(documentId, actor.ownerId);
 
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
@@ -627,13 +647,15 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
       const { documentId, itemDocumentId } = ctx.params;
       if (!documentId || !itemDocumentId) {
         throw appError('INVALID_PAYLOAD', 'documentId e itemDocumentId obbligatori.');
       }
 
       const body = ctx.request.body || {};
-      const order = await loadOrder(documentId, user.id);
+      const order = await loadOrder(documentId, actor.ownerId);
 
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
@@ -678,6 +700,8 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
       const { documentId, itemDocumentId } = ctx.params;
       if (!documentId || !itemDocumentId) {
         throw appError('INVALID_PAYLOAD', 'documentId e itemDocumentId obbligatori.');
@@ -689,7 +713,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         throw appError('INVALID_PAYLOAD', `status richiesto (uno fra ${ITEM_STATUS_ENUM.join(', ')}).`);
       }
 
-      const order = await loadOrder(documentId, user.id);
+      const order = await loadOrder(documentId, actor.ownerId);
 
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
@@ -706,6 +730,10 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
           `Transizione non ammessa: ${item.status} -> ${nextStatus}.`,
           { from: item.status, to: nextStatus, allowed }
         );
+      }
+
+      if (!canTransitionItem(actor, item.status, nextStatus)) {
+        throw appError('NOT_OWNER', 'Questo reparto non puo eseguire questa transizione.');
       }
 
       const updated = await strapi.documents('api::order-item.order-item').update({
@@ -728,13 +756,15 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
       const body = ctx.request.body || {};
       const paymentMethod = body.payment_method || 'simulator';
 
-      const order = await loadOrder(documentId, user.id);
+      const order = await loadOrder(documentId, actor.ownerId);
 
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
@@ -834,7 +864,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
               table,
               paymentMethod,
               paymentReference: paymentResult.transactionId,
-              userId: user.id,
+              userId: actor.ownerId,
               isWalkin: reservation ? !!reservation.is_walkin : false,
             });
 
@@ -847,7 +877,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             );
 
             await statsService.updateDailyStat(strapi, {
-              userId: user.id,
+              userId: actor.ownerId,
               dateKey,
               revenue: totalResult.total,
               customers: customersCount,
@@ -857,7 +887,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             });
 
             await statsService.updateElementStats(strapi, {
-              userId: user.id,
+              userId: actor.ownerId,
               items,
               timestamp: closedAtISO,
             });
@@ -875,7 +905,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       });
 
       // Ricarica ordine chiuso
-      const closed = await loadOrder(documentId, user.id);
+      const closed = await loadOrder(documentId, actor.ownerId);
 
       ctx.body = {
         data: {

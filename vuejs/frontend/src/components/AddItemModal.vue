@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import Modal from '@/components/Modal.vue';
 import { fetchMenuElements, orderErrorMessage } from '@/utils';
 import { useStore } from 'vuex';
+import { effectiveUserDocumentId } from '@/staffAccess';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -46,11 +47,12 @@ watch(() => props.show, async (v) => {
 
 const loadMenu = async () => {
     const user = store.getters.getUser;
-    if (!user?.documentId) return;
+    const menuOwnerDocumentId = effectiveUserDocumentId(user);
+    if (!menuOwnerDocumentId) return;
     menuLoading.value = true;
     menuError.value = '';
     try {
-        const data = await fetchMenuElements(user.documentId);
+        const data = await fetchMenuElements(menuOwnerDocumentId);
         const menuData = data?.data?.[0]?.fk_elements || [];
         menuElements.value = menuData;
     } catch (_err) {

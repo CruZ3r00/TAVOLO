@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { canSeeNavItem } from '@/staffAccess';
 
 const props = defineProps({
   username: { type: String, default: '' },
@@ -9,6 +10,7 @@ const props = defineProps({
   pendingCount: { type: Number, default: 0 },
   activeOrdersCount: { type: Number, default: 0 },
   posOnline: { type: Boolean, default: false },
+  user: { type: Object, default: null },
 });
 
 const route = useRoute();
@@ -19,11 +21,14 @@ const roles = computed(() => [
   { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen', accent: true },
   { id: 'prenotazioni', icon: 'bi-calendar-check', label: 'Prenotazioni', path: '/reservations', badge: props.pendingCount },
   { id: 'menu', icon: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
-]);
+].filter((item) => canSeeNavItem(props.user, item.id)));
 
 const sysItems = computed(() => [
   { id: 'sito', icon: 'bi-globe2', label: 'Sito pubblico', path: '/profile/show?section=sito' },
-]);
+  { id: 'logout', icon: 'bi-box-arrow-right', label: 'Esci', path: '/logout', danger: true },
+].filter((item) => canSeeNavItem(props.user, item.id)));
+
+const canOpenProfile = computed(() => canSeeNavItem(props.user, 'profilo'));
 
 const activeKey = computed(() => {
   const p = route.path;
@@ -35,6 +40,7 @@ const activeKey = computed(() => {
     if (route.query.section === 'sito') return 'sito';
     return 'profilo';
   }
+  if (p.startsWith('/logout')) return 'logout';
   if (p.startsWith('/dashboard')) return 'manager';
   return '';
 });
@@ -73,7 +79,7 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
       :key="it.id"
       :to="it.path"
       class="md-side-item"
-      :class="{ active: activeKey === it.id }"
+      :class="{ active: activeKey === it.id, danger: it.danger }"
     >
       <i :class="['bi', it.icon]" aria-hidden="true"></i>
       <span>{{ it.label }}</span>
@@ -82,6 +88,7 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
 
     <div class="md-side-foot">
       <router-link
+        v-if="canOpenProfile"
         to="/profile/show"
         class="md-side-user"
         :class="{ active: activeKey === 'profilo' }"
@@ -94,6 +101,13 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
         </div>
         <i class="bi bi-gear md-side-user-cta" aria-hidden="true"></i>
       </router-link>
+      <div v-else class="md-side-user">
+        <div class="md-side-avatar">{{ userInitial }}</div>
+        <div class="md-side-user-info">
+          <div class="md-side-uname">{{ restaurantName }}</div>
+          <div class="md-side-sub">{{ restaurantSub || username || 'Operatore' }}</div>
+        </div>
+      </div>
     </div>
   </aside>
 </template>
@@ -110,4 +124,6 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
 }
 .md-side-user.active { background: var(--bg-sunk, var(--bg-2)); border-radius: 8px; }
 .md-side-user.active .md-side-user-cta { color: var(--ac); }
+:deep(.md-side-item.danger) { color: var(--danger); }
+:deep(.md-side-item.danger i) { color: var(--danger); }
 </style>

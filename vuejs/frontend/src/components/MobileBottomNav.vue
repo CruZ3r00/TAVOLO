@@ -1,10 +1,12 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { canSeeNavItem } from '@/staffAccess';
 
 const props = defineProps({
   pendingCount: { type: Number, default: 0 },
   activeOrdersCount: { type: Number, default: 0 },
+  user: { type: Object, default: null },
 });
 
 const route = useRoute();
@@ -15,7 +17,7 @@ const items = computed(() => [
   { id: 'cucina', icon: 'bi-fire', iconActive: 'bi-fire', label: 'Cucina', path: '/kitchen', accent: true },
   { id: 'prenotazioni', icon: 'bi-calendar-check', iconActive: 'bi-calendar-check-fill', label: 'Prenota', path: '/reservations', badge: props.pendingCount },
   { id: 'menu', icon: 'bi-journal', iconActive: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
-]);
+].filter((item) => canSeeNavItem(props.user, item.id)));
 
 const activeKey = computed(() => {
   const p = route.path;

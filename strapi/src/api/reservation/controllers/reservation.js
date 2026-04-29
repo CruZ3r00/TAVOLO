@@ -35,6 +35,11 @@ const {
   lockActiveReservations,
 } = require('../../../utils/db-lock');
 const { openOrderForTableTx } = require('../../../utils/order-lifecycle');
+const {
+  STAFF_ROLES,
+  resolveStaffContext,
+  assertStaffRole,
+} = require('../../../utils/staff-access');
 
 const { ApplicationError } = errors;
 
@@ -647,6 +652,9 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const ownerId = actor.ownerId;
       const body = ctx.request.body || {};
       const tableDocIdInput = typeof body.table_id === 'string' && body.table_id.trim() !== 'auto'
         ? body.table_id.trim()
@@ -690,7 +698,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
           if (autoCreateTable) {
             effectiveTableDocId = await autoCreateTableTx({
               trx,
-              userId: user.id,
+              userId: ownerId,
               people,
               force,
               dialect,
@@ -709,13 +717,13 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
               notes: payload.notes,
               status: 'at_restaurant',
               is_walkin: true,
-              fk_user: { connect: [{ id: user.id }] },
+              fk_user: { connect: [{ id: ownerId }] },
             },
           });
 
           const { order } = await openOrderForTableTx({
             trx,
-            userId: user.id,
+            userId: ownerId,
             tableDocumentId: effectiveTableDocId,
             covers: effectiveCovers,
             reservationId: reservation.id,
@@ -743,7 +751,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
         throw appError('RESERVATION_CONTENTION', 'Contesa DB, riprova.');
       });
 
-      const reloaded = await loadReservation(result.reservation.documentId, user.id);
+      const reloaded = await loadReservation(result.reservation.documentId, ownerId);
 
       ctx.status = 201;
       ctx.body = {
