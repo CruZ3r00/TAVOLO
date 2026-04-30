@@ -186,13 +186,6 @@ ul{list-style:none}
 .tab:hover{border-color:var(--accent);color:var(--accent)}
 .tab.active{background:var(--text);border-color:var(--text);color:var(--bg)}
 
-.mday-card{display:flex;align-items:center;gap:1.5rem;background:var(--bg-alt);border:1px solid var(--bdr);border-radius:16px;padding:1.5rem 2rem;margin-bottom:2.5rem;flex-wrap:wrap}
-.mday-icon{width:48px;height:48px;border-radius:10px;background:#FBF3DB;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#8B6000}
-.mday-text{flex:1;min-width:180px}
-.mday-text strong{display:block;font:600 1.375rem/1 var(--fd);color:var(--text);margin-bottom:.25rem}
-.mday-text span{font-size:.875rem;color:var(--text-s)}
-.mday-price{font:700 2rem/1 var(--fd);color:var(--accent);letter-spacing:-.03em}
-
 .mcat{display:none;animation:fuA .3s ease}
 .mcat.on{display:block}
 @keyframes fuA{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -205,6 +198,7 @@ ul{list-style:none}
 .mitem__body{}
 .mitem__name{font:600 1.3125rem/1.2 var(--fd);color:var(--text);margin-bottom:.4rem;letter-spacing:-.015em}
 .mitem__desc{font:300 .875rem/1.7 var(--fb);color:var(--text-s)}
+.ing-out{text-decoration:line-through;text-decoration-color:#c0392b;text-decoration-thickness:1.5px;color:#c0392b}
 .mitem__badge{align-self:start;margin-top:.2rem;padding:.275rem .75rem;border-radius:9999px;font:.6875rem/1 var(--fb);font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
 .badge--man{background:rgba(61,106,80,.10);color:var(--accent2)}
 .badge--spc{background:rgba(196,148,48,.12);color:#8B6000}
@@ -549,7 +543,7 @@ ul{list-style:none}
   </div>
 </section>
 
-<!-- MENU -->
+<!-- MENU (dinamico — caricato dall'API ad ogni apertura del sito) -->
 <section class="sec sec--alt" id="menu">
   <div class="wrap">
     <div class="center ao" style="margin-bottom:2.5rem">
@@ -558,32 +552,8 @@ ul{list-style:none}
       <div class="rule rule--c"></div>
       <p class="lead">Cucina mantovana, pizze la sera e menu del giorno a pranzo. Prodotti locali, porzioni abbondanti.</p>
     </div>
-    <div class="menu-tabs ao" id="menuTabs">
-      <button class="tab active" data-cat="giorno">Menu del Giorno</button>
-    </div>
 
-    <!-- Menu del Giorno -->
-    <div class="mcat on" data-cat="giorno">
-      <div class="mday-card ao">
-        <div class="mday-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-        </div>
-        <div class="mday-text">
-          <strong>Menu di Lavoro</strong>
-          <span>Dal martedì al venerdì · Pranzo e cena · Primo + Secondo + Contorno + Acqua + Pane</span>
-        </div>
-        <div class="mday-price">€12–15</div>
-      </div>
-      <div class="mlist ao">
-        <div class="mitem"><span class="mitem__num">01</span><div class="mitem__body"><div class="mitem__name">Primo del giorno</div><div class="mitem__desc">Selezione giornaliera tra 6–7 proposte di pasta fresca — rigorosamente tirata a mano — o piatti asciutti della tradizione</div></div><span class="mitem__badge badge--man">Tradizione</span></div>
-        <div class="mitem"><span class="mitem__num">02</span><div class="mitem__body"><div class="mitem__name">Secondo del giorno</div><div class="mitem__desc">Piatto di carne con contorno a scelta: verdure di stagione, patate al forno, insalata fresca</div></div><span class="mitem__badge badge--spc">Del giorno</span></div>
-        <div class="mitem"><span class="mitem__num">03</span><div class="mitem__body"><div class="mitem__name">Tortelloni di zucca</div><div class="mitem__desc">Al burro e salvia, pasta fresca ripiena con zucca mantovana, amaretti e mostarda — simbolo della cucina locale</div></div><span class="mitem__badge badge--man">Mantovano</span></div>
-        <div class="mitem"><span class="mitem__num">04</span><div class="mitem__body"><div class="mitem__name">Risotto alla pilota</div><div class="mitem__desc">Con salamella pestata a coltello, burro e Grana Padano. Il piatto più identitario della pianura mantovana</div></div><span class="mitem__badge badge--man">Mantovano</span></div>
-        <div class="mitem"><span class="mitem__num">05</span><div class="mitem__body"><div class="mitem__name">Stracotto d'asino con polenta</div><div class="mitem__desc">Cottura lenta per ore in vino rosso e spezie, servito con polenta gialla morbida. Sapore intenso e avvolgente</div></div><span class="mitem__badge badge--spc">Signature</span></div>
-        <div class="mitem"><span class="mitem__num">06</span><div class="mitem__body"><div class="mitem__name">Grigliata mista della casa</div><div class="mitem__desc">Selezione di carni di giornata alla brace: salsiccia, costine, taglio del macellaio con contorno e pane</div></div></div>
-      </div>
-    </div>
-
+    <div class="menu-tabs ao" id="menuTabs"></div>
     <div id="menuDynamic">
       <div id="menuLoading" style="text-align:center;padding:3rem 0;color:var(--text-s)">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="animation:spin 1s linear infinite;display:inline-block"><path d="M21 12a9 9 0 11-6.22-8.56"/></svg>
@@ -951,10 +921,6 @@ if(!reduced){
     scrollTrigger:{trigger:'#menu',start:'top 78%'},
     opacity:0,y:30,duration:.7,ease:'power2.out',immediateRender:false
   });
-  gsap.from('.mday-card',{
-    scrollTrigger:{trigger:'.mday-card',start:'top 88%'},
-    opacity:0,x:-40,duration:.8,ease:sp,immediateRender:false
-  });
 
   // ── Menu cards stagger ─────────────────────────────
   document.querySelectorAll('.mgrid').forEach(grid=>{
@@ -1079,7 +1045,9 @@ document.getElementById('menuTabs').addEventListener('click', e => {
   document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   const cat = btn.dataset.cat;
-  document.querySelectorAll('.mcat').forEach(c => c.classList.toggle('on', c.dataset.cat === cat));
+  document.querySelectorAll('.mcat').forEach(c => {
+    c.classList.toggle('on', cat === '__all' || c.dataset.cat === cat);
+  });
 });
 
 /* ---- STATUS BADGE ---- */
@@ -1234,9 +1202,48 @@ if(!reduced){
 
 /* ---- LOAD MENU FROM API ---- */
 async function loadMenu() {
-  const API_BASE    = 'http://localhost:1337';
-  const USER_DOC_ID = 'tp5g7w5chivqkhq1zlfe47ne';
+  const API_BASE = (() => {
+    try {
+      const o = typeof window !== 'undefined' && window.location && window.location.origin;
+      if (o && o !== 'null' && /^https?:\/\//.test(o)) return o;
+    } catch (e) {}
+    // Fallback dev host (used when opening file:// or when origin isn't available)
+    return 'http://127.0.0.1:1337';
+  })();
+  console.debug('Using API_BASE =', API_BASE);
+  const USER_DOC_ID = 'zp00t4hb9wsfhu2a5bruxptb';
   const loadingEl   = document.getElementById('menuLoading');
+
+  // Escape HTML per evitare injection da contenuto utente.
+  const esc = (s) => String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  // Resolve URL relativa (es. "/uploads/foo.jpg") rispetto all'API base.
+  const resolveImgUrl = (u) => {
+    if (!u) return null;
+    if (/^https?:\/\//i.test(u)) return u;
+    return API_BASE + (u.startsWith('/') ? u : `/${u}`);
+  };
+
+  // Render della lista ingredienti. Supporta sia il nuovo formato
+  // [{ name, available }] sia il vecchio formato [string]. Gli ingredienti
+  // con available === false vengono mostrati barrati in rosso (solo l'ingrediente).
+  const renderIngredients = (ings) => {
+    if (!Array.isArray(ings) || !ings.length) return '';
+    return ings.map((ing) => {
+      if (ing && typeof ing === 'object') {
+        const name = esc(ing.name || '');
+        return ing.available === false
+          ? `<span class="ing-out">${name}</span>`
+          : name;
+      }
+      return esc(ing);
+    }).join(', ');
+  };
 
   try {
     const res  = await fetch(`${API_BASE}/api/menus/public/${USER_DOC_ID}`);
@@ -1245,7 +1252,17 @@ async function loadMenu() {
 
     // Supporta sia la public API (data.elements) sia il formato raw Strapi (data[0].fk_elements)
     const elements = json.data?.elements ?? json.data?.[0]?.fk_elements ?? [];
-    if (!elements.length) { if (loadingEl) loadingEl.remove(); return; }
+
+    const tabsContainer = document.getElementById('menuTabs');
+    const dynContainer  = document.getElementById('menuDynamic');
+    tabsContainer.innerHTML = '';
+    dynContainer.innerHTML  = '';
+
+    if (!elements.length) {
+      dynContainer.innerHTML =
+        '<p style="text-align:center;padding:3rem 0;color:var(--text-s)">Il menu non è ancora disponibile online. Chiamaci al <a href="tel:+390386671141" style="color:var(--accent)">0386 671141</a>.</p>';
+      return;
+    }
 
     // Raggruppa per categoria mantenendo l'ordine di arrivo
     const categories = new Map();
@@ -1255,26 +1272,59 @@ async function loadMenu() {
       categories.get(cat).push(el);
     });
 
-    const tabsContainer = document.getElementById('menuTabs');
-    const dynContainer  = document.getElementById('menuDynamic');
-    dynContainer.innerHTML = '';
+    // Card unificata: stesso layout per tutti i piatti (pizze e non).
+    const renderCard = (item) => {
+      const imgUrl = resolveImgUrl(
+        item.image_url
+          || item.image_full_url
+          || item.image?.formats?.small?.url
+          || item.image?.url
+      );
+      const desc      = renderIngredients(item.ingredients);
+      const allergens = item.allergens?.length
+        ? `<small style="display:block;margin-top:.5rem;color:var(--text-s);font-size:.72rem">Allergeni: ${esc(item.allergens.join(', '))}</small>`
+        : '';
+      const price = `€${Number(item.price).toFixed(2).replace('.', ',')}`;
+      const card  = document.createElement('div');
+      card.className = 'mcard';
+      card.innerHTML = `
+        ${imgUrl ? `<div style="border-radius:8px;overflow:hidden;aspect-ratio:16/9;margin-bottom:.75rem">
+          <img src="${esc(imgUrl)}" alt="${esc(item.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover">
+        </div>` : ''}
+        <div class="mcard__name">${esc(item.name)}
+          <span style="font:600 .9rem/1 var(--fb);color:var(--accent);float:right;margin-left:.5rem">${price}</span>
+        </div>
+        ${desc ? `<div class="mcard__desc">${desc}</div>` : ''}
+        ${allergens}`;
+      return card;
+    };
 
+    // Tab "Tutti" (default attivo, mostra ogni categoria)
+    const allTab = document.createElement('button');
+    allTab.className   = 'tab active';
+    allTab.dataset.cat = '__all';
+    allTab.textContent = 'Tutti';
+    tabsContainer.appendChild(allTab);
+
+    let catIndex = 0;
     categories.forEach((items, catName) => {
-      const catKey = catName.toLowerCase()
+      const baseKey = catName.toLowerCase()
         .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '');
-      const isPizza = /pizz/i.test(catName);
+        .replace(/[^a-z0-9-]/g, '') || 'cat';
+      // Suffisso numerico per garantire chiavi univoche anche se due categorie collidono dopo lo slug.
+      const catKey = `${baseKey}-${catIndex}`;
+      catIndex += 1;
 
-      // Tab
+      // Tab della categoria
       const tab = document.createElement('button');
-      tab.className    = 'tab';
-      tab.dataset.cat  = catKey;
-      tab.textContent  = catName;
+      tab.className   = 'tab';
+      tab.dataset.cat = catKey;
+      tab.textContent = catName;
       tabsContainer.appendChild(tab);
 
-      // Sezione categoria
+      // Sezione categoria — tutte visibili di default (filtro "Tutti")
       const mcat = document.createElement('div');
-      mcat.className   = 'mcat';
+      mcat.className   = 'mcat on';
       mcat.dataset.cat = catKey;
 
       const title = document.createElement('div');
@@ -1282,69 +1332,23 @@ async function loadMenu() {
       title.textContent = catName;
       mcat.appendChild(title);
 
-      if (isPizza) {
-        const grid = document.createElement('div');
-        grid.className = 'mgrid ao';
-        items.forEach((item, i) => {
-          const imgUrl = item.image
-            ? API_BASE + (item.image.formats?.small?.url || item.image.url)
-            : null;
-          const desc  = item.ingredients?.join(', ') || '';
-          const price = `€${Number(item.price).toFixed(2).replace('.', ',')}`;
-          const card  = document.createElement('div');
-          card.className = 'mcard';
-          card.innerHTML = `
-            ${imgUrl ? `<div style="border-radius:8px;overflow:hidden;aspect-ratio:16/9;margin-bottom:.75rem">
-              <img src="${imgUrl}" alt="${item.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">
-            </div>` : ''}
-            <div class="mcard__name">${item.name}
-              <span style="font:600 .875rem/1 var(--fb);color:var(--accent);float:right">${price}</span>
-            </div>
-            <div class="mcard__desc">${desc}</div>`;
-          grid.appendChild(card);
-        });
-        mcat.appendChild(grid);
-
-        if (!reduced) {
-          gsap.from(grid.querySelectorAll('.mcard'), {
-            scrollTrigger: { trigger: grid, start: 'top 85%' },
-            opacity: 0, y: 36, scale: .97, duration: .55, stagger: .07, ease: 'power2.out'
-          });
-        }
-      } else {
-        const list = document.createElement('div');
-        list.className = 'mlist ao';
-        items.forEach((item, i) => {
-          const imgUrl = item.image
-            ? API_BASE + (item.image.formats?.thumbnail?.url || item.image.url)
-            : null;
-          const desc      = item.ingredients?.join(', ') || '';
-          const allergens = item.allergens?.length
-            ? `<small style="display:block;margin-top:.3rem;color:var(--text-s);font-size:.72rem">
-                Allergeni: ${item.allergens.join(', ')}
-               </small>`
-            : '';
-          const price = `€${Number(item.price).toFixed(2).replace('.', ',')}`;
-          const row   = document.createElement('div');
-          row.className = 'mitem';
-          row.innerHTML = `
-            <span class="mitem__num">${String(i + 1).padStart(2, '0')}</span>
-            <div class="mitem__body">
-              ${imgUrl ? `<img src="${imgUrl}" alt="${item.name}" loading="lazy"
-                style="width:56px;height:56px;object-fit:cover;border-radius:8px;float:right;margin-left:1rem">` : ''}
-              <div class="mitem__name">${item.name}</div>
-              <div class="mitem__desc">${desc}${allergens}</div>
-            </div>
-            <span class="mitem__badge badge--spc">${price}</span>`;
-          list.appendChild(row);
-        });
-        mcat.appendChild(list);
-      }
-
+      const grid = document.createElement('div');
+      grid.className = 'mgrid ao';
+      items.forEach((item) => grid.appendChild(renderCard(item)));
+      mcat.appendChild(grid);
       dynContainer.appendChild(mcat);
+
+      if (!reduced) {
+        gsap.from(grid.querySelectorAll('.mcard'), {
+          scrollTrigger: { trigger: grid, start: 'top 85%' },
+          opacity: 0, y: 36, scale: .97, duration: .55, stagger: .07, ease: 'power2.out',
+          immediateRender: false
+        });
+      }
     });
 
     if (loadingEl) loadingEl.remove();
+    if (!reduced && window.ScrollTrigger) ScrollTrigger.refresh();
 
   } catch (err) {
     console.error('Errore caricamento menu:', err);

@@ -41,6 +41,24 @@ module.exports = (config, { strapi }) => {
     try {
       await fs.promises.access(filePath, fs.constants.R_OK);
       const content = await fs.promises.readFile(filePath, 'utf-8');
+
+      const siteCsp = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+        "script-src-attr 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+        "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+        "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",
+        "img-src 'self' data: blob: https://images.unsplash.com https://cdn.jsdelivr.net",
+        "frame-src https://www.google.com https://maps.google.com",
+        "connect-src 'self' http://localhost:1337 http://127.0.0.1:1337",
+        "frame-ancestors 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+      ].join('; ');
+      ctx.set('Content-Security-Policy', siteCsp);
+      ctx.remove('Content-Security-Policy-Report-Only');
+
       ctx.type = 'text/html';
       ctx.body = content;
     } catch (err) {
