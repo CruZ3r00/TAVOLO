@@ -36,7 +36,7 @@ const avatarLetter = computed(() => {
       <router-link v-if="showProfile" to="/profile/show" class="tv-mobile-top-avatar" aria-label="Profilo">
         <span>{{ avatarLetter }}</span>
       </router-link>
-      <router-link v-else to="/logout" class="tv-mobile-top-btn" aria-label="Esci">
+      <router-link to="/logout" class="tv-mobile-top-btn" aria-label="Esci">
         <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
       </router-link>
     </div>

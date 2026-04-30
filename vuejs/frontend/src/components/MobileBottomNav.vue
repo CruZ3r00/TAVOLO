@@ -17,7 +17,6 @@ const items = computed(() => [
   { id: 'cucina', icon: 'bi-fire', iconActive: 'bi-fire', label: 'Cucina', path: '/kitchen', accent: true },
   { id: 'prenotazioni', icon: 'bi-calendar-check', iconActive: 'bi-calendar-check-fill', label: 'Prenota', path: '/reservations', badge: props.pendingCount },
   { id: 'menu', icon: 'bi-journal', iconActive: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
-  { id: 'logout', icon: 'bi-box-arrow-right', iconActive: 'bi-box-arrow-right', label: 'Esci', path: '/logout' },
 ].filter((item) => canSeeNavItem(props.user, item.id)));
 
 const activeKey = computed(() => {
@@ -27,7 +26,6 @@ const activeKey = computed(() => {
   if (p.startsWith('/reservations')) return 'prenotazioni';
   if (p.startsWith('/menu-handler')) return 'menu';
   if (p.startsWith('/dashboard')) return 'manager';
-  if (p.startsWith('/logout')) return 'logout';
   return '';
 });
 </script>
