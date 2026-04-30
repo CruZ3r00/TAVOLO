@@ -39,7 +39,7 @@ export const canAccessRoute = (user, route) => {
 
 export const canSeeNavItem = (user, id) => {
   const role = staffRole(user);
-  if (role === STAFF_ROLES.CAMERIERE) return ['sala', 'logout'].includes(id);
+  if (role === STAFF_ROLES.CAMERIERE) return ['sala', 'prenotazioni', 'logout'].includes(id);
   if (role === STAFF_ROLES.CUCINA) return ['cucina', 'logout'].includes(id);
   return true;
 };

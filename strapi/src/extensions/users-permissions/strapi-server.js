@@ -27,7 +27,6 @@ const CAPACITY_MAX = 10000;
 const {
   resolveStaffContext,
   staffUserPayload,
-  createDefaultStaffAccounts,
 } = require('../../utils/staff-access');
 
 function parseCapacity(value) {
@@ -79,7 +78,6 @@ module.exports = (plugin) => {
 
   plugin.controllers.auth.register = async (ctx) => {
     const body = ctx.request.body || {};
-    const ownerPassword = typeof body.password === 'string' ? body.password : '';
 
     const cInv = parseCapacity(body.coperti_invernali);
     if (!isValidCapacity(cInv)) {
@@ -128,17 +126,9 @@ module.exports = (plugin) => {
         where: { id: createdUser.id },
         data: { url: siteUrl },
       });
-      const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
-        where: { id: createdUser.id },
-      });
-      const staffAccounts = await createDefaultStaffAccounts(strapi, owner || createdUser, ownerPassword);
       if (ctx.body && ctx.body.user) {
         ctx.body.user.url = siteUrl;
         Object.assign(ctx.body.user, staffUserPayload(ctx.body.user, ctx.body.user));
-        ctx.body.user.staff_accounts = staffAccounts.map((account) => ({
-          username: account.username,
-          staff_role: account.staff_role,
-        }));
       }
     } catch (error) {
       strapi.log.error(

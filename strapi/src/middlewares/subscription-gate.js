@@ -32,7 +32,10 @@ function isStaffApiAllowed(role, method, path) {
 
   if (role === 'cameriere') {
     if (path === '/api/tables') return method === 'GET';
+    if (path === '/api/reservations') return method === 'GET' || method === 'POST';
     if (path === '/api/reservations/walkin') return method === 'POST';
+    if (/^\/api\/reservations\/[^/]+\/status$/.test(path)) return method === 'PATCH';
+    if (/^\/api\/reservations\/[^/]+\/seat$/.test(path)) return method === 'POST';
     if (path === '/api/orders') return method === 'GET' || method === 'POST';
     if (/^\/api\/orders\/[^/]+$/.test(path)) return method === 'GET';
     if (/^\/api\/orders\/[^/]+\/total$/.test(path)) return method === 'GET';

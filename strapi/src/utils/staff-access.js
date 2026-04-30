@@ -7,16 +7,78 @@ const STAFF_ROLES = {
   CUCINA: 'cucina',
 };
 
-const DEFAULT_REGISTER_STAFF = [
-  { role: STAFF_ROLES.CAMERIERE, label: 'Cameriere' },
-  { role: STAFF_ROLES.CUCINA, label: 'Cucina' },
-];
-
 const KNOWN_ROLES = new Set(Object.values(STAFF_ROLES));
+const STAFF_USERNAME_SUFFIXES = new Map([
+  ['cameriere', STAFF_ROLES.CAMERIERE],
+  ['camerire', STAFF_ROLES.CAMERIERE],
+  ['cucina', STAFF_ROLES.CUCINA],
+]);
 
 function normalizeStaffRole(role) {
   const value = String(role || '').trim().toLowerCase();
   return KNOWN_ROLES.has(value) ? value : STAFF_ROLES.OWNER;
+}
+
+function roleFromStaffUsername(username) {
+  const value = String(username || '').trim().toLowerCase();
+  const match = value.match(/^(.+)\.([^.]+)$/);
+  if (!match) return null;
+  const role = STAFF_USERNAME_SUFFIXES.get(match[2]);
+  return role ? { ownerUsername: match[1], role } : null;
+}
+
+async function inferOwnerFromStaffUsername(strapi, actor) {
+  const inferred = roleFromStaffUsername(actor && actor.username);
+  if (!inferred) return null;
+
+  const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
+    where: { username: { $eqi: inferred.ownerUsername } },
+  });
+
+  if (!owner || owner.id === actor.id) return null;
+  return { owner, role: inferred.role };
+}
+
+async function resolveRestaurantStaffRecord(strapi, actor) {
+  if (!actor || !actor.id || !strapi.db.connection) return null;
+
+  try {
+    const row = await strapi.db.connection('restaurant_staff as staff')
+      .join('up_users as owner', 'owner.id', 'staff.owner_id')
+      .select([
+        'staff.role as staff_role',
+        'staff.owner_id as owner_id',
+        'owner.document_id as owner_document_id',
+        'owner.username as owner_username',
+        'owner.email as owner_email',
+        'owner.subscription_status as owner_subscription_status',
+        'owner.subscription_plan as owner_subscription_plan',
+        'owner.subscription_current_period_end as owner_subscription_current_period_end',
+        'owner.subscription_cancel_at_period_end as owner_subscription_cancel_at_period_end',
+        'owner.end_subscription as owner_end_subscription',
+      ])
+      .where('staff.user_id', actor.id)
+      .where('staff.active', true)
+      .first();
+
+    if (!row || !row.owner_id || row.owner_id === actor.id) return null;
+    return {
+      role: normalizeStaffRole(row.staff_role),
+      owner: {
+        id: row.owner_id,
+        documentId: row.owner_document_id,
+        username: row.owner_username,
+        email: row.owner_email,
+        subscription_status: row.owner_subscription_status,
+        subscription_plan: row.owner_subscription_plan,
+        subscription_current_period_end: row.owner_subscription_current_period_end,
+        subscription_cancel_at_period_end: row.owner_subscription_cancel_at_period_end,
+        end_subscription: row.owner_end_subscription,
+      },
+    };
+  } catch (_err) {
+    return null;
+  }
 }
 
 function staffError(message = 'Non autorizzato per questo reparto.') {
@@ -34,12 +96,24 @@ async function resolveStaffContext(strapi, user) {
   });
 
   const actor = fresh || user;
-  const role = normalizeStaffRole(actor.staff_role);
-  const owner = actor.fk_owner && actor.fk_owner.id ? actor.fk_owner : actor;
+  const staffRecord = await resolveRestaurantStaffRecord(strapi, actor);
+  const fallbackStaff = await inferOwnerFromStaffUsername(strapi, actor);
+  const explicitRole = normalizeStaffRole(actor.staff_role);
+  const role = staffRecord
+    ? staffRecord.role
+    : (actor.fk_owner && actor.fk_owner.id
+      ? explicitRole
+      : (fallbackStaff ? fallbackStaff.role : explicitRole));
+  const owner = staffRecord
+    ? staffRecord.owner
+    : (actor.fk_owner && actor.fk_owner.id
+      ? actor.fk_owner
+      : (fallbackStaff ? fallbackStaff.owner : actor));
   const ownerId = owner.id || actor.id;
+  const actorWithRole = { ...actor, staff_role: role };
 
   return {
-    actor,
+    actor: actorWithRole,
     role,
     owner,
     ownerId,
@@ -101,90 +175,6 @@ function compactRestaurantSlug(value, fallback = 'Ristorante') {
   return /^[0-9]/.test(clean) ? `${fallback}${clean}` : clean;
 }
 
-function staffEmail(ownerEmail, username, role) {
-  const fallback = `${username.toLowerCase()}@staff.tavolo.local`;
-  const email = String(ownerEmail || '').trim().toLowerCase();
-  const match = email.match(/^([^@\s]+)@([^@\s]+\.[^@\s]+)$/);
-  if (!match) return fallback;
-  return `${match[1]}+${role}@${match[2]}`;
-}
-
-async function authenticatedRoleId(strapi) {
-  const role = await strapi.db.query('plugin::users-permissions.role').findOne({
-    where: { type: 'authenticated' },
-    select: ['id'],
-  });
-  return role && role.id ? role.id : 1;
-}
-
-async function createOrUpdateStaffAccount(strapi, owner, password, staffDef, order) {
-  const base = compactRestaurantSlug(owner.restaurant_name || owner.username || owner.email);
-  const username = `${base}.${staffDef.role}`;
-  const fallbackEmail = `${username.toLowerCase()}@staff.tavolo.local`;
-  let email = staffEmail(owner.email, username, staffDef.role);
-  const userService = strapi.plugin('users-permissions').service('user');
-  const roleId = await authenticatedRoleId(strapi);
-
-  const emailOwner = await strapi.db.query('plugin::users-permissions.user').findOne({
-    where: { email },
-    select: ['id', 'username'],
-  });
-  if (emailOwner && emailOwner.username !== username) {
-    email = fallbackEmail;
-  }
-
-  const existing = await strapi.db.query('plugin::users-permissions.user').findOne({
-    where: { username },
-    populate: { fk_owner: true },
-  });
-
-  const data = {
-    username,
-    email,
-    provider: 'local',
-    password,
-    confirmed: true,
-    blocked: false,
-    name: staffDef.label,
-    surname: 'Staff',
-    staff_role: staffDef.role,
-    role: roleId,
-    fk_owner: owner.id,
-  };
-
-  let user;
-  if (existing) {
-    user = await userService.edit(existing.id, data);
-  } else {
-    user = await userService.add(data);
-  }
-
-  strapi.log.info(`Staff account pronto: ${username} -> owner ${owner.username || owner.id}`);
-  return {
-    id: user.id,
-    username,
-    staff_role: staffDef.role,
-    order,
-  };
-}
-
-async function createDefaultStaffAccounts(strapi, owner, password) {
-  if (!owner || !owner.id || !password) return [];
-  const enabled = String(process.env.REGISTER_AUTO_STAFF_ACCOUNTS || 'true').toLowerCase() !== 'false';
-  if (!enabled) return [];
-
-  const created = [];
-  for (let index = 0; index < DEFAULT_REGISTER_STAFF.length; index += 1) {
-    const staffDef = DEFAULT_REGISTER_STAFF[index];
-    try {
-      created.push(await createOrUpdateStaffAccount(strapi, owner, password, staffDef, index + 1));
-    } catch (err) {
-      strapi.log.warn(`Creazione staff ${staffDef.role} fallita per owner ${owner.username || owner.id}: ${err.message}`);
-    }
-  }
-  return created;
-}
-
 module.exports = {
   STAFF_ROLES,
   normalizeStaffRole,
@@ -193,5 +183,4 @@ module.exports = {
   canTransitionItem,
   staffUserPayload,
   compactRestaurantSlug,
-  createDefaultStaffAccounts,
 };

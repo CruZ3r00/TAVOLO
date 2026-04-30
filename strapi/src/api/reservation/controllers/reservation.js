@@ -360,6 +360,9 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
 
     try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const ownerId = actor.ownerId;
       const payload = validateCreatePayload(ctx.request.body);
       const requestedStatus = ctx.request.body && ctx.request.body.status;
       let status = 'confirmed';
@@ -371,13 +374,13 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
       }
 
       const created = await createWithCapacityCheck({
-        targetUserId: user.id,
+        targetUserId: ownerId,
         payload,
         status,
         enforceCapacity: true,
       });
 
-      const full = await loadReservation(created.documentId, user.id);
+      const full = await loadReservation(created.documentId, ownerId);
 
       ctx.status = 201;
       ctx.body = { data: serializeReservation(full) };
@@ -430,6 +433,9 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
 
     try {
       const q = ctx.request.query || {};
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const ownerId = actor.ownerId;
 
       const statusFilter = typeof q.status === 'string' && q.status.trim()
         ? q.status.split(',').map((s) => s.trim()).filter((s) => STATUS_ENUM.includes(s))
@@ -452,7 +458,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
         MAX_PAGE_SIZE
       );
 
-      const filters = { fk_user: { id: { $eq: user.id } } };
+      const filters = { fk_user: { id: { $eq: ownerId } } };
       if (statusFilter && statusFilter.length) {
         filters.status = { $in: statusFilter };
       }
@@ -509,7 +515,10 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
         throw appError('INVALID_TRANSITION', 'Per far accomodare usa POST /reservations/:documentId/seat.');
       }
 
-      const reservation = await loadReservation(documentId, user.id);
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const ownerId = actor.ownerId;
+      const reservation = await loadReservation(documentId, ownerId);
 
       if (TERMINAL_STATUSES.has(reservation.status)) {
         throw appError('INVALID_TRANSITION', 'Prenotazione già in stato terminale.', {
@@ -525,7 +534,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
         data: { status: nextStatus },
       });
 
-      const reloaded = await loadReservation(updated.documentId, user.id);
+      const reloaded = await loadReservation(updated.documentId, ownerId);
       ctx.body = { data: serializeReservation(reloaded) };
     } catch (err) {
       sendError(ctx, err);
@@ -548,6 +557,9 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
       const body = ctx.request.body || {};
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const ownerId = actor.ownerId;
       const rawTableId = typeof body.table_id === 'string' ? body.table_id.trim() : '';
       const autoCreateTable = !rawTableId || rawTableId === 'auto';
       const tableDocIdInput = autoCreateTable ? '' : rawTableId;
@@ -558,7 +570,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
         throw appError('INVALID_PAYLOAD', 'covers deve essere 1..1000.');
       }
 
-      const reservation = await loadReservation(documentId, user.id);
+      const reservation = await loadReservation(documentId, ownerId);
 
       if (reservation.status === 'at_restaurant') {
         throw appError('RESERVATION_ALREADY_SEATED', 'Prenotazione gia in sala.');
@@ -583,7 +595,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
           if (autoCreateTable) {
             effectiveTableDocId = await autoCreateTableTx({
               trx,
-              userId: user.id,
+              userId: ownerId,
               people,
               force,
               dialect,
@@ -592,7 +604,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
 
           const { order } = await openOrderForTableTx({
             trx,
-            userId: user.id,
+            userId: ownerId,
             tableDocumentId: effectiveTableDocId,
             covers: effectiveCovers,
             reservationId: reservation.id,
@@ -621,7 +633,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
         throw appError('RESERVATION_CONTENTION', 'Contesa DB, riprova.');
       });
 
-      const reloaded = await loadReservation(reservation.documentId, user.id);
+      const reloaded = await loadReservation(reservation.documentId, ownerId);
 
       ctx.status = 201;
       ctx.body = {

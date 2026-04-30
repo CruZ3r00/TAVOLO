@@ -1,10 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { store } from '@/store'; //usato per storage di jwt
 import { fetchBillingStatus } from '@/utils';
-import { STAFF_ROLES, canAccessRoute, defaultRouteForUser } from '@/staffAccess';
+import { STAFF_ROLES, canAccessRoute, defaultRouteForUser, staffRole } from '@/staffAccess';
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
 const SUBSCRIPTION_CHECK_TIMEOUT_MS = 5000;
+const BILLING_ROLES = new Set([STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
 
 const withTimeout = (promise, ms) => {
     let timeoutId;
@@ -91,7 +92,7 @@ const routes = [
         path: '/reservations',
         name: 'Prenotazioni',
         component: () => import('../Pages/Reservations.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true, staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE] },
+        meta: { requiresAuth: true, requiresSubscription: true, staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE] },
     },
     { //protetta - Gestione ordinazioni (sala)
         path: '/orders',
@@ -154,7 +155,11 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
 
-    if (isAuthenticated && to.matched.some(record => record.meta.requiresSubscription)) {
+    if (
+        isAuthenticated &&
+        to.matched.some(record => record.meta.requiresSubscription) &&
+        BILLING_ROLES.has(staffRole(store.getters.getUser))
+    ) {
         try {
             const billing = await withTimeout(
                 fetchBillingStatus(store.getters.getToken),

@@ -6,6 +6,9 @@ const props = defineProps({
   hasNotifications: { type: Boolean, default: false },
   username: { type: String, default: '' },
   restaurantName: { type: String, default: '' },
+  showMenuButton: { type: Boolean, default: false },
+  showReservations: { type: Boolean, default: false },
+  showProfile: { type: Boolean, default: false },
 });
 const emit = defineEmits(['menu']);
 
@@ -17,20 +20,24 @@ const avatarLetter = computed(() => {
 
 <template>
   <header class="tv-mobile-top">
-    <button type="button" class="tv-mobile-top-btn" @click="emit('menu')" aria-label="Apri menu">
+    <button v-if="showMenuButton" type="button" class="tv-mobile-top-btn" @click="emit('menu')" aria-label="Apri menu">
       <i class="bi bi-list" aria-hidden="true"></i>
     </button>
+    <span v-else class="tv-mobile-top-spacer" aria-hidden="true"></span>
     <div class="tv-mobile-top-title">
       <span class="tv-brand-mark sm">T</span>
       <strong>{{ title }}</strong>
     </div>
     <div class="tv-mobile-top-right">
-      <router-link to="/reservations" class="tv-mobile-top-btn" aria-label="Notifiche">
+      <router-link v-if="showReservations" to="/reservations" class="tv-mobile-top-btn" aria-label="Notifiche">
         <i class="bi bi-bell" aria-hidden="true"></i>
         <span v-if="hasNotifications" class="tv-mobile-top-dot" aria-hidden="true"></span>
       </router-link>
-      <router-link to="/profile/show" class="tv-mobile-top-avatar" aria-label="Profilo">
+      <router-link v-if="showProfile" to="/profile/show" class="tv-mobile-top-avatar" aria-label="Profilo">
         <span>{{ avatarLetter }}</span>
+      </router-link>
+      <router-link v-else to="/logout" class="tv-mobile-top-btn" aria-label="Esci">
+        <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
       </router-link>
     </div>
   </header>
@@ -38,6 +45,7 @@ const avatarLetter = computed(() => {
 
 <style scoped>
 .tv-mobile-top-right { display: inline-flex; align-items: center; gap: 6px; }
+.tv-mobile-top-spacer { width: 36px; height: 36px; flex: 0 0 36px; }
 .tv-mobile-top-avatar {
   width: 36px; height: 36px;
   border-radius: 50%;

@@ -109,6 +109,8 @@ const userInitial = computed(() => (username.value || 'U').charAt(0).toUpperCase
 const currentUser = computed(() => store.getters.getUser || null);
 const defaultAppRoute = computed(() => defaultRouteForUser(currentUser.value));
 const showNav = (id) => canSeeNavItem(currentUser.value, id);
+const showMobileProfile = computed(() => showNav('profilo'));
+const showMobileReservations = computed(() => showNav('prenotazioni'));
 
 const handleClickOutside = (e) => {
   const target = e.target;
@@ -151,6 +153,9 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
       :has-notifications="pendingCount > 0"
       :username="username"
       :restaurant-name="restaurantName"
+      :show-menu-button="false"
+      :show-reservations="showMobileReservations"
+      :show-profile="showMobileProfile"
       @menu="toggleMobileMenu"
     />
 
