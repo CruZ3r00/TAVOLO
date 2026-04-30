@@ -1106,12 +1106,20 @@ resForm.addEventListener('submit', async e => {
     date:             fd.get('date'),
     time:             timeFormatted,
     number_of_people: numPeople,
-    notes:            notesVal || null,
-    status:           'pending'
+    notes:            notesVal || null
   };
 
+  const RES_API_BASE = (() => {
+    try {
+      const o = window.location && window.location.origin;
+      if (o && o !== 'null' && /^https?:\/\//.test(o)) return o;
+    } catch (e) {}
+    return 'http://127.0.0.1:1337';
+  })();
+  const RES_USER_DOC_ID = 'zp00t4hb9wsfhu2a5bruxptb';
+
   try {
-    const res = await fetch('http://localhost:1337/api/reservations/public/tp5g7w5chivqkhq1zlfe47ne', {
+    const res = await fetch(`${RES_API_BASE}/api/reservations/public/${RES_USER_DOC_ID}`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(payload)
