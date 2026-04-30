@@ -28,6 +28,24 @@ module.exports = {
     },
     {
       method: 'POST',
+      path: '/billing/change-plan',
+      handler: 'billing.changePlan',
+      config: { auth: false, policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
+      path: '/billing/cancel',
+      handler: 'billing.cancelSubscription',
+      config: { auth: false, policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
+      path: '/billing/reactivate',
+      handler: 'billing.reactivateSubscription',
+      config: { auth: false, policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
       path: '/billing/webhook',
       handler: 'billing.webhook',
       config: { auth: false, policies: [], middlewares: [] },

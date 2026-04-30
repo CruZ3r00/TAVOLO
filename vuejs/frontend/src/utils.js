@@ -203,6 +203,46 @@ export const createBillingPortalSession = async (token) => {
     return payload.data;
 };
 
+export const changeBillingPlan = async (plan, token) => {
+    const resp = await fetch(`${API_BASE}/api/billing/change-plan`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ plan }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildBillingError(resp, payload);
+    return payload.data;
+};
+
+export const cancelBillingSubscription = async (token) => {
+    const resp = await fetch(`${API_BASE}/api/billing/cancel`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildBillingError(resp, payload);
+    return payload.data;
+};
+
+export const reactivateBillingSubscription = async (token) => {
+    const resp = await fetch(`${API_BASE}/api/billing/reactivate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildBillingError(resp, payload);
+    return payload.data;
+};
+
 // ============================================================================
 // Reservations API
 // ============================================================================

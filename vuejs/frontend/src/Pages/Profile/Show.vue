@@ -7,6 +7,7 @@ import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
 import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue';
 import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
+import SubscriptionForm from '@/Pages/Profile/Partials/SubscriptionForm.vue';
 import WebsiteConfigForm from '@/Pages/Profile/Partials/WebsiteConfigForm.vue';
 import PosCassaForm from '@/Pages/Profile/Partials/PosCassaForm.vue';
 
@@ -111,7 +112,10 @@ onMounted(async () => {
 
       <div class="pf-content">
         <Transition name="fade" mode="out-in">
-          <UpdateProfileInformationForm v-if="activeSection === 'profilo'" :user="userinfo" :key="'profilo'" />
+          <div v-if="activeSection === 'profilo'" :key="'profilo'" class="pf-stack">
+            <UpdateProfileInformationForm :user="userinfo" />
+            <SubscriptionForm />
+          </div>
 
           <div v-else-if="activeSection === 'sicurezza'" :key="'sicurezza'" class="pf-stack">
             <UpdatePasswordForm :id="userinfo.id" />

@@ -263,6 +263,153 @@ module.exports = {
     }
   },
 
+  async changePlan(ctx) {
+    const user = await requireBillingUser(ctx);
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+    const actor = await resolveStaffContext(strapi, user);
+    if (actor && ![STAFF_ROLES.OWNER].includes(actor.role)) {
+      return ctx.forbidden('Solo il titolare puo gestire la fatturazione.');
+    }
+
+    const billingUser = actor && actor.owner ? actor.owner : user;
+    if (!billingUser.stripe_subscription_id) {
+      return ctx.badRequest('Nessun abbonamento attivo da modificare.');
+    }
+
+    const { plan: requestedPlan } = ctx.request.body || {};
+    try {
+      const plan = getPlan(requestedPlan);
+      if (!plan) return ctx.badRequest('Piano non valido.');
+
+      const stripe = getStripe();
+      const subscription = await stripe.subscriptions.retrieve(billingUser.stripe_subscription_id);
+
+      if (subscription.status === 'canceled') {
+        ctx.status = 409;
+        return ctx.send({
+          error: { code: 'SUBSCRIPTION_CANCELED', message: 'Abbonamento gia cancellato. Sottoscrivi un nuovo piano.' },
+        });
+      }
+
+      const item = subscription.items?.data?.[0];
+      if (!item) return ctx.internalServerError('Item subscription non trovato.');
+
+      if (item.price?.id === plan.priceId) {
+        ctx.status = 409;
+        return ctx.send({
+          error: { code: 'PLAN_UNCHANGED', message: 'Sei gia su questo piano.' },
+        });
+      }
+
+      const updated = await stripe.subscriptions.update(subscription.id, {
+        items: [{ id: item.id, price: plan.priceId }],
+        proration_behavior: 'create_prorations',
+        cancel_at_period_end: false,
+        metadata: { ...(subscription.metadata || {}), plan: plan.key },
+      });
+
+      const snapshot = await subscriptionSnapshot(stripe, updated);
+      await updateUserSubscription(billingUser.id, { ...snapshot, subscription_plan: plan.key });
+
+      const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: billingUser.id },
+      });
+      return ctx.send({ data: safeUser(refreshed) });
+    } catch (err) {
+      strapi.log.error(`Stripe change-plan failed: ${err.message}`);
+      ctx.status = err.status || err.statusCode || 500;
+      return ctx.send({
+        error: { message: err.message || 'Cambio piano non riuscito.' },
+      });
+    }
+  },
+
+  async cancelSubscription(ctx) {
+    const user = await requireBillingUser(ctx);
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+    const actor = await resolveStaffContext(strapi, user);
+    if (actor && ![STAFF_ROLES.OWNER].includes(actor.role)) {
+      return ctx.forbidden('Solo il titolare puo gestire la fatturazione.');
+    }
+
+    const billingUser = actor && actor.owner ? actor.owner : user;
+    if (!billingUser.stripe_subscription_id) {
+      return ctx.badRequest('Nessun abbonamento attivo da annullare.');
+    }
+
+    try {
+      const stripe = getStripe();
+      const updated = await stripe.subscriptions.update(billingUser.stripe_subscription_id, {
+        cancel_at_period_end: true,
+      });
+      const snapshot = await subscriptionSnapshot(stripe, updated);
+      await updateUserSubscription(billingUser.id, snapshot);
+
+      const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: billingUser.id },
+      });
+      return ctx.send({ data: safeUser(refreshed) });
+    } catch (err) {
+      strapi.log.error(`Stripe cancel failed: ${err.message}`);
+      ctx.status = err.status || err.statusCode || 500;
+      return ctx.send({
+        error: { message: err.message || 'Annullamento non riuscito.' },
+      });
+    }
+  },
+
+  async reactivateSubscription(ctx) {
+    const user = await requireBillingUser(ctx);
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+    const actor = await resolveStaffContext(strapi, user);
+    if (actor && ![STAFF_ROLES.OWNER].includes(actor.role)) {
+      return ctx.forbidden('Solo il titolare puo gestire la fatturazione.');
+    }
+
+    const billingUser = actor && actor.owner ? actor.owner : user;
+    if (!billingUser.stripe_subscription_id) {
+      return ctx.badRequest('Nessun abbonamento da riattivare.');
+    }
+
+    try {
+      const stripe = getStripe();
+      const subscription = await stripe.subscriptions.retrieve(billingUser.stripe_subscription_id);
+
+      if (subscription.status === 'canceled') {
+        ctx.status = 409;
+        return ctx.send({
+          error: {
+            code: 'SUBSCRIPTION_CANCELED',
+            message: 'Abbonamento gia terminato. Sottoscrivi un nuovo piano.',
+          },
+        });
+      }
+      if (!subscription.cancel_at_period_end) {
+        ctx.status = 409;
+        return ctx.send({
+          error: { code: 'NOT_CANCELING', message: 'Abbonamento gia attivo, nulla da riattivare.' },
+        });
+      }
+
+      const updated = await stripe.subscriptions.update(subscription.id, {
+        cancel_at_period_end: false,
+      });
+      const snapshot = await subscriptionSnapshot(stripe, updated);
+      await updateUserSubscription(billingUser.id, snapshot);
+
+      const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: billingUser.id },
+      });
+      return ctx.send({ data: safeUser(refreshed) });
+    } catch (err) {
+      strapi.log.error(`Stripe reactivate failed: ${err.message}`);
+      ctx.status = err.status || err.statusCode || 500;
+      return ctx.send({
+        error: { message: err.message || 'Riattivazione non riuscita.' },
+      });
+    }
+  },
+
   async createPortalSession(ctx) {
     const user = await requireBillingUser(ctx);
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');
