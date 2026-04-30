@@ -65,9 +65,13 @@ const validate = () => {
 };
 
 const buildPayload = (force = false) => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
     const payload = {
         customer_name: form.value.customer_name.trim(),
         number_of_people: parseInt(form.value.number_of_people, 10),
+        date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+        time: `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
     };
     if (form.value.table_id && form.value.table_id !== 'auto') {
         payload.table_id = form.value.table_id;

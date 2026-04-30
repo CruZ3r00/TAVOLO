@@ -846,10 +846,19 @@
 .kr-week-day:hover { border-color: var(--line-strong); }
 .kr-week-day.today { border-color: var(--ac); box-shadow: 0 0 0 2px color-mix(in oklab, var(--ac) 16%, transparent); }
 .kr-week-day.empty { background: var(--bg-sunk, var(--bg-2)); }
+.kr-week-day.active {
+  background: var(--ac);
+  border-color: var(--ac);
+  color: var(--paper);
+  box-shadow: 0 6px 18px color-mix(in oklab, var(--ac) 30%, transparent);
+}
 .kr-week-name { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
 .kr-week-num { font-size: 22px; font-weight: 600; letter-spacing: -0.025em; }
 .kr-week-c { font-size: 11.5px; color: var(--ink-3); }
 .kr-week-day.today .kr-week-c { color: var(--ac); font-weight: 500; }
+.kr-week-day.active .kr-week-name,
+.kr-week-day.active .kr-week-num,
+.kr-week-day.active .kr-week-c { color: var(--paper); }
 
 .kr-kanban { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .kr-col {

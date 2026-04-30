@@ -57,7 +57,20 @@ const orderDetailRef = ref(null);
 const activeTab = ref('pending'); // mobile single-column view
 const fromDate = ref(todayISO());
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+function todayISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+const todayLabel = computed(() => {
+  const [y, m, d] = todayISO().split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('it-IT', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+});
 
 const buildParams = () => {
   const params = {
@@ -66,7 +79,7 @@ const buildParams = () => {
     status: 'pending,confirmed,at_restaurant',
   };
   if (fromDate.value) {
-    params.from = new Date(`${fromDate.value}T00:00:00`).toISOString();
+    params.from = `${fromDate.value}T00:00:00.000Z`;
   }
   return params;
 };
@@ -98,7 +111,11 @@ const loadData = async ({ silent = false } = {}) => {
   }
 };
 
-const byStatus = (s) => reservations.value.filter(r => r.status === s);
+const visibleReservations = computed(() => {
+  if (!fromDate.value) return reservations.value;
+  return reservations.value.filter(r => (r.date || '').slice(0, 10) >= fromDate.value);
+});
+const byStatus = (s) => visibleReservations.value.filter(r => r.status === s);
 const pendingList = computed(() => byStatus('pending'));
 const confirmedList = computed(() => byStatus('confirmed'));
 const atRestaurantList = computed(() => byStatus('at_restaurant'));
@@ -121,22 +138,33 @@ const occupiedOrders = computed(() => {
 });
 const occupiedTotalCount = computed(() => orphanReservations.value.length + occupiedOrders.value.length);
 
-// Week strip data — last 3 days, today, next 3 days
+// Week strip data — 3 days before, selected day, 3 days after.
+// Strip recenters on `fromDate.value` so the selected day is always visible.
 const weekDays = computed(() => {
   const out = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayIso = todayISO();
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const center = (() => {
+    if (fromDate.value) {
+      const [y, m, d] = fromDate.value.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+    return new Date();
+  })();
+  center.setHours(0, 0, 0, 0);
   for (let i = -3; i <= 3; i += 1) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const iso = d.toISOString().slice(0, 10);
+    const d = new Date(center);
+    d.setDate(center.getDate() + i);
+    const iso = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
     const dayName = d.toLocaleDateString('it-IT', { weekday: 'short' }).slice(0, 3);
-    const num = String(d.getDate()).padStart(2, '0');
+    const num = pad2(d.getDate());
     const count = reservations.value.filter(r => (r.date || '').slice(0, 10) === iso).length;
-    out.push({ iso, dayName, num, count, isToday: i === 0 });
+    out.push({ iso, dayName, num, count, isToday: iso === todayIso });
   }
   return out;
 });
+
+const isViewingToday = computed(() => fromDate.value === todayISO());
 
 const showToast = (type, message) => {
   toast.value = { type, message };
@@ -273,7 +301,10 @@ const goDate = (iso) => {
           </p>
         </div>
         <div class="md-top-tools">
-          <input type="date" v-model="fromDate" class="md-date-input" @change="loadData()" aria-label="Mostra dal giorno" />
+          <span class="md-today-pill" aria-label="Data odierna">
+            <i class="bi bi-calendar3"></i>
+            <span>{{ todayLabel }}</span>
+          </span>
           <button type="button" class="btn btn-sm" @click="loadData({ silent: true })" :disabled="loading || refreshing">
             <span v-if="refreshing" class="spin-icon"></span>
             <i v-else class="bi bi-arrow-clockwise"></i>
@@ -306,19 +337,33 @@ const goDate = (iso) => {
       </Transition>
 
       <!-- Week strip -->
-      <div class="kr-week">
-        <button
-          v-for="d in weekDays"
-          :key="d.iso"
-          type="button"
-          class="kr-week-day"
-          :class="{ today: d.isToday, empty: d.count === 0, active: fromDate === d.iso }"
-          @click="goDate(d.iso)"
-        >
-          <span class="kr-week-name">{{ d.dayName }}</span>
-          <span class="kr-week-num">{{ d.num }}</span>
-          <span class="kr-week-c">{{ d.count > 0 ? `${d.count} pers.` : '— libero' }}</span>
-        </button>
+      <div class="kr-week-bar">
+        <div class="kr-week">
+          <button
+            v-for="d in weekDays"
+            :key="d.iso"
+            type="button"
+            class="kr-week-day"
+            :class="{ today: d.isToday, empty: d.count === 0, active: fromDate === d.iso }"
+            @click="goDate(d.iso)"
+          >
+            <span class="kr-week-name">{{ d.dayName }}</span>
+            <span class="kr-week-num">{{ d.num }}</span>
+            <span class="kr-week-c">{{ d.count > 0 ? `${d.count} pers.` : '— libero' }}</span>
+          </button>
+        </div>
+        <Transition name="fade">
+          <button
+            v-if="!isViewingToday"
+            type="button"
+            class="kr-today-back"
+            @click="goDate(todayISO())"
+            aria-label="Torna a oggi"
+          >
+            <i class="bi bi-arrow-counterclockwise"></i>
+            <span>Oggi</span>
+          </button>
+        </Transition>
       </div>
 
       <!-- Mobile tabs -->
@@ -521,18 +566,54 @@ const goDate = (iso) => {
 </template>
 
 <style scoped>
-.md-date-input {
+.md-today-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   height: 32px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: var(--paper);
+  background: var(--bg-2, var(--paper));
   font-family: var(--f-sans);
   font-size: 12.5px;
-  color: var(--ink);
-  cursor: pointer;
+  font-weight: 500;
+  color: var(--ink-2, var(--ink));
+  white-space: nowrap;
+  text-transform: capitalize;
 }
-.md-date-input:focus { outline: none; border-color: var(--ac); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ac) 18%, transparent); }
+.md-today-pill i { color: var(--ac); font-size: 14px; }
+
+.kr-week-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+.kr-week-bar .kr-week { flex: 1; min-width: 0; }
+.kr-today-back {
+  flex: 0 0 auto;
+  align-self: stretch;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--ac);
+  color: var(--ac);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+.kr-today-back:hover { background: var(--ac); color: var(--paper); transform: translateY(-1px); }
+.kr-today-back i { font-size: 14px; }
+@media (max-width: 860px) {
+  .kr-today-back span { display: none; }
+  .kr-today-back { padding: 0 12px; }
+}
 
 .md-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
