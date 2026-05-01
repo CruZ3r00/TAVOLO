@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Product entry-point. Definisce Package, Media, MajorUpgrade, Properties globali, Feature.
+
+  Variabili passate dal build script (-D):
+    BinarySource    path al pos-rt-service.exe
+    ProductVersion  versione (es. 1.0.0)
+    ProductCode     GUID nuovo per ogni build (per MajorUpgrade)
+    LicenseRtf      path al file License.rtf
+    MarkerFile      (riservato — non piu' usato)
+
+  Properties Add/Remove Programs (ARP*):
+    ARPNOMODIFY=1  ARPNOREPAIR=1  -> nasconde i bottoni Modify e Repair (l'installer
+                                     supporta solo install/uninstall/upgrade).
+-->
+<?include Variables.wxi ?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <Product Id="$(var.ProductCode)"
+           Name="$(var.ProductName)"
+           Language="1040"
+           Version="$(var.ProductVersion)"
+           Manufacturer="$(var.Manufacturer)"
+           UpgradeCode="$(var.UpgradeCode)">
+
+    <!--
+      Note compatibilita' wixl 0.101 (msitools): alcuni attributi WiX 3 non supportati
+      sono passati via CLI (-a x64 imposta la platform) o lasciati al default.
+    -->
+    <Package InstallerVersion="500"
+             Compressed="yes"
+             InstallScope="perMachine"
+             Description="$(var.ProductDescription)"
+             Manufacturer="$(var.Manufacturer)"
+             Languages="1040"
+             SummaryCodepage="1252" />
+
+    <Media Id="1" Cabinet="posrt.cab" EmbedCab="yes" />
+
+    <!-- Upgrade: blocca downgrade. Schedule default = afterInstallInitialize. -->
+    <MajorUpgrade DowngradeErrorMessage="Una versione piu' recente di [ProductName] e' gia' installata. Disinstallala prima di procedere." />
+
+    <!-- Programs and Features metadata -->
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="ARPCONTACT" Value="$(var.ARPContact)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.ico" />
+    <Icon Id="AppIcon.ico" SourceFile="$(var.IconFile)" />
+
+    <!-- Default install dir gia' definito in Directories.wxs -->
+
+    <!--
+      Silent install: non mostriamo la License dialog WiX UI (wixl non supporta WixVariable).
+      Per integrare la licenza in un setup interattivo si puo' linkare WiXUI_Minimal con WiX 3.
+    -->
+
+    <!-- Feature unica: tutto si installa o niente -->
+    <Feature Id="Complete"
+             Title="POS-RT Service"
+             Level="1"
+             ConfigurableDirectory="INSTALLDIR"
+             Display="expand"
+             AllowAdvertise="no">
+      <ComponentRef Id="cmpExeAndService" />
+      <ComponentRef Id="cmpDataRoot" />
+      <ComponentRef Id="cmpDataDb" />
+      <ComponentRef Id="cmpDataLogs" />
+      <ComponentRef Id="cmpStartMenu" />
+    </Feature>
+
+    <!--
+      ACL strette su DATAROOT e REG_MULTI_SZ Environment del servizio sono applicate
+      da `installer/windows/Configure-PosRtService.ps1` (eseguito da install.ps1).
+      wixl 0.101 (msitools) non supporta util:PermissionEx ne' MultiStringValue —
+      per build con WiX Toolset 3+ su Windows si possono integrare nativamente.
+      Vedi installer/windows/README.md per il piano migrazione.
+    -->
+
+    <!--
+      Install richiede privilegi. Schedula la richiesta UAC tramite InstallPrivileges=elevated
+      (default per InstallScope=perMachine).
+    -->
+
+  </Product>
+</Wix>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Componenti NON-service (file non binari, dati, env, shortcut).
+
+  Il binario + ServiceInstall sono in Service.wxs (cmpExeAndService).
+
+  Componenti qui:
+    cmpDataRoot, cmpDataDb, cmpDataLogs - cartelle DATADIR (db, logs) con ACL stretta
+                                          (Administrators FullControl + NetworkService Modify).
+                                          Permanent="yes": NON rimosse su uninstall (preservano DB + audit chained).
+    cmpServiceEnv  - env vars del servizio in HKLM\...Services\PosRtService\Environment (REG_MULTI_SZ)
+    cmpStartMenu   - shortcut "POS-RT Service" nello Start Menu
+-->
+<?include Variables.wxi ?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <Fragment>
+
+    <!--
+      DATA DIR — ACL applicate via Custom Action `SetDataDirAcl` in Product.wxs (icacls).
+      Component senza Permanent (wixl 0.101 non lo supporta): in pratica le folder sopravvivono
+      l'uninstall comunque, perche' i file SQLite/log/audit creati a runtime dal servizio
+      le rendono non vuote, e Windows Installer non cancella directory non vuote.
+    -->
+    <DirectoryRef Id="DATAROOT">
+      <Component Id="cmpDataRoot" Guid="$(var.DataDirComponentGuid)" Win64="yes">
+        <CreateFolder />
+        <RegistryValue Root="HKLM"
+                       Key="SOFTWARE\$(var.Manufacturer)\$(var.ProductShortName)"
+                       Name="DataDir"
+                       Type="string"
+                       Value="[DATAROOT]"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DATADB">
+      <Component Id="cmpDataDb" Guid="*" Win64="yes">
+        <CreateFolder />
+        <RegistryValue Root="HKLM"
+                       Key="SOFTWARE\$(var.Manufacturer)\$(var.ProductShortName)"
+                       Name="DataDirDb" Type="string" Value="[DATADB]" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DATALOGS">
+      <Component Id="cmpDataLogs" Guid="*" Win64="yes">
+        <CreateFolder />
+        <RegistryValue Root="HKLM"
+                       Key="SOFTWARE\$(var.Manufacturer)\$(var.ProductShortName)"
+                       Name="DataDirLogs" Type="string" Value="[DATALOGS]" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- =============== START MENU SHORTCUT =============== -->
+    <DirectoryRef Id="StartMenuDir">
+      <Component Id="cmpStartMenu" Guid="$(var.StartMenuComponentGuid)" Win64="yes">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="POS-RT Service"
+                  Description="Servizio bridge POS-RT (loopback-only)."
+                  Target="[INSTALLDIR]pos-rt-service.exe"
+                  WorkingDirectory="INSTALLDIR" />
+        <RemoveFolder Id="RemoveStartMenuDir" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="SOFTWARE\$(var.Manufacturer)\$(var.ProductShortName)"
+                       Name="StartMenuInstalled" Type="integer" Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+  </Fragment>
+</Wix>

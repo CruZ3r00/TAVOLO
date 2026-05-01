@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Costanti del prodotto. Usato come include file dai .wxs principali.
+
+  REGOLE DI VERSIONING:
+    - UpgradeCode: FISSO PER SEMPRE. Cambia identita' del prodotto nel registro Windows.
+                   Cambiarlo significa "questa e' un'app diversa", quindi MajorUpgrade non funziona piu'.
+    - ProductCode: NUOVO AD OGNI BUILD. Passato al wixl tramite -D ProductCode=<guid>
+                   dal build-msi.sh. Generato runtime con uuidgen/python.
+    - Component GUIDs: STABILI per la lifetime del component. Se un component cambia file, mantieni il GUID.
+                       Se aggiungi un nuovo component, genera un nuovo GUID.
+-->
+<Include>
+  <?define ProductName       = "POS-RT Service" ?>
+  <?define ProductShortName  = "PosRtService" ?>
+  <?define Manufacturer      = "Tavolo" ?>
+  <?define ProductDescription = "Bridge service tra Strapi CMS e dispositivi POS / Registratore Telematico fiscale (loopback-only, outbound-initiated)." ?>
+  <?define UpgradeCode       = "818E55EA-C9B8-4CB6-ACE0-06CED459709B" ?>
+
+  <!-- Service runtime -->
+  <?define ServiceName       = "PosRtService" ?>
+  <?define ServiceDisplay    = "POS-RT Service (Strapi bridge)" ?>
+  <?define ServiceAccount    = "NT AUTHORITY\NetworkService" ?>
+
+  <!-- Component GUIDs (stabili) -->
+  <?define ExeComponentGuid       = "67CEA556-C58E-4FCE-B42E-B4B88D4E4EEF" ?>
+  <?define DataDirComponentGuid   = "B0B90CCB-6EF3-49EB-98B8-F72DCFCAE337" ?>
+  <?define EnvRegComponentGuid    = "2BEB747B-EAA7-4B06-A788-9BAF26956E98" ?>
+  <?define IconComponentGuid      = "C6106ED1-1D5F-4023-81C0-5B21443431A4" ?>
+  <?define StartMenuComponentGuid = "25F7DCE0-2E3E-4858-BE9C-A43233FFC538" ?>
+
+  <!-- Help / contact links nel "Programs and Features" di Windows.
+       Placeholders: aggiornare con URL reali di supporto / contatto del progetto. -->
+  <?define ARPContact      = "support@tavolo.local" ?>
+  <?define ARPURLInfoAbout = "" ?>
+</Include>

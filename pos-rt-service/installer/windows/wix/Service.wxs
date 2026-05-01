@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Componente "binario + servizio" — coppia indissolubile.
+
+  Caratteristiche servizio:
+    - Account NetworkService (least privilege, NON SYSTEM).
+    - StartType auto (resilience: parte al boot).
+    - ErrorControl normal (l'eventuale errore non blocca il boot Windows).
+    - Recovery: restart su 1a/2a failure (delay 60s); nessuna azione sulla 3a; reset counter ogni 24h.
+    - ServiceControl: Start="install" Stop="both" Remove="uninstall" Wait="yes".
+
+  Note:
+    - WiX richiede che ServiceInstall stia nello stesso Component del File chiave.
+    - Il File qui (.exe) e' KeyPath del component; il ciclo di vita del servizio
+      e' agganciato a quello del file.
+-->
+<?include Variables.wxi ?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="cmpExeAndService" Guid="$(var.ExeComponentGuid)" Win64="yes">
+
+        <File Id="filExe"
+              Name="pos-rt-service.exe"
+              Source="$(var.BinarySource)"
+              KeyPath="yes" />
+
+        <ServiceInstall Id="svcInstall"
+                        Name="$(var.ServiceName)"
+                        DisplayName="$(var.ServiceDisplay)"
+                        Description="$(var.ProductDescription)"
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Account="$(var.ServiceAccount)"
+                        Vital="yes"
+                        Interactive="no" />
+
+        <!--
+          Service recovery (restart on failure) e' applicato da Configure-PosRtService.ps1
+          tramite `sc.exe failure`. wixl 0.101 non supporta util:ServiceConfig.
+          Per build con WiX Toolset 3+ su Windows si puo' nativizzare.
+        -->
+
+        <ServiceControl Id="svcControl"
+                        Name="$(var.ServiceName)"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
+
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

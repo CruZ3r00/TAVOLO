@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">pos-rt-mobile</string>
+    <string name="title_activity_main">pos-rt-mobile</string>
+    <string name="package_name">it.posrtservice.mobile</string>
+    <string name="custom_url_scheme">it.posrtservice.mobile</string>
+</resources>

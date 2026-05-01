@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Alberatura directory dell'installer.
+
+  Layout:
+    %ProgramFiles%\PosRtService\        <- INSTALLDIR (binario, sola lettura)
+    %ProgramData%\PosRtService\         <- DATADIR (DB, log, audit, secrets)
+       \db\
+       \logs\
+    %ProgramData%\Microsoft\Windows\Start Menu\Programs\PosRtService\  <- shortcut
+
+  Nota: DATADIR NON viene rimossa su uninstall (preserva DB cifrato e audit log).
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+
+      <!-- Install dir: %ProgramFiles%\PosRtService -->
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLDIR" Name="PosRtService" />
+      </Directory>
+
+      <!-- Data dir: %ProgramData%\PosRtService -->
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="DATAROOT" Name="PosRtService">
+          <Directory Id="DATADB" Name="db" />
+          <Directory Id="DATALOGS" Name="logs" />
+        </Directory>
+      </Directory>
+
+      <!-- Start Menu shortcut -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="StartMenuDir" Name="PosRtService" />
+      </Directory>
+    </Directory>
+  </Fragment>
+</Wix>

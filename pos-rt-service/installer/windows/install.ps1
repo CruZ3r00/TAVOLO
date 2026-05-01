@@ -1,92 +1,100 @@
-# Installer PowerShell per pos-rt-service su Windows.
-# Esegue come Administrator.
+# install.ps1
 #
-# Uso:  .\install.ps1 -BinarySource .\dist\win\pos-rt-service.exe
+# Orchestratore di installazione per pos-rt-service su Windows.
+# Esegue il flusso completo:
+#   1. msiexec /i pos-rt-service-X.Y.Z.msi          (registra binario + servizio)
+#   2. Configure-PosRtService.ps1                   (ACL + env vars + recovery)
+#   3. apre il browser sul pannello di pairing      (best effort)
+#
+# Richiede privilegi di Administrator. Se eseguito senza, si re-elava in automatico.
+#
+# Uso:
+#   .\install.ps1                                          # default: cerca .msi sotto dist/win/
+#   .\install.ps1 -MsiPath C:\path\to\pos-rt-service.msi   # MSI esplicito
+#   .\install.ps1 -DataDir D:\posrt-data                   # data dir custom
+#   .\install.ps1 -LogLevel debug                          # log verbose
 
+[CmdletBinding()]
 param(
-    [string]$BinarySource = ".\dist\win\pos-rt-service.exe",
-    [string]$InstallDir = "$env:ProgramFiles\PosRtService",
-    [string]$DataDir = "$env:ProgramData\PosRtService",
-    [string]$ServiceName = "PosRtService"
+    [string]$MsiPath,
+    [string]$DataDir     = "$env:ProgramData\PosRtService",
+    [string]$ServiceName = "PosRtService",
+    [ValidateSet('trace','debug','info','warn','error','fatal','silent')]
+    [string]$LogLevel    = 'info',
+    [string]$LogFile     = "$env:TEMP\pos-rt-service-install.log"
 )
 
 $ErrorActionPreference = 'Stop'
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
-function Require-Admin {
-    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
-    if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        Write-Host "Questo script richiede privilegi di Administrator." -ForegroundColor Red
-        exit 1
+# --- Self-elevate se non admin ---
+function Test-Admin {
+    $current = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($current)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+if (-not (Test-Admin)) {
+    Write-Host "Richiesti privilegi di Administrator. Re-lancio elevato..." -ForegroundColor Yellow
+    $argList = @('-NoProfile','-ExecutionPolicy','Bypass','-File',"`"$($MyInvocation.MyCommand.Definition)`"")
+    foreach ($k in $PSBoundParameters.Keys) {
+        $v = $PSBoundParameters[$k]
+        $argList += "-$k"
+        $argList += "`"$v`""
+    }
+    Start-Process -FilePath powershell.exe -ArgumentList $argList -Verb RunAs
+    exit 0
+}
+
+# --- Localizza l'MSI ---
+if (-not $MsiPath) {
+    $candidates = @(
+        Join-Path $scriptDir '..\..\dist\win'      # repo layout
+        $scriptDir                                  # MSI affianco allo script
+        $env:TEMP
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path $c) {
+            $found = Get-ChildItem -Path $c -Filter 'pos-rt-service-*.msi' -ErrorAction SilentlyContinue |
+                     Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($found) { $MsiPath = $found.FullName; break }
+        }
     }
 }
-
-Require-Admin
-
-if (-not (Test-Path $BinarySource)) {
-    Write-Host "Binario non trovato: $BinarySource" -ForegroundColor Red
-    exit 2
+if (-not $MsiPath -or -not (Test-Path $MsiPath)) {
+    throw "MSI non trovato. Specifica -MsiPath, oppure costruiscilo con: bash installer/windows/build-msi.sh"
 }
 
-Write-Host "► Creazione directory..."
-New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-New-Item -ItemType Directory -Force -Path "$DataDir\db" | Out-Null
-New-Item -ItemType Directory -Force -Path "$DataDir\logs" | Out-Null
-
-# ACL: solo Administrators + NetworkService possono leggere/scrivere
-Write-Host "► Impostazione ACL..."
-$acl = Get-Acl $DataDir
-$acl.SetAccessRuleProtection($true, $false)
-$adminRule = New-Object System.Security.AccessControl.FileSystemAccessRule("BUILTIN\Administrators", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
-$serviceRule = New-Object System.Security.AccessControl.FileSystemAccessRule("NT AUTHORITY\NetworkService", "Modify", "ContainerInherit,ObjectInherit", "None", "Allow")
-$acl.AddAccessRule($adminRule)
-$acl.AddAccessRule($serviceRule)
-Set-Acl -Path $DataDir -AclObject $acl
-
-Write-Host "► Copia binario..."
-Copy-Item -Path $BinarySource -Destination "$InstallDir\pos-rt-service.exe" -Force
-
-Write-Host "► Installazione servizio Windows..."
-sc.exe delete $ServiceName 2>&1 | Out-Null
-
-New-Service -Name $ServiceName `
-    -BinaryPathName "`"$InstallDir\pos-rt-service.exe`"" `
-    -DisplayName "POS-RT Service (Strapi bridge)" `
-    -Description "Bridge tra Strapi CMS e dispositivi POS/RT fiscali (loopback-only)." `
-    -StartupType Automatic | Out-Null
-
-# Service account: NetworkService (least privilege, non SYSTEM)
-sc.exe config $ServiceName obj= "NT AUTHORITY\NetworkService" | Out-Null
-
-# Environment (registrati nel servizio)
-$envBlock = @(
-    "NODE_ENV=production",
-    "LOG_LEVEL=info",
-    "APP_DATA_DIR=$DataDir"
-) -join "`0"
-# Registry environment per il servizio
-$regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$ServiceName"
-Set-ItemProperty -Path $regPath -Name "Environment" -Value @(
-    "NODE_ENV=production",
-    "LOG_LEVEL=info",
-    "APP_DATA_DIR=$DataDir"
-) -Type MultiString
-
-Write-Host "► Avvio servizio..."
-Start-Service $ServiceName
-
-Start-Sleep -Seconds 2
-Get-Service $ServiceName
-
+Write-Host "==> Installazione pos-rt-service" -ForegroundColor Cyan
+Write-Host "  MSI:         $MsiPath"
+Write-Host "  DataDir:     $DataDir"
+Write-Host "  ServiceName: $ServiceName"
+Write-Host "  LogLevel:    $LogLevel"
+Write-Host "  Install log: $LogFile"
 Write-Host ""
-Write-Host "✓ Installazione completata." -ForegroundColor Green
-Write-Host "► Log:           $DataDir\logs\app.log"
-Write-Host "► UI pairing:    apri http://127.0.0.1:<porta>/ui/pair.html"
-Write-Host "  La porta è salvata in $DataDir\db (tabella config -> api.port) o visibile nei log."
 
-# Prova ad aprire il browser sull'URL UI (best effort)
-try {
-    Start-Sleep -Seconds 3
-    # Leggi la porta dal DB SQLite sarebbe complesso in PS puro — lascia all'utente
-    Start-Process "http://127.0.0.1"
-} catch {}
+# --- Step 1: msiexec ---
+Write-Host "==> [1/3] msiexec /i $(Split-Path -Leaf $MsiPath) /qb"
+$msiArgs = @('/i', "`"$MsiPath`"", '/qb', '/norestart', '/l*v', "`"$LogFile`"")
+$proc = Start-Process -FilePath msiexec.exe -ArgumentList $msiArgs -Wait -PassThru
+if ($proc.ExitCode -ne 0) {
+    Write-Host "msiexec fallito (exit $($proc.ExitCode)). Vedi log: $LogFile" -ForegroundColor Red
+    exit $proc.ExitCode
+}
+
+# --- Step 2: Configure (ACL + env + recovery) ---
+$configureScript = Join-Path $scriptDir 'Configure-PosRtService.ps1'
+if (-not (Test-Path $configureScript)) {
+    throw "Configure-PosRtService.ps1 non trovato accanto a install.ps1: $configureScript"
+}
+Write-Host ""
+Write-Host "==> [2/3] $configureScript"
+& $configureScript -DataDir $DataDir -ServiceName $ServiceName -LogLevel $LogLevel -RestartService:$true
+
+# --- Step 3: open browser (best effort, port unknown finche' il servizio non logga) ---
+Write-Host ""
+Write-Host "==> [3/3] Pannello pairing"
+Write-Host "  Il servizio alloca dinamicamente la porta API. Trovala in:"
+Write-Host "    $DataDir\logs\app.log  (cerca 'API locale')"
+Write-Host "  Poi apri http://127.0.0.1:<porta>/ui/pair.html"
+Write-Host ""
+Write-Host "Installazione completata." -ForegroundColor Green
