@@ -24,6 +24,7 @@ const {
 
 const paymentService = require('../../../services/payment');
 const statsService = require('../../../services/stats');
+const posBridge = require('../../../services/pos-bridge');
 const {
   STAFF_ROLES,
   resolveStaffContext,
@@ -65,6 +66,7 @@ const ERROR_STATUS = {
   ORDER_CONTENTION: 503,
   PAYMENT_UNAVAILABLE: 503,
   PAYMENT_TIMEOUT: 504,
+  POS_DEVICE_NOT_FOUND: 409,
 };
 
 function appError(code, message, details) {
@@ -218,6 +220,16 @@ async function loadOwnedMenuElement(documentId, userId) {
     .find((item) => item && item.documentId === documentId);
   if (!element) throw appError('INVALID_PAYLOAD', 'Elemento menu non trovato.');
   return element;
+}
+
+function serializePosJobItem(item) {
+  return {
+    name: item.name,
+    quantity: parseInt(item.quantity, 10) || 1,
+    price: Number(item.price || 0),
+    notes: item.notes || null,
+    element_document_id: item.fk_element ? item.fk_element.documentId : null,
+  };
 }
 
 /** Verifica lock_version (optimistic locking). */
@@ -775,6 +787,57 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       // Ricalcola totale definitivo
       const items = order.fk_items || [];
       const totalResult = computeTotal({ items });
+
+      if (paymentMethod === 'pos' || paymentMethod === 'fiscal_register') {
+        const device = await posBridge.findActiveDeviceForUser(strapi, actor.ownerId);
+        if (!device) {
+          throw appError(
+            'POS_DEVICE_NOT_FOUND',
+            'Nessun dispositivo POS/RT collegato. Apri l\'app pos-rt-service e collega il device.',
+          );
+        }
+
+        const dispatch = await posBridge.dispatchJob(strapi, {
+          device,
+          user: { id: actor.ownerId },
+          kind: 'order.close',
+          orderId: documentId,
+          priority: 10,
+          payload: {
+            order_doc_id: documentId,
+            amount: totalResult.total,
+            subtotal: totalResult.subtotal,
+            tax: totalResult.tax,
+            discount: totalResult.discount,
+            currency: 'EUR',
+            payment_method: paymentMethod,
+            table: order.fk_table
+              ? {
+                  documentId: order.fk_table.documentId,
+                  number: order.fk_table.number,
+                  area: order.fk_table.area,
+                }
+              : null,
+            items: items.map(serializePosJobItem),
+          },
+        });
+
+        ctx.status = 202;
+        ctx.body = {
+          data: {
+            queued: true,
+            event_id: dispatch.event_id,
+            delivered_via_ws: dispatch.delivered_via_ws,
+            apns_pushed: dispatch.apns_pushed,
+            payment: {
+              transactionId: dispatch.event_id,
+              timestamp: new Date().toISOString(),
+              status: 'queued',
+            },
+          },
+        };
+        return;
+      }
 
       // Invoca payment service
       let paymentResult;

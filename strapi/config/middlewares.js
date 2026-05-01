@@ -1,4 +1,8 @@
 const DEFAULT_CORS_ORIGINS = [
+  'http://localhost',
+  'https://localhost',
+  'capacitor://localhost',
+  'ionic://localhost',
   'http://localhost:5174',
   'http://localhost:5175',
   'http://localhost:5176',
@@ -13,7 +17,8 @@ const DEFAULT_CORS_ORIGINS = [
 
 const parseCorsOrigins = () => {
   const raw = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS;
-  const origins = (raw && raw.trim() ? raw.split(',') : DEFAULT_CORS_ORIGINS)
+  const configuredOrigins = raw && raw.trim() ? raw.split(',') : [];
+  const origins = [...DEFAULT_CORS_ORIGINS, ...configuredOrigins]
     .map((origin) => origin.trim())
     .filter(Boolean);
 

@@ -301,6 +301,10 @@ async function grantImportPermissions(strapi) {
       'api::order.order.deleteItem',
       'api::order.order.updateItemStatus',
       'api::order.order.close',
+      'api::pos-device.pos-device.register',
+      'api::pos-device.pos-device.createPairingToken',
+      'api::pos-device.pos-device.revoke',
+      'api::pos-device.pos-device.listMine',
       'plugin::upload.content-api.upload',
     ];
     for (const action of actions) {

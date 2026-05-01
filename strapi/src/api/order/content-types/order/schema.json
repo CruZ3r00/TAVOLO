@@ -41,6 +41,21 @@
       "required": false,
       "maxLength": 255
     },
+    "fiscal_status": {
+      "type": "enumeration",
+      "enum": ["pending", "completed", "failed", "not_required"],
+      "required": false
+    },
+    "fiscal_receipt_id": {
+      "type": "string",
+      "required": false,
+      "maxLength": 120
+    },
+    "fiscal_event_id": {
+      "type": "string",
+      "required": false,
+      "maxLength": 80
+    },
     "lock_version": {
       "type": "integer",
       "default": 0,

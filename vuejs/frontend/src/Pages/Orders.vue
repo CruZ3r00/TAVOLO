@@ -189,9 +189,13 @@ const onConfirmCheckout = async (payload) => {
   try {
     const result = await closeOrder(checkoutOrder.value.documentId, payload, token.value);
     showCheckout.value = false;
-    showOrderDetail.value = false;
-    currentOrderDocId.value = null;
-    showToast('success', `Conto chiuso. Rif: ${result.payment?.transactionId || 'OK'}`);
+    if (result.queued) {
+      showToast('success', `Richiesta inviata al dispositivo POS/RT. Rif: ${result.event_id || 'OK'}`);
+    } else {
+      showOrderDetail.value = false;
+      currentOrderDocId.value = null;
+      showToast('success', `Conto chiuso. Rif: ${result.payment?.transactionId || 'OK'}`);
+    }
     await loadData({ silent: true });
   } catch (err) {
     if (err?.code === 'STALE_ORDER') {
