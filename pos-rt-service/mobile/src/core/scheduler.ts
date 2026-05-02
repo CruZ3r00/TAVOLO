@@ -16,6 +16,7 @@ import { HttpClient } from './httpClient';
 import { devicePersistence } from './persistence';
 import { jobHandlers, type Job } from './jobHandlers';
 import { auditLog } from './auditLog';
+import { persistedIdempotencyStore } from './idempotency';
 import { startForegroundService, stopForegroundService } from '../plugins/foregroundService';
 
 let _interval: any = null;
@@ -140,6 +141,14 @@ export async function start(): Promise<void> {
   }
   // Avvia il Foreground Service Android (no-op su iOS/web).
   await startForegroundService();
+
+  // GC dei record di idempotency vecchi (best-effort, non bloccante).
+  persistedIdempotencyStore
+    .gc()
+    .then((removed) => {
+      if (removed > 0) auditLog.append({ kind: 'idempotency.gc', meta: { removed } }).catch(() => undefined);
+    })
+    .catch(() => undefined);
 
   const intervalSec = await devicePersistence.getPollInterval();
   // Polling

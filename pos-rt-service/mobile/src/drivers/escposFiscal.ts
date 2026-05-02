@@ -7,6 +7,8 @@
 import { sendTcpOnce } from '../plugins/tcpSocket';
 import { DriverError } from './types';
 import type { DriverStatus, PrinterDriver, PrintOutcome, ReceiptInput } from './types';
+import { concatBytes } from './helpers/frame';
+import { mapPrinterPaymentType } from './helpers/payTypeMap';
 
 const ESC = 0x1b;
 const ETB = 0x17;
@@ -64,7 +66,7 @@ export class EscposFiscalDriverMobile implements PrinterDriver {
       cmds.push(this.cmd('I', [desc, String(cents), String(qty), dept]));
     }
     const totalCents = Math.round(Number(data.total || 0) * 100);
-    const payType = data.payment_type ?? this.mapPaymentType(data.payment_method);
+    const payType = data.payment_type ?? mapPrinterPaymentType(data.payment_method, 'escpos-fiscal');
     cmds.push(this.cmd('T', [String(totalCents), String(payType)]));
     cmds.push(this.cmd('C', []));
     return this.exec(cmds, true);
@@ -87,15 +89,6 @@ export class EscposFiscalDriverMobile implements PrinterDriver {
     /* noop */
   }
 
-  private mapPaymentType(method?: string): number {
-    if (!method) return 1;
-    const m = method.toLowerCase();
-    if (m === 'cash' || m === 'contanti') return 1;
-    if (m === 'card' || m === 'pos' || m === 'credit_card') return 2;
-    if (m === 'meal_voucher' || m === 'ticket') return 4;
-    return 5;
-  }
-
   private cmd(opcode: string, args: string[]): Uint8Array {
     const enc = new TextEncoder();
     const opBuf = enc.encode(opcode);
@@ -104,7 +97,7 @@ export class EscposFiscalDriverMobile implements PrinterDriver {
       if (i > 0) argParts.push(new Uint8Array([ETB]));
       argParts.push(enc.encode(String(a)));
     });
-    const argsBuf = concat(argParts);
+    const argsBuf = concatBytes(argParts);
     const out = new Uint8Array(2 + opBuf.length + argsBuf.length + 1);
     out[0] = ESC;
     out[1] = 0x7c;
@@ -115,7 +108,7 @@ export class EscposFiscalDriverMobile implements PrinterDriver {
   }
 
   private async exec(cmds: Uint8Array[], fiscal: boolean): Promise<PrintOutcome> {
-    const buf = await sendTcpOnce(this.opts.host, this.opts.port, concat(cmds), {
+    const buf = await sendTcpOnce(this.opts.host, this.opts.port, concatBytes(cmds), {
       timeoutMs: this.opts.timeoutMs,
       quietMs: 200,
     });
@@ -133,16 +126,4 @@ export class EscposFiscalDriverMobile implements PrinterDriver {
       driver: this.name,
     };
   }
-}
-
-function concat(arrs: Uint8Array[]): Uint8Array {
-  let total = 0;
-  for (const a of arrs) total += a.length;
-  const out = new Uint8Array(total);
-  let off = 0;
-  for (const a of arrs) {
-    out.set(a, off);
-    off += a.length;
-  }
-  return out;
 }

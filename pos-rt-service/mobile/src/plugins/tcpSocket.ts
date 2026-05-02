@@ -20,6 +20,11 @@ interface PosTcpSocketPlugin {
     timeoutMs: number;
     quietMs?: number;
   }): Promise<{ responseBase64: string }>;
+  probePort(opts: {
+    host: string;
+    port: number;
+    timeoutMs?: number;
+  }): Promise<{ open: boolean; latencyMs: number; error?: string }>;
 }
 
 const Native = registerPlugin<PosTcpSocketPlugin>('PosTcpSocket');
@@ -52,6 +57,24 @@ export async function sendTcpOnce(
 
 export function tcpAvailable(): boolean {
   return isAvailable();
+}
+
+/**
+ * TCP connect-only probe (no IO). Resolve sempre con { open, latencyMs }.
+ * Usato dal portScanner della LAN discovery.
+ *
+ * Su web/dev (plugin non disponibile) ritorna { open: false } senza throw,
+ * così la discovery rimane "graceful" anche in modalità dev.
+ */
+export async function probePort(
+  host: string,
+  port: number,
+  timeoutMs: number = 300,
+): Promise<{ open: boolean; latencyMs: number; error?: string }> {
+  if (!isAvailable()) {
+    return { open: false, latencyMs: 0, error: 'PosTcpSocket non disponibile (build web)' };
+  }
+  return Native.probePort({ host, port, timeoutMs });
 }
 
 function uint8ToBase64(arr: Uint8Array): string {

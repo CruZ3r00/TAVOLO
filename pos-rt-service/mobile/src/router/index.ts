@@ -6,6 +6,7 @@ const routes = [
   { path: '/pair', component: () => import('../views/Pair.vue'), meta: { public: true } },
   { path: '/dashboard', component: () => import('../views/Dashboard.vue') },
   { path: '/settings', component: () => import('../views/Settings.vue') },
+  { path: '/discovery', component: () => import('../views/DeviceDiscovery.vue') },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ];
 

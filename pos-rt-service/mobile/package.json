@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "cap:sync": "cap sync",
     "cap:android:open": "cap open android",
     "cap:android:run": "cap run android",
@@ -32,6 +34,7 @@
     "@vitejs/plugin-vue": "^5.0.4",
     "typescript": "^5.4.5",
     "vite": "^5.2.6",
+    "vitest": "^1.6.0",
     "vue-tsc": "^2.0.6"
   }
 }

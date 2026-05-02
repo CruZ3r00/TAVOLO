@@ -16,12 +16,14 @@ const PRINTERS: Record<string, PrinterFactory> = {
   'epson-fpmate': async (opts) => new (await import('./epsonFpmate')).EpsonFpMateDriverMobile(opts),
   'custom-xon': async (opts) => new (await import('./customXon')).CustomXonDriverMobile(opts),
   'escpos-fiscal': async (opts) => new (await import('./escposFiscal')).EscposFiscalDriverMobile(opts),
+  italretail: async (opts) => new (await import('./italretail')).ItalretailDriverMobile(opts),
 };
 
 const PAYMENTS: Record<string, PaymentFactory> = {
   stub: async (opts) => new (await import('./stubPayment')).StubPaymentDriver(opts),
   'generic-ecr': async (opts) => new (await import('./genericEcr')).GenericEcrDriverMobile(opts),
   jpos: async (opts) => new (await import('./jpos')).JposDriverMobile(opts),
+  'nexi-p17': async (opts) => new (await import('./nexiP17')).NexiP17DriverMobile(opts),
   'escpos-bt': async (opts) => new (await import('./escposBt')).EscPosBtDriverMobile(opts),
 };
 

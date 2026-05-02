@@ -6,6 +6,8 @@
 import { sendTcpOnce } from '../plugins/tcpSocket';
 import { DriverError } from './types';
 import type { DriverStatus, PrinterDriver, PrintOutcome, ReceiptInput } from './types';
+import { concatBytes } from './helpers/frame';
+import { mapPrinterPaymentType } from './helpers/payTypeMap';
 
 const ESC = 0x1b;
 const ETX = 0x03;
@@ -55,7 +57,7 @@ export class CustomXonDriverMobile implements PrinterDriver {
       throw new DriverError('INVALID_PAYLOAD', 'custom-xon: scontrino senza voci');
     }
     const total = Math.round(Number(data.total || 0) * 100);
-    const paymentType = data.payment_type ?? this.mapPaymentType(data.payment_method);
+    const paymentType = data.payment_type ?? mapPrinterPaymentType(data.payment_method, 'custom-xon');
     const parts: Uint8Array[] = [];
     parts.push(this.frame('@', [this.opts.operator]));
     for (const it of items) {
@@ -67,7 +69,7 @@ export class CustomXonDriverMobile implements PrinterDriver {
     }
     parts.push(this.frame('+', [String(paymentType), String(total)]));
     parts.push(this.frame('#', []));
-    const big = concat(parts);
+    const big = concatBytes(parts);
     return this.exec(big, true);
   }
 
@@ -83,15 +85,6 @@ export class CustomXonDriverMobile implements PrinterDriver {
 
   async dispose(): Promise<void> {
     /* noop */
-  }
-
-  private mapPaymentType(method?: string): number {
-    if (!method) return 1;
-    const m = method.toLowerCase();
-    if (m === 'cash' || m === 'contanti') return 1;
-    if (m === 'card' || m === 'pos' || m === 'credit_card') return 2;
-    if (m === 'meal_voucher' || m === 'ticket') return 4;
-    return 5;
   }
 
   private frame(opcode: string, args: string[]): Uint8Array {
@@ -127,16 +120,4 @@ export class CustomXonDriverMobile implements PrinterDriver {
       driver: this.name,
     };
   }
-}
-
-function concat(arrs: Uint8Array[]): Uint8Array {
-  let total = 0;
-  for (const a of arrs) total += a.length;
-  const out = new Uint8Array(total);
-  let off = 0;
-  for (const a of arrs) {
-    out.set(a, off);
-    off += a.length;
-  }
-  return out;
 }

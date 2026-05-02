@@ -43,12 +43,16 @@ import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 import it.posrtservice.mobile.plugins.PosForegroundServicePlugin;
 import it.posrtservice.mobile.plugins.PosTcpSocketPlugin;
+import it.posrtservice.mobile.plugins.PosTcpStreamPlugin;
+import it.posrtservice.mobile.plugins.NetworkInfoPlugin;
 
 public class MainActivity extends BridgeActivity {
   @Override
   public void onCreate(Bundle savedInstanceState) {
     registerPlugin(PosForegroundServicePlugin.class);
     registerPlugin(PosTcpSocketPlugin.class);
+    registerPlugin(PosTcpStreamPlugin.class);
+    registerPlugin(NetworkInfoPlugin.class);
     super.onCreate(savedInstanceState);
   }
 }
@@ -109,12 +113,16 @@ https://capacitorjs.com/docs/android/deploying-to-google-play
 |------|-------|
 | `PosForegroundService.kt` | Servizio Android con notifica permanente che impedisce all'OS di killare il processo |
 | `PosForegroundServicePlugin.kt` | Bridge Capacitor JS → start/stop del Foreground Service |
-| `PosTcpSocketPlugin.kt` | Bridge Capacitor JS → API `sendOnce(host, port, payload, timeoutMs)`. Necessario per i driver TCP (custom-xon, escpos-fiscal, generic-ecr, jpos) |
+| `PosTcpSocketPlugin.kt` | Bridge Capacitor JS → API `sendOnce(host, port, payload, timeoutMs)` + `probePort` (connect-only, per LAN discovery). Necessario per i driver TCP one-shot (custom-xon, escpos-fiscal, generic-ecr, jpos) |
+| `PosTcpStreamPlugin.kt` | Bridge Capacitor JS → API `open/send/recv/close` (sessione persistente). Necessario per il driver Nexi P17 (Protocollo 17 / ECR17) che ha ACK + risposta differita post-PIN |
+| `NetworkInfoPlugin.kt` | Bridge Capacitor JS → `getLocalSubnet()` ritorna CIDR del Wi-Fi corrente. Usato dalla LAN discovery |
 
 I wrapper JS sono in:
 - `src/plugins/foregroundService.ts`
 - `src/plugins/tcpSocket.ts`
+- `src/plugins/tcpStream.ts`
+- `src/plugins/networkInfo.ts`
 
 Loro non usano il plugin direttamente: lo fanno via `Capacitor.registerPlugin()`,
 quindi se il plugin non è registrato (es. build web), tutte le chiamate
-falliscono in modo controllato (`DRIVER_UNAVAILABLE` per TCP, no-op per FG).
+falliscono in modo controllato (`DRIVER_UNAVAILABLE` per TCP, no-op per FG, scoperta vuota per network info).

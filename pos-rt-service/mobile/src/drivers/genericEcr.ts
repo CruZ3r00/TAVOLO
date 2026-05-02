@@ -13,6 +13,7 @@ import type {
   RefundInput,
   RefundOutcome,
 } from './types';
+import { frameAsciiLength, unframeAsciiLength } from './helpers/frame';
 
 export interface GenericEcrOptions {
   host: string;
@@ -181,18 +182,21 @@ export class GenericEcrDriverMobile implements PaymentDriver {
 
   private async send(xmlBody: string, timeoutMs?: number): Promise<string> {
     const body = new TextEncoder().encode(xmlBody);
-    if (body.length > 9999) throw new DriverError('INVALID_PAYLOAD', 'generic-ecr: body troppo grande');
-    const lenStr = String(body.length).padStart(4, '0');
-    const lenBuf = new TextEncoder().encode(lenStr);
-    const frame = new Uint8Array(lenBuf.length + body.length);
-    frame.set(lenBuf, 0);
-    frame.set(body, lenBuf.length);
+    let frame: Uint8Array;
+    try {
+      frame = frameAsciiLength(body, 4);
+    } catch (err: any) {
+      throw new DriverError('INVALID_PAYLOAD', `generic-ecr: ${err.message}`);
+    }
     const resp = await sendTcpOnce(this.opts.host, this.opts.port, frame, {
       timeoutMs: timeoutMs || this.opts.timeoutMs,
     });
     if (resp.length < 4) throw new DriverError('DRIVER_ERROR', 'generic-ecr: risposta troppo corta');
-    const expected = parseInt(new TextDecoder().decode(resp.subarray(0, 4)), 10);
-    return new TextDecoder().decode(resp.subarray(4, 4 + (Number.isFinite(expected) ? expected : resp.length - 4)));
+    try {
+      return new TextDecoder().decode(unframeAsciiLength(resp, 4));
+    } catch (err: any) {
+      throw new DriverError('DRIVER_ERROR', `generic-ecr: ${err.message}`);
+    }
   }
 }
 

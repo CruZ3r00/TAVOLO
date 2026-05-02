@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 // Carica credenziali release dal file gitignored se esiste.
 // In assenza, la signingConfig non viene applicata e `assembleRelease` produrra'
@@ -71,6 +72,10 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+
+    // Kotlin runtime — necessario per i plugin POS nativi in `plugins/*.kt`.
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$kotlinxCoroutinesVersion"
 }
 
 apply from: 'capacitor.build.gradle'

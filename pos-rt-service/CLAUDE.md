@@ -167,7 +167,53 @@ Job kinds the service handles today: **`order.close`** (charge + receipt), **`pr
 
 ## Mobile companion (`mobile/`)
 
-`mobile/` is a **separate** Capacitor + Vue 3 + TypeScript app, NOT the Node daemon. Same role (outbound-only bridge to Strapi + LAN POS/RT) but for Android/iOS. It has its own `package.json`, `vite` config, Capacitor projects (`android/`, `ios-staging/`), and TS sources under `mobile/src/{core,drivers,plugins,views}`. Treat it as a sibling project: same architectural rules apply (no cross-imports with the daemon), but it does not share runtime code with `src/`.
+`mobile/` is a **separate** Capacitor + Vue 3 + TypeScript app, NOT the Node daemon. Same role (outbound-only bridge to Strapi + LAN POS/RT) but for Android/iOS. It has its own `package.json`, `vite` config, Capacitor projects (`android/`, `ios-staging/`), and TS sources under `mobile/src/{core,drivers,plugins,services,composables,views}`. Treat it as a sibling project: same architectural rules apply (no cross-imports with the daemon), but it does not share runtime code with `src/`.
+
+### Real POS/RT drivers (ADR-0004)
+
+Sostituiti gli stub demo con driver reali per il mercato italiano:
+
+| Driver | Categoria | Wire | Default port | Note |
+|---|---|---|---|---|
+| `italretail` | printer (RT) | XON-XOFF over TCP | 9100 | Wrapper su `customXon`, modelli Italstart/Nice/Big. Hook `protocol: 'xml7'` riservato per modelli nuovi. |
+| `nexi-p17` | payment | Protocollo 17 / ECR17 | 9999 | STX/ETX/LRC framing + ACK/NAK retry + risposta differita post-PIN. Encoder `messageEncoder` pluggable per matrice-campi cliente. |
+| `epson-fpmate`, `custom-xon`, `escpos-fiscal`, `generic-ecr`, `jpos` | — | — | — | Già presenti, refactorati per usare gli helper condivisi. |
+
+**Pacchetti chiave:**
+
+- `mobile/src/drivers/helpers/{lrc,frame,payTypeMap,idempotency}.ts` — funzioni pure condivise (testate con Vitest, 54 test).
+- `mobile/src/plugins/tcpStream.ts` + `mobile/android-plugins/PosTcpStreamPlugin.kt` — sessione TCP persistente per driver con risposta differita (Nexi P17). Pattern `withSession(host, port, async (s) => {...})` con close in finally.
+- `mobile/src/plugins/networkInfo.ts` + `mobile/android-plugins/NetworkInfoPlugin.kt` — CIDR locale via Wi-Fi DHCP / NetworkInterface fallback.
+
+### LAN discovery
+
+`mobile/src/services/discovery/*` orchestrano: subnet detection → port scan parallelo (concurrency 50, connect-only) → driver probe → ranked candidates. Esposto via composable `useDiscovery()` e view `DeviceDiscovery.vue` (route `/discovery`).
+
+### Idempotency persistita
+
+`mobile/src/core/idempotency.ts` espone `persistedIdempotencyStore` (Preferences-backed). `jobHandlers.ts::handleOrderClose` esegue WAL: `setPending` → `charge` → `markCompleted`/`markFailed`. Su retry stesso `event_id`: completed → outcome cached; pending → `driver.inquiry?` (Nexi P17 implementato); failed → re-fire libero. Driver senza Inquiry e record pending → `INQUIRY_UNSUPPORTED` (verifica manuale). GC giornaliero al boot dello scheduler.
+
+### Plugin nativi Android (registrazione)
+
+I plugin `.kt` vivono in `mobile/android-plugins/` e sono copiati in `mobile/android/app/src/main/java/it/posrtservice/mobile/plugins/`. Registrati in `MainActivity.java`:
+- `PosForegroundServicePlugin` — foreground service per uptime in background
+- `PosTcpSocketPlugin` — TCP one-shot (sendOnce + probePort)
+- `PosTcpStreamPlugin` — TCP session-based (open/send/recv/close)
+- `NetworkInfoPlugin` — CIDR locale
+
+Gradle: Kotlin 1.9.22 + kotlinx-coroutines-android 1.7.3 (vedi `android/variables.gradle` + `android/app/build.gradle`).
+
+### Test e mock
+
+```bash
+cd mobile && npm test            # 54 unit test (Vitest)
+node tests/fixtures/mock-italretail-server.cjs 9100
+node tests/fixtures/mock-nexi-p17-server.cjs 9999 [--decline-rate=0.5] [--pin-delay=8000]
+```
+
+I mock TCP simulano i wire reali per smoke test su device fisico (collega l'app alla LAN del laptop) o per test di idempotency end-to-end ("kill-after-charge"). Vedi `tests/fixtures/README.md`.
+
+
 
 **Android release signing**: keystore in `~/.android/posrtmobile-release.jks` (mode 0600, NOT in repo). Credenziali in `mobile/android/keystore.properties` (gitignored), lette da `mobile/android/app/build.gradle` per la `signingConfigs.release`. APK firmato v1+v2+v3 via `./gradlew assembleRelease`, AAB via `bundleRelease`. R8/ProGuard `minifyEnabled=false` (Capacitor reflection-heavy) — TODO post-MVP attivare con keep-rules curate. Icon set: glifo "T" bianco geometrico su `#1E3A5F` (background brand), generabile via `tmp/gen_launcher_icons.py` se serve rigenerare.
 

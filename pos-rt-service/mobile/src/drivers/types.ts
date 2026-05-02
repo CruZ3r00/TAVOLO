@@ -73,6 +73,11 @@ export interface DriverStatus {
   [k: string]: unknown;
 }
 
+export interface InquiryHint {
+  amountCents?: number;
+  orderRef?: string | null;
+}
+
 export interface PaymentDriver {
   readonly name: string;
   init(): Promise<void>;
@@ -80,6 +85,14 @@ export interface PaymentDriver {
   refund(input: RefundInput): Promise<RefundOutcome>;
   getStatus(): Promise<DriverStatus>;
   dispose(): Promise<void>;
+  /**
+   * Opzionale: dato un txnRef, chiede al terminale lo stato della transazione.
+   * Usato dal jobHandler per recovery dopo crash dell'app prima dell'ack.
+   * - Ritorna ChargeOutcome se la transazione è approvata sul terminale.
+   * - Ritorna null se confermato "non trovata" (safe re-issue).
+   * - Throw se incerto: il jobHandler deve marcare failed e bloccare retry per evitare doppio addebito.
+   */
+  inquiry?(txnRef: string, hint: InquiryHint): Promise<ChargeOutcome | null>;
 }
 
 export interface PrinterDriver {
