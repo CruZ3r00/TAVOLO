@@ -23,6 +23,9 @@ const isLoading = ref(false);
 const errorMessage = ref('');
 
 const justRegistered = computed(() => route.query.registered === '1');
+const registrationNeedsVerification = computed(() => route.query.registered === 'verify');
+const emailConfirmed = computed(() => route.query.confirmed === '1');
+const passwordReset = computed(() => route.query.passwordReset === '1');
 
 const submit = async () => {
   isLoading.value = true;
@@ -78,6 +81,30 @@ const submit = async () => {
           <div>
             <strong>Registrazione completata</strong>
             <span>Accedi con le credenziali appena create.</span>
+          </div>
+        </div>
+
+        <div v-if="registrationNeedsVerification" class="au-trial">
+          <i class="bi bi-envelope-check-fill"></i>
+          <div>
+            <strong>Controlla la tua email</strong>
+            <span>Ti abbiamo inviato il link per confermare l'account prima dell'accesso.</span>
+          </div>
+        </div>
+
+        <div v-if="emailConfirmed" class="au-trial">
+          <i class="bi bi-check-circle-fill"></i>
+          <div>
+            <strong>Email confermata</strong>
+            <span>Ora puoi accedere al tuo account Tavolo.</span>
+          </div>
+        </div>
+
+        <div v-if="passwordReset" class="au-trial">
+          <i class="bi bi-check-circle-fill"></i>
+          <div>
+            <strong>Password aggiornata</strong>
+            <span>Accedi con la nuova password.</span>
           </div>
         </div>
 

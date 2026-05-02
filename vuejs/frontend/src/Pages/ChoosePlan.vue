@@ -96,6 +96,11 @@ const registerThenCheckout = async (planKey) => {
             return;
         }
         const data = await response.json();
+        if (data?.user && !data?.jwt) {
+            sessionStorage.removeItem('pending_registration');
+            router.push({ path: '/login', query: { registered: 'verify' } });
+            return;
+        }
         if (!data?.jwt || !data?.user) {
             errorMessage.value = 'Risposta di registrazione non valida.';
             return;

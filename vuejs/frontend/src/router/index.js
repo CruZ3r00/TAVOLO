@@ -76,6 +76,11 @@ const routes = [
         name: 'Recover password...',
         component: () => import('../Pages/Auth/ForgotPassword.vue'),
     },
+    { //non protetta
+        path: '/reset-password',
+        name: 'Reset password',
+        component: () => import('../Pages/Auth/ResetPassword.vue'),
+    },
     { //protetta
         path: '/menu-handler',
         name: 'Menu setter',

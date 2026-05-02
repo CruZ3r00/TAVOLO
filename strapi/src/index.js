@@ -244,6 +244,7 @@ module.exports = {
    */
   async bootstrap({ strapi }) {
     validateProductionConfig(strapi);
+    await configureUsersPermissionsEmail(strapi);
 
     // Seed data: crea utente demo e dati di test se non esistono
     if (process.env.SEED_DEMO_DATA === 'true') {
@@ -256,6 +257,84 @@ module.exports = {
     await grantPublicReservationPermission(strapi);
   },
 };
+
+async function configureUsersPermissionsEmail(strapi) {
+  try {
+    const pluginStore = strapi.store({ type: 'plugin', name: 'users-permissions' });
+    const frontendUrl = (process.env.FRONTEND_URL || process.env.SITE_BASE_URL || 'http://localhost:5174').replace(/\/+$/, '');
+    const apiUrl = (process.env.PUBLIC_URL || strapi.config.get('server.absoluteUrl') || 'http://localhost:1337').replace(/\/+$/, '');
+    const defaultFromRaw = process.env.SMTP_DEFAULT_FROM || 'Tavolo <no-reply@app.comfortables.eu>';
+    const replyTo = process.env.SMTP_DEFAULT_REPLY_TO || '';
+    const fromMatch = defaultFromRaw.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+    const from = fromMatch
+      ? { name: fromMatch[1] || 'Tavolo', email: fromMatch[2] }
+      : { name: 'Tavolo', email: defaultFromRaw };
+
+    const advanced = (await pluginStore.get({ key: 'advanced' })) || {};
+    await pluginStore.set({
+      key: 'advanced',
+      value: {
+        ...advanced,
+        unique_email: true,
+        allow_register: true,
+        email_confirmation: true,
+        email_reset_password: `${frontendUrl}/reset-password`,
+        email_confirmation_redirection: `${frontendUrl}/login?confirmed=1`,
+        default_role: advanced.default_role || 'authenticated',
+      },
+    });
+
+    const emails = (await pluginStore.get({ key: 'email' })) || {};
+    await pluginStore.set({
+      key: 'email',
+      value: {
+        ...emails,
+        reset_password: {
+          ...(emails.reset_password || {}),
+          display: 'Email.template.reset_password',
+          icon: 'sync',
+          options: {
+            ...(emails.reset_password && emails.reset_password.options ? emails.reset_password.options : {}),
+            from,
+            response_email: replyTo,
+            object: 'Reimposta la password Tavolo',
+            message: `<p>Ciao <%= USER.username %>,</p>
+
+<p>Abbiamo ricevuto una richiesta per reimpostare la password del tuo account Tavolo.</p>
+
+<p><a href="<%= URL %>?code=<%= TOKEN %>">Crea una nuova password</a></p>
+
+<p>Se non hai richiesto tu questa modifica, ignora questa email.</p>
+
+<p>A presto,<br>Team Tavolo</p>`,
+          },
+        },
+        email_confirmation: {
+          ...(emails.email_confirmation || {}),
+          display: 'Email.template.email_confirmation',
+          icon: 'check-square',
+          options: {
+            ...(emails.email_confirmation && emails.email_confirmation.options ? emails.email_confirmation.options : {}),
+            from,
+            response_email: replyTo,
+            object: 'Conferma il tuo account Tavolo',
+            message: `<p>Ciao <%= USER.username %>,</p>
+
+<p>Grazie per esserti registrato a Tavolo. Conferma la tua email per attivare l'account.</p>
+
+<p><a href="<%= URL %>?confirmation=<%= CODE %>">Conferma email</a></p>
+
+<p>A presto,<br>Team Tavolo</p>`,
+          },
+        },
+      },
+    });
+
+    strapi.log.info(`Users-permissions email configurate: reset=${frontendUrl}/reset-password, conferma=${apiUrl}/api/auth/email-confirmation`);
+  } catch (error) {
+    strapi.log.warn(`Configurazione email users-permissions non completata: ${error.message}`);
+  }
+}
 
 async function grantImportPermissions(strapi) {
   try {

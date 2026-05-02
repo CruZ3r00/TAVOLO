@@ -1,7 +1,7 @@
 <script setup>
     import { useHead } from '@vueuse/head';
-    import { reactive } from 'vue';
-    import { useRouter } from 'vue-router';
+    import { computed, reactive, ref } from 'vue';
+    import { useRoute, useRouter } from 'vue-router';
     import { defineRule, configure } from 'vee-validate';
     import AuthenticationCard from '@/components/AuthenticationCard.vue';
     import InputError from '@/components/InputError.vue';
@@ -32,14 +32,13 @@
         },
     });
 
-    const props = defineProps({
-        email: String,
-        token: String,
-    });
+    const route = useRoute();
+    const router = useRouter();
+    const isSubmitting = ref(false);
+    const successMessage = ref('');
+    const resetCode = computed(() => String(route.query.code || '').trim());
 
     const form = reactive({
-        token: props.token,
-        email: props.email,
         password: '',
         password_confirmation: '',
     });
@@ -48,32 +47,41 @@
         value: '',
     });
 
-    const router = useRouter();
-
     const submit = async () => {
+        if (!resetCode.value) {
+            errorMessage.value = 'Link di recupero non valido o incompleto.';
+            return;
+        }
+        if (form.password !== form.password_confirmation) {
+            errorMessage.value = 'Le password non coincidono.';
+            return;
+        }
+        isSubmitting.value = true;
+        errorMessage.value = '';
+        successMessage.value = '';
         try {
-            const response = fetch(`${API_BASE}/api/auth/reset-password`, {
+            const response = await fetch(`${API_BASE}/api/auth/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    code: form.code,
+                    code: resetCode.value,
                     password: form.password,
                     passwordConfirmation: form.password_confirmation,
                 }),
             });
 
-
             if (!response.ok) {
-            const data = await response.json();
-            errorMessage.value = data.message || 'Password reset failed';
+                const data = await response.json().catch(() => ({}));
+                errorMessage.value = data?.error?.message || data.message || 'Reset password non riuscito.';
             } else {
-            const data = await response.json();
-            localStorage.setItem('user', JSON.stringify(data));
-            router.push('/dashboard');
+                successMessage.value = 'Password aggiornata. Ora puoi accedere.';
+                setTimeout(() => router.push('/login?passwordReset=1'), 900);
             }
         } catch (error) {
             console.error('Error:', error);
-            errorMessage.value = 'An error occurred';
+            errorMessage.value = 'Errore di rete. Riprova.';
+        } finally {
+            isSubmitting.value = false;
         }
     };
 </script>
@@ -95,13 +103,14 @@
                 <span>{{ errorMessage.value }}</span>
             </div>
         </Transition>
+        <Transition name="fade">
+            <div v-if="successMessage" class="ds-alert ds-alert-success">
+                <i class="bi bi-check-circle"></i>
+                <span>{{ successMessage }}</span>
+            </div>
+        </Transition>
 
         <form @submit.prevent="submit" class="auth-form">
-            <div class="ds-field">
-                <InputLabel for="email" value="codice OTP" />
-                <TextInput id="email" v-model="form.code" type="email" required autofocus autocomplete="username" placeholder="La tua email" />
-            </div>
-
             <div class="ds-field">
                 <InputLabel for="password" value="Nuova password" />
                 <TextInput id="password" v-model="form.password" type="password" required autocomplete="new-password" placeholder="Nuova password" />
@@ -112,8 +121,9 @@
                 <TextInput id="password_confirmation" v-model="form.password_confirmation" type="password" required autocomplete="new-password" placeholder="Conferma password" />
             </div>
 
-            <button type="submit" class="ds-btn ds-btn-primary ds-btn-lg auth-submit">
-                Reimposta password
+            <button type="submit" class="ds-btn ds-btn-primary ds-btn-lg auth-submit" :disabled="isSubmitting || !resetCode">
+                <span v-if="isSubmitting" class="ds-spinner"></span>
+                <span v-else>Reimposta password</span>
             </button>
         </form>
     </AuthenticationCard>
@@ -153,6 +163,10 @@
 .auth-form { display: flex; flex-direction: column; gap: var(--s-4); }
 .auth-submit {
   width: 100%; height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-family: var(--f-sans, 'Geist', sans-serif);
   font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
   color: var(--bg); background: var(--ink);
@@ -164,6 +178,16 @@
   background: color-mix(in oklab, var(--ink) 90%, var(--ac));
   transform: translateY(-1px);
 }
+.auth-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+.auth-submit .ds-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in oklab, var(--bg) 30%, transparent);
+  border-top-color: var(--bg);
+  border-radius: 50%;
+  animation: fpspin 650ms linear infinite;
+}
+@keyframes fpspin { to { transform: rotate(360deg); } }
 .fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>

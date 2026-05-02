@@ -34,7 +34,6 @@ configure({
 });
 
 const schema = yup.object({
-  username: yup.string().required('Username is required'),
   email: yup.string().required('The email is mandatory.').email('Please enter a valid email address.'),
 });
 
@@ -54,17 +53,16 @@ const submit = handleSubmit(async () => {
 
 
     if (!response.ok) {
-      const data = await response.json();
-      errorMessage.value = data.message || 'Error during verification.';
+      const data = await response.json().catch(() => ({}));
+      errorMessage.value = data?.error?.message || data.message || 'Errore durante la richiesta.';
     } else {
-      successMessage.value = 'Identity confirmed. Proceed to reset password.';
+      successMessage.value = 'Se esiste un account con questa email, riceverai il link per reimpostare la password.';
     }
   } catch (error) {
     console.error('Errore:', error);
     errorMessage.value = 'An unexpected error occurred';
   }
 
-  values.username = '';
   values.email = '';
 });
 </script>
@@ -78,7 +76,7 @@ const submit = handleSubmit(async () => {
 
     <p class="auth-overline">Recupero</p>
     <h1 class="auth-title">Password dimenticata</h1>
-    <p class="auth-subtitle">Inserisci username ed email per recuperare l'accesso.</p>
+    <p class="auth-subtitle">Inserisci la tua email e ti invieremo il link di recupero.</p>
 
     <Transition name="fade">
       <div v-if="successMessage" class="ds-alert ds-alert-success">
@@ -103,7 +101,7 @@ const submit = handleSubmit(async () => {
 
       <button type="submit" class="ds-btn ds-btn-primary ds-btn-lg auth-submit" :disabled="isSubmitting">
         <span v-if="isSubmitting" class="ds-spinner"></span>
-        <span v-else>Conferma identita'</span>
+        <span v-else>Invia link di recupero</span>
       </button>
 
       <p class="auth-footer-text">
