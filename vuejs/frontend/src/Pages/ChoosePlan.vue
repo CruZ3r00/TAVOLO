@@ -98,7 +98,8 @@ const registerThenCheckout = async (planKey) => {
         const data = await response.json();
         if (data?.user && !data?.jwt) {
             sessionStorage.removeItem('pending_registration');
-            router.push({ path: '/login', query: { registered: 'verify' } });
+            sessionStorage.setItem('pending_plan_after_verification', planKey);
+            router.push({ path: '/login', query: { registered: 'verify', plan: planKey } });
             return;
         }
         if (!data?.jwt || !data?.user) {
@@ -155,7 +156,7 @@ const goBack = () => {
                 <p class="text-overline">Ultimo passaggio</p>
                 <h1 class="cp-title">Scegli il piano per <span v-if="pending">{{ pending.username }}</span></h1>
                 <p class="cp-subtitle">
-                    L'account verrà creato solo dopo aver scelto il piano e completato il pagamento.
+                    Dopo la scelta creeremo l'account. Conferma l'email, accedi e completa il pagamento.
                 </p>
             </header>
 

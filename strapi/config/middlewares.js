@@ -1,4 +1,4 @@
-const DEFAULT_CORS_ORIGINS = [
+const DEV_CORS_ORIGINS = [
   'http://localhost',
   'https://localhost',
   'capacitor://localhost',
@@ -18,7 +18,8 @@ const DEFAULT_CORS_ORIGINS = [
 const parseCorsOrigins = () => {
   const raw = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS;
   const configuredOrigins = raw && raw.trim() ? raw.split(',') : [];
-  const origins = [...DEFAULT_CORS_ORIGINS, ...configuredOrigins]
+  const defaults = process.env.NODE_ENV === 'production' ? [] : DEV_CORS_ORIGINS;
+  const origins = [...defaults, ...configuredOrigins]
     .map((origin) => origin.trim())
     .filter(Boolean);
 
@@ -26,6 +27,7 @@ const parseCorsOrigins = () => {
 };
 
 const frontendOrigins = parseCorsOrigins();
+const poweredByMiddleware = process.env.NODE_ENV === 'production' ? null : 'strapi::poweredBy';
 
 const parseFrameAncestors = () => {
   const raw = process.env.FRAME_ANCESTORS;
@@ -64,7 +66,7 @@ module.exports = [
       headers: '*',
     },
   },
-  'strapi::poweredBy',
+  poweredByMiddleware,
   'strapi::query',
   {
     name: 'strapi::body',
@@ -87,4 +89,4 @@ module.exports = [
      name: 'global::restaurant-sites',
      config: {},
    },
-];
+].filter(Boolean);

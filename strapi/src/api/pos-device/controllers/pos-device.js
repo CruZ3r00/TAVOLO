@@ -11,6 +11,8 @@
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { ulid } = require('ulid');
 const orderFinalizer = require('../../../services/order-close-finalizer');
 const { computeTotal } = require('../../../utils/order-total');
@@ -18,6 +20,7 @@ const { computeTotal } = require('../../../utils/order-total');
 const API = 'api::pos-device.pos-device';
 const JOB_API = 'api::pos-job.pos-job';
 const ORDER_API = 'api::order.order';
+const DEFAULT_ANDROID_APK_FILENAME = 'pos-rt-mobile-latest.apk';
 
 /**
  * Finalizza la chiusura di un ordine basandosi sull'ack ricevuto dal device.
@@ -135,6 +138,20 @@ function deriveWsUrl(req) {
 
 function publicHttpUrl(req) {
   return (process.env.PUBLIC_URL || `http://${req.host || 'localhost:1337'}`).replace(/\/+$/, '');
+}
+
+function apkDownloadPath() {
+  return process.env.POS_ANDROID_APK_PATH
+    || path.join(strapi.dirs.static.public, 'downloads', DEFAULT_ANDROID_APK_FILENAME);
+}
+
+function hasLocalApk() {
+  try {
+    const stat = fs.statSync(apkDownloadPath());
+    return stat.isFile();
+  } catch (_err) {
+    return false;
+  }
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -685,26 +702,66 @@ module.exports = {
    */
   async installers(ctx) {
     const base = (process.env.PUBLIC_URL || `http://${ctx.host || 'localhost:1337'}`).replace(/\/+$/, '');
-    function urlOrNull(envName, defaultLocal) {
+    function urlOrNull(envName) {
       const v = process.env[envName];
       if (v) return v;
-      // Default locale: Strapi serve /static/downloads/... Esempio:
-      //   POS_INSTALLER_WINDOWS_MSI=https://cdn.example.com/pos-rt-service-1.0.0.msi
-      // Se non settata, controlla se esiste localmente; se no, null.
-      return defaultLocal ? `${base}${defaultLocal}` : null;
+      return null;
     }
     ctx.body = {
       data: {
         current_version: process.env.POS_RT_SERVICE_VERSION || '1.0.0',
-        windows_msi_url: urlOrNull('POS_INSTALLER_WINDOWS_MSI', '/static/downloads/pos-rt-service-latest.msi'),
-        linux_appimage_url: urlOrNull('POS_INSTALLER_LINUX_APPIMAGE', null),
-        macos_dmg_url: urlOrNull('POS_INSTALLER_MACOS_DMG', null),
+        windows_msi_url: urlOrNull('POS_INSTALLER_WINDOWS_MSI'),
+        linux_appimage_url: urlOrNull('POS_INSTALLER_LINUX_APPIMAGE'),
+        macos_dmg_url: urlOrNull('POS_INSTALLER_MACOS_DMG'),
         android_play_url: process.env.POS_ANDROID_PLAY_URL || null,
-        android_apk_url: urlOrNull('POS_ANDROID_APK', '/static/downloads/pos-rt-mobile-latest.apk'),
+        android_apk_url: process.env.POS_ANDROID_APK
+          || (hasLocalApk() ? `${base}/api/pos-devices/downloads/android-apk` : null),
         ios_appstore_url: process.env.POS_IOS_APPSTORE_URL || null,
         docs_url: process.env.POS_DOCS_URL || null,
       },
     };
+  },
+
+  /**
+   * GET /api/pos-devices/downloads/android-apk
+   * Pubblico. Serve l'APK locale se presente.
+   */
+  async downloadAndroidApk(ctx) {
+    if (process.env.POS_ANDROID_APK) {
+      ctx.redirect(process.env.POS_ANDROID_APK);
+      return;
+    }
+
+    const filePath = apkDownloadPath();
+    let stat;
+    try {
+      stat = fs.statSync(filePath);
+    } catch (_err) {
+      ctx.status = 404;
+      ctx.body = {
+        error: {
+          code: 'APK_NOT_FOUND',
+          message: `APK non trovato. Caricalo in public/downloads/${DEFAULT_ANDROID_APK_FILENAME} oppure imposta POS_ANDROID_APK_PATH.`,
+        },
+      };
+      return;
+    }
+
+    if (!stat.isFile()) {
+      ctx.status = 404;
+      ctx.body = {
+        error: {
+          code: 'APK_NOT_FOUND',
+          message: 'Il percorso APK configurato non e un file.',
+        },
+      };
+      return;
+    }
+
+    ctx.set('Content-Type', 'application/vnd.android.package-archive');
+    ctx.set('Content-Length', String(stat.size));
+    ctx.set('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
+    ctx.body = fs.createReadStream(filePath);
   },
 };
 

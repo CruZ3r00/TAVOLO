@@ -50,6 +50,12 @@ const submit = async () => {
       store.dispatch('login', { user, token: data.jwt });
       localStorage.setItem('user', JSON.stringify(user));
       localStorage.setItem('token', data.jwt);
+      const pendingPlan = route.query.plan || sessionStorage.getItem('pending_plan_after_verification');
+      if (['starter', 'pro'].includes(pendingPlan)) {
+        sessionStorage.removeItem('pending_plan_after_verification');
+        router.push({ path: '/renew-sub', query: { checkout: 'retry', plan: pendingPlan } });
+        return;
+      }
       router.push(defaultRouteForUser(user));
     } else {
       errorMessage.value = 'Credenziali non valide. Riprova.';

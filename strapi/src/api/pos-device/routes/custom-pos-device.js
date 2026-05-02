@@ -47,6 +47,12 @@ module.exports = {
       handler: 'pos-device.installers',
       config: { auth: false, policies: [], middlewares: [] },
     },
+    {
+      method: 'GET',
+      path: '/pos-devices/downloads/android-apk',
+      handler: 'pos-device.downloadAndroidApk',
+      config: { auth: false, policies: [], middlewares: [] },
+    },
 
     // Runtime (auth X-Device-Token)
     {
