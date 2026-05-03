@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { devicePersistence } from './core/persistence';
 
 const route = useRoute();
 const isPaired = ref(false);
 
-onMounted(async () => {
+async function refreshPairingState(): Promise<void> {
   isPaired.value = await devicePersistence.isPaired();
-});
+}
+
+watch(() => route.fullPath, refreshPairingState, { immediate: true });
 
 const showNav = computed(() => isPaired.value && route.path !== '/pair');
 </script>

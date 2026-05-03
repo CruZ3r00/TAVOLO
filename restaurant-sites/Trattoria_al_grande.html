@@ -1103,7 +1103,7 @@ resForm.addEventListener('submit', async e => {
   const payload = {
     customer_name:    fd.get('name').trim(),
     phone:            fd.get('phone').trim(),
-    date:             fd.get('date'),
+    date:             BASEfd.get('date'),
     time:             timeFormatted,
     number_of_people: numPeople,
     notes:            notesVal || null
