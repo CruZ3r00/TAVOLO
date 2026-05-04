@@ -149,6 +149,21 @@
     },
     "unavailable_ingredients": {
       "type": "json"
+    },
+    "address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "cap": {
+      "type": "string"
+    },
+    "province": {
+      "type": "string"
+    },
+    "vat": {
+      "type": "string"
     }
   }
 }

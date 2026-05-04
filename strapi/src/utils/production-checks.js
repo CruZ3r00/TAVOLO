@@ -71,7 +71,17 @@ function validateProductionConfig(strapi) {
     if (!cors || cors === '*') {
         errors.push("Environment variable 'CORS_ORIGIN' or 'CORS_ORIGINS' is not set or allows all origins ('*').");   
     }
+    const allowedAppOrigins = new Set([
+        'capacitor://localhost',
+        'ionic://localhost',
+        'http://localhost',
+        'https://localhost',
+    ]);
+
     for (const origin of parseCsv(cors)) {
+        if (allowedAppOrigins.has(origin)) {
+            continue;
+        }
         if (!isHttpsUrl(origin)) {
             errors.push(`CORS origin '${origin}' must be https in production.`);
         }

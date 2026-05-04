@@ -277,7 +277,7 @@ async function configureUsersPermissionsEmail(strapi) {
         ...advanced,
         unique_email: true,
         allow_register: true,
-        email_confirmation: true,
+        email_confirmation: false,
         email_reset_password: `${frontendUrl}/reset-password`,
         email_confirmation_redirection: `${frontendUrl}/login?confirmed=1`,
         default_role: advanced.default_role || 'authenticated',

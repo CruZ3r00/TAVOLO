@@ -1,4 +1,11 @@
 const path = require('path');
+const fs = require('fs');
+
+const readOptionalFile = (filePath) => {
+  if (!filePath) return undefined;
+  return fs.readFileSync(filePath, 'utf8');
+};
+
 
 module.exports = ({ env }) => {
   const client = env('DATABASE_CLIENT', 'mysql'); // Cambiato da 'sqlite' a 'mysql'
@@ -14,7 +21,7 @@ module.exports = ({ env }) => {
         ssl: env.bool('DATABASE_SSL', false) ? {
           key: env('DATABASE_SSL_KEY', undefined),
           cert: env('DATABASE_SSL_CERT', undefined),
-          ca: env('DATABASE_SSL_CA', undefined),
+          ca: readOptionalFile(env('DATABASE_SSL_CA', undefined)),
           capath: env('DATABASE_SSL_CAPATH', undefined),
           cipher: env('DATABASE_SSL_CIPHER', undefined),
           rejectUnauthorized: env.bool('DATABASE_SSL_REJECT_UNAUTHORIZED', true),
@@ -33,7 +40,7 @@ module.exports = ({ env }) => {
         ssl: env.bool('DATABASE_SSL', false) ? {
           key: env('DATABASE_SSL_KEY', undefined),
           cert: env('DATABASE_SSL_CERT', undefined),
-          ca: env('DATABASE_SSL_CA', undefined),
+          ca: readOptionalFile(env('DATABASE_SSL_CA', undefined)),
           capath: env('DATABASE_SSL_CAPATH', undefined),
           cipher: env('DATABASE_SSL_CIPHER', undefined),
           rejectUnauthorized: env.bool('DATABASE_SSL_REJECT_UNAUTHORIZED', true),
