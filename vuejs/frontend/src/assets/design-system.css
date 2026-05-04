@@ -209,6 +209,135 @@
   --ac-contrast: oklch(0.15 0.005 265);
 }
 
+/* Legacy color fallback for engines without OKLCH/color-mix support
+   (for example SeaMonkey 2.53 / Gecko 60). Custom properties keep
+   unsupported color tokens verbatim, so redefine the palette with
+   plain sRGB values when OKLCH is unavailable. */
+@supports not (color: oklch(0.5 0 0)) {
+  :root,
+  [data-theme="light"] {
+    --bg: #fbfaf8;
+    --bg-elev: #ffffff;
+    --paper: #ffffff;
+    --bg-sunk: #f4f2ee;
+    --bg-hover: #ece9e3;
+    --bg-active: #e1ddd6;
+    --bg-dark: #242321;
+
+    --line: #e4dfd7;
+    --line-strong: #d0c8bd;
+
+    --ink: #2d2b28;
+    --ink-2: #5b5650;
+    --ink-3: #827b72;
+    --ink-4: #a49c91;
+
+    --glass: rgba(255, 255, 255, 0.78);
+
+    --warn: #b7791f;
+    --warn-bg: #fff3d6;
+    --warn-ink: #7c4a03;
+
+    --info: #2563eb;
+    --info-bg: #eaf1ff;
+    --info-ink: #1e40af;
+
+    --ok: #16875a;
+    --ok-bg: #e8f7ef;
+    --ok-ink: #116044;
+
+    --danger: #c24132;
+    --danger-bg: #fdeceb;
+    --danger-ink: #8f2c22;
+  }
+
+  [data-theme="dark"] {
+    --bg: #171a20;
+    --bg-elev: #20242c;
+    --paper: #20242c;
+    --bg-sunk: #12151a;
+    --bg-hover: #2a303a;
+    --bg-active: #343b47;
+    --bg-dark: #0f1115;
+
+    --line: #3a414d;
+    --line-strong: #525b69;
+
+    --ink: #f7f7f8;
+    --ink-2: #d4d8df;
+    --ink-3: #a6adb8;
+    --ink-4: #7b8491;
+
+    --glass: rgba(32, 36, 44, 0.78);
+  }
+
+  :root,
+  [data-accent="red"] {
+    --ac: #c84f4b;
+    --ac-2: #a93c38;
+    --ac-soft: #fdecea;
+    --ac-ink: #8f2f2a;
+    --ac-contrast: #ffffff;
+  }
+
+  [data-accent="green"] {
+    --ac: #16875a;
+    --ac-2: #116c49;
+    --ac-soft: #e8f7ef;
+    --ac-ink: #115a3d;
+    --ac-contrast: #ffffff;
+  }
+
+  [data-accent="blue"] {
+    --ac: #2563eb;
+    --ac-2: #1d4ed8;
+    --ac-soft: #eaf1ff;
+    --ac-ink: #1e40af;
+    --ac-contrast: #ffffff;
+  }
+
+  [data-accent="amber"] {
+    --ac: #d79523;
+    --ac-2: #b7791f;
+    --ac-soft: #fff3d6;
+    --ac-ink: #7c4a03;
+    --ac-contrast: #242321;
+  }
+
+  [data-theme="dark"][data-accent="red"],
+  [data-theme="dark"]:not([data-accent]) {
+    --ac: #df827e;
+    --ac-2: #f0a3a0;
+    --ac-soft: #55302f;
+    --ac-ink: #ffe2df;
+    --ac-contrast: #171a20;
+  }
+
+  [data-theme="dark"][data-accent="green"] {
+    --ac: #6ed3a0;
+    --ac-2: #98e3bd;
+    --ac-soft: #244a39;
+    --ac-ink: #e5fff0;
+    --ac-contrast: #171a20;
+  }
+
+  [data-theme="dark"][data-accent="blue"] {
+    --ac: #8ab4ff;
+    --ac-2: #b3ceff;
+    --ac-soft: #263d68;
+    --ac-ink: #e7f0ff;
+    --ac-contrast: #171a20;
+  }
+
+  [data-theme="dark"][data-accent="amber"] {
+    --ac: #f0bd59;
+    --ac-2: #ffd98c;
+    --ac-soft: #58421e;
+    --ac-ink: #fff2cf;
+    --ac-contrast: #171a20;
+  }
+}
+
 /* ============================================================
    Backward-compat aliases (older pages use these names)
    Maps the prior Inter/blue tokens onto Tavolo tokens

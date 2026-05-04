@@ -1907,3 +1907,82 @@
 
   .tv-field-row { grid-template-columns: 1fr; }
 }
+
+/* SeaMonkey / old Gecko fallback: no flex gap, no color-mix.
+   Keep the auth pages readable and keep primary buttons visible. */
+@supports not (color: oklch(0.5 0 0)) {
+  .au-shell .btn-accent,
+  .au-shell .btn-primary,
+  .fm-overlay .btn-accent,
+  .fm-overlay .btn-primary,
+  .md-app .btn-accent,
+  .md-app .btn-primary {
+    background: var(--ac);
+    border-color: var(--ac);
+    color: var(--ac-contrast);
+  }
+
+  .chip { background: #f0ede8; }
+  .chip.ok { background: var(--ok-bg); color: var(--ok-ink); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn-ink); }
+  .chip.info { background: var(--info-bg); color: var(--info-ink); }
+  .chip.ac { background: var(--ac-soft); color: var(--ac-ink); }
+
+  .au-side {
+    background: var(--ink);
+  }
+  .au-side::before {
+    display: none;
+  }
+  .au-side-mock,
+  .au-side-mock-stat {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+  .au-side-mock-h,
+  .au-side-mock-foot {
+    color: rgba(255, 255, 255, 0.72);
+  }
+  .au-side-mock-bars > div {
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .au-brand > * + *,
+  .au-providers > * + *,
+  .au-actions-row > * + *,
+  .au-progress > * + *,
+  .fl-row > * + *,
+  .fl-label-row > * + *,
+  .fl-input > * + *,
+  .fl-check > * + *,
+  .fl-meter > * + *,
+  .au-trial > * + * {
+    margin-left: 10px;
+  }
+
+  .au-form-wrap > * + *,
+  .au-form > * + *,
+  .au-side-content > * + *,
+  .au-side-mock > * + *,
+  .au-steps > * + *,
+  .au-includes > * + *,
+  .au-plans > * + * {
+    margin-top: 14px;
+  }
+
+  .au-form .btn,
+  .au-form button[type="submit"] {
+    min-height: 52px;
+    display: inline-block;
+    text-align: center;
+  }
+
+  .fl-field > * + * {
+    margin-top: 6px;
+  }
+
+  .fl-input {
+    background: var(--paper);
+    border-color: var(--line);
+  }
+}
