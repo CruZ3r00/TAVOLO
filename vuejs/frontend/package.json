@@ -28,6 +28,7 @@
   },
   "browserslist": [
     "defaults",
+    "firefox >= 60",
     "not IE 11"
   ]
 }

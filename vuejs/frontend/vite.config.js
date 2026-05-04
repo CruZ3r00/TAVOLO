@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     vue(),
     legacy({
-      targets: ['defaults', 'not IE 11'],
+      targets: ['defaults', 'firefox >= 60', 'not IE 11'],
       polyfills: true,
       renderLegacyChunks: true,
     }),
