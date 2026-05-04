@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Al Grande — Osteria della Torriana | Ristorante Pizzeria Serravalle a Po</title>
+<meta name="description" content="Ristorante Al Grande - Osteria della Torriana: cucina tipica mantovana, 50+ pizze, menu di lavoro e ampio parcheggio gratuito a Serravalle a Po (MN).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<style>
+/* ============================================================
+   DESIGN TOKENS — Tema A: Osteria Calda (default)
+   ============================================================ */
+:root {
+  --bg:        #FAF5E9;
+  --bg-alt:    #F0E9D6;
+  --bg-dark:   #180A03;
+  --text:      #261204;
+  --text-s:    #7B6454;
+  --accent:    #A8341F;
+  --accent2:   #3C6A50;
+  --gold:      #C49430;
+  --surf:      #FFFFFF;
+  --bdr:       rgba(38,18,4,.09);
+  --bdr-inv:   rgba(255,255,255,.10);
+  --gold-rgb:  196,148,48;
+  --spring:    cubic-bezier(.32,.72,0,1);
+  --fd: 'Cormorant Garamond', Georgia, serif;
+  --fb: 'DM Sans', system-ui, sans-serif;
+}
+/* Tema B — Notte Mantovana */
+.notte {
+  --bg:      #0D0804;
+  --bg-alt:  #150C07;
+  --bg-dark: #060402;
+  --text:    #F0E8D5;
+  --text-s:  rgba(240,232,213,.45);
+  --accent:  #D4A84A;
+  --accent2: #7B5535;
+  --gold:    #D4A84A;
+  --surf:    rgba(255,255,255,.045);
+  --bdr:     rgba(255,255,255,.09);
+  --bdr-inv: rgba(255,255,255,.09);
+}
+
+/* ============================================================
+   RESET + BASE
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:var(--fb);background:var(--bg);color:var(--text);line-height:1.65;overflow-x:hidden;transition:background .5s,color .5s}
+img{max-width:100%;height:auto;display:block}
+a{color:inherit;text-decoration:none}
+ul{list-style:none}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+.wrap{width:100%;max-width:1200px;margin:0 auto;padding:0 clamp(1rem,4vw,2.5rem)}
+.sec{padding:clamp(4rem,8vw,7rem) 0}
+.sec--alt{background:var(--bg-alt)}
+.sec--dark{background:var(--bg-dark)}
+
+.eyebrow{display:inline-block;font:600 .6875rem/1 var(--fb);letter-spacing:.2em;text-transform:uppercase;color:var(--accent);margin-bottom:1rem}
+.sec--dark .eyebrow{color:var(--gold)}
+
+.h2{font:600 clamp(2.5rem,5vw,4.25rem)/1.06 var(--fd);letter-spacing:-.025em;color:var(--text)}
+.sec--dark .h2{color:var(--text)}
+
+.lead{font-size:1.0625rem;color:var(--text-s);line-height:1.8;max-width:50ch}
+
+.rule{width:44px;height:2px;background:var(--accent);border-radius:2px;margin:1.25rem 0}
+.rule--c{margin:1.25rem auto}
+.sec--dark .rule{background:var(--gold)}
+
+.center{text-align:center}
+.center .lead{margin:0 auto}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:.5rem;padding:.875rem 1.875rem;border-radius:9999px;font:600 .875rem/1 var(--fb);letter-spacing:.02em;cursor:pointer;border:none;transition:all .4s var(--spring);white-space:nowrap}
+.btn-p{background:var(--accent);color:#fff}
+.btn-p:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(0,0,0,.22);filter:brightness(1.08)}
+.btn-g{background:rgba(255,255,255,.08);color:#fff;border:1.5px solid rgba(255,255,255,.3)}
+.btn-g:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.6);transform:translateY(-2px)}
+.btn-o{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.btn-o:hover{background:var(--accent);color:#fff;transform:translateY(-2px)}
+
+/* ============================================================
+   MOBILE OVERLAY
+   ============================================================ */
+.mob-overlay{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.5rem;opacity:0;pointer-events:none;transition:opacity .35s}
+.mob-overlay.open{opacity:1;pointer-events:all}
+.mob-overlay a{font:600 2.75rem/1 var(--fd);color:var(--text);transition:color .2s}
+.mob-overlay a:hover{color:var(--accent)}
+
+/* ============================================================
+   NAVBAR
+   ============================================================ */
+.nav{position:fixed;top:1.25rem;left:0;right:0;z-index:1000;display:flex;justify-content:center;pointer-events:none}
+.nav__pill{pointer-events:all;display:flex;align-items:center;gap:2rem;padding:.625rem 1rem .625rem 1.5rem;border-radius:9999px;background:rgba(255,255,255,.08);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border:1px solid rgba(255,255,255,.15);box-shadow:0 4px 30px rgba(0,0,0,.14);transition:all .5s var(--spring)}
+.nav.scrolled .nav__pill{background:rgba(250,245,233,.96);border-color:var(--bdr);box-shadow:0 4px 40px rgba(0,0,0,.10)}
+.notte .nav.scrolled .nav__pill{background:rgba(13,8,4,.96)}
+
+.nav__brand{line-height:1}
+.nav__name{font:600 1.25rem/1 var(--fd);color:#fff;transition:color .4s}
+.nav__sub{font:500 .5625rem/1 var(--fb);letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.5);transition:color .4s;display:block;margin-top:2px}
+.nav.scrolled .nav__name{color:var(--text)}
+.nav.scrolled .nav__sub{color:var(--text-s)}
+
+.nav__links{display:flex;gap:1.5rem}
+.nav__lnk{font-size:.8125rem;font-weight:500;color:rgba(255,255,255,.72);transition:color .2s}
+.nav__lnk:hover{color:#fff}
+.nav.scrolled .nav__lnk{color:var(--text-s)}
+.nav.scrolled .nav__lnk:hover{color:var(--text)}
+
+.nav__cta{padding:.4375rem 1.125rem;border-radius:9999px;font-size:.8125rem;font-weight:600;background:rgba(255,255,255,.13);color:#fff;border:1px solid rgba(255,255,255,.2);cursor:pointer;transition:all .4s var(--spring)}
+.nav__cta:hover{background:rgba(255,255,255,.22)}
+.nav.scrolled .nav__cta{background:var(--accent);border-color:var(--accent);color:#fff}
+.nav__cta:hover{filter:brightness(1.08)}
+
+.nav__ham{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:.375rem}
+.nav__ham span{display:block;width:20px;height:1.5px;background:#fff;border-radius:2px;transition:all .35s var(--spring)}
+.nav.scrolled .nav__ham span{background:var(--text)}
+.nav__ham.open span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
+.nav__ham.open span:nth-child(2){opacity:0}
+.nav__ham.open span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero{position:relative;min-height:100dvh;display:flex;align-items:flex-end;overflow:hidden}
+.hero__bg{position:absolute;inset:-12% 0;background:url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1800&q=85') center/cover no-repeat}
+.hero__scrim{position:absolute;inset:0;background:linear-gradient(112deg,rgba(18,6,2,.93) 0%,rgba(18,6,2,.52) 52%,rgba(18,6,2,.10) 100%),linear-gradient(to top,rgba(18,6,2,.78) 0%,transparent 48%)}
+.hero__grain{position:fixed;inset:0;pointer-events:none;z-index:3;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.038'/%3E%3C/svg%3E")}
+.hero__content{position:relative;z-index:4;width:100%;max-width:1200px;margin:0 auto;padding:0 clamp(1rem,6vw,3.5rem) clamp(4rem,9vh,6rem)}
+.hero__tag{display:inline-flex;align-items:center;gap:.5rem;padding:.375rem 1rem;border-radius:9999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);backdrop-filter:blur(12px);font:.6875rem/1 var(--fb);font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.78);margin-bottom:1.75rem}
+.hero__tag-dot{width:5px;height:5px;border-radius:50%;background:var(--gold)}
+.hero__title{font:300 clamp(4.5rem,9.5vw,9rem)/0.93 var(--fd);color:#FDFAF4;letter-spacing:-.03em;margin-bottom:1.5rem}
+.hero__title em{font-style:italic;font-weight:700;color:var(--gold)}
+.hero__desc{font:300 clamp(1rem,1.5vw,1.175rem)/1.78 var(--fb);color:rgba(255,255,255,.60);max-width:44ch;margin-bottom:2.5rem}
+.hero__ctas{display:flex;gap:.875rem;flex-wrap:wrap}
+.hero__scroll{position:absolute;bottom:2.5rem;right:clamp(1rem,5vw,3.5rem);z-index:4;display:flex;flex-direction:column;align-items:center;gap:.5rem;color:rgba(255,255,255,.3);font:.5625rem/1 var(--fb);letter-spacing:.2em;text-transform:uppercase;writing-mode:vertical-rl}
+.hero__scroll-ln{width:1px;height:48px;background:linear-gradient(to top,rgba(255,255,255,.38),transparent);animation:lnBr 2.5s ease-in-out infinite}
+@keyframes lnBr{0%,100%{transform:scaleY(.5);opacity:.3}50%{transform:scaleY(1);opacity:1}}
+
+/* ============================================================
+   INFO BAR
+   ============================================================ */
+.infobar{background:var(--bg-alt);border-bottom:1px solid var(--bdr);padding:.875rem 0}
+.infobar__inner{display:flex;justify-content:center;align-items:center;gap:2rem;flex-wrap:wrap}
+.infobar__item{display:flex;align-items:center;gap:.5rem;font-size:.8125rem;color:var(--text-s)}
+.infobar__item a{color:var(--text);font-weight:600;transition:color .2s}
+.infobar__item a:hover{color:var(--accent)}
+.infobar__sep{width:1px;height:14px;background:var(--bdr)}
+.status{display:inline-flex;align-items:center;gap:.375rem;padding:.25rem .75rem;border-radius:9999px;font:.6875rem/1 var(--fb);font-weight:600;letter-spacing:.04em}
+.status.open{background:#E8F5E9;color:#2E7D32}
+.status.closed{background:#FFEBEE;color:#C62828}
+.status__dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.status.open .status__dot{animation:dp 2s ease-in-out infinite}
+@keyframes dp{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ============================================================
+   CHI SIAMO
+   ============================================================ */
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2rem,6vw,5rem);align-items:center}
+.about-img-wrap{position:relative}
+.about-img-frame{border-radius:24px;overflow:hidden;aspect-ratio:4/5}
+.about-img-frame img{width:100%;height:100%;object-fit:cover;transition:transform .8s var(--spring)}
+.about-img-wrap:hover img{transform:scale(1.04)}
+.about-stat{position:absolute;bottom:2rem;right:-1.5rem;background:var(--bg);border:1px solid var(--bdr);border-radius:16px;padding:1.25rem 1.5rem;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.10);min-width:108px}
+.about-stat__n{font:700 2.75rem/1 var(--fd);color:var(--accent);letter-spacing:-.03em}
+.about-stat__l{font:.625rem/1.4 var(--fb);text-transform:uppercase;letter-spacing:.12em;color:var(--text-s);margin-top:.375rem}
+.about-stars{display:flex;justify-content:center;gap:2px;margin-top:.5rem;color:var(--gold);font-size:.75rem}
+.about-text p{color:var(--text-s);line-height:1.85;margin-bottom:1.25rem}
+.about-pills{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.75rem}
+.about-pill{padding:.4375rem .875rem;border-radius:9999px;border:1px solid var(--bdr);font-size:.8125rem;font-weight:500;color:var(--text-s);background:var(--bg-alt)}
+
+/* ============================================================
+   MENU
+   ============================================================ */
+.menu-tabs{display:flex;gap:.375rem;flex-wrap:wrap;justify-content:center;margin-bottom:2.5rem}
+.tab{padding:.5rem 1.25rem;border-radius:9999px;border:1px solid var(--bdr);background:transparent;color:var(--text-s);font:.5rem/1 var(--fb);font-size:.8125rem;font-weight:500;cursor:pointer;transition:all .25s}
+.tab:hover{border-color:var(--accent);color:var(--accent)}
+.tab.active{background:var(--text);border-color:var(--text);color:var(--bg)}
+
+.mcat{display:none;animation:fuA .3s ease}
+.mcat.on{display:block}
+@keyframes fuA{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.mcat__ttl{font:600 1.5rem/1 var(--fd);color:var(--text);margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--bdr);letter-spacing:-.01em}
+/* ── Elegant menu list (antipasti/primi/secondi/dolci) ── */
+.mlist{display:flex;flex-direction:column;margin-bottom:2.5rem;border-top:1px solid var(--bdr)}
+.mitem{display:grid;grid-template-columns:2rem 1fr auto;align-items:start;gap:1rem;padding:1.375rem 0.75rem;border-bottom:1px solid var(--bdr);position:relative;cursor:default;transition:background .25s,padding .25s;border-radius:10px}
+.mitem:hover{background:rgba(168,52,31,.04);padding-left:1.25rem}
+.mitem__num{font:400 .75rem/1 var(--fd);color:var(--accent);opacity:.45;padding-top:.35rem;text-align:right}
+.mitem__body{}
+.mitem__name{font:600 1.3125rem/1.2 var(--fd);color:var(--text);margin-bottom:.4rem;letter-spacing:-.015em}
+.mitem__desc{font:300 .875rem/1.7 var(--fb);color:var(--text-s)}
+.ing-out{text-decoration:line-through;text-decoration-color:#c0392b;text-decoration-thickness:1.5px;color:#c0392b}
+.mitem__badge{align-self:start;margin-top:.2rem;padding:.275rem .75rem;border-radius:9999px;font:.6875rem/1 var(--fb);font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
+.badge--man{background:rgba(61,106,80,.10);color:var(--accent2)}
+.badge--spc{background:rgba(196,148,48,.12);color:#8B6000}
+.badge--veg{background:rgba(46,125,50,.10);color:#2E7D32}
+.badge--new{background:rgba(168,52,31,.10);color:var(--accent)}
+
+/* ── Pizza cards (grid) ── */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.75rem;margin-bottom:2.5rem}
+.mcard{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:1.25rem 1.375rem;transition:all .3s;position:relative;overflow:hidden}
+.mcard::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--gold));transform:scaleX(0);transform-origin:left;transition:transform .35s var(--spring)}
+.mcard:hover::after{transform:scaleX(1)}
+.mcard:hover{transform:translateY(-3px);box-shadow:0 10px 32px rgba(0,0,0,.09);border-color:rgba(168,52,31,.2)}
+.mcard__name{font:600 1.125rem/1.3 var(--fd);color:var(--text);margin-bottom:.4rem;letter-spacing:-.01em}
+.mcard__desc{font-size:.8125rem;color:var(--text-s);line-height:1.65}
+
+/* ============================================================
+   GALLERY
+   ============================================================ */
+.gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:280px 280px;gap:.75rem}
+.gitem{border-radius:18px;overflow:hidden;cursor:pointer;position:relative}
+.gitem::after{content:'';position:absolute;inset:0;background:rgba(18,6,2,0);transition:background .4s}
+.gitem:hover::after{background:rgba(18,6,2,.14)}
+.gitem img{width:100%;height:100%;object-fit:cover;transition:transform .7s var(--spring)}
+.gitem:hover img{transform:scale(1.06)}
+.gitem:nth-child(1){grid-row:span 2}
+.gitem:nth-child(5){grid-column:span 2}
+
+/* ============================================================
+   SERVIZI
+   ============================================================ */
+.srv-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.srv-card{border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:1.875rem;display:flex;flex-direction:column;gap:.875rem;background:rgba(255,255,255,.04);transition:all .4s var(--spring)}
+.srv-card:hover{background:rgba(255,255,255,.08);transform:translateY(-3px);box-shadow:0 16px 40px rgba(0,0,0,.32);border-color:rgba(255,255,255,.22)}
+.srv-card:first-child{grid-column:span 2;flex-direction:row;align-items:flex-start;gap:1.5rem}
+.srv-icon{width:48px;height:48px;border-radius:12px;background:rgba(var(--gold-rgb),.12);border:1px solid rgba(var(--gold-rgb),.25);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
+.srv-ttl{font:600 1.125rem/1.3 var(--fd);color:#F5EED8;margin-bottom:.5rem;letter-spacing:-.01em}
+.srv-desc{font-size:.9rem;color:rgba(245,238,216,.70);line-height:1.72}
+
+/* ============================================================
+   RECENSIONI — marquee infinito
+   ============================================================ */
+.rev-track-wrap{overflow:hidden;position:relative;margin:0 calc(-1*clamp(1rem,4vw,2.5rem))}
+.rev-track-wrap::before,.rev-track-wrap::after{content:'';position:absolute;top:0;bottom:0;width:120px;z-index:2;pointer-events:none}
+.rev-track-wrap::before{left:0;background:linear-gradient(to right,var(--bg-alt) 20%,transparent)}
+.rev-track-wrap::after{right:0;background:linear-gradient(to left,var(--bg-alt) 20%,transparent)}
+.rev-track{display:flex;gap:1.25rem;width:max-content;animation:marquee 52s linear infinite;padding:.5rem clamp(1rem,4vw,2.5rem) 1.5rem}
+.rev-track:hover{animation-play-state:paused}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.rev-card{background:var(--surf);border:1px solid var(--bdr);border-radius:22px;padding:1.875rem;display:flex;flex-direction:column;width:340px;flex-shrink:0;transition:all .4s var(--spring);cursor:default}
+.rev-card:hover{transform:translateY(-7px) scale(1.01);box-shadow:0 20px 48px rgba(0,0,0,.11);border-color:rgba(168,52,31,.25)}
+.rev-qm{font:normal 2.75rem/1 Georgia,serif;color:var(--accent);opacity:.14;margin-bottom:-.25rem}
+.rev-stars{display:flex;gap:2px;margin-bottom:.875rem;color:var(--gold);font-size:.9rem}
+.rev-text{font-size:.9375rem;color:var(--text);line-height:1.75;font-style:italic;flex:1;margin-bottom:1.25rem}
+.rev-author{font-size:.8125rem;font-weight:600;color:var(--text-s);padding-top:.875rem;border-top:1px solid var(--bdr)}
+.rev-stats{display:flex;margin-top:3rem;background:var(--surf);border:1px solid var(--bdr);border-radius:16px;overflow:hidden}
+.rev-stat{flex:1;display:flex;align-items:center;gap:1rem;padding:1.5rem 2rem;border-right:1px solid var(--bdr)}
+.rev-stat:last-child{border-right:none}
+.rev-stat__n{font:700 1.75rem/1 var(--fd);color:var(--text);letter-spacing:-.02em}
+.rev-stat__l{font-size:.75rem;color:var(--text-s);margin-top:3px}
+
+/* ============================================================
+   PRENOTAZIONE
+   ============================================================ */
+.res-wrap{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2rem,6vw,5rem);align-items:start}
+.res-phone{display:flex;align-items:center;gap:1rem;background:rgba(255,255,255,.05);border:1px solid var(--bdr-inv);border-radius:16px;padding:1.25rem 1.5rem;margin:1.5rem 0;transition:background .3s}
+.res-phone:hover{background:rgba(255,255,255,.09)}
+.res-ph-icon{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.07);border:1px solid var(--bdr-inv);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
+.res-ph-lbl{font:.625rem/1 var(--fb);font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:rgba(240,232,213,.4)}
+.res-ph-num{font:600 1.5rem/1 var(--fd);color:#F0E8D5;letter-spacing:-.02em}
+.hr-tbl{width:100%;border-collapse:collapse}
+.hr-tbl tr{border-bottom:1px solid var(--bdr-inv)}
+.hr-tbl tr.today{background:rgba(var(--gold-rgb),.10)}
+.hr-tbl td{padding:.625rem .75rem;font-size:.875rem;color:rgba(240,232,213,.55)}
+.hr-tbl td:first-child{font-weight:500;color:#F0E8D5}
+.hr-tbl td:last-child{text-align:right;color:var(--gold)}
+
+.res-form{background:var(--bg);border-radius:24px;padding:2.25rem;border:1px solid var(--bdr);box-shadow:0 20px 60px rgba(0,0,0,.18)}
+.res-form h3{font:600 1.875rem/1 var(--fd);color:var(--text);margin-bottom:1.5rem;letter-spacing:-.02em}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.fgrp{display:flex;flex-direction:column;gap:.375rem;margin-bottom:1rem}
+.fgrp label{font-size:.8125rem;font-weight:600;color:var(--text)}
+.fgrp input,.fgrp select,.fgrp textarea{padding:.75rem 1rem;border:1px solid var(--bdr);border-radius:10px;font:400 .9375rem/1.4 var(--fb);color:var(--text);background:var(--bg-alt);outline:none;transition:border-color .2s}
+.fgrp input:focus,.fgrp select:focus,.fgrp textarea:focus{border-color:var(--accent)}
+.fgrp textarea{resize:vertical;min-height:80px}
+.fgrp--full{grid-column:1/-1}
+.fsubmit{width:100%;justify-content:center;padding:1rem;font-size:.9375rem;border-radius:12px}
+.form-ok{display:none;text-align:center;padding:3rem 2rem}
+.form-ok__ic{display:flex;justify-content:center;margin-bottom:1rem}
+.form-ok h3{font:600 1.875rem/1 var(--fd);color:#2E7D32;margin-bottom:.75rem}
+.form-ok p{color:var(--text-s)}
+
+/* ============================================================
+   MAPPA
+   ============================================================ */
+.map-frame{border-radius:24px;overflow:hidden;aspect-ratio:16/6;box-shadow:0 8px 40px rgba(0,0,0,.12);margin-bottom:2.5rem}
+.map-frame iframe{width:100%;height:100%;border:0;display:block}
+.map-info{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1.5rem}
+.minfo-item{display:flex;gap:.875rem;align-items:flex-start}
+.minfo-icon{width:38px;height:38px;border-radius:10px;background:var(--bg-alt);border:1px solid var(--bdr);display:flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0}
+.minfo-lbl{font:.6875rem/1 var(--fb);text-transform:uppercase;letter-spacing:.1em;color:var(--text-s);margin-bottom:4px}
+.minfo-val{font-size:.9375rem;font-weight:500;color:var(--text)}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.footer{background:var(--bg-dark);padding:4rem 0 2rem;position:relative}
+.footer::before{content:'';display:block;height:3px;background:linear-gradient(90deg,var(--accent),var(--gold),var(--accent2))}
+.ft-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr;gap:2.5rem;padding-bottom:3rem;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:2rem}
+.ft-logo{font:600 2rem/1 var(--fd);color:#F0E8D5;margin-bottom:.75rem;letter-spacing:-.01em}
+.ft-tag{font-size:.875rem;color:rgba(240,232,213,.42);line-height:1.7;margin-bottom:1.5rem}
+.ft-social{display:flex;gap:.625rem}
+.soc-btn{width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center;transition:all .3s;color:rgba(240,232,213,.65)}
+.soc-btn:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+.ft-h{font:600 1.125rem/1 var(--fd);color:#F0E8D5;margin-bottom:1.25rem}
+.ft-links{display:flex;flex-direction:column;gap:.625rem}
+.ft-links a{font-size:.875rem;color:rgba(240,232,213,.42);transition:color .2s}
+.ft-links a:hover{color:var(--gold)}
+.ft-hrs{display:flex;flex-direction:column;gap:.5rem}
+.ft-hr{display:flex;justify-content:space-between;font-size:.875rem;color:rgba(240,232,213,.42);padding-bottom:.5rem;border-bottom:1px solid rgba(255,255,255,.05)}
+.ft-hr-t{color:var(--gold);font-weight:500}
+.ft-bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;font-size:.75rem;color:rgba(240,232,213,.28)}
+
+/* ============================================================
+   TWEAKS
+   ============================================================ */
+.tweaks{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9000;background:var(--bg);border:1px solid var(--bdr);border-radius:20px;padding:1.5rem;width:256px;box-shadow:0 16px 60px rgba(0,0,0,.18);display:none;font-family:var(--fb)}
+.tweaks.open{display:block}
+.tweaks h4{font:600 1.0625rem/1 var(--fd);color:var(--text);margin-bottom:1rem}
+.twk-lbl{font:.75rem/1 var(--fb);font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--text-s);margin-bottom:.5rem;display:block}
+.twk-opts{display:flex;flex-direction:column;gap:.375rem;margin-bottom:1.25rem}
+.twk-btn{display:flex;align-items:center;gap:.625rem;padding:.625rem .875rem;border-radius:10px;border:1px solid var(--bdr);cursor:pointer;font-size:.875rem;color:var(--text-s);background:transparent;font-family:var(--fb);text-align:left;width:100%;transition:all .2s}
+.twk-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.twk-btn:not(.on):hover{border-color:var(--accent);color:var(--accent)}
+.twk-sw{width:16px;height:16px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(0,0,0,.12)}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media(max-width:900px){
+  .nav__links,.nav__cta{display:none}
+  .nav__ham{display:flex}
+  .about-grid{grid-template-columns:1fr}
+  .about-img-frame{aspect-ratio:16/9}
+  .about-stat{right:0}
+  .srv-grid{grid-template-columns:1fr 1fr}
+  .srv-card:first-child{grid-column:span 2}
+  .rev-grid{grid-template-columns:1fr 1fr}
+  .rev-card:first-child{grid-row:auto}
+  .res-wrap{grid-template-columns:1fr}
+  .ft-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){
+  .gallery-grid{grid-template-columns:1fr 1fr;grid-template-rows:auto}
+  .gitem:nth-child(1),.gitem:nth-child(5){grid-row:auto;grid-column:auto}
+  .srv-grid{grid-template-columns:1fr}
+  .srv-card:first-child{grid-column:auto;flex-direction:column}
+  .rev-grid,.rev-stats,.ft-grid{grid-template-columns:1fr}
+  .rev-stats{flex-direction:column}
+  .rev-stat{border-right:none;border-bottom:1px solid var(--bdr)}
+  .frow{grid-template-columns:1fr}
+  .ft-bottom{flex-direction:column;text-align:center}
+  .infobar__inner{flex-direction:column;gap:.75rem}
+  .infobar__sep{display:none}
+  .hero__ctas{flex-direction:column;align-items:flex-start}
+  .tweaks{right:.75rem;left:.75rem;width:auto}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============================================================
+   ENHANCED — Bottoni CTA: shimmer, fill, arrow, magnetico
+   ============================================================ */
+.btn{position:relative;overflow:hidden}
+
+/* Shimmer sweep luminoso su btn-p e btn-g */
+.btn-p::before,.btn-g::before{
+  content:'';position:absolute;inset:0;
+  background:rgba(255,255,255,.17);
+  transform:translateX(-115%) skewX(-18deg);
+  transition:transform .58s var(--spring);
+  pointer-events:none;border-radius:inherit;
+}
+.btn-p:hover::before,.btn-g:hover::before{transform:translateX(115%) skewX(-18deg)}
+
+/* Fill da sinistra su btn-o: gradient scorrevole */
+.btn-o{
+  background:linear-gradient(to right,var(--accent) 50%,transparent 50%);
+  background-size:200% 100%;
+  background-position:100% 0;
+  transition:background-position .45s var(--spring),color .3s ease,transform .4s var(--spring),border-color .3s;
+}
+.btn-o:hover{background-position:0 0;color:#fff;transform:none}
+
+/* Override transform hover — gestito da GSAP magnetico */
+.btn-p:hover,.btn-g:hover{transform:none}
+
+/* Arrow span (iniettata via JS) — scivola da sinistra */
+.btn__arr{
+  display:inline-block;max-width:0;opacity:0;
+  transform:translateX(-10px);
+  transition:max-width .4s var(--spring),opacity .28s ease,transform .4s var(--spring);
+  overflow:hidden;white-space:nowrap;
+  font-size:.9em;line-height:1;
+}
+.btn:hover .btn__arr{max-width:1.5em;opacity:1;transform:translateX(0)}
+
+/* ============================================================
+   ENHANCED — Pizza cards: accent bar, numero bg, reveal ingredienti
+   ============================================================ */
+/* Accent bar verticale sinistra — scala verso l'alto al hover */
+.mcard::before{
+  content:'';position:absolute;
+  top:12px;left:0;bottom:12px;width:3px;
+  background:linear-gradient(180deg,var(--accent) 0%,var(--gold) 100%);
+  border-radius:0 3px 3px 0;
+  transform:scaleY(0);transform-origin:bottom center;
+  transition:transform .42s var(--spring);
+}
+.mcard:hover::before{transform:scaleY(1)}
+
+/* Numero grande decorativo in background */
+.mcard__num-bg{
+  position:absolute;bottom:-0.12em;right:0.1em;
+  font:900 5rem/1 var(--fd);
+  color:var(--accent);opacity:.04;
+  pointer-events:none;user-select:none;
+  letter-spacing:-.06em;
+  transition:opacity .42s ease,transform .42s var(--spring);
+  transform:translateY(4px) scale(1);
+}
+.mcard:hover .mcard__num-bg{opacity:.13;transform:translateY(-2px) scale(1.07)}
+
+/* Ingredienti: da semi-nascosti a completamente visibili al hover */
+.mcard__desc{
+  opacity:.38;transform:translateY(6px);
+  transition:opacity .35s ease,transform .38s var(--spring);
+}
+.mcard:hover .mcard__desc{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- Mobile overlay -->
+<div class="mob-overlay" id="mobMenu">
+  <a href="#chi-siamo" onclick="closeMob()">Chi Siamo</a>
+  <a href="#menu" onclick="closeMob()">Menu</a>
+  <a href="#servizi" onclick="closeMob()">Servizi</a>
+  <a href="#recensioni" onclick="closeMob()">Recensioni</a>
+  <a href="#prenota" onclick="closeMob()">Prenota</a>
+  <a href="#contatti" onclick="closeMob()">Contatti</a>
+</div>
+
+<!-- NAVBAR -->
+<header class="nav" id="nav">
+  <nav class="nav__pill">
+    <a href="#top" class="nav__brand">
+      <span class="nav__name">Al Grande</span>
+      <span class="nav__sub">Osteria della Torriana</span>
+    </a>
+    <ul class="nav__links">
+      <li><a href="#chi-siamo" class="nav__lnk">Chi Siamo</a></li>
+      <li><a href="#menu" class="nav__lnk">Menu</a></li>
+      <li><a href="#servizi" class="nav__lnk">Servizi</a></li>
+      <li><a href="#recensioni" class="nav__lnk">Recensioni</a></li>
+      <li><a href="#contatti" class="nav__lnk">Contatti</a></li>
+    </ul>
+    <a href="#prenota" class="nav__cta">Prenota</a>
+    <button class="nav__ham" id="ham" aria-label="Menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="hero__bg" id="heroBg"></div>
+  <div class="hero__scrim"></div>
+  <div class="hero__grain"></div>
+  <div class="hero__content">
+    <p class="hero__tag" id="hTag"><span class="hero__tag-dot"></span>Osteria della Torriana · Serravalle a Po (MN)</p>
+    <h1 class="hero__title" id="hTitle">Al <em>Grande</em></h1>
+    <p class="hero__desc" id="hDesc">Cucina tipica mantovana, menu di lavoro, oltre cinquanta pizze e ospitalità autentica nel cuore della Bassa.</p>
+    <div class="hero__ctas" id="hCtas">
+      <a href="#menu" class="btn btn-p">Scopri il Menu</a>
+      <a href="#prenota" class="btn btn-g">Prenota un Tavolo</a>
+    </div>
+  </div>
+  <div class="hero__scroll">Scorri<div class="hero__scroll-ln"></div></div>
+</section>
+
+<!-- INFO BAR -->
+<div class="infobar">
+  <div class="wrap">
+    <div class="infobar__inner">
+      <div class="infobar__item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Mar–Ven 06:00–23:30 &middot; Sab 07:00–23:30 &middot; Dom 08:00–23:30
+      </div>
+      <div class="infobar__sep"></div>
+      <div class="infobar__item">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 8.8 19.79 19.79 0 01.1 2.2 2 2 0 012.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.06 7.96A16 16 0 0016 17.94l1.32-1.32a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+        <a href="tel:+390386671141">0386&nbsp;671141</a>
+      </div>
+      <div class="infobar__sep"></div>
+      <div class="infobar__item">
+        <div class="status" id="statusBadge"><span class="status__dot"></span><span id="statusTxt">Verifica…</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHI SIAMO -->
+<section class="sec" id="chi-siamo">
+  <div class="wrap">
+    <div class="about-grid">
+      <div class="about-img-wrap ao">
+        <div class="about-img-frame">
+          <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80" alt="Interno ristorante Al Grande" loading="lazy">
+        </div>
+        <div class="about-stat">
+          <span class="about-stat__n">574</span>
+          <span class="about-stat__l">Recensioni<br>Google</span>
+          <div class="about-stars">★★★★☆</div>
+        </div>
+      </div>
+      <div class="about-text ao">
+        <span class="eyebrow">La nostra storia</span>
+        <h2 class="h2">Una trattoria<br><em style="font-style:italic">vera</em></h2>
+        <div class="rule"></div>
+        <p>L'Osteria della Torriana è un punto di riferimento per la cucina mantovana nella Bassa. Da anni accogliamo lavoratori, famiglie e viaggiatori con piatti della tradizione preparati con ingredienti locali e una carta delle pizze che supera le cinquanta varietà.</p>
+        <p>Il nostro menu di lavoro — disponibile dal martedì al venerdì — offre un'alternativa concreta e saporita al pranzo veloce: primo, secondo, contorno, pane e acqua a partire da 12 euro.</p>
+        <div class="about-pills">
+          <span class="about-pill">Cucina mantovana</span>
+          <span class="about-pill">50+ pizze</span>
+          <span class="about-pill">Menu di lavoro</span>
+          <span class="about-pill">Parcheggio gratuito</span>
+          <span class="about-pill">Cani ammessi</span>
+          <span class="about-pill">Wi-Fi gratuito</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MENU (dinamico — caricato dall'API ad ogni apertura del sito) -->
+<section class="sec sec--alt" id="menu">
+  <div class="wrap">
+    <div class="center ao" style="margin-bottom:2.5rem">
+      <span class="eyebrow">Da mangiare</span>
+      <h2 class="h2">Il nostro Menu</h2>
+      <div class="rule rule--c"></div>
+      <p class="lead">Cucina mantovana, pizze la sera e menu del giorno a pranzo. Prodotti locali, porzioni abbondanti.</p>
+    </div>
+
+    <div class="menu-tabs ao" id="menuTabs"></div>
+    <div id="menuDynamic">
+      <div id="menuLoading" style="text-align:center;padding:3rem 0;color:var(--text-s)">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="animation:spin 1s linear infinite;display:inline-block"><path d="M21 12a9 9 0 11-6.22-8.56"/></svg>
+        <p style="margin-top:.75rem;font-size:.9rem">Caricamento menu in corso…</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GALLERY -->
+<section class="sec" id="galleria">
+  <div class="wrap">
+    <div class="center ao" style="margin-bottom:2.5rem">
+      <span class="eyebrow">Galleria</span>
+      <h2 class="h2">Dal nostro locale</h2>
+      <div class="rule rule--c"></div>
+    </div>
+    <div class="gallery-grid ao">
+      <div class="gitem"><img src="https://images.unsplash.com/photo-1498579150354-977475b7ea0b?w=700&q=80" alt="Pizza" loading="lazy"></div>
+      <div class="gitem"><img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80" alt="Piatto mantovano" loading="lazy"></div>
+      <div class="gitem"><img src="https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=500&q=80" alt="Dolce della casa" loading="lazy"></div>
+      <div class="gitem"><img src="https://images.unsplash.com/photo-1544025162-d76694265947?w=500&q=80" alt="Grigliata mista" loading="lazy"></div>
+      <div class="gitem"><img src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900&q=80" alt="Sala ristorante" loading="lazy"></div>
+    </div>
+  </div>
+</section>
+
+<!-- SERVIZI -->
+<section class="sec sec--dark" id="servizi">
+  <div class="wrap">
+    <div class="center ao" style="margin-bottom:3rem">
+      <span class="eyebrow">Perché sceglierci</span>
+      <h2 class="h2">I Nostri Servizi</h2>
+      <div class="rule rule--c"></div>
+      <p class="lead" style="margin:0 auto">Struttura comoda, servizi concreti e un'atmosfera dove ci si sente subito a casa.</p>
+    </div>
+    <div class="srv-grid">
+      <div class="srv-card ao">
+        <div class="srv-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+        <div>
+          <div class="srv-ttl">Ampio Parcheggio Gratuito</div>
+          <p class="srv-desc">Decine di posti auto gratuiti, con spazi dedicati anche per camion, furgoni e mezzi pesanti. Sosta comoda su Via Mantovana, senza stress da parcheggio. Ideale per chi arriva da fuori comune o è di passaggio.</p>
+        </div>
+      </div>
+      <div class="srv-card ao">
+        <div class="srv-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg></div>
+        <div>
+          <div class="srv-ttl">Menu di Lavoro dal Lunedì</div>
+          <p class="srv-desc">Dal martedì al venerdì, a pranzo e a cena: primo, secondo, contorno, pane e acqua a partire da 12 euro. Almeno 6 proposte di primo e altrettante di secondo ogni giorno, cambiate settimanalmente.</p>
+        </div>
+      </div>
+      <div class="srv-card ao">
+        <div class="srv-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+        <div>
+          <div class="srv-ttl">Sala per Gruppi e Cerimonie</div>
+          <p class="srv-desc">Sala riservata per feste private, compleanni, pranzi aziendali e cerimonie fino a 80 persone. Menu concordato in anticipo su misura del gruppo. Contattateci per preventivi senza impegno.</p>
+        </div>
+      </div>
+      <div class="srv-card ao">
+        <div class="srv-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+        <div>
+          <div class="srv-ttl">Doccia per Camionisti</div>
+          <p class="srv-desc">Un servizio raro e molto apprezzato dai professionisti della strada. Doccia riservata, pulita e disponibile durante gli orari di apertura. Una sosta completa: mangi bene, ti riposi, riparti in forma.</p>
+        </div>
+      </div>
+      <div class="srv-card ao">
+        <div class="srv-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 115 19"/><path d="M19.07 4.93l-2.83 2.83"/></svg></div>
+        <div>
+          <div class="srv-ttl">Pizza Tutte le Sere + Asporto</div>
+          <p class="srv-desc">Pizzeria attiva tutte le sere con oltre 50 gusti: classiche, bianche, speciali e stagionali. Possibilità di asporto per portare la pizza a casa. Consigliato prenotare la sera per evitare attese.</p>
+        </div>
+      </div>
+      <div class="srv-card ao">
+        <div class="srv-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+        <div>
+          <div class="srv-ttl">Ambiente Accessibile e Familiare</div>
+          <p class="srv-desc">Ingresso, sala e bagno completamente accessibili in sedia a rotelle. Cani ammessi in sala e in spazio esterno. Wi-Fi gratuito per i clienti. Seggioloni disponibili per i più piccoli.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RECENSIONI -->
+<section class="sec sec--alt" id="recensioni">
+  <div class="wrap">
+    <div class="center ao" style="margin-bottom:2.5rem">
+      <span class="eyebrow">Cosa dicono di noi</span>
+      <h2 class="h2">Le Recensioni</h2>
+      <div class="rule rule--c"></div>
+      <p class="lead">574 recensioni su Google parlano di pizza generosa, piatti abbondanti e personale cordiale.</p>
+    </div>
+    <div class="rev-track-wrap">
+      <div class="rev-track">
+        <!-- Set originale -->
+        <article class="rev-card"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Pizza ben cotta e farcita, non troppo sottile né troppo spessa. Anche i primi sono molto buoni — i tortelloni di zucca sono semplicemente perfetti, come li faceva la nonna. Ci torno sempre volentieri.</p><div class="rev-author">Elisabetta Mazzarotto — Google ✓</div></article>
+        <article class="rev-card"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Tortelloni di zucca buonissimi, stracotto d'asino con polenta ottimo. Porzioni molto abbondanti e personale gentile. I cani sono i benvenuti, cosa non scontata. Consigliato a tutti.</p><div class="rev-author">Vivana Trezzi — Google ✓</div></article>
+        <article class="rev-card"><div class="rev-qm">"</div><div class="rev-stars">★★★★☆</div><p class="rev-text">Trattoria accogliente e caratteristica. Menu del giorno ampio con almeno sei o sette proposte sia di primo che di secondo. Personale gentile e disponibile. Prezzi onestissimi per la qualità.</p><div class="rev-author">Pierpaolo Laera — Google ✓</div></article>
+        <article class="rev-card"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Vengo qui ogni settimana per il pranzo di lavoro. Cucina vera, porzioni abbondanti, niente fuffa. Il risotto alla pilota è il migliore che abbia mai mangiato fuori casa. Parcheggio comodissimo.</p><div class="rev-author">Marco Bertolini — Google ✓</div></article>
+        <article class="rev-card"><div class="rev-qm">"</div><div class="rev-stars">★★★★☆</div><p class="rev-text">Ristorante di famiglia, autentico. La pizza è ottima, impasto ben lievitato e condimenti freschi. Bello anche il bollito mantovano con la mostarda. Un posto raro dove si mangia davvero bene spendendo poco.</p><div class="rev-author">Francesca Giorgi — Google ✓</div></article>
+        <article class="rev-card"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Siamo venuti per una cena aziendale di 20 persone: tutto perfetto. Menu concordato in anticipo, servizio puntuale, cucina di qualità. La sbrisolona finale ha fatto il giro del tavolo due volte. Torneremo.</p><div class="rev-author">Giorgio Mancini — Google ✓</div></article>
+        <article class="rev-card"><div class="rev-qm">"</div><div class="rev-stars">★★★★☆</div><p class="rev-text">Sono un camionista e mi fermo qui ogni volta che passo sulla Mantovana. Cucina abbondante, prezzi giusti, parcheggio ampio per i mezzi pesanti e doccia disponibile. Una rarità assoluta su questa strada.</p><div class="rev-author">Roberto Fasani — Google ✓</div></article>
+        <article class="rev-card"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Il luccio in salsa alla mantovana ci ha sorpreso tantissimo — un piatto che si trova rarissimamente e qui è preparato con cura e rispetto della tradizione. Ambiente rustico e accogliente, personale sorridente.</p><div class="rev-author">Anna Ferrarini — Google ✓</div></article>
+        <article class="rev-card"><div class="rev-qm">"</div><div class="rev-stars">★★★★☆</div><p class="rev-text">Cucina mantovana autentica, ingredienti locali, atmosfera genuina. La grigliata mista è servita fumante e abbondante. Uno di quei posti dove non si fa bella figura ma si mangia benissimo. Perfetto.</p><div class="rev-author">Simone Andreoli — Google ✓</div></article>
+        <!-- Duplicati per loop infinito seamless (nascosti agli screen reader) -->
+        <article class="rev-card" aria-hidden="true"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Pizza ben cotta e farcita, non troppo sottile né troppo spessa. Anche i primi sono molto buoni — i tortelloni di zucca sono semplicemente perfetti, come li faceva la nonna. Ci torno sempre volentieri.</p><div class="rev-author">Elisabetta Mazzarotto — Google ✓</div></article>
+        <article class="rev-card" aria-hidden="true"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Tortelloni di zucca buonissimi, stracotto d'asino con polenta ottimo. Porzioni molto abbondanti e personale gentile. I cani sono i benvenuti, cosa non scontata. Consigliato a tutti.</p><div class="rev-author">Vivana Trezzi — Google ✓</div></article>
+        <article class="rev-card" aria-hidden="true"><div class="rev-qm">"</div><div class="rev-stars">★★★★☆</div><p class="rev-text">Trattoria accogliente e caratteristica. Menu del giorno ampio con almeno sei o sette proposte sia di primo che di secondo. Personale gentile e disponibile. Prezzi onestissimi per la qualità.</p><div class="rev-author">Pierpaolo Laera — Google ✓</div></article>
+        <article class="rev-card" aria-hidden="true"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Vengo qui ogni settimana per il pranzo di lavoro. Cucina vera, porzioni abbondanti, niente fuffa. Il risotto alla pilota è il migliore che abbia mai mangiato fuori casa. Parcheggio comodissimo.</p><div class="rev-author">Marco Bertolini — Google ✓</div></article>
+        <article class="rev-card" aria-hidden="true"><div class="rev-qm">"</div><div class="rev-stars">★★★★☆</div><p class="rev-text">Ristorante di famiglia, autentico. La pizza è ottima, impasto ben lievitato e condimenti freschi. Bello anche il bollito mantovano con la mostarda. Un posto raro dove si mangia davvero bene spendendo poco.</p><div class="rev-author">Francesca Giorgi — Google ✓</div></article>
+        <article class="rev-card" aria-hidden="true"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Siamo venuti per una cena aziendale di 20 persone: tutto perfetto. Menu concordato in anticipo, servizio puntuale, cucina di qualità. La sbrisolona finale ha fatto il giro del tavolo due volte. Torneremo.</p><div class="rev-author">Giorgio Mancini — Google ✓</div></article>
+        <article class="rev-card" aria-hidden="true"><div class="rev-qm">"</div><div class="rev-stars">★★★★☆</div><p class="rev-text">Sono un camionista e mi fermo qui ogni volta che passo sulla Mantovana. Cucina abbondante, prezzi giusti, parcheggio ampio per i mezzi pesanti e doccia disponibile. Una rarità assoluta su questa strada.</p><div class="rev-author">Roberto Fasani — Google ✓</div></article>
+        <article class="rev-card" aria-hidden="true"><div class="rev-qm">"</div><div class="rev-stars">★★★★★</div><p class="rev-text">Il luccio in salsa alla mantovana ci ha sorpreso tantissimo — un piatto che si trova rarissimamente e qui è preparato con cura e rispetto della tradizione. Ambiente rustico e accogliente, personale sorridente.</p><div class="rev-author">Anna Ferrarini — Google ✓</div></article>
+        <article class="rev-card" aria-hidden="true"><div class="rev-qm">"</div><div class="rev-stars">★★★★☆</div><p class="rev-text">Cucina mantovana autentica, ingredienti locali, atmosfera genuina. La grigliata mista è servita fumante e abbondante. Uno di quei posti dove non si fa bella figura ma si mangia benissimo. Perfetto.</p><div class="rev-author">Simone Andreoli — Google ✓</div></article>
+      </div>
+    </div>
+    <div class="rev-stats ao">
+      <div class="rev-stat"><div><div class="rev-stat__n">4.0/5</div><div class="rev-stat__l">Google Reviews</div></div></div>
+      <div class="rev-stat"><div><div class="rev-stat__n">574</div><div class="rev-stat__l">Recensioni totali</div></div></div>
+      <div class="rev-stat"><div><div class="rev-stat__n">€10–20</div><div class="rev-stat__l">Fascia di prezzo</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRENOTAZIONE -->
+<section class="sec sec--dark" id="prenota">
+  <div class="wrap">
+    <div class="res-wrap">
+      <div class="ao">
+        <span class="eyebrow">Vieni a trovarci</span>
+        <h2 class="h2">Prenota il<br>tuo tavolo</h2>
+        <div class="rule"></div>
+        <p class="lead">Compila il modulo o chiamaci direttamente per tavoli, gruppi, cerimonie e cene aziendali.</p>
+        <a href="tel:+390386671141" class="res-phone">
+          <div class="res-ph-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 8.8 19.79 19.79 0 01.1 2.2 2 2 0 012.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.06 7.96A16 16 0 0016 17.94l1.32-1.32a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></div>
+          <div><div class="res-ph-lbl">Chiamaci</div><div class="res-ph-num">0386 671141</div></div>
+        </a>
+        <table class="hr-tbl" id="hrTbl">
+          <tr><td>Lunedì</td><td>Chiuso</td></tr>
+          <tr><td>Martedì</td><td>06:00–23:30</td></tr>
+          <tr><td>Mercoledì</td><td>06:00–23:30</td></tr>
+          <tr><td>Giovedì</td><td>06:00–23:30</td></tr>
+          <tr><td>Venerdì</td><td>06:00–23:30</td></tr>
+          <tr><td>Sabato</td><td>07:00–23:30</td></tr>
+          <tr><td>Domenica</td><td>08:00–23:30</td></tr>
+        </table>
+      </div>
+      <div class="ao">
+        <form class="res-form" id="resForm" novalidate>
+          <h3>Scegli data e orario</h3>
+          <div class="frow">
+            <div class="fgrp"><label>Nome e Cognome *</label><input type="text" name="name" required placeholder="Mario Rossi"></div>
+            <div class="fgrp"><label>Telefono *</label><input type="tel" name="phone" required placeholder="+39 333 0000000"></div>
+          </div>
+          <div class="frow">
+            <div class="fgrp"><label>Data *</label><input type="date" name="date" id="resDate" required></div>
+            <div class="fgrp"><label>Orario *</label>
+              <select name="time" required>
+                <option value="">Seleziona orario</option>
+                <optgroup label="Pranzo"><option>12:00</option><option>12:30</option><option>13:00</option><option>13:30</option><option>14:00</option></optgroup>
+                <optgroup label="Cena"><option>19:00</option><option>19:30</option><option>20:00</option><option>20:30</option><option>21:00</option><option>21:30</option><option>22:00</option></optgroup>
+              </select>
+            </div>
+          </div>
+          <div class="fgrp">
+            <label>Coperti *</label>
+            <select name="guests" required><option value="1">1 persona</option><option value="2" selected>2 persone</option><option value="3">3 persone</option><option value="4">4 persone</option><option value="5">5 persone</option><option value="6">6 persone</option><option value="7">7 persone</option><option value="8">8 persone</option><option value="10+">10+ (contattaci)</option></select>
+          </div>
+          <div class="fgrp fgrp--full"><label>Note o richieste speciali</label><textarea placeholder="Allergie, occasioni speciali, richieste particolari…" rows="3"></textarea></div>
+          <button type="submit" class="btn btn-p fsubmit">Conferma Prenotazione</button>
+        </form>
+        <div class="res-form form-ok" id="formOk">
+          <div class="form-ok__ic"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>Prenotazione ricevuta!</h3>
+          <p>Ti ricontatteremo al numero indicato per confermare il tavolo. A presto da Al Grande!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MAPPA -->
+<section class="sec" id="contatti">
+  <div class="wrap">
+    <div class="center ao" style="margin-bottom:2.5rem">
+      <span class="eyebrow">Dove siamo</span>
+      <h2 class="h2">Come raggiungerci</h2>
+      <div class="rule rule--c"></div>
+    </div>
+    <div class="map-frame ao">
+      <iframe title="Mappa Al Grande" src="https://maps.google.com/maps?q=45.0666514,11.0827336&z=15&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </div>
+    <div class="map-info ao">
+      <div class="minfo-item">
+        <div class="minfo-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+        <div><div class="minfo-lbl">Indirizzo</div><div class="minfo-val">Via Mantovana 49/1<br>Torriana di Serravalle a Po (MN)</div></div>
+      </div>
+      <div class="minfo-item">
+        <div class="minfo-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 8.8 19.79 19.79 0 01.1 2.2 2 2 0 012.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.06 7.96A16 16 0 0016 17.94l1.32-1.32a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg></div>
+        <div><div class="minfo-lbl">Telefono</div><div class="minfo-val"><a href="tel:+390386671141" style="color:inherit">0386 671141</a></div></div>
+      </div>
+      <div class="minfo-item">
+        <div class="minfo-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+        <div><div class="minfo-lbl">Orari</div><div class="minfo-val">Lunedì chiuso<br>Mar–Ven 06:00–23:30<br>Sab 07:00 · Dom 08:00–23:30</div></div>
+      </div>
+      <div class="minfo-item">
+        <div class="minfo-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg></div>
+        <div><div class="minfo-lbl">Social</div><div class="minfo-val"><a href="https://www.facebook.com/OSTERIADELLATORRIANA" target="_blank" rel="noopener" style="color:inherit">facebook.com/OSTERIADELLATORRIANA</a></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="ft-grid">
+      <div>
+        <div class="ft-logo">Al Grande</div>
+        <p class="ft-tag">Osteria della Torriana: cucina tipica mantovana, menu di lavoro, pizza la sera e atmosfera familiare nel cuore della Bassa.</p>
+        <div class="ft-social">
+          <a href="https://www.facebook.com/OSTERIADELLATORRIANA" class="soc-btn" target="_blank" rel="noopener" aria-label="Facebook">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+          </a>
+          <a href="tel:+390386671141" class="soc-btn" aria-label="Telefono">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 8.8 19.79 19.79 0 01.1 2.2 2 2 0 012.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.06 7.96A16 16 0 0016 17.94l1.32-1.32a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          </a>
+          <a href="https://maps.google.com/?q=45.0666514,11.0827336" class="soc-btn" target="_blank" rel="noopener" aria-label="Mappa">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </a>
+        </div>
+      </div>
+      <div>
+        <div class="ft-h">Menu</div>
+        <div class="ft-links">
+          <a href="#chi-siamo">Chi Siamo</a>
+          <a href="#menu">Il Menu</a>
+          <a href="#galleria">Galleria</a>
+          <a href="#servizi">Servizi</a>
+          <a href="#recensioni">Recensioni</a>
+          <a href="#prenota">Prenota</a>
+        </div>
+      </div>
+      <div>
+        <div class="ft-h">Orari</div>
+        <div class="ft-hrs">
+          <div class="ft-hr"><span>Lunedì</span><span class="ft-hr-t">Chiuso</span></div>
+          <div class="ft-hr"><span>Mar – Ven</span><span class="ft-hr-t">06:00–23:30</span></div>
+          <div class="ft-hr"><span>Sabato</span><span class="ft-hr-t">07:00–23:30</span></div>
+          <div class="ft-hr"><span>Domenica</span><span class="ft-hr-t">08:00–23:30</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="ft-h">Contatti</div>
+        <div class="ft-links">
+          <a href="tel:+390386671141">0386 671141</a>
+          <a href="https://www.facebook.com/OSTERIADELLATORRIANA" target="_blank" rel="noopener">Pagina Facebook</a>
+          <span style="color:rgba(240,232,213,.42);font-size:.875rem">Via Mantovana 49/1<br>46030 Torriana di Serravalle a Po (MN)</span>
+        </div>
+        <div style="margin-top:1.5rem">
+          <a href="#prenota" class="btn btn-p" style="font-size:.8125rem;padding:.625rem 1.25rem;border-radius:8px">Prenota ora</a>
+        </div>
+      </div>
+    </div>
+    <div class="ft-bottom">
+      <span>© <span id="yr"></span> Al Grande — Ristorante Pizzeria. Tutti i diritti riservati.</span>
+      <a href="https://maps.google.com/?q=45.0666514,11.0827336" target="_blank" rel="noopener" style="color:inherit">Apri in Google Maps ↗</a>
+    </div>
+  </div>
+</footer>
+
+<!-- TWEAKS PANEL -->
+<div class="tweaks" id="tweaksPanel">
+  <h4>Tweaks</h4>
+  <span class="twk-lbl">Variante visiva</span>
+  <div class="twk-opts">
+    <button class="twk-btn on" data-theme="calda" onclick="setTheme('calda',this)">
+      <span class="twk-sw" style="background:#FAF5E9;border-color:#A8341F"></span>
+      Osteria Calda
+    </button>
+    <button class="twk-btn" data-theme="notte" onclick="setTheme('notte',this)">
+      <span class="twk-sw" style="background:#0D0804;border-color:#D4A84A"></span>
+      Notte Mantovana
+    </button>
+  </div>
+  <span class="twk-lbl">Immagine Hero</span>
+  <div class="twk-opts">
+    <button class="twk-btn on" data-hero="0" onclick="setHero(0,this)">Sala ristorante</button>
+    <button class="twk-btn" data-hero="1" onclick="setHero(1,this)">Pizza</button>
+    <button class="twk-btn" data-hero="2" onclick="setHero(2,this)">Interno serale</button>
+  </div>
+</div>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+const reduced = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+/* ---- NAVBAR ---- */
+const nav = document.getElementById('nav');
+ScrollTrigger.create({
+  start:'top -80',
+  onEnter:()=>nav.classList.add('scrolled'),
+  onLeaveBack:()=>nav.classList.remove('scrolled')
+});
+
+/* ---- HAMBURGER ---- */
+const ham = document.getElementById('ham');
+const mob = document.getElementById('mobMenu');
+ham.addEventListener('click',()=>{
+  const o=mob.classList.toggle('open');
+  ham.classList.toggle('open',o);
+  ham.setAttribute('aria-expanded',o);
+  document.body.style.overflow=o?'hidden':'';
+});
+function closeMob(){
+  mob.classList.remove('open');ham.classList.remove('open');
+  ham.setAttribute('aria-expanded','false');document.body.style.overflow='';
+}
+mob.addEventListener('click',e=>{if(e.target===mob)closeMob()});
+
+/* ---- GSAP ANIMATIONS ---- */
+if(!reduced){
+  const sp = 'cubic-bezier(.32,.72,0,1)';
+
+  // ── Hero entrance ──────────────────────────────────
+  gsap.timeline({delay:.15})
+    .from('#hTag',  {opacity:0,y:24,filter:'blur(6px)',duration:.85,ease:'power3.out'})
+    .from('#hTitle',{opacity:0,y:72,filter:'blur(10px)',duration:1.15,ease:'power3.out'},'-=.5')
+    .from('#hDesc', {opacity:0,y:30,filter:'blur(5px)',duration:.85,ease:'power3.out'},'-=.55')
+    .from('#hCtas', {opacity:0,y:22,duration:.7,ease:'power3.out'},'-=.45')
+    .from('.hero__scroll',{opacity:0,duration:.6},'-=.2');
+
+  // ── Hero parallax (scrub) ──────────────────────────
+  gsap.to('#heroBg',{
+    scrollTrigger:{trigger:'.hero',start:'top top',end:'bottom top',scrub:1.2},
+    y:'30%',ease:'none'
+  });
+
+  // ── Info bar slide down ────────────────────────────
+  gsap.from('.infobar',{
+    scrollTrigger:{trigger:'.infobar',start:'top 95%'},
+    opacity:0,y:-20,duration:.6,ease:'power2.out',immediateRender:false
+  });
+
+  // ── About: image clips in from left, text from right ──
+  gsap.from('.about-img-wrap',{
+    scrollTrigger:{trigger:'#chi-siamo',start:'top 78%'},
+    opacity:0,x:-60,duration:1,ease:sp,immediateRender:false
+  });
+  gsap.from('.about-text',{
+    scrollTrigger:{trigger:'#chi-siamo',start:'top 78%'},
+    opacity:0,x:60,duration:1,ease:sp,immediateRender:false
+  });
+  gsap.from('.about-stat',{
+    scrollTrigger:{trigger:'.about-img-wrap',start:'top 70%'},
+    opacity:0,scale:.7,y:20,duration:.8,delay:.35,ease:'back.out(1.6)',immediateRender:false
+  });
+  gsap.from('.about-pill',{
+    scrollTrigger:{trigger:'.about-pills',start:'top 88%'},
+    opacity:0,y:16,scale:.92,duration:.5,stagger:.06,ease:'power2.out',immediateRender:false
+  });
+
+  // ── Menu tabs slide in ─────────────────────────────
+  gsap.from('.menu-tabs',{
+    scrollTrigger:{trigger:'#menu',start:'top 78%'},
+    opacity:0,y:30,duration:.7,ease:'power2.out',immediateRender:false
+  });
+
+  // ── Menu cards stagger ─────────────────────────────
+  document.querySelectorAll('.mgrid').forEach(grid=>{
+    gsap.from(grid.querySelectorAll('.mcard'),{
+      scrollTrigger:{trigger:grid,start:'top 85%'},
+      opacity:0,y:36,scale:.97,duration:.55,stagger:.07,ease:'power2.out',immediateRender:false
+    });
+  });
+
+  // ── Gallery items: stagger with scale ─────────────
+  gsap.from('.gitem',{
+    scrollTrigger:{trigger:'.gallery-grid',start:'top 82%'},
+    opacity:0,scale:.92,duration:.7,stagger:{amount:.5,from:'start'},ease:sp,immediateRender:false
+  });
+  // Subtle parallax on gallery images
+  document.querySelectorAll('.gitem img').forEach((img,i)=>{
+    gsap.to(img,{
+      scrollTrigger:{trigger:img,start:'top bottom',end:'bottom top',scrub:1.5},
+      y: i%2===0 ? '12%' : '-12%',
+      ease:'none'
+    });
+  });
+
+  // ── Service cards: fan out ─────────────────────────
+  gsap.from('.srv-card',{
+    scrollTrigger:{trigger:'.srv-grid',start:'top 95%'},
+    opacity:0,y:50,duration:.65,stagger:.1,ease:'power2.out',immediateRender:false
+  });
+
+  // ── Review marquee track: fade-slide in ───────────
+  gsap.from('.rev-track-wrap',{
+    scrollTrigger:{trigger:'.rev-track-wrap',start:'top 90%'},
+    opacity:0,y:30,duration:.85,ease:sp,immediateRender:false
+  });
+
+  // ── Animated counters (stats) ─────────────────────
+  function animateCounter(el, target, decimals=0, suffix=''){
+    const obj={v:0};
+    gsap.to(obj,{
+      scrollTrigger:{trigger:el,start:'top 85%',once:true},
+      v:target,duration:1.6,ease:'power2.out',
+      onUpdate(){
+        el.textContent = obj.v.toFixed(decimals) + suffix;
+      }
+    });
+  }
+  const statN = document.querySelector('.about-stat__n');
+  if(statN) animateCounter(statN,574,0,'');
+  document.querySelectorAll('.rev-stat__n').forEach((el,i)=>{
+    if(i===0) animateCounter(el,4.0,1,'/5');
+    if(i===1) animateCounter(el,574,0,'');
+  });
+
+  // ── Rule lines grow in ─────────────────────────────
+  gsap.utils.toArray('.rule').forEach(r=>{
+    gsap.from(r,{
+      scrollTrigger:{trigger:r,start:'top 90%'},
+      scaleX:0,transformOrigin:'left center',duration:.7,ease:'power3.out'
+    });
+  });
+
+  // ── Section headings: words slide up ──────────────
+  document.querySelectorAll('.h2').forEach(h=>{
+    // wrap words
+    const words = h.innerHTML.split(/(<[^>]+>|[^<\s]+|\s+)/g).filter(Boolean);
+    const wrapped = words.map(w=>{
+      if(w.trim()===''||w.startsWith('<')) return w;
+      return `<span style="display:inline-block;overflow:hidden"><span class="wrd" style="display:inline-block">${w}</span></span>`;
+    }).join('');
+    h.innerHTML = wrapped;
+    gsap.from(h.querySelectorAll('.wrd'),{
+      scrollTrigger:{trigger:h,start:'top 85%'},
+      y:'110%',opacity:0,duration:.7,stagger:.08,ease:'power3.out'
+    });
+  });
+
+  // ── Reservation form slides up ────────────────────
+  gsap.from('.res-form',{
+    scrollTrigger:{trigger:'.res-form',start:'top 85%'},
+    opacity:0,y:50,scale:.98,duration:.85,ease:sp,immediateRender:false
+  });
+  gsap.from('.res-phone',{
+    scrollTrigger:{trigger:'.res-phone',start:'top 88%'},
+    opacity:0,x:-30,duration:.7,ease:'power2.out',immediateRender:false
+  });
+  gsap.from('.hr-tbl tr',{
+    scrollTrigger:{trigger:'.hr-tbl',start:'top 85%'},
+    opacity:0,x:-20,duration:.45,stagger:.06,ease:'power2.out',immediateRender:false
+  });
+
+  // ── Map frame reveal ──────────────────────────────
+  gsap.from('.map-frame',{
+    scrollTrigger:{trigger:'.map-frame',start:'top 82%'},
+    opacity:0,scale:.97,y:30,duration:.9,ease:sp,immediateRender:false
+  });
+  gsap.from('.minfo-item',{
+    scrollTrigger:{trigger:'.map-info',start:'top 88%'},
+    opacity:0,y:24,duration:.5,stagger:.1,ease:'power2.out',immediateRender:false
+  });
+
+  // ── Footer gradient bar ───────────────────────────
+  gsap.from('.footer::before',{
+    scrollTrigger:{trigger:'.footer',start:'top 90%'},
+    scaleX:0,transformOrigin:'left center',duration:1,ease:'power3.out'
+  });
+  gsap.from('.ft-grid > div',{
+    scrollTrigger:{trigger:'.ft-grid',start:'top 85%'},
+    opacity:0,y:30,duration:.6,stagger:.1,ease:'power2.out',immediateRender:false
+  });
+
+  // ── Review stats bar ──────────────────────────────
+  gsap.from('.rev-stats',{
+    scrollTrigger:{trigger:'.rev-stats',start:'top 88%'},
+    opacity:0,y:24,duration:.7,ease:sp,immediateRender:false
+  });
+}
+
+/* ---- MENU TABS (event delegation) ---- */
+document.getElementById('menuTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const cat = btn.dataset.cat;
+  document.querySelectorAll('.mcat').forEach(c => {
+    c.classList.toggle('on', cat === '__all' || c.dataset.cat === cat);
+  });
+});
+
+/* ---- STATUS BADGE ---- */
+function checkStatus(){
+  const now=new Date(),h=now.getHours()+now.getMinutes()/60,d=now.getDay();
+  const openH=d===6?7:d===0?8:6;
+  const open=d!==1&&h>=openH&&h<23.5;
+  const b=document.getElementById('statusBadge'),t=document.getElementById('statusTxt');
+  b.className='status '+(open?'open':'closed');
+  t.textContent=open?'Aperto ora':'Attualmente chiusi';
+}
+checkStatus();setInterval(checkStatus,60000);
+
+/* ---- HIGHLIGHT TODAY ---- */
+const days=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+const today=days[new Date().getDay()];
+document.querySelectorAll('#hrTbl tr').forEach(r=>{
+  if(r.cells[0]&&r.cells[0].textContent.trim()===today)r.classList.add('today');
+});
+
+/* ---- FOOTER YEAR ---- */
+document.getElementById('yr').textContent=new Date().getFullYear();
+
+/* ---- DATE MIN ---- */
+const rd=document.getElementById('resDate');
+if(rd){const t=new Date().toISOString().split('T')[0];rd.min=t;rd.value=t;}
+
+/* ---- FORM SUBMIT ---- */
+const resForm = document.getElementById('resForm');
+const formOk  = document.getElementById('formOk');
+resForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  let ok = true;
+  resForm.querySelectorAll('[required]').forEach(f => {
+    if (!f.value.trim()) {
+      f.style.borderColor = '#C62828'; ok = false;
+      f.addEventListener('input', () => f.style.borderColor = '', { once: true });
+    }
+  });
+  if (!ok) return;
+
+  const submitBtn = resForm.querySelector('.fsubmit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Invio in corso…';
+
+  const fd = new FormData(resForm);
+  const guestsRaw = fd.get('guests');
+  const numPeople = guestsRaw === '10+' ? 10 : parseInt(guestsRaw, 10);
+  const timeVal   = fd.get('time');
+  const timeFormatted = timeVal.split(':').length === 2 ? timeVal + ':00' : timeVal;
+  const notesVal  = (fd.get('notes') || '').trim();
+
+  const payload = {
+    customer_name:    fd.get('name').trim(),
+    phone:            fd.get('phone').trim(),
+    date:             fd.get('date'),
+    time:             timeFormatted,
+    number_of_people: numPeople,
+    notes:            notesVal || null
+  };
+
+  const RES_API_BASE = (() => {
+    try {
+      const o = window.location && window.location.origin;
+      if (o && o !== 'null' && /^https?:\/\//.test(o)) return o;
+    } catch (e) {}
+    return 'http://127.0.0.1:1337';
+  })();
+  const RES_USER_DOC_ID = 'bncg1qnbb96j4h44su14lbxe';
+
+  try {
+    const res = await fetch(`${RES_API_BASE}/api/reservations/public/${RES_USER_DOC_ID}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Errore ${res.status}`);
+    }
+    resForm.style.display = 'none';
+    formOk.style.display  = 'block';
+    formOk.style.borderRadius = '24px';
+    formOk.style.padding  = '3rem 2rem';
+  } catch (err) {
+    submitBtn.disabled    = false;
+    submitBtn.textContent = 'Conferma Prenotazione';
+    let errDiv = resForm.querySelector('.form-error');
+    if (!errDiv) {
+      errDiv = document.createElement('p');
+      errDiv.className = 'form-error';
+      errDiv.style.cssText = 'color:#C62828;font-size:.875rem;margin-top:.75rem;text-align:center';
+      resForm.appendChild(errDiv);
+    }
+    errDiv.textContent = 'Prenotazione non riuscita: ' + err.message + '. Riprova o chiamaci al 0386 671141.';
+  }
+});
+
+/* ---- SMOOTH SCROLL ---- */
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    const t=document.querySelector(a.getAttribute('href'));
+    if(t){e.preventDefault();const top=t.getBoundingClientRect().top+window.scrollY-80;window.scrollTo({top,behavior:'smooth'});}
+  });
+});
+
+/* ---- TWEAKS ---- */
+const HERO_IMGS=[
+  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1800&q=85",
+  "https://images.unsplash.com/photo-1498579150354-977475b7ea0b?w=1800&q=85",
+  "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1800&q=85"
+];
+function setTheme(t,btn){
+  document.body.classList.toggle('notte',t==='notte');
+  document.querySelectorAll('.twk-btn[data-theme]').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  window.parent.postMessage({type:'__edit_mode_set_keys',edits:{theme:t}},'*');
+}
+function setHero(i,btn){
+  document.getElementById('heroBg').style.backgroundImage=`url('${HERO_IMGS[i]}')`;
+  document.querySelectorAll('.twk-btn[data-hero]').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+}
+const panel=document.getElementById('tweaksPanel');
+window.addEventListener('message',e=>{
+  if(e.data?.type==='__activate_edit_mode')panel.classList.add('open');
+  if(e.data?.type==='__deactivate_edit_mode')panel.classList.remove('open');
+});
+window.parent.postMessage({type:'__edit_mode_available'},'*');
+
+/* ---- INJECT ARROW SPANS NEI BOTTONI ---- */
+document.querySelectorAll('.btn').forEach(btn=>{
+  const arr=document.createElement('span');
+  arr.className='btn__arr';arr.setAttribute('aria-hidden','true');
+  arr.textContent='→';btn.appendChild(arr);
+});
+
+/* ---- INJECT NUMERI BG NELLE CARD PIZZA ---- */
+document.querySelectorAll('.mgrid .mcard:not([style*="dashed"])').forEach((card,i)=>{
+  const n=document.createElement('span');
+  n.className='mcard__num-bg';n.setAttribute('aria-hidden','true');
+  n.textContent=String(i+1).padStart(2,'0');
+  card.appendChild(n);
+});
+
+/* ---- MAGNETIC BUTTON — GSAP pull effect ---- */
+if(!reduced){
+  document.querySelectorAll('.btn').forEach(btn=>{
+    btn.addEventListener('mousemove',e=>{
+      const r=btn.getBoundingClientRect();
+      const x=(e.clientX-r.left-r.width/2)*.26;
+      const y=(e.clientY-r.top-r.height/2)*.26-3;
+      gsap.to(btn,{x,y,duration:.35,ease:'power2.out',overwrite:true});
+    });
+    btn.addEventListener('mouseleave',()=>{
+      gsap.to(btn,{x:0,y:0,duration:.65,ease:'elastic.out(1,.4)',overwrite:true});
+    });
+  });
+}
+
+/* ---- LOAD MENU FROM API ---- */
+async function loadMenu() {
+  const API_BASE = (() => {
+    try {
+      const o = typeof window !== 'undefined' && window.location && window.location.origin;
+      if (o && o !== 'null' && /^https?:\/\//.test(o)) return o;
+    } catch (e) {}
+    // Fallback dev host (used when opening file:// or when origin isn't available)
+    return 'http://127.0.0.1:1337';
+  })();
+  console.debug('Using API_BASE =', API_BASE);
+  const USER_DOC_ID = 'bncg1qnbb96j4h44su14lbxe';
+  const loadingEl   = document.getElementById('menuLoading');
+
+  // Escape HTML per evitare injection da contenuto utente.
+  const esc = (s) => String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  // Resolve URL relativa (es. "/uploads/foo.jpg") rispetto all'API base.
+  const resolveImgUrl = (u) => {
+    if (!u) return null;
+    if (/^https?:\/\//i.test(u)) return u;
+    return API_BASE + (u.startsWith('/') ? u : `/${u}`);
+  };
+
+  // Render della lista ingredienti. Supporta sia il nuovo formato
+  // [{ name, available }] sia il vecchio formato [string]. Gli ingredienti
+  // con available === false vengono mostrati barrati in rosso (solo l'ingrediente).
+  const renderIngredients = (ings) => {
+    if (!Array.isArray(ings) || !ings.length) return '';
+    return ings.map((ing) => {
+      if (ing && typeof ing === 'object') {
+        const name = esc(ing.name || '');
+        return ing.available === false
+          ? `<span class="ing-out">${name}</span>`
+          : name;
+      }
+      return esc(ing);
+    }).join(', ');
+  };
+
+  try {
+    const res  = await fetch(`${API_BASE}/api/menus/public/${USER_DOC_ID}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    // Supporta sia la public API (data.elements) sia il formato raw Strapi (data[0].fk_elements)
+    const elements = json.data?.elements ?? json.data?.[0]?.fk_elements ?? [];
+
+    const tabsContainer = document.getElementById('menuTabs');
+    const dynContainer  = document.getElementById('menuDynamic');
+    tabsContainer.innerHTML = '';
+    dynContainer.innerHTML  = '';
+
+    if (!elements.length) {
+      dynContainer.innerHTML =
+        '<p style="text-align:center;padding:3rem 0;color:var(--text-s)">Il menu non è ancora disponibile online. Chiamaci al <a href="tel:+390386671141" style="color:var(--accent)">0386 671141</a>.</p>';
+      return;
+    }
+
+    // Raggruppa per categoria mantenendo l'ordine di arrivo
+    const categories = new Map();
+    elements.forEach(el => {
+      const cat = el.category || 'Altro';
+      if (!categories.has(cat)) categories.set(cat, []);
+      categories.get(cat).push(el);
+    });
+
+    // Card unificata: stesso layout per tutti i piatti (pizze e non).
+    const renderCard = (item) => {
+      const imgUrl = resolveImgUrl(
+        item.image_url
+          || item.image_full_url
+          || item.image?.formats?.small?.url
+          || item.image?.url
+      );
+      const desc      = renderIngredients(item.ingredients);
+      const allergens = item.allergens?.length
+        ? `<small style="display:block;margin-top:.5rem;color:var(--text-s);font-size:.72rem">Allergeni: ${esc(item.allergens.join(', '))}</small>`
+        : '';
+      const price = `€${Number(item.price).toFixed(2).replace('.', ',')}`;
+      const card  = document.createElement('div');
+      card.className = 'mcard';
+      card.innerHTML = `
+        ${imgUrl ? `<div style="border-radius:8px;overflow:hidden;aspect-ratio:16/9;margin-bottom:.75rem">
+          <img src="${esc(imgUrl)}" alt="${esc(item.name)}" loading="lazy" style="width:100%;height:100%;object-fit:cover">
+        </div>` : ''}
+        <div class="mcard__name">${esc(item.name)}
+          <span style="font:600 .9rem/1 var(--fb);color:var(--accent);float:right;margin-left:.5rem">${price}</span>
+        </div>
+        ${desc ? `<div class="mcard__desc">${desc}</div>` : ''}
+        ${allergens}`;
+      return card;
+    };
+
+    // Tab "Tutti" (default attivo, mostra ogni categoria)
+    const allTab = document.createElement('button');
+    allTab.className   = 'tab active';
+    allTab.dataset.cat = '__all';
+    allTab.textContent = 'Tutti';
+    tabsContainer.appendChild(allTab);
+
+    let catIndex = 0;
+    categories.forEach((items, catName) => {
+      const baseKey = catName.toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '') || 'cat';
+      // Suffisso numerico per garantire chiavi univoche anche se due categorie collidono dopo lo slug.
+      const catKey = `${baseKey}-${catIndex}`;
+      catIndex += 1;
+
+      // Tab della categoria
+      const tab = document.createElement('button');
+      tab.className   = 'tab';
+      tab.dataset.cat = catKey;
+      tab.textContent = catName;
+      tabsContainer.appendChild(tab);
+
+      // Sezione categoria — tutte visibili di default (filtro "Tutti")
+      const mcat = document.createElement('div');
+      mcat.className   = 'mcat on';
+      mcat.dataset.cat = catKey;
+
+      const title = document.createElement('div');
+      title.className   = 'mcat__ttl';
+      title.textContent = catName;
+      mcat.appendChild(title);
+
+      const grid = document.createElement('div');
+      grid.className = 'mgrid ao';
+      items.forEach((item) => grid.appendChild(renderCard(item)));
+      mcat.appendChild(grid);
+      dynContainer.appendChild(mcat);
+
+      if (!reduced) {
+        gsap.from(grid.querySelectorAll('.mcard'), {
+          scrollTrigger: { trigger: grid, start: 'top 85%' },
+          opacity: 0, y: 36, scale: .97, duration: .55, stagger: .07, ease: 'power2.out',
+          immediateRender: false
+        });
+      }
+    });
+
+    if (loadingEl) loadingEl.remove();
+    if (!reduced && window.ScrollTrigger) ScrollTrigger.refresh();
+
+  } catch (err) {
+    console.error('Errore caricamento menu:', err);
+    if (loadingEl) {
+      loadingEl.innerHTML =
+        '<p style="color:var(--text-s)">Menu temporaneamente non disponibile. Chiamaci al <a href="tel:+390386671141" style="color:var(--accent)">0386 671141</a>.</p>';
+    }
+  }
+}
+loadMenu();
+
+// Schema.org
+const ld=document.createElement('script');ld.type='application/ld+json';
+ld.text=JSON.stringify({"@context":"https://schema.org","@type":"Restaurant","name":"Al Grande — Osteria della Torriana","telephone":"+390386671141","url":"https://www.ristorantealgrande.it","address":{"@type":"PostalAddress","streetAddress":"Via Mantovana, 49/1","addressLocality":"Torriana di Serravalle a Po","addressRegion":"MN","postalCode":"46030","addressCountry":"IT"},"geo":{"@type":"GeoCoordinates","latitude":45.0666514,"longitude":11.0827336},"servesCuisine":["Italiana","Pizzeria","Cucina mantovana"],"priceRange":"€10–20","aggregateRating":{"@type":"AggregateRating","ratingValue":"4.0","reviewCount":"574","bestRating":"5"}});
+document.head.appendChild(ld);
+</script>
+</body>
+</html>

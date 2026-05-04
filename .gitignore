@@ -15,3 +15,7 @@ strapi/.env
 strapi/.env.*
 *.bak*
 _backups/
+restaurant-sites/*.html
+!restaurant-sites/fatimaelgrandi5@gmail.com.html
+restaurant-sites/*.html
+!restaurant-sites/fatimaelgrandi5@gmail.com.html
