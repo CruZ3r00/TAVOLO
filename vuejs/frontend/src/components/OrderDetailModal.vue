@@ -325,7 +325,7 @@ defineExpose({ onItemAdded, silentReload });
                                 @click="openAddItem"
                             >
                                 <i class="bi bi-plus-lg" aria-hidden="true"></i>
-                                <span>Aggiungi piatto</span>
+                                <span>Aggiungi</span>
                             </button>
                             <button
                                 type="button"
