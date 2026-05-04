@@ -28,10 +28,16 @@ const totalAmount = computed(() => parseFloat(props.order?.total_amount || 0).to
 const lockVersion = computed(() => props.order?.lock_version ?? 0);
 
 const METHODS = [
-    { value: 'simulator', label: 'Simulatore', icon: 'bi-bug' },
+    { value: 'simulator', label: 'Chiudi conto', icon: 'bi-receipt-cutoff' },
     { value: 'pos', label: 'POS', icon: 'bi-credit-card' },
     { value: 'fiscal_register', label: 'Cassa fiscale', icon: 'bi-printer' },
 ];
+
+const confirmLabel = computed(() => (
+    paymentMethod.value === 'simulator'
+        ? 'Chiudi conto'
+        : `Paga € ${totalAmount.value}`
+));
 
 const doCheckout = () => {
     errorMessage.value = '';
@@ -120,7 +126,7 @@ const onClose = () => {
                         <span v-if="submitting" class="ds-spinner" aria-hidden="true"></span>
                         <template v-else>
                             <i class="bi bi-lock" aria-hidden="true"></i>
-                            <span>Paga &euro; {{ totalAmount }}</span>
+                            <span>{{ confirmLabel }}</span>
                         </template>
                     </button>
                 </div>
