@@ -73,6 +73,14 @@ onMounted(() => {
         router.replace('/register');
         return;
     }
+    const requiredBillingFields = ['address', 'city', 'cap', 'province', 'vat'];
+    const missingBillingFields = requiredBillingFields.filter((field) => !String(pending.value?.[field] || '').trim());
+    if (missingBillingFields.length > 0) {
+        errorMessage.value = 'Completa i dati fiscali prima di scegliere il piano.';
+        sessionStorage.removeItem('pending_registration');
+        setTimeout(() => router.replace('/register'), 1400);
+        return;
+    }
     nextTick(() => {
         // Pro è già visibile al mount; le altre due slidano fuori dopo un breve delay.
         setTimeout(() => { animateIn.value = true; }, 350);

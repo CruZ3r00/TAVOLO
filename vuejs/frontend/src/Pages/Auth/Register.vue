@@ -87,6 +87,22 @@ const submitStep1 = () => {
 const submitStep2 = () => {
   errorMessage.value = '';
   if (!restaurantName.value) { errorMessage.value = 'Inserisci il nome del ristorante.'; return; }
+  if (!address.value || !cap.value || !city.value || !province.value || !vat.value) {
+    errorMessage.value = 'Completa indirizzo, CAP, citta, provincia e partita IVA.';
+    return;
+  }
+  if (!/^\d{5}$/.test(String(cap.value).trim())) {
+    errorMessage.value = 'CAP non valido: inserisci 5 cifre.';
+    return;
+  }
+  if (!/^[A-Za-z]{2}$/.test(String(province.value).trim())) {
+    errorMessage.value = 'Provincia non valida: usa 2 lettere, es. MN.';
+    return;
+  }
+  if (!/^\d{11}$/.test(String(vat.value).trim())) {
+    errorMessage.value = 'Partita IVA non valida: inserisci 11 cifre.';
+    return;
+  }
   const cInv = parseInt(copertiInvernali.value, 10);
   if (!Number.isFinite(cInv) || cInv < 1 || cInv > 10000) {
     errorMessage.value = 'Coperti invernali: intero tra 1 e 10000.'; return;
@@ -122,11 +138,11 @@ const submitStep3 = () => {
       birth_date: birthDate.value || null,
       coperti_invernali: cInv,
       restaurant_name: restaurantName.value || username.value,
-      address: address.value || null,
-      city: city.value || null,
-      cap: cap.value || null,
-      province: province.value || null,
-      vat: vat.value || null,
+      address: address.value.trim(),
+      city: city.value.trim(),
+      cap: cap.value.trim(),
+      province: province.value.trim().toUpperCase(),
+      vat: vat.value.trim(),
     };
     if (cEst != null) pending.coperti_estivi = cEst;
     sessionStorage.setItem('pending_registration', JSON.stringify(pending));
@@ -230,27 +246,27 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
           </label>
           <div class="fl-row">
             <label class="fl-field" style="flex: 2;">
-              <span class="fl-label">Indirizzo</span>
-              <span class="fl-input"><i class="bi bi-geo-alt"></i><input v-model="address" type="text" placeholder="Via Roma 24" /></span>
+              <span class="fl-label">Indirizzo *</span>
+              <span class="fl-input"><i class="bi bi-geo-alt"></i><input v-model="address" type="text" placeholder="Via Roma 24" required /></span>
             </label>
             <label class="fl-field">
-              <span class="fl-label">CAP</span>
-              <span class="fl-input"><input v-model="cap" type="text" placeholder="46100" /></span>
+              <span class="fl-label">CAP *</span>
+              <span class="fl-input"><input v-model="cap" type="text" placeholder="46100" required /></span>
             </label>
           </div>
           <div class="fl-row">
             <label class="fl-field" style="flex: 2;">
-              <span class="fl-label">Città</span>
-              <span class="fl-input"><input v-model="city" type="text" placeholder="Mantova" /></span>
+              <span class="fl-label">Città *</span>
+              <span class="fl-input"><input v-model="city" type="text" placeholder="Mantova" required /></span>
             </label>
             <label class="fl-field">
-              <span class="fl-label">Provincia</span>
-              <span class="fl-input"><input v-model="province" type="text" placeholder="MN" /></span>
+              <span class="fl-label">Provincia *</span>
+              <span class="fl-input"><input v-model="province" type="text" placeholder="MN" maxlength="2" required /></span>
             </label>
           </div>
           <label class="fl-field">
-            <span class="fl-label">Partita IVA</span>
-            <span class="fl-input"><i class="bi bi-receipt"></i><input v-model="vat" type="text" placeholder="01234567890" /></span>
+            <span class="fl-label">Partita IVA *</span>
+            <span class="fl-input"><i class="bi bi-receipt"></i><input v-model="vat" type="text" placeholder="01234567890" inputmode="numeric" required /></span>
             <span class="fl-help">Necessaria per emettere scontrini fiscali.</span>
           </label>
           <div class="fl-row">

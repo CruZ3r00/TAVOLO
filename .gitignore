@@ -8,3 +8,10 @@ strapi/public/downloads/*.apk
 # Added by code-review-graph
 .code-review-graph/
 .claude/*
+
+.env
+.env.*
+strapi/.env
+strapi/.env.*
+*.bak*
+_backups/
