@@ -511,7 +511,7 @@ export const fetchOrderTotal = async (documentId, token) => {
 
 /**
  * Aggiunge item all'ordine.
- * body: { element_id?, name?, price?, quantity, notes?, lock_version? }
+ * body: { element_id?, name?, price?, quantity, category?, course?, notes?, lock_version? }
  */
 export const addOrderItem = async (orderDocumentId, body, token) => {
     const resp = await fetch(`${API_BASE}/api/orders/${orderDocumentId}/items`, {

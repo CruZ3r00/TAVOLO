@@ -101,6 +101,8 @@ function serializeItem(item) {
     name: item.name,
     price: item.price,
     quantity: item.quantity,
+    category: item.category || (item.fk_element ? item.fk_element.category : null) || null,
+    course: parseInt(item.course, 10) || 1,
     notes: item.notes || null,
     status: item.status,
     fk_element: item.fk_element ? { documentId: item.fk_element.documentId } : null,
@@ -227,6 +229,8 @@ function serializePosJobItem(item) {
     name: item.name,
     quantity: parseInt(item.quantity, 10) || 1,
     price: Number(item.price || 0),
+    category: item.category || (item.fk_element ? item.fk_element.category : null) || null,
+    course: parseInt(item.course, 10) || 1,
     notes: item.notes || null,
     element_document_id: item.fk_element ? item.fk_element.documentId : null,
   };
@@ -416,7 +420,11 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       const [results, total] = await Promise.all([
         strapi.documents('api::order.order').findMany({
           filters,
-          populate: ['fk_table', 'fk_items', 'fk_reservation'],
+          populate: {
+            fk_table: true,
+            fk_items: { populate: ['fk_element'] },
+            fk_reservation: true,
+          },
           sort: ['opened_at:desc'],
           pagination: { page, pageSize },
         }),
@@ -510,13 +518,14 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
       assertLockVersion(order, body.lock_version);
 
-      let itemName, itemPrice;
+      let itemName, itemPrice, itemCategory, menuElement;
 
       if (body.element_id) {
         // Da menu: carica l'Element solo se appartiene al menu dell'utente.
-        const el = await loadOwnedMenuElement(body.element_id, actor.ownerId);
-        itemName = el.name;
-        itemPrice = el.price;
+        menuElement = await loadOwnedMenuElement(body.element_id, actor.ownerId);
+        itemName = menuElement.name;
+        itemPrice = menuElement.price;
+        itemCategory = menuElement.category || null;
       } else {
         // Item libero
         itemName = typeof body.name === 'string' ? body.name.trim() : '';
@@ -527,11 +536,20 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         if (!Number.isFinite(itemPrice) || itemPrice < 0) {
           throw appError('INVALID_PAYLOAD', 'price obbligatorio e deve essere >= 0.');
         }
+        itemCategory = typeof body.category === 'string' ? body.category.trim() : null;
+        if (itemCategory && itemCategory.length > 100) {
+          throw appError('INVALID_PAYLOAD', 'category troppo lunga (max 100).');
+        }
       }
 
       const quantity = parseInt(body.quantity, 10);
       if (!Number.isFinite(quantity) || quantity < 1) {
         throw appError('INVALID_PAYLOAD', 'quantity obbligatoria (intero >= 1).');
+      }
+
+      const course = body.course !== undefined ? parseInt(body.course, 10) : 1;
+      if (!Number.isFinite(course) || course < 1 || course > 12) {
+        throw appError('INVALID_PAYLOAD', 'course deve essere un intero 1..12.');
       }
 
       const notes = typeof body.notes === 'string' ? body.notes.trim() : null;
@@ -541,14 +559,15 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         name: itemName,
         price: itemPrice,
         quantity,
+        category: itemCategory || null,
+        course,
         notes: notes && notes.length > 0 ? notes : null,
         status: 'taken',
         fk_order: { connect: [{ id: order.id }] },
       };
 
-      if (body.element_id) {
-        const el = await loadOwnedMenuElement(body.element_id, actor.ownerId);
-        itemData.fk_element = { connect: [{ id: el.id }] };
+      if (menuElement) {
+        itemData.fk_element = { connect: [{ id: menuElement.id }] };
       }
 
       const createdItem = await strapi.documents('api::order-item.order-item').create({

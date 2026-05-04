@@ -57,7 +57,27 @@ const totalAmount = computed(() => parseFloat(order.value?.total_amount || 0).to
 const tableNumber = computed(() => order.value?.table?.number ?? '?');
 const itemsSorted = computed(() => {
     if (!order.value?.items) return [];
-    return [...order.value.items].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    return [...order.value.items].sort((a, b) => {
+        const ca = parseInt(a.course, 10) || 1;
+        const cb = parseInt(b.course, 10) || 1;
+        if (ca !== cb) return ca - cb;
+        return new Date(a.createdAt) - new Date(b.createdAt);
+    });
+});
+const itemsByCourse = computed(() => {
+    const groups = [];
+    const byCourse = new Map();
+    for (const item of itemsSorted.value) {
+        const course = parseInt(item.course, 10) || 1;
+        let group = byCourse.get(course);
+        if (!group) {
+            group = { course, items: [] };
+            byCourse.set(course, group);
+            groups.push(group);
+        }
+        group.items.push(item);
+    }
+    return groups;
 });
 
 const showToast = (type, message) => {
@@ -269,17 +289,27 @@ defineExpose({ onItemAdded, silentReload });
                         <div v-if="itemsSorted.length === 0" class="odm-empty">
                             <p>Nessun piatto nell'ordine. Aggiungi il primo piatto.</p>
                         </div>
-                        <OrderItemRow
-                            v-for="item in itemsSorted"
-                            :key="item.documentId"
-                            :item="item"
-                            :order-active="isActive"
-                            :busy="busyItemIds.has(item.documentId)"
-                            @increment="handleIncrement"
-                            @decrement="handleDecrement"
-                            @delete="handleDelete"
-                            @serve="handleServe"
-                        />
+                        <section
+                            v-for="group in itemsByCourse"
+                            :key="group.course"
+                            class="odm-course-group"
+                        >
+                            <header class="odm-course-header">
+                                <span>{{ group.course }}a portata</span>
+                                <strong>{{ group.items.length }}</strong>
+                            </header>
+                            <OrderItemRow
+                                v-for="item in group.items"
+                                :key="item.documentId"
+                                :item="item"
+                                :order-active="isActive"
+                                :busy="busyItemIds.has(item.documentId)"
+                                @increment="handleIncrement"
+                                @decrement="handleDecrement"
+                                @delete="handleDelete"
+                                @serve="handleServe"
+                            />
+                        </section>
                     </div>
 
                     <!-- Footer con totale e azioni -->
@@ -410,10 +440,48 @@ defineExpose({ onItemAdded, silentReload });
 .odm-items {
     display: flex;
     flex-direction: column;
-    gap: var(--s-2);
+    gap: var(--s-3);
     max-height: 360px;
     overflow-y: auto;
     padding-right: 4px;
+}
+.odm-course-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+}
+.odm-course-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    min-height: 30px;
+    padding: 6px 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    color: var(--ink);
+}
+.odm-course-header span {
+    font-size: 12px;
+    font-weight: 700;
+}
+.odm-course-header strong {
+    min-width: 24px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-sm);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
 }
 .odm-empty {
     padding: var(--s-6);

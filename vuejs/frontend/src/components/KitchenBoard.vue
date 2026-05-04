@@ -19,13 +19,38 @@ const allItems = computed(() => {
       items.push({ ...item, _tableNumber: tNum, _orderDocumentId: order.documentId });
     }
   }
-  items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  items.sort((a, b) => {
+    const ca = parseInt(a.course, 10) || 1;
+    const cb = parseInt(b.course, 10) || 1;
+    if (ca !== cb) return ca - cb;
+    return new Date(a.createdAt) - new Date(b.createdAt);
+  });
   return items;
 });
 
 const takenItems = computed(() => allItems.value.filter(i => i.status === 'taken'));
 const preparingItems = computed(() => allItems.value.filter(i => i.status === 'preparing'));
 const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready'));
+
+const groupByCourse = (items) => {
+  const groups = [];
+  const byCourse = new Map();
+  for (const item of items) {
+    const course = parseInt(item.course, 10) || 1;
+    let group = byCourse.get(course);
+    if (!group) {
+      group = { course, items: [] };
+      byCourse.set(course, group);
+      groups.push(group);
+    }
+    group.items.push(item);
+  }
+  return groups;
+};
+
+const takenGroups = computed(() => groupByCourse(takenItems.value));
+const preparingGroups = computed(() => groupByCourse(preparingItems.value));
+const readyGroups = computed(() => groupByCourse(readyItems.value));
 </script>
 
 <template>
@@ -44,14 +69,17 @@ const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready
           <i class="bi bi-inbox"/>
           <p>Nessuna portata in attesa</p>
         </div>
-        <KitchenItemCard
-          v-for="item in takenItems"
-          :key="item.documentId"
-          :item="item"
-          :table-number="item._tableNumber"
-          :busy="busyItemIds.has(item.documentId)"
-          @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
-        />
+        <section v-for="group in takenGroups" :key="group.course" class="kt-course">
+          <header class="kt-course-h">{{ group.course }}a portata</header>
+          <KitchenItemCard
+            v-for="item in group.items"
+            :key="item.documentId"
+            :item="item"
+            :table-number="item._tableNumber"
+            :busy="busyItemIds.has(item.documentId)"
+            @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
+          />
+        </section>
       </div>
     </section>
 
@@ -69,14 +97,17 @@ const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready
           <i class="bi bi-inbox"/>
           <p>Niente in lavorazione</p>
         </div>
-        <KitchenItemCard
-          v-for="item in preparingItems"
-          :key="item.documentId"
-          :item="item"
-          :table-number="item._tableNumber"
-          :busy="busyItemIds.has(item.documentId)"
-          @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
-        />
+        <section v-for="group in preparingGroups" :key="group.course" class="kt-course">
+          <header class="kt-course-h">{{ group.course }}a portata</header>
+          <KitchenItemCard
+            v-for="item in group.items"
+            :key="item.documentId"
+            :item="item"
+            :table-number="item._tableNumber"
+            :busy="busyItemIds.has(item.documentId)"
+            @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
+          />
+        </section>
       </div>
     </section>
 
@@ -94,14 +125,17 @@ const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready
           <i class="bi bi-inbox"/>
           <p>Nessun piatto pronto</p>
         </div>
-        <KitchenItemCard
-          v-for="item in readyItems"
-          :key="item.documentId"
-          :item="item"
-          :table-number="item._tableNumber"
-          :busy="busyItemIds.has(item.documentId)"
-          @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
-        />
+        <section v-for="group in readyGroups" :key="group.course" class="kt-course">
+          <header class="kt-course-h">{{ group.course }}a portata</header>
+          <KitchenItemCard
+            v-for="item in group.items"
+            :key="item.documentId"
+            :item="item"
+            :table-number="item._tableNumber"
+            :busy="busyItemIds.has(item.documentId)"
+            @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
+          />
+        </section>
       </div>
     </section>
   </div>
@@ -122,3 +156,30 @@ const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready
     <p>Quando la sala manderà gli ordini, li vedrai qui — divisi per stato e con il timer di preparazione.</p>
   </div>
 </template>
+
+<style scoped>
+.kt-course {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.kt-course + .kt-course {
+  margin-top: 12px;
+}
+.kt-course-h {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--ink-2);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+}
+</style>

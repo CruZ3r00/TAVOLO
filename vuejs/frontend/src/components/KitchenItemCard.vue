@@ -65,6 +65,12 @@ const onAdvance = () => {
           <span class="kic-qty">×{{ item.quantity }}</span>
         </div>
         <div class="kic-meta">
+          <span class="kic-course">
+            <i class="bi bi-layers"/>{{ parseInt(item.course, 10) || 1 }}a
+          </span>
+          <span v-if="item.category" class="kic-category">
+            {{ item.category }}
+          </span>
           <span class="kic-timer">
             <i class="bi bi-clock"/>{{ elapsed }}
           </span>
@@ -117,4 +123,18 @@ const onAdvance = () => {
 <style scoped>
 .kic-busy { opacity: 0.6; pointer-events: none; }
 .kic-action:disabled { opacity: 0.6; cursor: not-allowed; }
+.kic-course,
+.kic-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 700;
+}
 </style>
