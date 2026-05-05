@@ -566,8 +566,12 @@ export const deleteOrderItem = async (orderDocumentId, itemDocumentId, body, tok
  * Transizione stato item (FSM).
  * body: { status }
  */
-export const updateItemStatus = async (orderDocumentId, itemDocumentId, status, token) => {
-    const resp = await fetch(`${API_BASE}/api/orders/${orderDocumentId}/items/${itemDocumentId}/status`, {
+export const updateItemStatus = async (orderDocumentId, itemDocumentId, status, token, params = {}) => {
+    const query = qs.stringify(params, { skipNulls: true });
+    const url = query
+        ? `${API_BASE}/api/orders/${orderDocumentId}/items/${itemDocumentId}/status?${query}`
+        : `${API_BASE}/api/orders/${orderDocumentId}/items/${itemDocumentId}/status`;
+    const resp = await fetch(url, {
         method: 'PATCH',
         headers: {
             'Content-Type': 'application/json',

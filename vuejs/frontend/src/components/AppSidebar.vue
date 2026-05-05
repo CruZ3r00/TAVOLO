@@ -19,6 +19,9 @@ const roles = computed(() => [
   { id: 'manager', icon: 'bi-speedometer2', label: 'Manager', path: '/dashboard' },
   { id: 'sala', icon: 'bi-grid-3x3-gap', label: 'Sala', path: '/orders', badge: props.activeOrdersCount },
   { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen', accent: true },
+  { id: 'bar', icon: 'bi-cup-straw', label: 'Bar', path: '/bar', accent: true },
+  { id: 'pizzeria', icon: 'bi-record-circle', label: 'Pizzeria', path: '/pizzeria', accent: true },
+  { id: 'cucina_sg', icon: 'bi-shield-check', label: 'Cucina SG', path: '/kitchen-sg', accent: true },
   { id: 'prenotazioni', icon: 'bi-calendar-check', label: 'Prenotazioni', path: '/reservations', badge: props.pendingCount },
   { id: 'menu', icon: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
 ].filter((item) => canSeeNavItem(props.user, item.id)));
@@ -32,7 +35,10 @@ const canOpenProfile = computed(() => canSeeNavItem(props.user, 'profilo'));
 
 const activeKey = computed(() => {
   const p = route.path;
+  if (p.startsWith('/kitchen-sg')) return 'cucina_sg';
   if (p.startsWith('/kitchen')) return 'cucina';
+  if (p.startsWith('/bar')) return 'bar';
+  if (p.startsWith('/pizzeria')) return 'pizzeria';
   if (p.startsWith('/orders')) return 'sala';
   if (p.startsWith('/reservations')) return 'prenotazioni';
   if (p.startsWith('/menu-handler')) return 'menu';

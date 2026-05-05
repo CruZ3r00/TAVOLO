@@ -22,9 +22,9 @@ const plans = [
         period: '/ mese',
         features: [
             'Vista Sala, Cucina, Cassa',
+            'Account cameriere e cucina',
             'Fino a 20 tavoli',
             'Menu digitale + QR',
-            'Assistenza via email',
         ],
         side: 'left',
     },
@@ -35,10 +35,10 @@ const plans = [
         period: '/ mese',
         features: [
             'Tutto di Essenziale',
+            'Reparti bar, pizzeria e cucina SG',
+            'Smistamento categorie automatico',
             'Prenotazioni online illimitate',
             'Statistiche storiche e report',
-            'Scontrino elettronico',
-            'Assistenza prioritaria',
         ],
         side: 'center',
         highlight: true,

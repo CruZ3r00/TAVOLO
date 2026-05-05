@@ -5,7 +5,7 @@ import { STAFF_ROLES, canAccessRoute, defaultRouteForUser, staffRole } from '@/s
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
 const SUBSCRIPTION_CHECK_TIMEOUT_MS = 5000;
-const BILLING_ROLES = new Set([STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
+const PRO_STAFF_ROLES = new Set([STAFF_ROLES.GESTIONE, STAFF_ROLES.BAR, STAFF_ROLES.PIZZERIA, STAFF_ROLES.CUCINA_SG]);
 
 const withTimeout = (promise, ms) => {
     let timeoutId;
@@ -111,6 +111,24 @@ const routes = [
         component: () => import('../Pages/Orders.vue'),
         meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CUCINA] },
     },
+    { //protetta - Vista bar
+        path: '/bar',
+        name: 'Bar',
+        component: () => import('../Pages/Orders.vue'),
+        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'bar', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.BAR] },
+    },
+    { //protetta - Vista pizzeria
+        path: '/pizzeria',
+        name: 'Pizzeria',
+        component: () => import('../Pages/Orders.vue'),
+        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'pizzeria', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.PIZZERIA] },
+    },
+    { //protetta - Vista cucina senza glutine
+        path: '/kitchen-sg',
+        name: 'Cucina SG',
+        component: () => import('../Pages/Orders.vue'),
+        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina_sg', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CUCINA_SG] },
+    },
     { //non protetta
         path: '/who-are-us',
         name: 'Chi siamo',
@@ -160,11 +178,7 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
 
-    if (
-        isAuthenticated &&
-        to.matched.some(record => record.meta.requiresSubscription) &&
-        BILLING_ROLES.has(staffRole(store.getters.getUser))
-    ) {
+    if (isAuthenticated && to.matched.some(record => record.meta.requiresSubscription)) {
         try {
             const billing = await withTimeout(
                 fetchBillingStatus(store.getters.getToken),
@@ -178,7 +192,17 @@ router.beforeEach(async (to, from, next) => {
             }
 
             if (billing && !ACTIVE_SUBSCRIPTION_STATUSES.has(billing.subscription_status)) {
-                next({ path: '/renew-sub', query: { checkout: 'retry' } });
+                next({ path: '/renew-sub', query: { checkout: 'retry', reason: 'expired' } });
+                return;
+            }
+
+            const role = staffRole(store.getters.getUser);
+            if (
+                billing &&
+                billing.subscription_plan === 'starter' &&
+                PRO_STAFF_ROLES.has(role)
+            ) {
+                next({ path: '/renew-sub', query: { checkout: 'retry', reason: 'pro-required' } });
                 return;
             }
         } catch (err) {
@@ -191,7 +215,7 @@ router.beforeEach(async (to, from, next) => {
             }
 
             if (err?.status === 402 || err?.code === 'SUBSCRIPTION_REQUIRED') {
-                next({ path: '/renew-sub', query: { checkout: 'retry' } });
+                next({ path: '/renew-sub', query: { checkout: 'retry', reason: 'expired' } });
                 return;
             }
 

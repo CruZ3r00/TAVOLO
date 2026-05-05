@@ -27,6 +27,7 @@ const statsService = require('../../../services/stats');
 const posBridge = require('../../../services/pos-bridge');
 const {
   STAFF_ROLES,
+  KITCHEN_LIKE_ROLES,
   resolveStaffContext,
   assertStaffRole,
   canTransitionItem,
@@ -256,6 +257,65 @@ function assertLockVersion(order, clientVersion) {
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 25;
 const ORDER_STATUS_ENUM = ['active', 'closed'];
+const STATION_ROLES = new Set([
+  STAFF_ROLES.CUCINA,
+  STAFF_ROLES.BAR,
+  STAFF_ROLES.PIZZERIA,
+  STAFF_ROLES.CUCINA_SG,
+]);
+
+function normalizeStation(value) {
+  const station = String(value || '').trim().toLowerCase();
+  return STATION_ROLES.has(station) ? station : null;
+}
+
+function stationForActor(actor, query) {
+  if (!actor) return null;
+  if (KITCHEN_LIKE_ROLES.has(actor.role)) return actor.role;
+  if (actor.role === STAFF_ROLES.OWNER || actor.role === STAFF_ROLES.GESTIONE) {
+    return normalizeStation(query && query.station);
+  }
+  return null;
+}
+
+async function stationForCategory(ownerId, category) {
+  const cleanCategory = String(category || '').trim();
+  if (!cleanCategory || !strapi.db.connection) return STAFF_ROLES.CUCINA;
+
+  try {
+    const row = await strapi.db.connection('restaurant_category_routing')
+      .select('staff_role')
+      .where('owner_id', ownerId)
+      .whereRaw('lower(category) = lower(?)', [cleanCategory])
+      .first();
+    return normalizeStation(row && row.staff_role) || STAFF_ROLES.CUCINA;
+  } catch (_err) {
+    return STAFF_ROLES.CUCINA;
+  }
+}
+
+async function filterItemsForStation(order, ownerId, station) {
+  if (!station || !order || !Array.isArray(order.fk_items)) return order;
+
+  const filtered = [];
+  for (const item of order.fk_items) {
+    const itemStation = await stationForCategory(ownerId, item.category || (item.fk_element && item.fk_element.category));
+    if (itemStation === station) filtered.push(item);
+  }
+  return { ...order, fk_items: filtered };
+}
+
+async function filterOrdersForStation(orders, ownerId, station) {
+  if (!station) return orders;
+  const filtered = [];
+  for (const order of orders || []) {
+    const stationOrder = await filterItemsForStation(order, ownerId, station);
+    if ((stationOrder.fk_items || []).some((item) => item.status !== 'served')) {
+      filtered.push(stationOrder);
+    }
+  }
+  return filtered;
+}
 
 /* ================================================================== */
 /* CONTROLLER                                                         */
@@ -370,9 +430,18 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
+      assertStaffRole(actor, [
+        STAFF_ROLES.OWNER,
+        STAFF_ROLES.GESTIONE,
+        STAFF_ROLES.CAMERIERE,
+        STAFF_ROLES.CUCINA,
+        STAFF_ROLES.BAR,
+        STAFF_ROLES.PIZZERIA,
+        STAFF_ROLES.CUCINA_SG,
+      ]);
       const ownerId = actor.ownerId;
       const q = ctx.request.query || {};
+      const station = stationForActor(actor, q);
 
       const statusFilter = typeof q.status === 'string' && q.status.trim()
         ? q.status.split(',').map((s) => s.trim()).filter((s) => ORDER_STATUS_ENUM.includes(s))
@@ -431,14 +500,16 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         strapi.documents('api::order.order').count({ filters }),
       ]);
 
+      const stationResults = await filterOrdersForStation(results || [], ownerId, station);
+
       ctx.body = {
-        data: (results || []).map((o) => serializeOrder(o, true)),
+        data: stationResults.map((o) => serializeOrder(o, true)),
         meta: {
           pagination: {
             page,
             pageSize,
-            total,
-            pageCount: Math.ceil(total / pageSize),
+            total: station ? stationResults.length : total,
+            pageCount: station ? Math.ceil(stationResults.length / pageSize) : Math.ceil(total / pageSize),
           },
         },
       };
@@ -457,11 +528,24 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
+      assertStaffRole(actor, [
+        STAFF_ROLES.OWNER,
+        STAFF_ROLES.GESTIONE,
+        STAFF_ROLES.CAMERIERE,
+        STAFF_ROLES.CUCINA,
+        STAFF_ROLES.BAR,
+        STAFF_ROLES.PIZZERIA,
+        STAFF_ROLES.CUCINA_SG,
+      ]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
-      const order = await loadOrder(documentId, actor.ownerId);
+      const station = stationForActor(actor, ctx.request.query || {});
+      const order = await filterItemsForStation(
+        await loadOrder(documentId, actor.ownerId),
+        actor.ownerId,
+        station
+      );
 
       ctx.body = { data: serializeOrder(order, true) };
     } catch (err) {
@@ -732,7 +816,15 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
+      assertStaffRole(actor, [
+        STAFF_ROLES.OWNER,
+        STAFF_ROLES.GESTIONE,
+        STAFF_ROLES.CAMERIERE,
+        STAFF_ROLES.CUCINA,
+        STAFF_ROLES.BAR,
+        STAFF_ROLES.PIZZERIA,
+        STAFF_ROLES.CUCINA_SG,
+      ]);
       const { documentId, itemDocumentId } = ctx.params;
       if (!documentId || !itemDocumentId) {
         throw appError('INVALID_PAYLOAD', 'documentId e itemDocumentId obbligatori.');
@@ -753,6 +845,14 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       const items = order.fk_items || [];
       const item = items.find((i) => i.documentId === itemDocumentId);
       if (!item) throw appError('ITEM_NOT_FOUND', 'Item non trovato.');
+
+      const station = stationForActor(actor, ctx.request.query || {});
+      if (station) {
+        const itemStation = await stationForCategory(actor.ownerId, item.category || (item.fk_element && item.fk_element.category));
+        if (itemStation !== station) {
+          throw appError('NOT_OWNER', 'Questo reparto non puo lavorare questa categoria.');
+        }
+      }
 
       // FSM check
       const allowed = ITEM_TRANSITIONS[item.status] || [];

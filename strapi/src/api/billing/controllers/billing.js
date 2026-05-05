@@ -86,6 +86,16 @@ async function updateUserSubscription(userId, data) {
   });
 }
 
+async function syncOwnerStaffAccounts(userId) {
+  const numericId = Number.parseInt(userId, 10);
+  if (!Number.isFinite(numericId) || numericId <= 0 || !strapi.db.connection) return;
+  try {
+    await strapi.db.connection.raw('select public.sync_owner_staff_accounts(?)', [numericId]);
+  } catch (err) {
+    strapi.log.warn(`syncOwnerStaffAccounts fallita per user ${numericId}: ${err.message}`);
+  }
+}
+
 async function findUserByStripe({ customerId, subscriptionId }) {
   if (subscriptionId) {
     const bySubscription = await strapi.db.query('plugin::users-permissions.user').findOne({
@@ -249,6 +259,7 @@ module.exports = {
         ...snapshot,
         subscription_plan: normalizePlanKey(session.metadata?.plan) || snapshot.subscription_plan,
       });
+      await syncOwnerStaffAccounts(user.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: user.id },
@@ -310,6 +321,7 @@ module.exports = {
 
       const snapshot = await subscriptionSnapshot(stripe, updated);
       await updateUserSubscription(billingUser.id, { ...snapshot, subscription_plan: plan.key });
+      await syncOwnerStaffAccounts(billingUser.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: billingUser.id },
@@ -344,6 +356,7 @@ module.exports = {
       });
       const snapshot = await subscriptionSnapshot(stripe, updated);
       await updateUserSubscription(billingUser.id, snapshot);
+      await syncOwnerStaffAccounts(billingUser.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: billingUser.id },
@@ -396,6 +409,7 @@ module.exports = {
       });
       const snapshot = await subscriptionSnapshot(stripe, updated);
       await updateUserSubscription(billingUser.id, snapshot);
+      await syncOwnerStaffAccounts(billingUser.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: billingUser.id },
@@ -457,6 +471,7 @@ module.exports = {
             ...snapshot,
             subscription_plan: normalizePlanKey(session.metadata?.plan) || snapshot.subscription_plan,
           });
+          await syncOwnerStaffAccounts(userId);
         }
       }
 
@@ -478,6 +493,7 @@ module.exports = {
             stripe_customer_id: subscription.customer,
             ...(await subscriptionSnapshot(stripe, subscription)),
           });
+          await syncOwnerStaffAccounts(user?.id);
         }
       }
     } catch (err) {

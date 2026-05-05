@@ -111,6 +111,13 @@ module.exports = {
           where: { id: createdUser.id },
           data: { url: siteUrl },
         });
+        if (strapi.db.connection) {
+          try {
+            await strapi.db.connection.raw('select public.sync_owner_staff_accounts(?)', [createdUser.id]);
+          } catch (syncErr) {
+            strapi.log.warn(`register middleware: sync staff DB fallita per user ${createdUser.id}: ${syncErr.message}`);
+          }
+        }
         if (ctx.body && ctx.body.user) {
           ctx.body.user.url = siteUrl;
         }

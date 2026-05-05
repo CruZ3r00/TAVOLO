@@ -29,7 +29,15 @@ const refreshing = ref(false);
 const errorMessage = ref('');
 const toast = ref(null);
 
-const mode = computed(() => (route.meta?.ordersMode === 'cucina' ? 'cucina' : 'cameriere'));
+const kitchenModes = {
+  cucina: { title: 'Cucina', overline: 'Cucina', station: 'cucina' },
+  bar: { title: 'Bar', overline: 'Bar', station: 'bar' },
+  pizzeria: { title: 'Pizzeria', overline: 'Pizzeria', station: 'pizzeria' },
+  cucina_sg: { title: 'Cucina SG', overline: 'Senza glutine', station: 'cucina_sg' },
+};
+const mode = computed(() => (route.meta?.ordersMode && kitchenModes[route.meta.ordersMode] ? route.meta.ordersMode : 'cameriere'));
+const isKitchenMode = computed(() => mode.value !== 'cameriere');
+const modeInfo = computed(() => kitchenModes[mode.value] || { title: 'Sala', overline: 'Sala', station: null });
 
 const showOrderDetail = ref(false);
 const currentOrderDocId = ref(null);
@@ -78,7 +86,7 @@ const loadData = async ({ silent = false } = {}) => {
   try {
     const [tablesResp, ordersResp] = await Promise.all([
       fetchTables(token.value),
-      fetchOrders({ status: 'active', pageSize: 100 }, token.value),
+      fetchOrders({ status: 'active', pageSize: 100, station: modeInfo.value.station }, token.value),
     ]);
     tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
     orders.value = Array.isArray(ordersResp?.data) ? ordersResp.data : [];
@@ -220,7 +228,7 @@ const handleKitchenAdvance = async ({ item, next, orderDocumentId }) => {
     if (itemInOrder) { oldStatus = itemInOrder.status; itemInOrder.status = next; }
   }
   try {
-    await updateItemStatus(orderDocumentId, item.documentId, next, token.value);
+    await updateItemStatus(orderDocumentId, item.documentId, next, token.value, { station: modeInfo.value.station });
     showToast('success', `"${item.name}" → ${statusLabel(next)}`);
   } catch (err) {
     if (orderIdx !== -1) {
@@ -293,7 +301,7 @@ const openOrderFromQuery = () => {
 };
 
 onMounted(async () => {
-  document.title = mode.value === 'cucina' ? 'Cucina · Tavolo' : 'Sala · Tavolo';
+  document.title = `${modeInfo.value.title} · Tavolo`;
   await loadData();
   await subscribeRealtime(effectiveUserId(store.getters.getUser));
   document.addEventListener('visibilitychange', onVisibilityChange);
@@ -312,14 +320,14 @@ const now = computed(() => {
 </script>
 
 <template>
-  <AppLayout :page-title="mode === 'cucina' ? 'Cucina' : 'Sala'">
-    <div class="md-main" :class="{ 'kt-main': mode === 'cucina' }">
+  <AppLayout :page-title="modeInfo.title">
+    <div class="md-main" :class="{ 'kt-main': isKitchenMode }">
       <header class="md-top">
         <div>
           <div class="overline">
-            {{ mode === 'cucina' ? 'Cucina' : 'Sala' }} · {{ now }}
+            {{ modeInfo.overline }} · {{ now }}
           </div>
-          <h1>{{ mode === 'cucina' ? 'Comande in corso' : 'Sala & tavoli' }}</h1>
+          <h1>{{ isKitchenMode ? 'Comande in corso' : 'Sala & tavoli' }}</h1>
           <p v-if="mode === 'cameriere'">
             {{ stats.occupied }} occupati su {{ stats.total }} · {{ stats.free }} liberi
             <span v-if="stats.readyTables > 0"> · <strong style="color: var(--ok);">{{ stats.readyTables }} da chiudere</strong></span>
@@ -359,7 +367,7 @@ const now = computed(() => {
 
       <!-- Skeleton loaders -->
       <div v-if="loading && tables.length === 0 && orders.length === 0">
-        <div v-if="mode === 'cameriere'" class="ord-skel-grid">
+          <div v-if="mode === 'cameriere'" class="ord-skel-grid">
           <div v-for="n in 8" :key="`sk-tbl-${n}`" class="ord-skel-card">
             <Skeleton width="40%" height="22px" />
             <Skeleton width="60%" height="11px" style="margin-top: 8px;" />

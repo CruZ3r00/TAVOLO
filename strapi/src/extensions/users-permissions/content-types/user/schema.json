@@ -118,7 +118,10 @@
         "owner",
         "gestione",
         "cameriere",
-        "cucina"
+        "cucina",
+        "bar",
+        "pizzeria",
+        "cucina_sg"
       ],
       "default": "owner"
     },

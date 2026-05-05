@@ -33,7 +33,7 @@ const copertiInvernali = ref('');
 const copertiEstivi = ref('');
 const birthDate = ref('');
 
-// Step 3 — plan (we just continue to /choose-plan)
+// Step 3 — plan (we continue to /choose-plan for Essenziale/Professionale)
 const isLoading = ref(false);
 const errorMessage = ref('');
 
@@ -169,7 +169,7 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
             {{ step === 1 ? "Crea l'account" : step === 2 ? 'Il tuo ristorante' : 'Scegli il piano' }}
           </h1>
           <p>
-            {{ step === 1 ? 'Iniziamo dai tuoi dati. Servono 30 secondi.' : step === 2 ? 'Servono per fatturazione e configurazione.' : 'Cambi quando vuoi, senza vincoli.' }}
+            {{ step === 1 ? 'Iniziamo dai tuoi dati. Servono 30 secondi.' : step === 2 ? 'Servono per fatturazione e configurazione.' : 'Scegli Essenziale o Professionale. Cambi quando vuoi.' }}
           </p>
         </div>
 
@@ -298,7 +298,7 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
               <span>Nessun addebito ora. Inserisci la carta solo alla fine del periodo. Annulli quando vuoi.</span>
             </div>
           </div>
-          <p class="fl-help">Cliccando su "Continua" andrai alla pagina di scelta del piano. Lì potrai confrontare i piani disponibili e completare la registrazione tramite Stripe.</p>
+          <p class="fl-help">Cliccando su "Continua" andrai alla pagina di scelta del piano. Lì potrai scegliere Essenziale o Professionale e completare la registrazione tramite Stripe.</p>
           <div class="au-actions-row">
             <button type="button" class="btn btn-lg" @click="goBack">
               <i class="bi bi-arrow-left"></i> Indietro

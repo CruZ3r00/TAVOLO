@@ -1,7 +1,7 @@
 'use strict';
 
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
-const { resolveStaffContext } = require('../utils/staff-access');
+const { KITCHEN_LIKE_ROLES, resolveStaffContext } = require('../utils/staff-access');
 
 const BYPASS_PREFIXES = [
   '/api/auth/',
@@ -26,6 +26,10 @@ function hasValidSubscription(user) {
   return periodEndDate.getTime() >= Date.now();
 }
 
+function isProfessionalPlan(user) {
+  return String(user && user.subscription_plan || '').toLowerCase() === 'pro';
+}
+
 function isStaffApiAllowed(role, method, path) {
   if (role === 'owner' || role === 'gestione') return true;
   if (path === '/api/users/me') return method === 'GET';
@@ -47,7 +51,7 @@ function isStaffApiAllowed(role, method, path) {
     return false;
   }
 
-  if (role === 'cucina') {
+  if (KITCHEN_LIKE_ROLES.has(role)) {
     if (path === '/api/tables') return method === 'GET';
     if (path === '/api/orders') return method === 'GET';
     if (/^\/api\/orders\/[^/]+$/.test(path)) return method === 'GET';
@@ -101,8 +105,39 @@ module.exports = (_config, { strapi }) => {
       return;
     }
 
-    if (hasValidSubscription(billingUser)) {
+    const activeSubscription = hasValidSubscription(billingUser);
+    if (
+      activeSubscription &&
+      (
+        actor.role === 'owner' ||
+        isProfessionalPlan(billingUser) ||
+        actor.role === 'cameriere' ||
+        actor.role === 'cucina'
+      )
+    ) {
       return next();
+    }
+
+    if (activeSubscription) {
+      ctx.status = 403;
+      ctx.body = {
+        error: {
+          code: 'STAFF_PLAN_FORBIDDEN',
+          message: 'Questo reparto richiede il piano Professionale.',
+        },
+      };
+      return;
+    }
+
+    if (actor && actor.role !== 'owner') {
+      ctx.status = 402;
+      ctx.body = {
+        error: {
+          code: 'SUBSCRIPTION_REQUIRED',
+          message: 'Abbonamento non attivo. Accedi con l\'account titolare per rinnovare.',
+        },
+      };
+      return;
     }
 
     ctx.status = 402;

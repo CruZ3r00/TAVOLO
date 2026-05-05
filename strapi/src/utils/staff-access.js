@@ -5,6 +5,9 @@ const STAFF_ROLES = {
   GESTIONE: 'gestione',
   CAMERIERE: 'cameriere',
   CUCINA: 'cucina',
+  BAR: 'bar',
+  PIZZERIA: 'pizzeria',
+  CUCINA_SG: 'cucina_sg',
 };
 
 const KNOWN_ROLES = new Set(Object.values(STAFF_ROLES));
@@ -12,6 +15,17 @@ const STAFF_USERNAME_SUFFIXES = new Map([
   ['cameriere', STAFF_ROLES.CAMERIERE],
   ['camerire', STAFF_ROLES.CAMERIERE],
   ['cucina', STAFF_ROLES.CUCINA],
+  ['bar', STAFF_ROLES.BAR],
+  ['pizzeria', STAFF_ROLES.PIZZERIA],
+  ['cucinasg', STAFF_ROLES.CUCINA_SG],
+  ['cucina_sg', STAFF_ROLES.CUCINA_SG],
+]);
+
+const KITCHEN_LIKE_ROLES = new Set([
+  STAFF_ROLES.CUCINA,
+  STAFF_ROLES.BAR,
+  STAFF_ROLES.PIZZERIA,
+  STAFF_ROLES.CUCINA_SG,
 ]);
 
 function normalizeStaffRole(role) {
@@ -131,7 +145,7 @@ function assertStaffRole(actor, allowedRoles) {
 function canTransitionItem(actor, fromStatus, toStatus) {
   const role = actor && actor.role ? actor.role : STAFF_ROLES.OWNER;
   if (role === STAFF_ROLES.OWNER || role === STAFF_ROLES.GESTIONE) return true;
-  if (role === STAFF_ROLES.CUCINA) {
+  if (KITCHEN_LIKE_ROLES.has(role)) {
     return (fromStatus === 'taken' && toStatus === 'preparing') ||
       (fromStatus === 'preparing' && toStatus === 'ready');
   }
@@ -177,6 +191,7 @@ function compactRestaurantSlug(value, fallback = 'Ristorante') {
 
 module.exports = {
   STAFF_ROLES,
+  KITCHEN_LIKE_ROLES,
   normalizeStaffRole,
   resolveStaffContext,
   assertStaffRole,

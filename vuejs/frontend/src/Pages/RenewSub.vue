@@ -8,6 +8,7 @@ import {
     fetchBillingStatus,
     syncBillingCheckout,
 } from '@/utils';
+import { STAFF_ROLES, staffRole } from '@/staffAccess';
 
 const route = useRoute();
 const router = useRouter();
@@ -20,6 +21,7 @@ const loadingPlan = ref(null);
 const portalLoading = ref(false);
 const syncing = ref(false);
 const token = computed(() => store.getters.getToken);
+const isOwnerAccount = computed(() => staffRole(store.getters.getUser) === STAFF_ROLES.OWNER);
 
 // Solo 2 piani in renew. Custom non c'è.
 const PLANS = {
@@ -30,9 +32,9 @@ const PLANS = {
         period: '/ mese',
         features: [
             'Vista Sala, Cucina, Cassa',
+            'Account cameriere e cucina',
             'Fino a 20 tavoli',
             'Menu digitale + QR',
-            'Assistenza via email',
         ],
     },
     pro: {
@@ -42,10 +44,10 @@ const PLANS = {
         period: '/ mese',
         features: [
             'Tutto di Essenziale',
+            'Reparti bar, pizzeria e cucina SG',
+            'Smistamento categorie automatico',
             'Prenotazioni online illimitate',
             'Statistiche storiche e report',
-            'Scontrino elettronico',
-            'Assistenza prioritaria',
         ],
     },
 };
@@ -142,6 +144,12 @@ const logout = () => {
 };
 
 const checkoutNotice = computed(() => {
+    if (!isOwnerAccount.value) {
+        return 'Abbonamento non attivo o reparto non incluso nel piano. Accedi con l\'account titolare per rinnovare o cambiare piano.';
+    }
+    if (route.query.reason === 'pro-required') {
+        return 'Questo reparto richiede il piano Professionale. Accedi con l\'account titolare per cambiare piano.';
+    }
     if (route.query.checkout === 'cancelled') {
         return 'Checkout annullato. Puoi riprendere quando vuoi.';
     }
@@ -158,7 +166,7 @@ onMounted(async () => {
 
     // Retry automatico se il flusso ChoosePlan ci ha rimbalzato qui con un piano già scelto.
     const requestedPlan = typeof route.query.plan === 'string' ? route.query.plan : '';
-    if (route.query.checkout === 'retry' && PLANS[requestedPlan]) {
+    if (isOwnerAccount.value && route.query.checkout === 'retry' && PLANS[requestedPlan]) {
         subscribe(requestedPlan);
     }
 });
@@ -219,7 +227,20 @@ onMounted(async () => {
             </header>
 
             <!-- RETURNING USER: due opzioni (continua col tuo / passa all'altro) -->
-            <section v-if="currentPlan && switchPlan" class="renew-options">
+            <section v-if="!isOwnerAccount" class="renew-options">
+                <article class="opt-card opt-card-current">
+                    <div class="opt-tag opt-tag-current">Accesso titolare richiesto</div>
+                    <h3 class="plan-name">Rinnovo non disponibile da questo account</h3>
+                    <p class="renew-card-text">
+                        Gli account staff usano l'abbonamento del titolare e non possono aprire checkout o cambiare piano.
+                    </p>
+                    <button type="button" class="plan-cta plan-cta-primary" @click="logout">
+                        Accedi con il titolare
+                    </button>
+                </article>
+            </section>
+
+            <section v-else-if="currentPlan && switchPlan" class="renew-options">
                 <article class="opt-card opt-card-current">
                     <div class="opt-tag opt-tag-current">Il tuo piano</div>
                     <h3 class="plan-name">{{ currentPlan.name }}</h3>
@@ -340,6 +361,13 @@ onMounted(async () => {
     border-radius: var(--r-md);
     font-family: var(--f-mono, 'Geist Mono', monospace);
     font-weight: 700; font-size: 15px; letter-spacing: -0.02em;
+}
+
+.renew-card-text {
+    margin: 0 0 var(--s-5);
+    color: var(--ink-3);
+    font-size: 14px;
+    line-height: 1.55;
 }
 .renew-brand-text { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
 
