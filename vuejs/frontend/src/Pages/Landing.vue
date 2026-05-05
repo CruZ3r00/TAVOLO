@@ -2,81 +2,228 @@
 import { onMounted, nextTick } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
+const serviceProblems = [
+  'ordini che non arrivano al reparto giusto',
+  'confusione tra sala e cucina',
+  'stati non chiari: in preparazione, pronto, servito',
+  'troppe comunicazioni a voce',
+];
+
+const flowSteps = [
+  {
+    title: 'Il cameriere inserisce l’ordine',
+    body: 'Dal tavolo o da una prenotazione, con note e quantità già ordinate.',
+  },
+  {
+    title: 'Ogni reparto vede solo i suoi piatti',
+    body: 'Cucina, bar, pizzeria e altri reparti ricevono la propria coda.',
+  },
+  {
+    title: 'Gli stati avanzano',
+    body: 'Da preso a in preparazione, poi pronto, senza chiamate continue.',
+  },
+  {
+    title: 'La sala serve senza errori',
+    body: 'Il cameriere vede cosa è pronto e chiude il giro al tavolo.',
+  },
+];
+
+const features = [
+  { icon: 'bi-grid-3x3-gap', title: 'Gestione tavoli', body: 'Tavoli liberi, occupati e ordini aperti sempre visibili.' },
+  { icon: 'bi-calendar-check', title: 'Prenotazioni e walk-in', body: 'Prenotazioni, arrivi senza prenotazione e sala nello stesso flusso.' },
+  { icon: 'bi-receipt', title: 'Ordini multi-reparto', body: 'Un ordine unico può andare a cucina, bar, pizzeria e altri reparti.' },
+  { icon: 'bi-funnel', title: 'Filtri per reparto', body: 'Ogni reparto lavora solo le categorie che gli competono.' },
+  { icon: 'bi-arrow-repeat', title: 'Stati ordine in tempo reale', body: 'Preparazione, pronto e servito aggiornati durante il servizio.' },
+  { icon: 'bi-people', title: 'Ruoli operativi', body: 'Owner, cameriere, cucina, bar e pizzeria con accessi separati.' },
+  { icon: 'bi-diagram-3', title: 'Coordinamento reparti', body: 'Sala, cucina e bar restano sincronizzati senza messaggi sparsi.' },
+];
+
+const plans = [
+  {
+    key: 'starter',
+    name: 'Essenziale',
+    price: '€ 39,99',
+    period: '/ mese',
+    label: 'Per partire ordinati',
+    body: 'Per locali che vogliono gestire sala, ordini e cucina senza complicare il servizio.',
+    features: [
+      'Vista sala e tavoli',
+      'Prenotazioni e walk-in',
+      'Ordini verso cucina',
+      'Account cameriere e cucina',
+      'Menu digitale con QR',
+    ],
+  },
+  {
+    key: 'pro',
+    name: 'Professionale',
+    price: '€ 74,99',
+    period: '/ mese',
+    label: 'Per più reparti al lavoro',
+    body: 'Per ristoranti, pizzerie e bar con cucina che devono dividere le comande tra più postazioni.',
+    features: [
+      'Tutto del piano Essenziale',
+      'Reparti bar, pizzeria e cucina SG',
+      'Smistamento automatico per categoria',
+      'Ruoli staff più specifici',
+      'Statistiche storiche e report',
+    ],
+    highlighted: true,
+  },
+];
+
 onMounted(() => {
-  nextTick(() => { document.title = 'Tavolo · Il gestionale dei ristoranti moderni'; });
+  nextTick(() => { document.title = 'COMFORTABLES · Gestionale ristorante in tempo reale'; });
 });
 </script>
 
 <template>
-  <AppLayout variant="public" page-title="Tavolo">
+  <AppLayout variant="public" page-title="COMFORTABLES">
     <div class="dashboard-public">
       <section class="public-hero">
         <div class="public-container">
           <div class="public-hero-head">
-            <span class="public-eyebrow"><span class="tv-pulse"></span> Il gestionale che fa girare il servizio</span>
+            <span class="public-eyebrow">
+              <span class="tv-pulse"></span>
+              Gestionale per ristoranti piccoli e medi
+            </span>
             <h1>
-              Sala, cucina, cassa: <em>un solo gestionale</em>
-              <br />che fa girare il ristorante.
+              Gestisci sala, ordini e reparti <em>in tempo reale.</em>
             </h1>
             <p>
-              Apri tavoli e mandi ordini in 3 tap. Stampi scontrini fiscali con stampante RT.
-              Incassi con POS Bluetooth. Gestisci prenotazioni online dal tuo sito personalizzato.
-              Tutto da iPad, Android o computer che hai gia.
+              COMFORTABLES collega tavoli, prenotazioni e reparti: il cameriere prende
+              l’ordine, ogni reparto vede solo ciò che deve preparare, e la sala segue
+              tutto senza confusione.
             </p>
-            <div class="public-cta">
+            <div class="public-cta" aria-label="Azioni principali">
               <router-link to="/register" class="btn btn-lg btn-accent btn-pill">
-                Prova 14 giorni gratis <i class="bi bi-arrow-right"></i>
+                Prova gratis 14 giorni <i class="bi bi-arrow-right" aria-hidden="true"></i>
               </router-link>
-              <router-link to="/login" class="btn btn-lg btn-pill">
-                <i class="bi bi-box-arrow-in-right"></i> Accedi
-              </router-link>
+              <a href="#come-funziona" class="btn btn-lg btn-pill">
+                <i class="bi bi-play-circle" aria-hidden="true"></i> Guarda come funziona
+              </a>
             </div>
-            <div class="public-badges">
-              <span><i class="bi bi-check2"></i> Nessuna carta richiesta</span>
-              <span><i class="bi bi-check2"></i> Setup in 10 minuti</span>
-              <span><i class="bi bi-check2"></i> Stampa fiscale certificata AdE</span>
-              <span><i class="bi bi-check2"></i> Funziona offline</span>
-            </div>
+            <div class="public-microcopy">Nessun vincolo. Puoi disdire quando vuoi.</div>
           </div>
         </div>
       </section>
 
-      <section class="public-features">
+      <section class="public-problem" aria-labelledby="problem-title">
+        <div class="public-container">
+          <div class="public-split">
+            <div class="public-section-copy">
+              <div class="overline">Il problema</div>
+              <h2 id="problem-title">Quando il servizio si complica</h2>
+              <p>
+                Nei momenti pieni basta poco: un piatto detto a voce, una comanda
+                persa, un reparto che non sa cosa deve preparare.
+              </p>
+            </div>
+            <ul class="public-problem-list">
+              <li v-for="item in serviceProblems" :key="item">
+                <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
+                <span>{{ item }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="public-solution" aria-labelledby="solution-title">
         <div class="public-container">
           <div class="public-section-h">
-            <div class="overline">Funzionalita reali . in produzione</div>
-            <h2>Sei <em>flussi</em> che non ti rallentano.</h2>
+            <div class="overline">La soluzione</div>
+            <h2 id="solution-title">Un flusso unico, chiaro</h2>
+            <p>
+              Con COMFORTABLES ogni ordine segue un flusso preciso: viene inserito in sala,
+              distribuito automaticamente ai reparti e aggiornato in tempo reale fino al servizio.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="come-funziona" class="public-flow" aria-labelledby="flow-title">
+        <div class="public-container">
+          <div class="public-section-h">
+            <div class="overline">Come funziona</div>
+            <h2 id="flow-title">Dal tavolo al reparto, senza passaggi a voce.</h2>
+          </div>
+          <div class="public-flow-grid">
+            <article v-for="(step, index) in flowSteps" :key="step.title" class="public-flow-step">
+              <span class="public-flow-number">{{ index + 1 }}</span>
+              <h3>{{ step.title }}</h3>
+              <p>{{ step.body }}</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="public-features" aria-labelledby="features-title">
+        <div class="public-container">
+          <div class="public-section-h">
+            <div class="overline">Funzionalità operative</div>
+            <h2 id="features-title">Tutto quello che serve durante il servizio.</h2>
           </div>
           <div class="public-features-grid">
-            <article class="public-feature">
-              <div class="public-feature-icon"><i class="bi bi-grid-3x3-gap"></i></div>
-              <h3>Gestione sala e ordini</h3>
-              <p>Apri un tavolo, aggiungi portate e mandale alla cucina in 3 tap. Note, allergie, divisione conto.</p>
+            <article v-for="feature in features" :key="feature.title" class="public-feature">
+              <div class="public-feature-icon">
+                <i :class="['bi', feature.icon]" aria-hidden="true"></i>
+              </div>
+              <h3>{{ feature.title }}</h3>
+              <p>{{ feature.body }}</p>
             </article>
-            <article class="public-feature">
-              <div class="public-feature-icon"><i class="bi bi-fire"></i></div>
-              <h3>KDS per la brigata</h3>
-              <p>Board kanban per la cucina: ogni stazione vede la sua coda. Da fare > in prep > pronto in un tap.</p>
-            </article>
-            <article class="public-feature">
-              <div class="public-feature-icon"><i class="bi bi-credit-card-2-back"></i></div>
-              <h3>Pagamenti POS + RT</h3>
-              <p>App scaricabile su qualsiasi dispositivo: connetti il POS via Bluetooth e la stampante fiscale via WiFi.</p>
-            </article>
-            <article class="public-feature">
-              <div class="public-feature-icon"><i class="bi bi-calendar-check"></i></div>
-              <h3>Prenotazioni & arrivi</h3>
-              <p>Tutte le richieste in una board kanban: in attesa, confermate, in sala. Conferma con un tap.</p>
-            </article>
-            <article class="public-feature">
-              <div class="public-feature-icon"><i class="bi bi-globe2"></i></div>
-              <h3>Sito pubblico + QR menu</h3>
-              <p>Ogni abbonamento include un menu digitale con QR. In piu puoi richiedere un sito personalizzato.</p>
-            </article>
-            <article class="public-feature">
-              <div class="public-feature-icon"><i class="bi bi-bar-chart-line"></i></div>
-              <h3>Statistiche e insight</h3>
-              <p>Coperti, incasso, scontrino medio, piatti piu amati. Tutto storicizzato, esportabile, confrontabile.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="public-benefit" aria-labelledby="benefit-title">
+        <div class="public-container">
+          <div class="public-benefit-inner">
+            <div>
+              <div class="overline">Beneficio chiave</div>
+              <h2 id="benefit-title">Meno confusione. Più controllo.</h2>
+            </div>
+            <p>
+              Ogni persona vede solo ciò che deve fare. Tutto il resto è già organizzato.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="public-plans" aria-labelledby="plans-title">
+        <div class="public-container">
+          <div class="public-section-h">
+            <div class="overline">Piani</div>
+            <h2 id="plans-title">Scegli in base a come lavora il tuo locale.</h2>
+            <p>
+              I piani non cambiano solo il prezzo: cambiano quanti reparti puoi coordinare
+              e quanto dettaglio hai nella gestione del servizio.
+            </p>
+          </div>
+          <div class="public-plans-grid">
+            <article
+              v-for="plan in plans"
+              :key="plan.key"
+              class="public-plan"
+              :class="{ 'public-plan-highlight': plan.highlighted }"
+            >
+              <div v-if="plan.highlighted" class="public-plan-tag">Consigliato</div>
+              <div class="public-plan-label">{{ plan.label }}</div>
+              <h3>{{ plan.name }}</h3>
+              <div class="public-plan-price">
+                <span>{{ plan.price }}</span>
+                <small>{{ plan.period }}</small>
+              </div>
+              <p>{{ plan.body }}</p>
+              <ul>
+                <li v-for="feature in plan.features" :key="feature">
+                  <i class="bi bi-check2" aria-hidden="true"></i>
+                  <span>{{ feature }}</span>
+                </li>
+              </ul>
+              <router-link to="/register" class="btn btn-lg btn-pill" :class="{ 'btn-accent': plan.highlighted }">
+                Prova gratis 14 giorni
+              </router-link>
             </article>
           </div>
         </div>
@@ -86,17 +233,17 @@ onMounted(() => {
         <div class="public-container">
           <div class="public-cta-inner">
             <div>
-              <div class="overline" style="color: color-mix(in oklab, white 60%, transparent);">Pronto a iniziare?</div>
-              <h3>Prova Tavolo gratis per 14 giorni.</h3>
-              <p>Senza carta. Senza setup. Cambi quando vuoi.</p>
+              <div class="overline" style="color: color-mix(in oklab, white 60%, transparent);">Prova gratuita</div>
+              <h3>Prova gratis 14 giorni.</h3>
+              <p>Nessun vincolo. Puoi disdire quando vuoi.</p>
             </div>
             <div class="public-cta-actions">
               <router-link to="/register" class="btn btn-lg btn-pill btn-accent">
-                <i class="bi bi-rocket-takeoff"></i> Inizia ora
+                Prova gratis 14 giorni <i class="bi bi-arrow-right" aria-hidden="true"></i>
               </router-link>
-              <router-link to="/contact-us" class="btn btn-lg btn-pill">
-                <i class="bi bi-chat-dots"></i> Parla con noi
-              </router-link>
+              <a href="#come-funziona" class="btn btn-lg btn-pill">
+                <i class="bi bi-play-circle" aria-hidden="true"></i> Guarda come funziona
+              </a>
             </div>
           </div>
         </div>
@@ -117,7 +264,7 @@ onMounted(() => {
 
 .public-hero {
   position: relative;
-  padding: 80px 0 80px;
+  padding: 80px 0 72px;
   background:
     radial-gradient(60% 60% at 80% 0%, color-mix(in oklab, var(--ac) 12%, transparent), transparent 60%),
     radial-gradient(50% 50% at 0% 30%, color-mix(in oklab, var(--info) 8%, transparent), transparent 60%),
@@ -137,7 +284,7 @@ onMounted(() => {
 }
 .public-hero .public-container { position: relative; z-index: 1; }
 
-.public-hero-head { text-align: center; max-width: 900px; margin: 0 auto; }
+.public-hero-head { text-align: center; max-width: 920px; margin: 0 auto; }
 .public-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--paper); border: 1px solid var(--line);
@@ -152,22 +299,109 @@ onMounted(() => {
 }
 .public-hero p {
   font-size: clamp(15px, 1.6vw, 19px); line-height: 1.55;
-  color: var(--ink-2); max-width: 720px; margin: 0 auto 32px; text-wrap: pretty;
+  color: var(--ink-2); max-width: 760px; margin: 0 auto 32px; text-wrap: pretty;
 }
-.public-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
-.public-badges {
-  display: flex; gap: 24px; justify-content: center; flex-wrap: wrap;
-  font-size: 13px; color: var(--ink-3);
-}
-.public-badges span { display: inline-flex; align-items: center; gap: 6px; }
-.public-badges i { color: var(--ok); }
+.public-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+.public-microcopy { font-size: 13px; color: var(--ink-3); }
 
-.public-features { padding: 80px 0; background: var(--bg-sunk, var(--bg-2)); }
-.public-section-h { max-width: 760px; margin: 0 auto 48px; text-align: center; }
-.public-section-h h2 {
-  font-size: clamp(28px, 3.6vw, 44px); line-height: 1.1;
-  letter-spacing: -0.03em; font-weight: 600; margin: 12px 0 0; text-wrap: balance;
+.public-problem,
+.public-flow,
+.public-benefit,
+.public-plans {
+  padding: 72px 0;
+  background: var(--bg);
 }
+.public-solution,
+.public-features {
+  padding: 72px 0;
+  background: var(--bg-sunk, var(--bg-2));
+}
+
+.public-section-h { max-width: 760px; margin: 0 auto 44px; text-align: center; }
+.public-section-h h2,
+.public-section-copy h2,
+.public-benefit h2 {
+  font-size: clamp(28px, 3.6vw, 44px); line-height: 1.1;
+  letter-spacing: -0.03em; font-weight: 600; margin: 12px 0 0;
+  color: var(--ink); text-wrap: balance;
+}
+.public-section-h p,
+.public-section-copy p,
+.public-benefit p {
+  margin: 16px 0 0;
+  font-size: 16px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+.public-split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 40px;
+  align-items: center;
+}
+.public-section-copy { max-width: 520px; }
+.public-problem-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.public-problem-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px;
+  color: var(--ink-2);
+  box-shadow: var(--shadow-xs);
+}
+.public-problem-list i { color: var(--warn, var(--ac)); font-size: 18px; }
+
+.public-flow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.public-flow-step {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  min-height: 190px;
+}
+.public-flow-number {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--ac-soft);
+  color: var(--ac);
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+.public-flow-step h3,
+.public-feature h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  color: var(--ink);
+}
+.public-flow-step p,
+.public-feature p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
 .public-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .public-feature {
   background: var(--paper); border: 1px solid var(--line);
@@ -183,13 +417,101 @@ onMounted(() => {
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--ac); font-size: 22px; margin-bottom: 16px;
 }
-.public-feature h3 {
-  margin: 0 0 8px; font-size: 18px;
-  letter-spacing: -0.02em; font-weight: 600; color: var(--ink);
-}
-.public-feature p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
 
-.public-cta-box { padding: 80px 0; background: var(--bg); }
+.public-benefit-inner {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+  gap: 28px;
+  align-items: center;
+  box-shadow: var(--shadow-xs);
+}
+.public-benefit p { margin: 0; font-size: 18px; }
+
+.public-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+.public-plan {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 30px;
+  box-shadow: var(--shadow-xs);
+}
+.public-plan-highlight {
+  border-color: color-mix(in oklab, var(--ac) 45%, var(--line));
+  box-shadow: var(--shadow-md);
+}
+.public-plan-tag {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: var(--ac);
+  color: var(--paper);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.public-plan-label {
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.public-plan h3 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 26px;
+  letter-spacing: -0.03em;
+}
+.public-plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.public-plan-price span {
+  color: var(--ink);
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+.public-plan-price small { color: var(--ink-3); font-size: 14px; }
+.public-plan p {
+  margin: 0 0 20px;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.public-plan ul {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.public-plan li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+.public-plan li i {
+  color: var(--ok);
+  margin-top: 2px;
+}
+
+.public-cta-box { padding: 72px 0 80px; background: var(--bg); }
 .public-cta-inner {
   background: var(--ink); color: var(--paper);
   border-radius: 24px; padding: 56px;
@@ -212,13 +534,31 @@ onMounted(() => {
 }
 .public-cta-inner :deep(.btn-accent:hover) { background: color-mix(in oklab, var(--paper) 90%, var(--ac)); }
 
-@media (max-width: 1080px) { .public-features-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 1080px) {
+  .public-features-grid { grid-template-columns: 1fr 1fr; }
+  .public-flow-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 820px) {
+  .public-split,
+  .public-benefit-inner,
+  .public-plans-grid {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 720px) {
   .public-hero { padding: 56px 0; }
-  .public-features { padding: 56px 0; }
-  .public-features-grid { grid-template-columns: 1fr; }
+  .public-problem,
+  .public-solution,
+  .public-flow,
+  .public-features,
+  .public-benefit,
+  .public-plans { padding: 56px 0; }
+  .public-features-grid,
+  .public-flow-grid { grid-template-columns: 1fr; }
+  .public-flow-step { min-height: 0; }
   .public-cta-box { padding: 40px 0; }
-  .public-cta-inner { padding: 32px; }
+  .public-cta-inner,
+  .public-benefit-inner { padding: 32px; }
   .public-cta-inner h3 { font-size: 22px; }
 }
 </style>
