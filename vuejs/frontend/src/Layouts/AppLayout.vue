@@ -80,7 +80,9 @@ const stopRealtimeCounts = async () => {
     realtimeRefreshHandle = null;
   }
   if (realtimeChannel && supabase) {
-    await supabase.removeChannel(realtimeChannel);
+    try {
+      await supabase.removeChannel(realtimeChannel);
+    } catch (_err) { /* realtime is optional */ }
     realtimeChannel = null;
   }
 };
@@ -89,15 +91,24 @@ const subscribeRealtimeCounts = async () => {
   await stopRealtimeCounts();
   const userId = effectiveUserId(store.getters.getUser);
   if (!isSupabaseRealtimeConfigured || !supabase || !userId) return;
-  realtimeChannel = supabase
-    .channel(`app-counts-${userId}`)
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'order_realtime_events',
-      filter: `user_id=eq.${userId}`,
-    }, scheduleRealtimeCountsRefresh)
-    .subscribe();
+  try {
+    realtimeChannel = supabase
+      .channel(`app-counts-${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'order_realtime_events',
+        filter: `user_id=eq.${userId}`,
+      }, scheduleRealtimeCountsRefresh);
+
+    realtimeChannel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        realtimeChannel = null;
+      }
+    });
+  } catch (_err) {
+    realtimeChannel = null;
+  }
 };
 
 const variantResolved = computed(() => {

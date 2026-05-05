@@ -270,7 +270,9 @@ const stopRealtime = async () => {
     realtimeRefreshHandle = null;
   }
   if (realtimeChannel && supabase) {
-    await supabase.removeChannel(realtimeChannel);
+    try {
+      await supabase.removeChannel(realtimeChannel);
+    } catch (_err) { /* realtime is optional */ }
     realtimeChannel = null;
   }
 };
@@ -279,15 +281,24 @@ const subscribeRealtime = async (userId) => {
   await stopRealtime();
   if (!isSupabaseRealtimeConfigured || !supabase || !userId) return;
 
-  realtimeChannel = supabase
-    .channel(`kitchen-orders-${userId}`)
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'order_realtime_events',
-      filter: `user_id=eq.${userId}`,
-    }, scheduleRealtimeRefresh)
-    .subscribe();
+  try {
+    realtimeChannel = supabase
+      .channel(`kitchen-orders-${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'order_realtime_events',
+        filter: `user_id=eq.${userId}`,
+      }, scheduleRealtimeRefresh);
+
+    realtimeChannel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        realtimeChannel = null;
+      }
+    });
+  } catch (_err) {
+    realtimeChannel = null;
+  }
 };
 const onVisibilityChange = () => {
   if (document.visibilityState === 'visible') loadData({ silent: true });

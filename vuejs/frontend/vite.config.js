@@ -6,10 +6,11 @@ import legacy from '@vitejs/plugin-legacy'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/',
   plugins: [
     vue(),
     legacy({
-      targets: ['defaults', 'firefox >= 60', 'not IE 11'],
+      targets: ['Firefox >= 52', 'Chrome >= 49', 'Safari >= 10.1', 'Edge >= 18'],
       polyfills: true,
       renderLegacyChunks: true,
     }),
