@@ -85,7 +85,7 @@ const loadData = async ({ silent = false } = {}) => {
   if (silent) refreshing.value = true; else loading.value = true;
   try {
     const [tablesResp, ordersResp] = await Promise.all([
-      fetchTables(token.value),
+      isKitchenMode.value ? Promise.resolve({ data: [] }) : fetchTables(token.value),
       fetchOrders({ status: 'active', pageSize: 100, station: modeInfo.value.station }, token.value),
     ]);
     tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];

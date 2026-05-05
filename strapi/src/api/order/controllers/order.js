@@ -269,6 +269,43 @@ function normalizeStation(value) {
   return STATION_ROLES.has(station) ? station : null;
 }
 
+function classifyCategoryFallback(category) {
+  const value = String(category || '').trim().toLowerCase();
+  if (!value) return STAFF_ROLES.CUCINA;
+
+  if (/(bevande|bibite|drink|cocktail|vino|vini|birra|birre|amari|liquori|distillati|aperitivi|bar|caffe|caffè|acqua|soft drink|analcolic)/.test(value)) {
+    return STAFF_ROLES.BAR;
+  }
+  if (/(senza glutine|gluten free|gluten-free|sg|celiac|celiach)/.test(value)) {
+    return STAFF_ROLES.CUCINA_SG;
+  }
+  if (/(pizza|pizze|pizzeria|focaccia|calzone)/.test(value)) {
+    return STAFF_ROLES.PIZZERIA;
+  }
+
+  return STAFF_ROLES.CUCINA;
+}
+
+async function activeStationOrKitchen(ownerId, station) {
+  const normalized = normalizeStation(station) || STAFF_ROLES.CUCINA;
+  if (normalized === STAFF_ROLES.CUCINA || !strapi.db.connection) return STAFF_ROLES.CUCINA;
+
+  try {
+    const row = await strapi.db.connection('restaurant_staff as staff')
+      .leftJoin('up_users as user', 'user.id', 'staff.user_id')
+      .select(['staff.active', 'user.blocked'])
+      .where('staff.owner_id', ownerId)
+      .where('staff.role', normalized)
+      .first();
+
+    return row && row.active !== false && row.blocked !== true
+      ? normalized
+      : STAFF_ROLES.CUCINA;
+  } catch (_err) {
+    return normalized;
+  }
+}
+
 function stationForActor(actor, query) {
   if (!actor) return null;
   if (actor.role === STAFF_ROLES.CUCINA) {
@@ -287,14 +324,30 @@ async function stationForCategory(ownerId, category) {
   if (!cleanCategory || !strapi.db.connection) return STAFF_ROLES.CUCINA;
 
   try {
+    await strapi.db.connection.raw('select public.ensure_restaurant_category_routing(?, ?)', [ownerId, cleanCategory]);
+
     const row = await strapi.db.connection('restaurant_category_routing')
-      .select('staff_role')
+      .select(['staff_role', 'locked'])
       .where('owner_id', ownerId)
       .whereRaw('lower(category) = lower(?)', [cleanCategory])
       .first();
-    return normalizeStation(row && row.staff_role) || STAFF_ROLES.CUCINA;
+
+    if (row && row.locked !== true) {
+      const automaticStation = await activeStationOrKitchen(ownerId, classifyCategoryFallback(cleanCategory));
+      const currentStation = normalizeStation(row.staff_role) || STAFF_ROLES.CUCINA;
+      if (automaticStation !== currentStation) {
+        await strapi.db.connection('restaurant_category_routing')
+          .where('owner_id', ownerId)
+          .whereRaw('lower(category) = lower(?)', [cleanCategory])
+          .where('locked', false)
+          .update({ staff_role: automaticStation });
+      }
+      return automaticStation;
+    }
+
+    return activeStationOrKitchen(ownerId, normalizeStation(row && row.staff_role) || classifyCategoryFallback(cleanCategory));
   } catch (_err) {
-    return STAFF_ROLES.CUCINA;
+    return activeStationOrKitchen(ownerId, classifyCategoryFallback(cleanCategory));
   }
 }
 

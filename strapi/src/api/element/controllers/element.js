@@ -91,6 +91,17 @@ function serializeElement(element) {
   };
 }
 
+async function ensureCategoryRouting(strapi, ownerId, category) {
+  const cleanCategory = trimString(category);
+  if (!ownerId || !cleanCategory || !strapi.db.connection) return;
+
+  try {
+    await strapi.db.connection.raw('select public.ensure_restaurant_category_routing(?, ?)', [ownerId, cleanCategory]);
+  } catch (err) {
+    strapi.log.warn(`element category routing: sync fallita per user ${ownerId}: ${err.message}`);
+  }
+}
+
 async function loadUserMenu(strapi, userId) {
   const menus = await strapi.documents('api::menu.menu').findMany({
     filters: {
@@ -140,6 +151,7 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
         },
         status: 'published',
       });
+      await ensureCategoryRouting(strapi, user.id, parsed.data.category);
 
       const menu = await ensureUserMenu(strapi, user.id);
       const existingConn = Array.isArray(menu.fk_elements)
@@ -191,6 +203,9 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
         data: parsed.data,
         status: 'published',
       });
+      if (parsed.data.category) {
+        await ensureCategoryRouting(strapi, user.id, parsed.data.category);
+      }
 
       ctx.body = { data: serializeElement(updated) };
     } catch (error) {

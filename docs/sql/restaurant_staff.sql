@@ -428,13 +428,33 @@ language plpgsql
 as $$
 declare
   v_category text := nullif(btrim(coalesce(p_category, '')), '');
+  v_role text;
+  v_role_available boolean;
 begin
   if p_owner_id is null or v_category is null then
     return;
   end if;
 
+  v_role := public.classify_staff_role_for_category(v_category);
+
+  if v_role <> 'cucina' then
+    select exists (
+      select 1
+      from public.restaurant_staff staff
+      join public.up_users staff_user on staff_user.id = staff.user_id
+      where staff.owner_id = p_owner_id
+        and staff.role = v_role
+        and staff.active = true
+        and coalesce(staff_user.blocked, false) = false
+    ) into v_role_available;
+
+    if not coalesce(v_role_available, false) then
+      v_role := 'cucina';
+    end if;
+  end if;
+
   insert into public.restaurant_category_routing (owner_id, category, staff_role)
-  values (p_owner_id, v_category, public.classify_staff_role_for_category(v_category))
+  values (p_owner_id, v_category, v_role)
   on conflict (owner_id, category_key) do nothing;
 end;
 $$;
