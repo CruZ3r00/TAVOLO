@@ -652,6 +652,19 @@ export interface ApiOrderItemOrderItem extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    category: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 100;
+      }>;
+    course: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 12;
+          min: 1;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<1>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -725,6 +738,17 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    fiscal_event_id: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    fiscal_receipt_id: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    fiscal_status: Schema.Attribute.Enumeration<
+      ['pending', 'completed', 'failed', 'not_required']
+    >;
     fk_items: Schema.Attribute.Relation<
       'oneToMany',
       'api::order-item.order-item'
@@ -1708,8 +1732,11 @@ export interface PluginUsersPermissionsUser
     draftAndPublish: false;
   };
   attributes: {
+    address: Schema.Attribute.String;
     birth_date: Schema.Attribute.Date;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    cap: Schema.Attribute.String;
+    city: Schema.Attribute.String;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     createdAt: Schema.Attribute.DateTime;
@@ -1743,6 +1770,7 @@ export interface PluginUsersPermissionsUser
       }>;
     payment_method: Schema.Attribute.JSON;
     provider: Schema.Attribute.String;
+    province: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
     role: Schema.Attribute.Relation<
@@ -1754,7 +1782,15 @@ export interface PluginUsersPermissionsUser
       'plugin::users-permissions.user'
     >;
     staff_role: Schema.Attribute.Enumeration<
-      ['owner', 'gestione', 'cameriere', 'cucina']
+      [
+        'owner',
+        'gestione',
+        'cameriere',
+        'cucina',
+        'bar',
+        'pizzeria',
+        'cucina_sg',
+      ]
     > &
       Schema.Attribute.DefaultTo<'owner'>;
     stripe_customer_id: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1780,6 +1816,7 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 3;
       }>;
+    vat: Schema.Attribute.String;
   };
 }
 

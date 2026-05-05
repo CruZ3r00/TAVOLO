@@ -1,3 +1,91 @@
+# Plan — Verify Owner Tabs And Department Category Editing (2026-05-05)
+
+## Obiettivo
+
+Verificare e correggere due regressioni funzionali: i tab owner dentro `Ordini` devono navigare davvero tra `Cucina`, `Bar`, `Pizzeria`, `Cucina SG`; nella scheda Profilo > Reparti le categorie assegnate devono essere modificabili quando il piano lo consente, oppure mostrare chiaramente se il blocco dipende da assenza dati/piano.
+
+## Checklist
+
+- [x] Controllare router/guard/staff roles delle rotte dei reparti produttivi.
+- [x] Correggere il click dei tab owner e verificare che punti a una navigazione router esplicita.
+- [x] Controllare payload account/staff e form Reparti per categorie modificabili.
+- [x] Correggere modifica/salvataggio categoria -> reparto se il problema e nel codice.
+- [x] Verificare con controlli disponibili, distinguendo cio che non puo essere testato senza runtime.
+
+## Review
+
+- `git diff --check` OK.
+- Le rotte `/kitchen`, `/bar`, `/pizzeria`, `/kitchen-sg` includono `STAFF_ROLES.OWNER` e hanno `ordersMode` dedicato.
+- I tab owner in `Orders.vue` ora sono bottoni come nella pagina profilo e chiamano `router.push(...)` tramite `switchOwnerOrderMode`.
+- La scheda Reparti ora espone piano/motivo blocco ricevuti dal backend e usa il ruolo effettivo della categoria nel select.
+- Non ho potuto fare login/API/browser end-to-end: Strapi non risponde su `localhost:1337` o `localhost:1437`, e `npm`/`node` non sono disponibili nel PATH nemmeno con esecuzione fuori sandbox.
+
+
+# Plan — Strapi SSL CA Startup Fix (2026-05-05)
+
+## Obiettivo
+
+Evitare che `npm run dev` di Strapi fallisca quando `DATABASE_SSL_CA` punta a un certificato locale non presente sulla macchina di sviluppo.
+
+## Checklist
+
+- [x] Verificare causa in `strapi/config/database.js`.
+- [x] Rendere opzionale il file CA senza disattivare SSL.
+- [x] Verificare sintassi/config con gli strumenti disponibili.
+
+## Review
+
+- `git diff --check` OK.
+- `node` non disponibile nel `PATH` di questo ambiente, quindi non ho potuto fare un require diretto del config. La macchina dell'utente ha `npm`, quindi puo rilanciare `npm run dev`.
+
+## Follow-up
+
+- [x] Gestire anche `self-signed certificate in certificate chain` quando manca il CA in sviluppo.
+- [x] Evitare warning `fs.existsSync` con tipi non stringa.
+- [x] Mantenere errore esplicito in produzione se `DATABASE_SSL_CA` punta a un file assente.
+- [x] Rimuovere l'hard-fail automatico basato su `NODE_ENV`; il fail ora richiede `DATABASE_SSL_FAIL_ON_MISSING_CA=true`.
+
+# Plan — Persistent Category Routing By Department (2026-05-05)
+
+## Obiettivo
+
+Rendere persistente l'assegnazione delle categorie ai reparti: classificazione automatica solo al primo inserimento, modifica manuale dalla pagina Reparti, override sempre a Cucina per piano Essenziale/Starter, cameriere sempre attivo e non disattivabile.
+
+## Checklist
+
+- [x] Mappare routing categorie, account reparto e vincoli piano.
+- [x] Centralizzare la logica backend di routing categorie.
+- [x] Aggiungere API per leggere/salvare assegnazioni categoria -> reparto.
+- [x] Aggiornare pagina Reparti con categorie spostabili tra reparti.
+- [x] Correggere filtro ordini per Starter/Pro.
+- [x] Verificare con controlli disponibili.
+
+## Review
+
+- `git diff --check` OK.
+- `npm run build` non eseguibile in questo ambiente: `npm` non e disponibile nel `PATH`.
+- Aggiunta patch SQL opzionale in `docs/sql/category_routing_manual_assignments_patch.sql`.
+
+# Plan — Owner Orders Navigation (2026-05-05)
+
+## Obiettivo
+
+Rendere la navigazione owner piu semplice: sidebar desktop e bottom navbar mobile racchiudono in `Ordini` solo i reparti produttivi (`Cucina`, `Bar`, `Pizzeria`, `Cucina SG`), mentre `Manager`, `Sala`, `Prenotazioni` e `Menu` restano sezioni autonome. I reparti produttivi vengono scelti una alla volta da tab in testata pagina con lo stile del profilo. Le viste dedicate agli staff restano invariate.
+
+## Checklist
+
+- [x] Verificare struttura corrente di sidebar, bottom nav e pagina ordini.
+- [x] Limitare la nav del ruolo owner a un solo item `Ordini` per i reparti produttivi.
+- [x] Lasciare `Manager`, `Sala`, `Prenotazioni` e `Menu` come item owner separati.
+- [x] Aggiungere tabs owner in `Orders.vue` per Cucina, Bar, Pizzeria e Cucina SG.
+- [x] Verificare con gli strumenti disponibili.
+
+## Review
+
+- `git diff --check` OK.
+- `npm run build` non eseguibile in questo ambiente: `npm`/`node` non sono disponibili nel `PATH`.
+- Diff controllato sui file modificati; le viste staff mantengono la lista precedente per ruolo e la scheda owner `Ordini` include solo i reparti produttivi.
+
 # Plan — POS/Cassa Fiscale Integration (PC + Mobile)
 
 > **Scope ratificato con l'utente** (sessione 2026-04-26):

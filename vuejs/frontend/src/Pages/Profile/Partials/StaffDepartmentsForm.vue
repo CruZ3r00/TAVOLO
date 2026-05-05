@@ -1,17 +1,53 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useStore } from 'vuex';
-import { fetchStaffSettings, updateStaffSetting } from '@/utils';
+import { fetchStaffSettings, updateCategoryRouting, updateStaffSetting } from '@/utils';
 
 const store = useStore();
 const token = computed(() => store.getters.getToken);
 
+const routableRoles = new Set(['cucina', 'bar', 'pizzeria', 'cucina_sg']);
 const departments = ref([]);
 const loading = ref(true);
 const savingRole = ref(null);
+const savingCategory = ref(null);
 const errorMessage = ref('');
 const successMessage = ref('');
 const hasPendingBackend = computed(() => departments.value.some((department) => department.pending_backend));
+const routingAllowed = computed(() => departments.value.some((department) => department.routing_allowed));
+const routableDepartments = computed(() => departments.value.filter((department) => routableRoles.has(department.role)));
+const departmentCategories = (department) => (
+    Array.isArray(department?.categories) ? department.categories : []
+);
+const categoryTotal = computed(() => departments.value.reduce((total, department) => (
+    total + departmentCategories(department).length
+), 0));
+const routingBlockedReason = computed(() => (
+    departments.value.find((department) => department.routing_blocked_reason)?.routing_blocked_reason || ''
+));
+const subscriptionPlan = computed(() => (
+    departments.value.find((department) => department.subscription_plan)?.subscription_plan || ''
+));
+const subscriptionPlanLabel = computed(() => {
+    if (subscriptionPlan.value === 'pro') return 'Professionale';
+    if (subscriptionPlan.value === 'starter') return 'Essenziale';
+    return subscriptionPlan.value || 'non attivo';
+});
+const routingNotice = computed(() => {
+    if (hasPendingBackend.value) {
+        return 'Configurazione reparti in sincronizzazione. Riprova tra qualche istante se un salvataggio non viene confermato.';
+    }
+    if (categoryTotal.value === 0) {
+        return 'Nessuna categoria trovata nel menu. Aggiungi elementi con categoria per abilitarne lo smistamento.';
+    }
+    if (!routingAllowed.value) {
+        if (routingBlockedReason.value === 'subscription_required') {
+            return 'Le categorie sono presenti, ma la modifica delle assegnazioni richiede un abbonamento attivo al piano Professionale.';
+        }
+        return `Le categorie sono presenti, ma la modifica delle assegnazioni richiede il piano Professionale. Piano rilevato: ${subscriptionPlanLabel.value}. Con il piano Essenziale tutte le portate arrivano in Cucina.`;
+    }
+    return '';
+});
 
 const roleIcon = (role) => {
     switch (role) {
@@ -22,6 +58,24 @@ const roleIcon = (role) => {
         case 'cucina_sg': return 'bi-shield-check';
         default: return 'bi-person-badge';
     }
+};
+
+const roleLabel = (role) => (
+    routableDepartments.value.find((department) => department.role === role)?.label || role
+);
+
+const categoryRole = (category, fallbackRole) => (
+    routableRoles.has(category?.staff_role) ? category.staff_role : fallbackRole
+);
+
+const categorySelectDisabled = (category) => (
+    !routingAllowed.value || savingCategory.value === category?.category
+);
+
+const categorySelectTitle = (category) => {
+    if (savingCategory.value === category?.category) return 'Salvataggio in corso...';
+    if (!routingAllowed.value) return 'Richiede il piano Professionale.';
+    return 'Sposta questa categoria in un altro reparto.';
 };
 
 const loadDepartments = async () => {
@@ -43,7 +97,7 @@ const loadDepartments = async () => {
 };
 
 const toggleDepartment = async (department) => {
-    if (!department || savingRole.value || !department.plan_allowed) return;
+    if (!department || savingRole.value || !department.can_toggle) return;
     const nextActive = !department.active;
     savingRole.value = department.role;
     errorMessage.value = '';
@@ -59,6 +113,23 @@ const toggleDepartment = async (department) => {
     }
 };
 
+const moveCategory = async (category, role, currentRole) => {
+    if (!routingAllowed.value || savingCategory.value || !category || !role) return;
+    if (role === currentRole) return;
+    savingCategory.value = category;
+    errorMessage.value = '';
+    successMessage.value = '';
+    try {
+        departments.value = await updateCategoryRouting(category, role, token.value);
+        successMessage.value = `Categoria "${category}" assegnata a ${roleLabel(role)}.`;
+        setTimeout(() => { successMessage.value = ''; }, 3500);
+    } catch (err) {
+        errorMessage.value = err?.message || 'Assegnazione categoria non riuscita.';
+    } finally {
+        savingCategory.value = null;
+    }
+};
+
 onMounted(loadDepartments);
 </script>
 
@@ -68,7 +139,7 @@ onMounted(loadDepartments);
             <div class="section-icon"><i class="bi bi-people"></i></div>
             <div>
                 <h3 class="section-title">Reparti staff</h3>
-                <p class="section-description">Scegli quali account operativi possono accedere al ristorante.</p>
+                <p class="section-description">Scegli quali account operativi possono accedere al ristorante e dove inviare le categorie.</p>
             </div>
         </div>
 
@@ -92,17 +163,19 @@ onMounted(loadDepartments);
             </div>
 
             <div v-else class="staff-grid">
-                <div v-if="hasPendingBackend" class="staff-inline-note">
-                    Configurazione reparti in sincronizzazione. Riprova tra qualche istante se un salvataggio non viene confermato.
+                <div
+                    v-if="routingNotice"
+                    class="staff-inline-note"
+                    :class="{ 'staff-inline-note--locked': categoryTotal > 0 && !routingAllowed }"
+                >
+                    {{ routingNotice }}
                 </div>
-                <button
+
+                <div
                     v-for="department in departments"
                     :key="department.role"
-                    type="button"
                     class="staff-card"
                     :class="{ active: department.active && department.plan_allowed, disabled: !department.plan_allowed }"
-                    :disabled="savingRole === department.role || !department.plan_allowed"
-                    @click="toggleDepartment(department)"
                 >
                     <span class="staff-card-icon">
                         <i :class="['bi', roleIcon(department.role)]"></i>
@@ -111,12 +184,56 @@ onMounted(loadDepartments);
                         <strong>{{ department.label }}</strong>
                         <em>{{ department.username || 'Account in preparazione' }}</em>
                     </span>
-                    <span class="staff-toggle" :class="{ on: department.active && department.plan_allowed }">
+                    <button
+                        type="button"
+                        class="staff-toggle"
+                        :class="{ on: department.active && department.plan_allowed, locked: !department.can_toggle }"
+                        :disabled="savingRole === department.role || !department.can_toggle"
+                        :aria-label="department.can_toggle ? `${department.active ? 'Disattiva' : 'Attiva'} ${department.label}` : `${department.label} bloccato`"
+                        @click="toggleDepartment(department)"
+                    >
                         <span v-if="savingRole === department.role" class="ds-spinner"></span>
                         <i v-else-if="department.active && department.plan_allowed" class="bi bi-check2"></i>
-                    </span>
-                    <span v-if="!department.plan_allowed" class="staff-plan-note">Richiede Professionale</span>
-                </button>
+                        <i v-else-if="!department.can_toggle" class="bi bi-lock"></i>
+                    </button>
+                    <span v-if="department.role === 'cameriere'" class="staff-plan-note">Sempre attivo</span>
+                    <span v-else-if="!department.plan_allowed" class="staff-plan-note">Richiede Professionale</span>
+
+                    <div v-if="routableRoles.has(department.role)" class="staff-categories">
+                        <div class="staff-categories-head">
+                            <span>Categorie</span>
+                            <small>{{ departmentCategories(department).length }}</small>
+                        </div>
+                        <div v-if="departmentCategories(department).length === 0" class="staff-empty-categories">
+                            Nessuna categoria assegnata.
+                        </div>
+                        <label
+                            v-for="category in departmentCategories(department)"
+                            :key="`${department.role}-${category.category}`"
+                            class="staff-category-row"
+                        >
+                            <span>
+                                <strong>{{ category.category }}</strong>
+                                <em>{{ category.item_count }} elementi</em>
+                            </span>
+                            <select
+                                class="staff-category-select"
+                                :value="categoryRole(category, department.role)"
+                                :disabled="categorySelectDisabled(category)"
+                                :title="categorySelectTitle(category)"
+                                @change="moveCategory(category.category, $event.target.value, categoryRole(category, department.role))"
+                            >
+                                <option
+                                    v-for="target in routableDepartments"
+                                    :key="target.role"
+                                    :value="target.role"
+                                >
+                                    {{ target.label }}
+                                </option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -172,7 +289,7 @@ onMounted(loadDepartments);
 }
 .staff-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 12px;
 }
 .staff-inline-note {
@@ -184,6 +301,10 @@ onMounted(loadDepartments);
     color: var(--ink-2);
     font-size: 13px;
     line-height: 1.45;
+}
+.staff-inline-note--locked {
+    border-color: color-mix(in oklab, var(--ac) 22%, var(--line));
+    background: color-mix(in oklab, var(--ac) 7%, var(--paper));
 }
 .staff-card {
     position: relative;
@@ -199,10 +320,9 @@ onMounted(loadDepartments);
     background: var(--bg);
     color: var(--ink);
     text-align: left;
-    cursor: pointer;
     transition: border-color 140ms, background 140ms, transform 140ms;
 }
-.staff-card:hover:not(:disabled) {
+.staff-card:hover:not(.disabled) {
     border-color: color-mix(in oklab, var(--ac) 45%, var(--line));
     transform: translateY(-1px);
 }
@@ -212,7 +332,6 @@ onMounted(loadDepartments);
 }
 .staff-card.disabled {
     opacity: 0.68;
-    cursor: not-allowed;
 }
 .staff-card-icon {
     width: 38px;
@@ -247,13 +366,20 @@ onMounted(loadDepartments);
     height: 22px;
     display: grid;
     place-items: center;
+    border: 0;
     border-radius: 999px;
     background: var(--bg-sunk, var(--bg-2));
     color: var(--paper);
     justify-self: end;
+    cursor: pointer;
 }
 .staff-toggle.on {
     background: var(--ok);
+}
+.staff-toggle.locked,
+.staff-toggle:disabled {
+    cursor: not-allowed;
+    background: color-mix(in oklab, var(--ink-3) 26%, var(--line));
 }
 .staff-plan-note {
     grid-column: 2 / 4;
@@ -261,6 +387,79 @@ onMounted(loadDepartments);
     font-size: 12px;
     font-weight: 600;
 }
+.staff-categories {
+    grid-column: 1 / -1;
+    border-top: 1px dashed var(--line);
+    margin-top: 2px;
+    padding-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.staff-categories-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--ink-3);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.staff-categories-head small {
+    font-family: var(--f-mono);
+    font-size: 11px;
+}
+.staff-empty-categories {
+    color: var(--ink-3);
+    font-size: 12.5px;
+}
+.staff-category-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 150px);
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--paper);
+}
+.staff-category-row strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.staff-category-row em {
+    display: block;
+    margin-top: 2px;
+    color: var(--ink-3);
+    font-size: 11.5px;
+    font-style: normal;
+}
+.staff-category-select {
+    width: 100%;
+    min-height: 34px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    color: var(--ink);
+    font: inherit;
+    font-size: 12.5px;
+    padding: 0 8px;
+}
+.staff-category-select:disabled {
+    color: var(--ink-3);
+    cursor: not-allowed;
+}
 .fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
+
+@media (max-width: 620px) {
+    .staff-category-row {
+        grid-template-columns: 1fr;
+    }
+}
 </style>

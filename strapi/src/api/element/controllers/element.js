@@ -5,6 +5,7 @@
  */
 
 const { createCoreController } = require('@strapi/strapi').factories;
+const { ensureCategoryRouting } = require('../../../utils/category-routing');
 
 const trimString = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -89,17 +90,6 @@ function serializeElement(element) {
     createdAt: element.createdAt,
     updatedAt: element.updatedAt,
   };
-}
-
-async function ensureCategoryRouting(strapi, ownerId, category) {
-  const cleanCategory = trimString(category);
-  if (!ownerId || !cleanCategory || !strapi.db.connection) return;
-
-  try {
-    await strapi.db.connection.raw('select public.ensure_restaurant_category_routing(?, ?)', [ownerId, cleanCategory]);
-  } catch (err) {
-    strapi.log.warn(`element category routing: sync fallita per user ${ownerId}: ${err.message}`);
-  }
 }
 
 async function loadUserMenu(strapi, userId) {

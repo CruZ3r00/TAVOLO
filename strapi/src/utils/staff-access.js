@@ -98,6 +98,7 @@ async function resolveRestaurantStaffRecord(strapi, actor) {
 
 async function applyStaffActiveState(strapi, ownerId, role, active) {
   if (!strapi.db.connection) return null;
+  const nextActive = role === STAFF_ROLES.CAMERIERE ? true : !!active;
 
   const row = await strapi.db.connection('restaurant_staff')
     .select(['user_id', 'role'])
@@ -110,7 +111,7 @@ async function applyStaffActiveState(strapi, ownerId, role, active) {
   await strapi.db.connection('restaurant_staff')
     .where('owner_id', ownerId)
     .where('role', role)
-    .update({ active: !!active });
+    .update({ active: nextActive });
 
   const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
     where: { id: ownerId },
@@ -133,10 +134,10 @@ async function applyStaffActiveState(strapi, ownerId, role, active) {
 
   await strapi.db.query('plugin::users-permissions.user').update({
     where: { id: row.user_id },
-    data: { blocked: !(!!active && planAllowsRole) },
+    data: { blocked: !(nextActive && planAllowsRole) },
   });
 
-  return { user_id: row.user_id, role, active: !!active, blocked: !(!!active && planAllowsRole) };
+  return { user_id: row.user_id, role, active: nextActive, blocked: !(nextActive && planAllowsRole) };
 }
 
 function staffError(message = 'Non autorizzato per questo reparto.') {

@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import OrdersTableGrid from '@/components/OrdersTableGrid.vue';
 import KitchenBoard from '@/components/KitchenBoard.vue';
@@ -11,7 +11,7 @@ import CheckoutModal from '@/components/CheckoutModal.vue';
 import Modal from '@/components/Modal.vue';
 import Skeleton from '@/components/Skeleton.vue';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
-import { effectiveUserId } from '@/staffAccess';
+import { STAFF_ROLES, effectiveUserId, staffRole } from '@/staffAccess';
 import {
   fetchTables, fetchOrders, closeOrder,
   addOrderItem, updateItemStatus, orderErrorMessage,
@@ -20,7 +20,10 @@ import {
 
 const store = useStore();
 const route = useRoute();
+const router = useRouter();
 const token = computed(() => store.getters.getToken);
+const currentUser = computed(() => store.getters.getUser || null);
+const isOwnerView = computed(() => staffRole(currentUser.value) === STAFF_ROLES.OWNER);
 
 const tables = ref([]);
 const orders = ref([]);
@@ -35,9 +38,26 @@ const kitchenModes = {
   pizzeria: { title: 'Pizzeria', overline: 'Pizzeria', station: 'pizzeria' },
   cucina_sg: { title: 'Cucina SG', overline: 'Senza glutine', station: 'cucina_sg' },
 };
+const ownerOrderTabs = [
+  { mode: 'cucina', label: 'Cucina', icon: 'bi-fire', path: '/kitchen' },
+  { mode: 'bar', label: 'Bar', icon: 'bi-cup-straw', path: '/bar' },
+  { mode: 'pizzeria', label: 'Pizzeria', icon: 'bi-record-circle', path: '/pizzeria' },
+  { mode: 'cucina_sg', label: 'Cucina SG', icon: 'bi-shield-check', path: '/kitchen-sg' },
+];
 const mode = computed(() => (route.meta?.ordersMode && kitchenModes[route.meta.ordersMode] ? route.meta.ordersMode : 'cameriere'));
 const isKitchenMode = computed(() => mode.value !== 'cameriere');
 const modeInfo = computed(() => kitchenModes[mode.value] || { title: 'Sala', overline: 'Sala', station: null });
+const isOwnerProductionMode = computed(() => isOwnerView.value && isKitchenMode.value);
+const pageTitle = computed(() => (isOwnerProductionMode.value ? 'Ordini' : modeInfo.value.title));
+const headerTitle = computed(() => {
+  if (isOwnerProductionMode.value) return 'Ordini';
+  return isKitchenMode.value ? 'Comande in corso' : 'Sala & tavoli';
+});
+const headerOverline = computed(() => (
+  isOwnerProductionMode.value
+    ? `Ordini · ${modeInfo.value.overline} · ${now.value}`
+    : `${modeInfo.value.overline} · ${now.value}`
+));
 
 const showOrderDetail = ref(false);
 const currentOrderDocId = ref(null);
@@ -311,8 +331,17 @@ const openOrderFromQuery = () => {
   showOrderDetail.value = true;
 };
 
+const updateDocumentTitle = () => {
+  document.title = `${pageTitle.value} · Tavolo`;
+};
+
+const switchOwnerOrderMode = (tab) => {
+  if (!tab?.path || route.path === tab.path) return;
+  router.push(tab.path);
+};
+
 onMounted(async () => {
-  document.title = `${modeInfo.value.title} · Tavolo`;
+  updateDocumentTitle();
   await loadData();
   await subscribeRealtime(effectiveUserId(store.getters.getUser));
   document.addEventListener('visibilitychange', onVisibilityChange);
@@ -328,17 +357,21 @@ const now = computed(() => {
   const d = new Date();
   return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 });
+
+watch(() => route.path, async () => {
+  updateDocumentTitle();
+  await loadData();
+  openOrderFromQuery();
+});
 </script>
 
 <template>
-  <AppLayout :page-title="modeInfo.title">
+  <AppLayout :page-title="pageTitle">
     <div class="md-main" :class="{ 'kt-main': isKitchenMode }">
       <header class="md-top">
         <div>
-          <div class="overline">
-            {{ modeInfo.overline }} · {{ now }}
-          </div>
-          <h1>{{ isKitchenMode ? 'Comande in corso' : 'Sala & tavoli' }}</h1>
+          <div class="overline">{{ headerOverline }}</div>
+          <h1>{{ headerTitle }}</h1>
           <p v-if="mode === 'cameriere'">
             {{ stats.occupied }} occupati su {{ stats.total }} · {{ stats.free }} liberi
             <span v-if="stats.readyTables > 0"> · <strong style="color: var(--ok);">{{ stats.readyTables }} da chiudere</strong></span>
@@ -361,6 +394,20 @@ const now = computed(() => {
           </button>
         </div>
       </header>
+
+      <div v-if="isOwnerProductionMode" class="pf-tabs ord-tabs" aria-label="Sezioni ordini">
+        <button
+          v-for="tab in ownerOrderTabs"
+          :key="tab.mode"
+          type="button"
+          class="pf-tab"
+          :class="{ active: mode === tab.mode }"
+          @click="switchOwnerOrderMode(tab)"
+        >
+          <i :class="['bi', tab.icon]" aria-hidden="true"></i>
+          {{ tab.label }}
+        </button>
+      </div>
 
       <Transition name="fade">
         <div v-if="errorMessage" class="md-card" style="border-color: var(--danger); background: var(--danger-bg); padding: 12px 16px; color: var(--danger);">
@@ -594,6 +641,13 @@ const now = computed(() => {
 
 .fade-enter-active, .fade-leave-active { transition: opacity 200ms, transform 200ms; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-6px); }
+
+.ord-tabs {
+  margin-top: -4px;
+}
+.ord-tabs .pf-tab {
+  text-decoration: none;
+}
 
 @media (max-width: 860px) {
   .md-toast { left: 16px; right: 16px; bottom: 88px; max-width: none; }

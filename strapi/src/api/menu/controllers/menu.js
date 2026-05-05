@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { createCoreController } = require('@strapi/strapi').factories;
+const { ensureCategoryRouting } = require('../../../utils/category-routing');
 
 const ALLOWED_MIME = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
 
@@ -26,17 +27,6 @@ const DEFAULT_MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20MB
 const DEFAULT_OCR_TIMEOUT_MS = 180000; // 180s
 const DEFAULT_OCR_SERVICE_URL = 'http://127.0.0.1:8001';
 const MAX_BULK_ELEMENTS = 200;
-
-async function ensureCategoryRouting(strapi, ownerId, category) {
-  const cleanCategory = typeof category === 'string' ? category.trim() : '';
-  if (!ownerId || !cleanCategory || !strapi.db.connection) return;
-
-  try {
-    await strapi.db.connection.raw('select public.ensure_restaurant_category_routing(?, ?)', [ownerId, cleanCategory]);
-  } catch (err) {
-    strapi.log.warn(`menu category routing: sync fallita per user ${ownerId}: ${err.message}`);
-  }
-}
 
 /**
  * Reduce a string to a filesystem-safe slug.

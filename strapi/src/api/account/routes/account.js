@@ -17,6 +17,12 @@ module.exports = {
       handler: 'account.updateStaff',
       config: { auth: false, policies: [], middlewares: [] },
     },
+    {
+      method: 'PUT',
+      path: '/account/category-routing',
+      handler: 'account.updateCategoryRouting',
+      config: { auth: false, policies: [], middlewares: [] },
+    },
     { method: 'PUT',    path: '/account/password',        handler: 'account.updatePassword' },
     { method: 'POST',   path: '/account/destroy',         handler: 'account.destroy' },
     { method: 'GET',    path: '/account/2fa/status',      handler: 'account.twoFactorStatus' },

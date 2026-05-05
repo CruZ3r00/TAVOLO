@@ -1,7 +1,12 @@
 'use strict';
 
 const Stripe = require('stripe');
-const { resolveStaffContext, staffUserPayload, STAFF_ROLES } = require('../../../utils/staff-access');
+const {
+  applyStaffActiveState,
+  resolveStaffContext,
+  staffUserPayload,
+  STAFF_ROLES,
+} = require('../../../utils/staff-access');
 
 const PLAN_CONFIG = {
   starter: { name: 'Starter', priceEnv: 'STRIPE_PRICE_STARTER' },
@@ -98,6 +103,7 @@ async function staffSettingsPayload(owner) {
   if (!owner || !owner.id || !strapi.db.connection) return [];
   try {
     await strapi.db.connection.raw('select public.sync_owner_staff_accounts(?)', [owner.id]);
+    await applyStaffActiveState(strapi, owner.id, STAFF_ROLES.CAMERIERE, true);
   } catch (err) {
     strapi.log.warn(`billing status: sync staff fallita per user ${owner.id}: ${err.message}`);
   }
@@ -117,11 +123,14 @@ async function staffSettingsPayload(owner) {
   const byRole = new Map((rows || []).map((row) => [row.role, row]));
   return MANAGED_STAFF_ROLES.map((role) => {
     const row = byRole.get(role) || {};
+    const planAllowed = planAllowsStaffRole(owner, role);
+    const isWaiter = role === STAFF_ROLES.CAMERIERE;
     return {
       role,
       label: staffRoleLabel(role),
-      active: row.active !== false,
-      plan_allowed: planAllowsStaffRole(owner, role),
+      active: isWaiter ? true : row.active !== false,
+      plan_allowed: planAllowed,
+      can_toggle: !isWaiter && planAllowed,
       blocked: !!row.blocked,
       username: row.username || null,
       display_name: row.display_name || row.username || null,

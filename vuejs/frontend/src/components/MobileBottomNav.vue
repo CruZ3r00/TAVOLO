@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { canSeeNavItem } from '@/staffAccess';
+import { STAFF_ROLES, canSeeNavItem, staffRole } from '@/staffAccess';
 
 const props = defineProps({
   pendingCount: { type: Number, default: 0 },
@@ -10,20 +10,46 @@ const props = defineProps({
 });
 
 const route = useRoute();
+const isOwner = computed(() => staffRole(props.user) === STAFF_ROLES.OWNER);
 
-const items = computed(() => [
-  { id: 'manager', icon: 'bi-house', iconActive: 'bi-house-fill', label: 'Home', path: '/dashboard' },
-  { id: 'sala', icon: 'bi-grid-3x3-gap', iconActive: 'bi-grid-3x3-gap-fill', label: 'Sala', path: '/orders', badge: props.activeOrdersCount },
-  { id: 'cucina', icon: 'bi-fire', iconActive: 'bi-fire', label: 'Cucina', path: '/kitchen', accent: true },
-  { id: 'bar', icon: 'bi-cup-straw', iconActive: 'bi-cup-straw', label: 'Bar', path: '/bar', accent: true },
-  { id: 'pizzeria', icon: 'bi-record-circle', iconActive: 'bi-record-circle-fill', label: 'Pizza', path: '/pizzeria', accent: true },
-  { id: 'cucina_sg', icon: 'bi-shield-check', iconActive: 'bi-shield-fill-check', label: 'SG', path: '/kitchen-sg', accent: true },
-  { id: 'prenotazioni', icon: 'bi-calendar-check', iconActive: 'bi-calendar-check-fill', label: 'Prenota', path: '/reservations', badge: props.pendingCount },
-  { id: 'menu', icon: 'bi-journal', iconActive: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
-].filter((item) => canSeeNavItem(props.user, item.id)));
+const items = computed(() => {
+  if (isOwner.value) {
+    return [
+      { id: 'manager', icon: 'bi-house', iconActive: 'bi-house-fill', label: 'Home', path: '/dashboard' },
+      { id: 'sala', icon: 'bi-grid-3x3-gap', iconActive: 'bi-grid-3x3-gap-fill', label: 'Sala', path: '/orders', badge: props.activeOrdersCount },
+      {
+        id: 'ordini',
+        icon: 'bi-receipt',
+        iconActive: 'bi-receipt-cutoff',
+        label: 'Ordini',
+        path: '/kitchen',
+        badge: props.activeOrdersCount,
+      },
+      { id: 'prenotazioni', icon: 'bi-calendar-check', iconActive: 'bi-calendar-check-fill', label: 'Prenota', path: '/reservations', badge: props.pendingCount },
+      { id: 'menu', icon: 'bi-journal', iconActive: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
+    ];
+  }
+
+  return [
+    { id: 'manager', icon: 'bi-house', iconActive: 'bi-house-fill', label: 'Home', path: '/dashboard' },
+    { id: 'sala', icon: 'bi-grid-3x3-gap', iconActive: 'bi-grid-3x3-gap-fill', label: 'Sala', path: '/orders', badge: props.activeOrdersCount },
+    { id: 'cucina', icon: 'bi-fire', iconActive: 'bi-fire', label: 'Cucina', path: '/kitchen', accent: true },
+    { id: 'bar', icon: 'bi-cup-straw', iconActive: 'bi-cup-straw', label: 'Bar', path: '/bar', accent: true },
+    { id: 'pizzeria', icon: 'bi-record-circle', iconActive: 'bi-record-circle-fill', label: 'Pizza', path: '/pizzeria', accent: true },
+    { id: 'cucina_sg', icon: 'bi-shield-check', iconActive: 'bi-shield-fill-check', label: 'SG', path: '/kitchen-sg', accent: true },
+    { id: 'prenotazioni', icon: 'bi-calendar-check', iconActive: 'bi-calendar-check-fill', label: 'Prenota', path: '/reservations', badge: props.pendingCount },
+    { id: 'menu', icon: 'bi-journal', iconActive: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
+  ].filter((item) => canSeeNavItem(props.user, item.id));
+});
 
 const activeKey = computed(() => {
   const p = route.path;
+  if (isOwner.value && (
+    p.startsWith('/kitchen-sg') ||
+    p.startsWith('/kitchen') ||
+    p.startsWith('/bar') ||
+    p.startsWith('/pizzeria')
+  )) return 'ordini';
   if (p.startsWith('/kitchen-sg')) return 'cucina_sg';
   if (p.startsWith('/kitchen')) return 'cucina';
   if (p.startsWith('/bar')) return 'bar';

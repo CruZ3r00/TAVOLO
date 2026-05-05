@@ -32,6 +32,10 @@ const {
   assertStaffRole,
   canTransitionItem,
 } = require('../../../utils/staff-access');
+const {
+  normalizeStation,
+  stationForCategory: stationForCategoryByOwner,
+} = require('../../../utils/category-routing');
 
 const { ApplicationError } = errors;
 
@@ -257,54 +261,6 @@ function assertLockVersion(order, clientVersion) {
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 25;
 const ORDER_STATUS_ENUM = ['active', 'closed'];
-const STATION_ROLES = new Set([
-  STAFF_ROLES.CUCINA,
-  STAFF_ROLES.BAR,
-  STAFF_ROLES.PIZZERIA,
-  STAFF_ROLES.CUCINA_SG,
-]);
-
-function normalizeStation(value) {
-  const station = String(value || '').trim().toLowerCase();
-  return STATION_ROLES.has(station) ? station : null;
-}
-
-function classifyCategoryFallback(category) {
-  const value = String(category || '').trim().toLowerCase();
-  if (!value) return STAFF_ROLES.CUCINA;
-
-  if (/(bevande|bibite|drink|cocktail|vino|vini|birra|birre|amari|liquori|distillati|aperitivi|bar|caffe|caffè|acqua|soft drink|analcolic)/.test(value)) {
-    return STAFF_ROLES.BAR;
-  }
-  if (/(senza glutine|gluten free|gluten-free|sg|celiac|celiach)/.test(value)) {
-    return STAFF_ROLES.CUCINA_SG;
-  }
-  if (/(pizza|pizze|pizzeria|focaccia|calzone)/.test(value)) {
-    return STAFF_ROLES.PIZZERIA;
-  }
-
-  return STAFF_ROLES.CUCINA;
-}
-
-async function activeStationOrKitchen(ownerId, station) {
-  const normalized = normalizeStation(station) || STAFF_ROLES.CUCINA;
-  if (normalized === STAFF_ROLES.CUCINA || !strapi.db.connection) return STAFF_ROLES.CUCINA;
-
-  try {
-    const row = await strapi.db.connection('restaurant_staff as staff')
-      .leftJoin('up_users as user', 'user.id', 'staff.user_id')
-      .select(['staff.active', 'user.blocked'])
-      .where('staff.owner_id', ownerId)
-      .where('staff.role', normalized)
-      .first();
-
-    return row && row.active !== false && row.blocked !== true
-      ? normalized
-      : STAFF_ROLES.CUCINA;
-  } catch (_err) {
-    return normalized;
-  }
-}
 
 function stationForActor(actor, query) {
   if (!actor) return null;
@@ -319,54 +275,22 @@ function stationForActor(actor, query) {
   return null;
 }
 
-async function stationForCategory(ownerId, category) {
-  const cleanCategory = String(category || '').trim();
-  if (!cleanCategory || !strapi.db.connection) return STAFF_ROLES.CUCINA;
-
-  try {
-    await strapi.db.connection.raw('select public.ensure_restaurant_category_routing(?, ?)', [ownerId, cleanCategory]);
-
-    const row = await strapi.db.connection('restaurant_category_routing')
-      .select(['staff_role', 'locked'])
-      .where('owner_id', ownerId)
-      .whereRaw('lower(category) = lower(?)', [cleanCategory])
-      .first();
-
-    if (row && row.locked !== true) {
-      const automaticStation = await activeStationOrKitchen(ownerId, classifyCategoryFallback(cleanCategory));
-      const currentStation = normalizeStation(row.staff_role) || STAFF_ROLES.CUCINA;
-      if (automaticStation !== currentStation) {
-        await strapi.db.connection('restaurant_category_routing')
-          .where('owner_id', ownerId)
-          .whereRaw('lower(category) = lower(?)', [cleanCategory])
-          .where('locked', false)
-          .update({ staff_role: automaticStation });
-      }
-      return automaticStation;
-    }
-
-    return activeStationOrKitchen(ownerId, normalizeStation(row && row.staff_role) || classifyCategoryFallback(cleanCategory));
-  } catch (_err) {
-    return activeStationOrKitchen(ownerId, classifyCategoryFallback(cleanCategory));
-  }
-}
-
-async function filterItemsForStation(order, ownerId, station) {
+async function filterItemsForStation(order, owner, station) {
   if (!station || !order || !Array.isArray(order.fk_items)) return order;
 
   const filtered = [];
   for (const item of order.fk_items) {
-    const itemStation = await stationForCategory(ownerId, item.category || (item.fk_element && item.fk_element.category));
+    const itemStation = await stationForCategoryByOwner(strapi, owner, item.category || (item.fk_element && item.fk_element.category));
     if (itemStation === station) filtered.push(item);
   }
   return { ...order, fk_items: filtered };
 }
 
-async function filterOrdersForStation(orders, ownerId, station) {
+async function filterOrdersForStation(orders, owner, station) {
   if (!station) return orders;
   const filtered = [];
   for (const order of orders || []) {
-    const stationOrder = await filterItemsForStation(order, ownerId, station);
+    const stationOrder = await filterItemsForStation(order, owner, station);
     if ((stationOrder.fk_items || []).some((item) => item.status !== 'served')) {
       filtered.push(stationOrder);
     }
@@ -557,7 +481,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         strapi.documents('api::order.order').count({ filters }),
       ]);
 
-      const stationResults = await filterOrdersForStation(results || [], ownerId, station);
+      const stationResults = await filterOrdersForStation(results || [], actor.owner, station);
 
       ctx.body = {
         data: stationResults.map((o) => serializeOrder(o, true)),
@@ -600,7 +524,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       const station = stationForActor(actor, ctx.request.query || {});
       const order = await filterItemsForStation(
         await loadOrder(documentId, actor.ownerId),
-        actor.ownerId,
+        actor.owner,
         station
       );
 
@@ -905,7 +829,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
       const station = stationForActor(actor, ctx.request.query || {});
       if (station) {
-        const itemStation = await stationForCategory(actor.ownerId, item.category || (item.fk_element && item.fk_element.category));
+        const itemStation = await stationForCategoryByOwner(strapi, actor.owner, item.category || (item.fk_element && item.fk_element.category));
         if (itemStation !== station) {
           throw appError('NOT_OWNER', 'Questo reparto non puo lavorare questa categoria.');
         }

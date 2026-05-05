@@ -2,6 +2,13 @@
 
 const crypto = require('crypto');
 const { STAFF_ROLES, applyStaffActiveState } = require('../../../utils/staff-access');
+const {
+  ROUTABLE_STAFF_ROLE_SET,
+  listCategoryRouting,
+  normalizeStation,
+  ownerHasProfessionalRouting,
+  updateCategoryRouting: saveCategoryRouting,
+} = require('../../../utils/category-routing');
 const CAPACITY_MIN = 1;
 const CAPACITY_MAX = 10000;
 const MANAGED_STAFF_ROLES = [
@@ -154,6 +161,12 @@ function staffRoleLabel(role) {
 }
 
 async function staffSettingsPayload(strapi, owner) {
+  try {
+    await applyStaffActiveState(strapi, owner.id, STAFF_ROLES.CAMERIERE, true);
+  } catch (_err) {
+    // Best effort: the UI still reports cameriere as non-disattivabile.
+  }
+
   const rows = strapi.db.connection
     ? await strapi.db.connection('restaurant_staff as staff')
       .leftJoin('up_users as user', 'user.id', 'staff.user_id')
@@ -169,17 +182,43 @@ async function staffSettingsPayload(strapi, owner) {
       .whereIn('staff.role', MANAGED_STAFF_ROLES)
     : [];
 
+  const routingAllowed = ownerHasProfessionalRouting(owner);
+  const subscriptionActive = hasActiveSubscription(owner);
+  const routingBlockedReason = routingAllowed
+    ? null
+    : (subscriptionActive ? 'pro_required' : 'subscription_required');
+  let categoryRouting = [];
+  try {
+    categoryRouting = await listCategoryRouting(strapi, owner);
+  } catch (err) {
+    strapi.log.warn(`staffSettingsPayload: routing categorie non disponibile per user ${owner.id}: ${err.message}`);
+  }
+
+  const categoriesByRole = new Map();
+  for (const item of categoryRouting) {
+    const role = normalizeStation(item.staff_role) || STAFF_ROLES.CUCINA;
+    if (!categoriesByRole.has(role)) categoriesByRole.set(role, []);
+    categoriesByRole.get(role).push(item);
+  }
+
   const byRole = new Map((rows || []).map((row) => [row.role, row]));
   return MANAGED_STAFF_ROLES.map((role) => {
     const row = byRole.get(role) || {};
+    const planAllowed = planAllowsRole(owner, role);
+    const isWaiter = role === STAFF_ROLES.CAMERIERE;
     return {
       role,
       label: staffRoleLabel(role),
-      active: row.active !== false,
-      plan_allowed: planAllowsRole(owner, role),
+      active: isWaiter ? true : row.active !== false,
+      plan_allowed: planAllowed,
+      can_toggle: !isWaiter && planAllowed,
       blocked: !!row.blocked,
       username: row.username || null,
       display_name: row.display_name || row.username || null,
+      routing_allowed: routingAllowed,
+      routing_blocked_reason: routingBlockedReason,
+      subscription_plan: owner.subscription_plan || null,
+      categories: ROUTABLE_STAFF_ROLE_SET.has(role) ? (categoriesByRole.get(role) || []) : [],
     };
   });
 }
@@ -212,7 +251,7 @@ module.exports = {
         }
       }
 
-      const active = !!(ctx.request.body || {}).active;
+      const active = role === STAFF_ROLES.CAMERIERE ? true : !!(ctx.request.body || {}).active;
       const updated = await applyStaffActiveState(strapi, user.id, role, active);
       if (!updated) return ctx.notFound('Account reparto non trovato.');
 
@@ -286,7 +325,7 @@ module.exports = {
       return ctx.badRequest('Reparto non valido.');
     }
 
-    const active = !!(ctx.request.body || {}).active;
+    const active = role === STAFF_ROLES.CAMERIERE ? true : !!(ctx.request.body || {}).active;
     if (strapi.db.connection) {
       try {
         await strapi.db.connection.raw('select public.sync_owner_staff_accounts(?)', [user.id]);
@@ -303,6 +342,44 @@ module.exports = {
       select: ['id', 'subscription_status', 'subscription_plan', 'subscription_current_period_end', 'end_subscription'],
     });
     return ctx.send({ data: await staffSettingsPayload(strapi, refreshedOwner) });
+  },
+
+  async updateCategoryRouting(ctx) {
+    const user = await requireAccountUser(ctx);
+    if (!user) return ctx.unauthorized();
+
+    const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: user.id },
+      select: ['id', 'subscription_status', 'subscription_plan', 'subscription_current_period_end', 'end_subscription', 'staff_role'],
+    });
+    if (!owner || (owner.staff_role && owner.staff_role !== STAFF_ROLES.OWNER)) {
+      return ctx.forbidden('Solo il titolare puo gestire i reparti.');
+    }
+    if (!ownerHasProfessionalRouting(owner)) {
+      ctx.status = 403;
+      ctx.body = {
+        error: {
+          code: 'STAFF_PLAN_FORBIDDEN',
+          message: 'Le assegnazioni delle categorie richiedono il piano Professionale.',
+        },
+      };
+      return;
+    }
+
+    const body = ctx.request.body || {};
+    const category = typeof body.category === 'string' ? body.category.trim() : '';
+    const role = normalizeStation(body.staff_role || body.role);
+    if (!category) return ctx.badRequest('Categoria obbligatoria.');
+    if (!role) return ctx.badRequest('Reparto non valido.');
+
+    try {
+      const saved = await saveCategoryRouting(strapi, owner, category, role);
+      if (!saved) return ctx.internalServerError('Routing categorie non disponibile.');
+      return ctx.send({ data: await staffSettingsPayload(strapi, owner) });
+    } catch (err) {
+      strapi.log.error('updateCategoryRouting:', err);
+      return ctx.internalServerError('Impossibile aggiornare assegnazione categoria.');
+    }
   },
 
   async updatePassword(ctx) {
