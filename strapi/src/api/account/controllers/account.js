@@ -109,6 +109,25 @@ async function findUserWebsiteConfig(userId, populate = []) {
   return configs && configs.length > 0 ? configs[0] : null;
 }
 
+async function requireAccountUser(ctx) {
+  if (ctx.state.user?.id) return ctx.state.user;
+
+  const header = ctx.request.headers.authorization || '';
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  if (!match) return null;
+
+  try {
+    const payload = await strapi.plugin('users-permissions').service('jwt').verify(match[1]);
+    if (!payload?.id) return null;
+    return strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: payload.id },
+    });
+  } catch (err) {
+    strapi.log.warn(`Account JWT non valido: ${err.message}`);
+    return null;
+  }
+}
+
 function hasActiveSubscription(user) {
   if (!user || !['active', 'trialing'].includes(user.subscription_status)) return false;
   const periodEnd = user.subscription_current_period_end || user.end_subscription;
@@ -194,7 +213,7 @@ module.exports = {
   },
 
   async listStaff(ctx) {
-    const user = ctx.state.user;
+    const user = await requireAccountUser(ctx);
     if (!user) return ctx.unauthorized();
 
     const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
@@ -217,7 +236,7 @@ module.exports = {
   },
 
   async updateStaff(ctx) {
-    const user = ctx.state.user;
+    const user = await requireAccountUser(ctx);
     if (!user) return ctx.unauthorized();
 
     const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
