@@ -21,3 +21,6 @@ restaurant-sites/*.html
 !restaurant-sites/fatimaelgrandi5@gmail.com.html
 strapi/.env.backup-before-fix
 .DS_Store
+
+# Strapi runtime uploads
+strapi/public/uploads/
