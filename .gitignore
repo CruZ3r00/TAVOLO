@@ -24,3 +24,6 @@ strapi/.env.backup-before-fix
 
 # Strapi runtime uploads
 strapi/public/uploads/
+
+# Strapi runtime uploads
+strapi/public/uploads/
