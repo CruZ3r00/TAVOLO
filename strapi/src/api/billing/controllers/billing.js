@@ -7,6 +7,13 @@ const PLAN_CONFIG = {
   starter: { name: 'Starter', priceEnv: 'STRIPE_PRICE_STARTER' },
   pro: { name: 'Pro', priceEnv: 'STRIPE_PRICE_PRO' },
 };
+const MANAGED_STAFF_ROLES = [
+  STAFF_ROLES.CAMERIERE,
+  STAFF_ROLES.CUCINA,
+  STAFF_ROLES.BAR,
+  STAFF_ROLES.PIZZERIA,
+  STAFF_ROLES.CUCINA_SG,
+];
 
 let stripeClient = null;
 
@@ -60,6 +67,66 @@ function safeUser(user) {
     subscription_current_period_end: user.subscription_current_period_end || user.end_subscription || null,
     subscription_cancel_at_period_end: !!user.subscription_cancel_at_period_end,
   };
+}
+
+function hasActiveSubscription(user) {
+  if (!user || !['active', 'trialing'].includes(user.subscription_status)) return false;
+  const periodEnd = user.subscription_current_period_end || user.end_subscription;
+  if (!periodEnd) return true;
+  const periodEndDate = new Date(periodEnd);
+  return !Number.isNaN(periodEndDate.getTime()) && periodEndDate.getTime() >= Date.now();
+}
+
+function planAllowsStaffRole(user, role) {
+  if (!hasActiveSubscription(user)) return false;
+  if (user.subscription_plan === 'pro') return true;
+  return user.subscription_plan === 'starter' && [STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA].includes(role);
+}
+
+function staffRoleLabel(role) {
+  switch (role) {
+    case STAFF_ROLES.CAMERIERE: return 'Sala';
+    case STAFF_ROLES.CUCINA: return 'Cucina';
+    case STAFF_ROLES.BAR: return 'Bar';
+    case STAFF_ROLES.PIZZERIA: return 'Pizzeria';
+    case STAFF_ROLES.CUCINA_SG: return 'Cucina SG';
+    default: return role;
+  }
+}
+
+async function staffSettingsPayload(owner) {
+  if (!owner || !owner.id || !strapi.db.connection) return [];
+  try {
+    await strapi.db.connection.raw('select public.sync_owner_staff_accounts(?)', [owner.id]);
+  } catch (err) {
+    strapi.log.warn(`billing status: sync staff fallita per user ${owner.id}: ${err.message}`);
+  }
+
+  const rows = await strapi.db.connection('restaurant_staff as staff')
+    .leftJoin('up_users as user', 'user.id', 'staff.user_id')
+    .select([
+      'staff.role',
+      'staff.active',
+      'staff.display_name',
+      'user.username',
+      'user.blocked',
+    ])
+    .where('staff.owner_id', owner.id)
+    .whereIn('staff.role', MANAGED_STAFF_ROLES);
+
+  const byRole = new Map((rows || []).map((row) => [row.role, row]));
+  return MANAGED_STAFF_ROLES.map((role) => {
+    const row = byRole.get(role) || {};
+    return {
+      role,
+      label: staffRoleLabel(role),
+      active: row.active !== false,
+      plan_allowed: planAllowsStaffRole(owner, role),
+      blocked: !!row.blocked,
+      username: row.username || null,
+      display_name: row.display_name || row.username || null,
+    };
+  });
 }
 
 function isoFromUnix(timestamp) {
@@ -167,6 +234,7 @@ module.exports = {
       data: {
         ...safeUser(billingUser),
         ...staffUserPayload(actor ? actor.actor : user, billingUser),
+        staff_departments: actor && actor.role === STAFF_ROLES.OWNER ? await staffSettingsPayload(billingUser) : undefined,
       },
     });
   },

@@ -188,7 +188,41 @@ module.exports = {
   async updateProfile(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.unauthorized();
-    const { username, email } = ctx.request.body || {};
+    const { username, email, staff_department_role: staffDepartmentRole } = ctx.request.body || {};
+
+    if (staffDepartmentRole) {
+      const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: user.id },
+        select: ['id', 'subscription_status', 'subscription_plan', 'subscription_current_period_end', 'end_subscription', 'staff_role'],
+      });
+      if (!owner || (owner.staff_role && owner.staff_role !== STAFF_ROLES.OWNER)) {
+        return ctx.forbidden('Solo il titolare puo gestire i reparti.');
+      }
+
+      const role = String(staffDepartmentRole || '').trim().toLowerCase();
+      if (!MANAGED_STAFF_ROLES.includes(role)) {
+        return ctx.badRequest('Reparto non valido.');
+      }
+
+      if (strapi.db.connection) {
+        try {
+          await strapi.db.connection.raw('select public.sync_owner_staff_accounts(?)', [user.id]);
+        } catch (err) {
+          strapi.log.warn(`updateProfile staff: sync staff fallita per user ${user.id}: ${err.message}`);
+        }
+      }
+
+      const active = !!(ctx.request.body || {}).active;
+      const updated = await applyStaffActiveState(strapi, user.id, role, active);
+      if (!updated) return ctx.notFound('Account reparto non trovato.');
+
+      const refreshedOwner = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: user.id },
+        select: ['id', 'subscription_status', 'subscription_plan', 'subscription_current_period_end', 'end_subscription'],
+      });
+      return ctx.send({ data: await staffSettingsPayload(strapi, refreshedOwner) });
+    }
+
     const data = {};
     if (username && username !== user.username) data.username = String(username).trim();
     if (email && email !== user.email) data.email = String(email).trim().toLowerCase();
