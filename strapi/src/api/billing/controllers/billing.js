@@ -230,11 +230,12 @@ module.exports = {
 
     const actor = await resolveStaffContext(strapi, user);
     const billingUser = actor && actor.owner ? actor.owner : user;
+    const canManageStaff = actor && !actor.isStaff && actor.role === STAFF_ROLES.OWNER;
     return ctx.send({
       data: {
         ...safeUser(billingUser),
         ...staffUserPayload(actor ? actor.actor : user, billingUser),
-        staff_departments: actor && actor.role === STAFF_ROLES.OWNER ? await staffSettingsPayload(billingUser) : undefined,
+        staff_departments: canManageStaff ? await staffSettingsPayload(billingUser) : undefined,
       },
     });
   },

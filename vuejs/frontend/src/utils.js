@@ -155,7 +155,7 @@ export const fetchBillingStatus = async (token) => {
     });
     const payload = await resp.json().catch(() => ({}));
     if (!resp.ok) throw buildBillingError(resp, payload);
-    return payload.data;
+    return Array.isArray(payload.data) ? payload.data : fetchStaffSettings(token);
 };
 
 export const createBillingCheckoutSession = async (plan, token) => {
@@ -245,7 +245,18 @@ export const reactivateBillingSubscription = async (token) => {
 
 export const fetchStaffSettings = async (token) => {
     const billing = await fetchBillingStatus(token);
-    return Array.isArray(billing?.staff_departments) ? billing.staff_departments : [];
+    if (Array.isArray(billing?.staff_departments) && billing.staff_departments.length > 0) {
+        return billing.staff_departments;
+    }
+    const starterAllowed = billing?.subscription_plan === 'starter' || billing?.subscription_plan === 'pro';
+    const proAllowed = billing?.subscription_plan === 'pro';
+    return [
+        { role: 'cameriere', label: 'Sala', active: true, plan_allowed: starterAllowed, blocked: !starterAllowed, username: null, pending_backend: true },
+        { role: 'cucina', label: 'Cucina', active: true, plan_allowed: starterAllowed, blocked: !starterAllowed, username: null, pending_backend: true },
+        { role: 'bar', label: 'Bar', active: true, plan_allowed: proAllowed, blocked: !proAllowed, username: null, pending_backend: true },
+        { role: 'pizzeria', label: 'Pizzeria', active: true, plan_allowed: proAllowed, blocked: !proAllowed, username: null, pending_backend: true },
+        { role: 'cucina_sg', label: 'Cucina SG', active: true, plan_allowed: proAllowed, blocked: !proAllowed, username: null, pending_backend: true },
+    ];
 };
 
 export const updateStaffSetting = async (role, active, token) => {

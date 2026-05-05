@@ -11,6 +11,7 @@ const loading = ref(true);
 const savingRole = ref(null);
 const errorMessage = ref('');
 const successMessage = ref('');
+const hasPendingBackend = computed(() => departments.value.some((department) => department.pending_backend));
 
 const roleIcon = (role) => {
     switch (role) {
@@ -86,6 +87,9 @@ onMounted(loadDepartments);
             </div>
 
             <div v-else class="staff-grid">
+                <div v-if="hasPendingBackend" class="staff-inline-note">
+                    Configurazione reparti in sincronizzazione. Riprova tra qualche istante se un salvataggio non viene confermato.
+                </div>
                 <button
                     v-for="department in departments"
                     :key="department.role"
@@ -165,6 +169,16 @@ onMounted(loadDepartments);
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     gap: 12px;
+}
+.staff-inline-note {
+    grid-column: 1 / -1;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in oklab, var(--warn) 25%, var(--line));
+    border-radius: var(--r-md);
+    background: color-mix(in oklab, var(--warn) 8%, var(--paper));
+    color: var(--ink-2);
+    font-size: 13px;
+    line-height: 1.45;
 }
 .staff-card {
     position: relative;
