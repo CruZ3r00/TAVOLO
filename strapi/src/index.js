@@ -358,6 +358,8 @@ async function grantImportPermissions(strapi) {
       'api::element.element.update',
       'api::element.element.remove',
       'api::account.account.updateProfile',
+      'api::account.account.listStaff',
+      'api::account.account.updateStaff',
       'api::account.account.getWebsiteConfig',
       'api::account.account.upsertWebsiteConfig',
       'api::account.account.updatePassword',

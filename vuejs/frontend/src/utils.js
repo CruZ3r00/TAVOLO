@@ -243,6 +243,33 @@ export const reactivateBillingSubscription = async (token) => {
     return payload.data;
 };
 
+export const fetchStaffSettings = async (token) => {
+    const resp = await fetch(`${API_BASE}/api/account/staff`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildBillingError(resp, payload);
+    return payload.data;
+};
+
+export const updateStaffSetting = async (role, active, token) => {
+    const resp = await fetch(`${API_BASE}/api/account/staff/${encodeURIComponent(role)}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ active }),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildBillingError(resp, payload);
+    return payload.data;
+};
+
 // ============================================================================
 // Reservations API
 // ============================================================================

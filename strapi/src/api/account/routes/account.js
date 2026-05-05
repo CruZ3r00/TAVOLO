@@ -5,6 +5,8 @@ module.exports = {
     { method: 'GET',    path: '/account/website-config',  handler: 'account.getWebsiteConfig' },
     { method: 'PUT',    path: '/account/website-config',  handler: 'account.upsertWebsiteConfig' },
     { method: 'PUT',    path: '/account/profile',         handler: 'account.updateProfile' },
+    { method: 'GET',    path: '/account/staff',           handler: 'account.listStaff' },
+    { method: 'PUT',    path: '/account/staff/:role',     handler: 'account.updateStaff' },
     { method: 'PUT',    path: '/account/password',        handler: 'account.updatePassword' },
     { method: 'POST',   path: '/account/destroy',         handler: 'account.destroy' },
     { method: 'GET',    path: '/account/2fa/status',      handler: 'account.twoFactorStatus' },

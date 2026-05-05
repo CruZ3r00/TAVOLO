@@ -271,6 +271,10 @@ function normalizeStation(value) {
 
 function stationForActor(actor, query) {
   if (!actor) return null;
+  if (actor.role === STAFF_ROLES.CUCINA) {
+    const requested = normalizeStation(query && query.station);
+    return requested === STAFF_ROLES.CUCINA_SG ? requested : STAFF_ROLES.CUCINA;
+  }
   if (KITCHEN_LIKE_ROLES.has(actor.role)) return actor.role;
   if (actor.role === STAFF_ROLES.OWNER || actor.role === STAFF_ROLES.GESTIONE) {
     return normalizeStation(query && query.station);

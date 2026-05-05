@@ -10,7 +10,7 @@ mentre i trigger SQL mantengono utenti staff, link `fk_owner` e righe
 - `owner`: account ristorante pagante, accesso completo e rinnovo Stripe.
 - `gestione`: cassa/gestione, accesso operativo completo ma non checkout.
 - `cameriere`: sala e prenotazioni.
-- `cucina`: board cucina.
+- `cucina`: board cucina e board senza glutine.
 - `bar`: board bar, solo piano Professionale.
 - `pizzeria`: board pizzeria, solo piano Professionale.
 - `cucina_sg`: board senza glutine, solo piano Professionale.
@@ -34,8 +34,22 @@ dell'owner:
 - `<NomeRistorante>.pizzeria`
 - `<NomeRistorante>.cucinasg`
 
-Gli account sono `confirmed = true`. Il campo `blocked` e la riga
-`restaurant_staff.active` seguono il piano dell'owner.
+Gli account sono `confirmed = true`. La riga `restaurant_staff.active`
+rappresenta la scelta dell'owner nel profilo. Il campo `blocked` viene calcolato
+da piano, scadenza e scelta owner.
+
+## Gestione owner
+
+Dal profilo owner, sezione Reparti, si possono attivare o disattivare:
+
+- sala/cameriere
+- cucina
+- bar
+- pizzeria
+- cucina SG
+
+I reparti fuori piano restano visibili ma non attivabili finche non si passa al
+piano richiesto. Le preferenze restano salvate anche se il piano cambia.
 
 ## Smistamento categorie
 

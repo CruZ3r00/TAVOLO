@@ -127,7 +127,7 @@ const routes = [
         path: '/kitchen-sg',
         name: 'Cucina SG',
         component: () => import('../Pages/Orders.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina_sg', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CUCINA_SG] },
+        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina_sg', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CUCINA, STAFF_ROLES.CUCINA_SG] },
     },
     { //non protetta
         path: '/who-are-us',

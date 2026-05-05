@@ -61,6 +61,7 @@ async function resolveRestaurantStaffRecord(strapi, actor) {
       .join('up_users as owner', 'owner.id', 'staff.owner_id')
       .select([
         'staff.role as staff_role',
+        'staff.active as staff_active',
         'staff.owner_id as owner_id',
         'owner.document_id as owner_document_id',
         'owner.username as owner_username',
@@ -72,12 +73,12 @@ async function resolveRestaurantStaffRecord(strapi, actor) {
         'owner.end_subscription as owner_end_subscription',
       ])
       .where('staff.user_id', actor.id)
-      .where('staff.active', true)
       .first();
 
     if (!row || !row.owner_id || row.owner_id === actor.id) return null;
     return {
       role: normalizeStaffRole(row.staff_role),
+      active: row.staff_active !== false,
       owner: {
         id: row.owner_id,
         documentId: row.owner_document_id,
@@ -93,6 +94,49 @@ async function resolveRestaurantStaffRecord(strapi, actor) {
   } catch (_err) {
     return null;
   }
+}
+
+async function applyStaffActiveState(strapi, ownerId, role, active) {
+  if (!strapi.db.connection) return null;
+
+  const row = await strapi.db.connection('restaurant_staff')
+    .select(['user_id', 'role'])
+    .where('owner_id', ownerId)
+    .where('role', role)
+    .first();
+
+  if (!row || !row.user_id) return null;
+
+  await strapi.db.connection('restaurant_staff')
+    .where('owner_id', ownerId)
+    .where('role', role)
+    .update({ active: !!active });
+
+  const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
+    where: { id: ownerId },
+    select: ['id', 'subscription_status', 'subscription_plan', 'subscription_current_period_end', 'end_subscription'],
+  });
+
+  const status = owner && owner.subscription_status;
+  const periodEnd = owner && (owner.subscription_current_period_end || owner.end_subscription);
+  const hasActiveSubscription = ['active', 'trialing'].includes(status) && (
+    !periodEnd || new Date(periodEnd).getTime() >= Date.now()
+  );
+  const isProRole = role === STAFF_ROLES.GESTIONE ||
+    role === STAFF_ROLES.BAR ||
+    role === STAFF_ROLES.PIZZERIA ||
+    role === STAFF_ROLES.CUCINA_SG;
+  const planAllowsRole = hasActiveSubscription && (
+    owner.subscription_plan === 'pro' ||
+    (!isProRole && owner.subscription_plan === 'starter')
+  );
+
+  await strapi.db.query('plugin::users-permissions.user').update({
+    where: { id: row.user_id },
+    data: { blocked: !(!!active && planAllowsRole) },
+  });
+
+  return { user_id: row.user_id, role, active: !!active, blocked: !(!!active && planAllowsRole) };
 }
 
 function staffError(message = 'Non autorizzato per questo reparto.') {
@@ -131,6 +175,7 @@ async function resolveStaffContext(strapi, user) {
     role,
     owner,
     ownerId,
+    staffActive: staffRecord ? staffRecord.active : true,
     isStaff: role !== STAFF_ROLES.OWNER || ownerId !== actor.id,
   };
 }
@@ -198,4 +243,5 @@ module.exports = {
   canTransitionItem,
   staffUserPayload,
   compactRestaurantSlug,
+  applyStaffActiveState,
 };

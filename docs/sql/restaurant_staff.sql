@@ -6,6 +6,8 @@
 -- The paying account remains public.up_users (owner). Staff users never own a
 -- Stripe customer/subscription: they are normal Strapi users linked to the
 -- owner through Strapi's fk_owner relation table and public.restaurant_staff.
+-- restaurant_staff.active is the owner preference. up_users.blocked is derived
+-- from owner preference plus the current plan/subscription.
 
 create extension if not exists pgcrypto;
 
@@ -190,6 +192,7 @@ declare
   v_staff_id integer;
   v_username text;
   v_email text;
+  v_active boolean;
 begin
   v_username := public.staff_username_for_role(p_owner.id, p_owner.username, p_role);
   v_email := public.synthetic_staff_email(p_owner.id, p_role);
@@ -270,10 +273,9 @@ begin
   perform public.copy_owner_auth_role_link(v_staff_id, p_owner.id);
 
   insert into public.restaurant_staff (owner_id, user_id, role, active, display_name)
-  values (p_owner.id, v_staff_id, p_role, p_enabled, v_username)
+  values (p_owner.id, v_staff_id, p_role, true, v_username)
   on conflict (owner_id, user_id) do update
   set role = excluded.role,
-      active = excluded.active,
       display_name = excluded.display_name;
 
   update public.restaurant_staff
@@ -281,6 +283,17 @@ begin
   where owner_id = p_owner.id
     and role = p_role
     and user_id <> v_staff_id;
+
+  select active into v_active
+  from public.restaurant_staff
+  where owner_id = p_owner.id
+    and user_id = v_staff_id
+  limit 1;
+
+  update public.up_users
+  set blocked = not (coalesce(v_active, true) and p_enabled),
+      updated_at = now()
+  where id = v_staff_id;
 
   return v_staff_id;
 end;
@@ -321,17 +334,12 @@ begin
   perform public.upsert_staff_account(v_owner, 'cucina', v_is_pro or v_is_essential);
 
   update public.up_users staff
-  set blocked = not v_is_pro,
+  set blocked = not (rs.active and v_is_pro),
       updated_at = now()
   from public.restaurant_staff rs
   where rs.owner_id = v_owner.id
     and rs.role = 'gestione'
     and rs.user_id = staff.id;
-
-  update public.restaurant_staff
-  set active = v_is_pro
-  where owner_id = v_owner.id
-    and role = 'gestione';
 
   if v_is_pro then
     perform public.upsert_staff_account(v_owner, 'bar', true);
@@ -348,10 +356,6 @@ begin
         and rs.role = v_role
         and rs.user_id = staff.id;
 
-      update public.restaurant_staff
-      set active = false
-      where owner_id = v_owner.id
-        and role = v_role;
     end loop;
   end if;
 
@@ -363,9 +367,6 @@ begin
     where rs.owner_id = v_owner.id
       and rs.user_id = staff.id;
 
-    update public.restaurant_staff
-    set active = false
-    where owner_id = v_owner.id;
   end if;
 end;
 $$;

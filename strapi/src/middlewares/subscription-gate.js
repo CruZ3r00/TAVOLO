@@ -94,6 +94,17 @@ module.exports = (_config, { strapi }) => {
     const actor = await resolveStaffContext(strapi, user);
     const billingUser = actor && actor.owner ? actor.owner : user;
 
+    if (actor && actor.isStaff && actor.staffActive === false) {
+      ctx.status = 403;
+      ctx.body = {
+        error: {
+          code: 'STAFF_DISABLED',
+          message: 'Questo reparto e stato disattivato dal titolare.',
+        },
+      };
+      return;
+    }
+
     if (actor && !isStaffApiAllowed(actor.role, ctx.method, path)) {
       ctx.status = 403;
       ctx.body = {

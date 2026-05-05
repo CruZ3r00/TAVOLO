@@ -8,6 +8,7 @@ import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthe
 import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
 import SubscriptionForm from '@/Pages/Profile/Partials/SubscriptionForm.vue';
+import StaffDepartmentsForm from '@/Pages/Profile/Partials/StaffDepartmentsForm.vue';
 import WebsiteConfigForm from '@/Pages/Profile/Partials/WebsiteConfigForm.vue';
 import PosCassaForm from '@/Pages/Profile/Partials/PosCassaForm.vue';
 
@@ -16,6 +17,7 @@ const route = useRoute();
 
 const sections = [
   { key: 'profilo', label: 'Account', icon: 'bi-person' },
+  { key: 'staff', label: 'Reparti', icon: 'bi-people' },
   { key: 'sicurezza', label: 'Sicurezza', icon: 'bi-shield-lock' },
   { key: 'sito', label: 'Sito web', icon: 'bi-globe2' },
   { key: 'poscassa', label: 'POS / Cassa fiscale', icon: 'bi-credit-card-2-front' },
@@ -116,6 +118,8 @@ onMounted(async () => {
             <UpdateProfileInformationForm :user="userinfo" />
             <SubscriptionForm />
           </div>
+
+          <StaffDepartmentsForm v-else-if="activeSection === 'staff'" :key="'staff'" />
 
           <div v-else-if="activeSection === 'sicurezza'" :key="'sicurezza'" class="pf-stack">
             <UpdatePasswordForm :id="userinfo.id" />
