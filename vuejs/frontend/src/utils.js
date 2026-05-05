@@ -155,7 +155,7 @@ export const fetchBillingStatus = async (token) => {
     });
     const payload = await resp.json().catch(() => ({}));
     if (!resp.ok) throw buildBillingError(resp, payload);
-    return Array.isArray(payload.data) ? payload.data : fetchStaffSettings(token);
+    return payload.data;
 };
 
 export const createBillingCheckoutSession = async (plan, token) => {

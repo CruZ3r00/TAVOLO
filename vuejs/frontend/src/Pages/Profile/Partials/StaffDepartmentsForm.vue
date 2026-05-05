@@ -25,9 +25,14 @@ const roleIcon = (role) => {
 };
 
 const loadDepartments = async () => {
-    if (!token.value) return;
     loading.value = true;
     errorMessage.value = '';
+    if (!token.value) {
+        departments.value = [];
+        errorMessage.value = 'Sessione non valida. Accedi di nuovo.';
+        loading.value = false;
+        return;
+    }
     try {
         departments.value = await fetchStaffSettings(token.value);
     } catch (err) {
