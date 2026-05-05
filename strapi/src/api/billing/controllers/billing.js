@@ -230,7 +230,7 @@ module.exports = {
 
     const actor = await resolveStaffContext(strapi, user);
     const billingUser = actor && actor.owner ? actor.owner : user;
-    const canManageStaff = actor && !actor.isStaff && actor.role === STAFF_ROLES.OWNER;
+    const canManageStaff = billingUser && user && billingUser.id === user.id;
     return ctx.send({
       data: {
         ...safeUser(billingUser),
