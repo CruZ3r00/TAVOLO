@@ -3,12 +3,14 @@ import { onBeforeUnmount, onMounted, ref } from 'vue';
 import * as THREE from 'three';
 
 const host = ref(null);
+const emit = defineEmits(['scene-error']);
 
 let renderer;
 let scene;
 let camera;
 let frameId = 0;
 let resizeObserver;
+let removeResizeListener;
 let startedAt = 0;
 const disposables = [];
 
@@ -61,6 +63,7 @@ const createScene = () => {
   const el = host.value;
   if (!el) return;
 
+  try {
   scene = new THREE.Scene();
   scene.background = null;
 
@@ -68,7 +71,11 @@ const createScene = () => {
   camera.position.set(4.8, 5.4, 6.2);
   camera.lookAt(0, 0, 0);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+  renderer = new THREE.WebGLRenderer({
+    antialias: window.devicePixelRatio <= 2,
+    alpha: true,
+    powerPreference: 'default',
+  });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8));
   renderer.setClearColor(0x000000, 0);
   el.appendChild(renderer.domElement);
@@ -178,10 +185,19 @@ const createScene = () => {
     frameId = window.requestAnimationFrame(animate);
   };
 
-  resizeObserver = new ResizeObserver(resize);
-  resizeObserver.observe(el);
+  if ('ResizeObserver' in window) {
+    resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(el);
+  } else {
+    window.addEventListener('resize', resize, { passive: true });
+    removeResizeListener = () => window.removeEventListener('resize', resize);
+  }
   resize();
   frameId = window.requestAnimationFrame(animate);
+  } catch (error) {
+    console.warn('Landing hero scene fallback', error);
+    emit('scene-error');
+  }
 };
 
 onMounted(createScene);
@@ -189,6 +205,7 @@ onMounted(createScene);
 onBeforeUnmount(() => {
   if (frameId) window.cancelAnimationFrame(frameId);
   if (resizeObserver) resizeObserver.disconnect();
+  removeResizeListener?.();
   if (renderer?.domElement?.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
   disposables.forEach((item) => item?.dispose?.());
   renderer?.dispose?.();

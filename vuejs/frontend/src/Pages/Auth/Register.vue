@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router';
 import { ref, computed } from 'vue';
 
 useHead({
-  title: 'Registrazione · Tavolo',
-  meta: [{ name: 'description', content: 'Crea il tuo account Tavolo' }],
+  title: 'Registrazione · ComforTables',
+  meta: [{ name: 'description', content: 'Crea il tuo account ComforTables' }],
 });
 
 const router = useRouter();
@@ -159,8 +159,8 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
   <div class="au-shell">
     <div class="au-pane">
       <router-link to="/" class="au-brand">
-        <span class="tv-brand-mark">T</span>
-        <span class="brand-text">Tavolo</span>
+        <span class="tv-brand-mark">C</span>
+        <span class="brand-text">ComforTables</span>
       </router-link>
 
       <div class="au-form-wrap">
@@ -317,7 +317,7 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
       </div>
 
       <footer class="au-foot">
-        <span>© {{ new Date().getFullYear() }} Tavolo S.r.l.</span>
+        <span>© {{ new Date().getFullYear() }} ComforTables</span>
         <div>
           <router-link to="/terms">Termini</router-link>
           <router-link to="/privacy-policy">Privacy</router-link>

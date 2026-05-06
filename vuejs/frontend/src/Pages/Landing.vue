@@ -9,10 +9,12 @@ const canUseHeroScene = ref(false);
 const supportsWebGL = () => {
   if (typeof window === 'undefined') return false;
   const canvas = document.createElement('canvas');
-  return !!(
-    window.WebGLRenderingContext
-    && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
-  );
+  const context = window.WebGLRenderingContext
+    && (canvas.getContext('webgl', { failIfMajorPerformanceCaveat: false }) || canvas.getContext('experimental-webgl'));
+
+  if (!context) return false;
+  context.getExtension?.('WEBGL_lose_context')?.loseContext?.();
+  return true;
 };
 
 const serviceProblems = [
@@ -118,8 +120,7 @@ const plans = [
 onMounted(() => {
   nextTick(() => { document.title = 'COMFORTABLES · Gestionale ristorante in tempo reale'; });
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const compactViewport = window.matchMedia?.('(max-width: 720px)').matches;
-  canUseHeroScene.value = !compactViewport && !prefersReducedMotion && supportsWebGL();
+  canUseHeroScene.value = !prefersReducedMotion && supportsWebGL();
 });
 </script>
 
@@ -128,7 +129,7 @@ onMounted(() => {
     <div class="dashboard-public">
       <section class="public-hero">
         <div class="public-hero-scene-wrap">
-          <LandingHeroScene v-if="canUseHeroScene" />
+          <LandingHeroScene v-if="canUseHeroScene" @scene-error="canUseHeroScene = false" />
           <div v-else class="public-hero-static" aria-hidden="true">
             <span></span><span></span><span></span><span></span>
           </div>
@@ -428,6 +429,16 @@ onMounted(() => {
   top: 18%;
   background: color-mix(in oklab, var(--ac) 14%, var(--paper));
 }
+@keyframes publicStaticFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(10px, -8px, 0) rotate(1.5deg); }
+}
+.public-hero-static span {
+  animation: publicStaticFloat 6s ease-in-out infinite;
+}
+.public-hero-static span:nth-child(2) { animation-delay: -1.4s; }
+.public-hero-static span:nth-child(3) { animation-delay: -2.8s; }
+.public-hero-static span:nth-child(4) { animation-delay: -4.2s; }
 
 .public-hero-grid {
   display: grid;
@@ -960,7 +971,15 @@ onMounted(() => {
 @media (max-width: 720px) {
   .public-hero { padding: 34px 0 42px; }
   .public-hero-scene-wrap {
-    display: none;
+    display: block;
+    inset: 2% -26% auto 18%;
+    height: 285px;
+    opacity: 0.28;
+  }
+  .public-hero-scene-wrap::after {
+    background:
+      radial-gradient(closest-side at 52% 46%, color-mix(in oklab, var(--ac) 16%, transparent), transparent 70%),
+      linear-gradient(180deg, transparent, var(--bg) 86%);
   }
   .public-hero h1 {
     font-size: 34px;
@@ -1030,6 +1049,9 @@ onMounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .public-hero-static span {
+    animation: none;
+  }
   .public-card-scroll .public-container {
     min-height: 0;
   }

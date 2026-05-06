@@ -7,8 +7,8 @@ import { API_BASE } from '@/utils';
 import { defaultRouteForUser } from '@/staffAccess';
 
 useHead({
-  title: 'Accedi · Tavolo',
-  meta: [{ name: 'description', content: 'Accedi a Tavolo per gestire il tuo ristorante' }],
+  title: 'Accedi · ComforTables',
+  meta: [{ name: 'description', content: 'Accedi a ComforTables per gestire il tuo ristorante' }],
 });
 
 const store = useStore();
@@ -72,8 +72,8 @@ const submit = async () => {
   <div class="au-shell">
     <div class="au-pane">
       <router-link to="/" class="au-brand">
-        <span class="tv-brand-mark">T</span>
-        <span class="brand-text">Tavolo</span>
+        <span class="tv-brand-mark">C</span>
+        <span class="brand-text">ComforTables</span>
       </router-link>
 
       <div class="au-form-wrap">
@@ -102,7 +102,7 @@ const submit = async () => {
           <i class="bi bi-check-circle-fill"></i>
           <div>
             <strong>Email confermata</strong>
-            <span>Ora puoi accedere al tuo account Tavolo.</span>
+            <span>Ora puoi accedere al tuo account ComforTables.</span>
           </div>
         </div>
 
@@ -165,7 +165,7 @@ const submit = async () => {
       </div>
 
       <footer class="au-foot">
-        <span>© {{ new Date().getFullYear() }} Tavolo S.r.l.</span>
+        <span>© {{ new Date().getFullYear() }} ComforTables</span>
         <div>
           <router-link to="/terms">Termini</router-link>
           <router-link to="/privacy-policy">Privacy</router-link>
@@ -178,7 +178,7 @@ const submit = async () => {
       <div class="au-side-content">
         <div class="overline" style="color: color-mix(in oklab, white 60%, transparent);">Servizio in corso</div>
         <h2>Tutto sotto controllo, anche stasera.</h2>
-        <p>Coperti gestiti, tavoli aperti, scontrini fiscali stampati. Tavolo è la consolle di servizio della tua brigata.</p>
+        <p>Coperti gestiti, tavoli aperti, scontrini fiscali stampati. ComforTables è la consolle di servizio della tua brigata.</p>
 
         <div class="au-side-mock">
           <div class="au-side-mock-h">
