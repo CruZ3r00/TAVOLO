@@ -48,16 +48,42 @@ const mode = computed(() => (route.meta?.ordersMode && kitchenModes[route.meta.o
 const isKitchenMode = computed(() => mode.value !== 'cameriere');
 const modeInfo = computed(() => kitchenModes[mode.value] || { title: 'Sala', overline: 'Sala', station: null });
 const isOwnerProductionMode = computed(() => isOwnerView.value && isKitchenMode.value);
+const isPro = computed(() => currentUser.value?.subscription_plan === 'pro');
+
+// Owner monitor: department pill bar (Tutti/Cucina/Bar/Pizzeria/Cucina SG)
+const initialMonitorDept = (() => {
+  const m = route.meta?.ordersMode;
+  return m && ['cucina', 'bar', 'pizzeria', 'cucina_sg'].includes(m) ? m : 'all';
+})();
+const monitorDept = ref(initialMonitorDept);
+const COURSE_LABELS = { 1: 'Prima portata', 2: 'Seconda portata', 3: 'Terza portata', 4: 'Altro' };
+const ROLE_LABELS = { cucina: 'Cucina', bar: 'Bar', pizzeria: 'Pizzeria', cucina_sg: 'Cucina SG' };
+const ROLE_ICONS = { cucina: 'bi-fire', bar: 'bi-cup-straw', pizzeria: 'bi-record-circle', cucina_sg: 'bi-shield-check' };
+
+const departmentPills = computed(() => ([
+  { key: 'all',       label: 'Tutti',     icon: 'bi-grid-3x3-gap', allowed: true },
+  { key: 'cucina',    label: 'Cucina',    icon: 'bi-fire',          allowed: true },
+  { key: 'bar',       label: 'Bar',       icon: 'bi-cup-straw',     allowed: isPro.value },
+  { key: 'pizzeria',  label: 'Pizzeria',  icon: 'bi-record-circle', allowed: isPro.value },
+  { key: 'cucina_sg', label: 'Cucina SG', icon: 'bi-shield-check',  allowed: isPro.value },
+]));
+
+const stationFromMonitor = computed(() => (monitorDept.value === 'all' ? null : monitorDept.value));
+const effectiveStation = computed(() => (
+  isOwnerProductionMode.value ? stationFromMonitor.value : modeInfo.value.station
+));
+
 const pageTitle = computed(() => (isOwnerProductionMode.value ? 'Ordini' : modeInfo.value.title));
 const headerTitle = computed(() => {
-  if (isOwnerProductionMode.value) return 'Ordini';
+  if (isOwnerProductionMode.value) return 'Ordini in tempo reale';
   return isKitchenMode.value ? 'Comande in corso' : 'Sala & tavoli';
 });
-const headerOverline = computed(() => (
-  isOwnerProductionMode.value
-    ? `Ordini · ${modeInfo.value.overline} · ${now.value}`
-    : `${modeInfo.value.overline} · ${now.value}`
-));
+const headerOverline = computed(() => {
+  if (isOwnerProductionMode.value) {
+    return `Monitoraggio operativo · live · ${now.value}`;
+  }
+  return `${modeInfo.value.overline} · ${now.value}`;
+});
 
 const showOrderDetail = ref(false);
 const currentOrderDocId = ref(null);
@@ -100,13 +126,79 @@ const kitchenStats = computed(() => {
   return { total, ready };
 });
 
+// ===== Monitor view (owner) =====
+const itemStation = (item) => {
+  if (!item) return null;
+  return item.station || item.fk_element?.staff_role || null;
+};
+const itemCourse = (item) => {
+  const c = parseInt(item?.course, 10);
+  return Number.isFinite(c) && c >= 1 ? c : 1;
+};
+const formatElapsed = (ts) => {
+  if (!ts) return '0\'';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '0\'';
+  const m = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
+  return `${m}'`;
+};
+const orderTopStatus = (order) => {
+  const items = (order.items || []).filter(i => i.status !== 'served' && i.status !== 'cancelled');
+  if (items.length === 0) return 'consegnato';
+  if (items.every(i => i.status === 'ready')) return 'pronto';
+  if (items.some(i => i.status === 'preparing' || i.status === 'taken')) return 'lavorazione';
+  return 'lavorazione';
+};
+const filteredMonitorOrders = computed(() => {
+  const dept = monitorDept.value;
+  return orders.value
+    .filter(o => o.status === 'active' && Array.isArray(o.items))
+    .map(o => {
+      const items = dept === 'all' ? o.items : o.items.filter(i => itemStation(i) === dept);
+      return { ...o, items };
+    })
+    .filter(o => o.items.length > 0)
+    .map(o => ({
+      ...o,
+      _topStatus: orderTopStatus(o),
+      _grouped: o.items.reduce((acc, it) => {
+        const c = itemCourse(it);
+        (acc[c] = acc[c] || []).push(it);
+        return acc;
+      }, {}),
+    }))
+    .sort((a, b) => new Date(b.opened_at || b.createdAt || 0) - new Date(a.opened_at || a.createdAt || 0));
+});
+const monitorStats = computed(() => {
+  const list = filteredMonitorOrders.value;
+  let inLav = 0, pronti = 0, consegnati = 0;
+  list.forEach(o => {
+    if (o._topStatus === 'lavorazione') inLav += 1;
+    else if (o._topStatus === 'pronto') pronti += 1;
+    else if (o._topStatus === 'consegnato') consegnati += 1;
+  });
+  return { total: list.length, inLav, pronti, consegnati };
+});
+const monitorActiveTitle = computed(() => (
+  monitorDept.value === 'all' ? 'Tutti i reparti' : (ROLE_LABELS[monitorDept.value] || 'Reparto')
+));
+const monitorActiveIcon = computed(() => (
+  monitorDept.value === 'all' ? 'bi-grid-3x3-gap' : (ROLE_ICONS[monitorDept.value] || 'bi-grid-3x3-gap')
+));
+const tableNumber = (order) => order?.fk_table?.number ?? order?.table_number ?? order?.table ?? '?';
+const setMonitorDept = (key, allowed) => {
+  if (!allowed) return;
+  monitorDept.value = key;
+  loadData({ silent: true });
+};
+
 const loadData = async ({ silent = false } = {}) => {
   if (!token.value) return;
   if (silent) refreshing.value = true; else loading.value = true;
   try {
     const [tablesResp, ordersResp] = await Promise.all([
       isKitchenMode.value ? Promise.resolve({ data: [] }) : fetchTables(token.value),
-      fetchOrders({ status: 'active', pageSize: 100, station: modeInfo.value.station }, token.value),
+      fetchOrders({ status: 'active', pageSize: 100, station: effectiveStation.value }, token.value),
     ]);
     tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
     orders.value = Array.isArray(ordersResp?.data) ? ordersResp.data : [];
@@ -332,7 +424,7 @@ const openOrderFromQuery = () => {
 };
 
 const updateDocumentTitle = () => {
-  document.title = `${pageTitle.value} · Tavolo`;
+  document.title = `${pageTitle.value} · ComforTables`;
 };
 
 const switchOwnerOrderMode = (tab) => {
@@ -360,6 +452,12 @@ const now = computed(() => {
 
 watch(() => route.path, async () => {
   updateDocumentTitle();
+  if (isOwnerProductionMode.value) {
+    const m = route.meta?.ordersMode;
+    if (m && ['cucina', 'bar', 'pizzeria', 'cucina_sg'].includes(m)) {
+      monitorDept.value = m;
+    }
+  }
   await loadData();
   openOrderFromQuery();
 });
@@ -395,18 +493,26 @@ watch(() => route.path, async () => {
         </div>
       </header>
 
-      <div v-if="isOwnerProductionMode" class="pf-tabs ord-tabs" aria-label="Sezioni ordini">
+      <!-- ===== OWNER · monitor toolbar ===== -->
+      <div v-if="isOwnerProductionMode" class="ct-dept-bar" aria-label="Reparto monitorato">
         <button
-          v-for="tab in ownerOrderTabs"
-          :key="tab.mode"
+          v-for="pill in departmentPills"
+          :key="pill.key"
           type="button"
-          class="pf-tab"
-          :class="{ active: mode === tab.mode }"
-          @click="switchOwnerOrderMode(tab)"
+          class="ct-dept-pill"
+          :class="{ active: monitorDept === pill.key }"
+          :disabled="!pill.allowed"
+          :title="pill.allowed ? '' : 'Disponibile con il piano Professionale'"
+          @click="setMonitorDept(pill.key, pill.allowed)"
         >
-          <i :class="['bi', tab.icon]" aria-hidden="true"></i>
-          {{ tab.label }}
+          <i :class="['bi', pill.icon]" aria-hidden="true"></i>
+          <span>{{ pill.label }}</span>
+          <span v-if="!pill.allowed" class="lock-pill">PRO</span>
         </button>
+        <span v-if="!isPro" class="ct-dept-bar__note">
+          <i class="bi bi-info-circle" style="color: var(--ac);"></i>
+          Piano Essenziale: solo Cucina
+        </span>
       </div>
 
       <Transition name="fade">
@@ -445,13 +551,131 @@ watch(() => route.path, async () => {
       </div>
 
       <template v-else>
+        <!-- ===== KPI strip + Monitor (owner) ===== -->
+        <template v-if="isOwnerProductionMode">
+          <div class="ct-stat-grid ct-stagger">
+            <div class="ct-stat">
+              <span class="ct-stat__ico"><i class="bi bi-receipt"></i></span>
+              <div>
+                <div class="ct-stat__label">Ordini attivi</div>
+                <div class="ct-stat__value">{{ monitorStats.total }}</div>
+              </div>
+            </div>
+            <div class="ct-stat ct-stat--warn">
+              <span class="ct-stat__ico"><i class="bi bi-fire"></i></span>
+              <div>
+                <div class="ct-stat__label">In lavorazione</div>
+                <div class="ct-stat__value">{{ monitorStats.inLav }}</div>
+              </div>
+            </div>
+            <div class="ct-stat ct-stat--ok">
+              <span class="ct-stat__ico"><i class="bi bi-bell"></i></span>
+              <div>
+                <div class="ct-stat__label">Pronti</div>
+                <div class="ct-stat__value">{{ monitorStats.pronti }}</div>
+              </div>
+            </div>
+            <div class="ct-stat ct-stat--muted">
+              <span class="ct-stat__ico"><i class="bi bi-check2-circle"></i></span>
+              <div>
+                <div class="ct-stat__label">Consegnati</div>
+                <div class="ct-stat__value">{{ monitorStats.consegnati }}</div>
+              </div>
+            </div>
+          </div>
+
+          <section class="ct-orders-section">
+            <header class="ct-orders-section__head">
+              <h2 class="ct-orders-section__title">
+                <i :class="['bi', monitorActiveIcon]" aria-hidden="true"></i>
+                {{ monitorActiveTitle }}
+              </h2>
+              <div class="ct-orders-live">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span>Live · aggiornamento auto</span>
+              </div>
+            </header>
+
+            <div class="ct-orders-grid ct-stagger">
+              <article
+                v-for="o in filteredMonitorOrders"
+                :key="o.documentId || o.id"
+                class="ct-order-card"
+                @click="handleViewOrder(o)"
+                role="button"
+                tabindex="0"
+                @keydown.enter="handleViewOrder(o)"
+              >
+                <header class="ct-order-card__head">
+                  <span class="ct-order-card__pill">T{{ tableNumber(o) }}</span>
+                  <div class="ct-order-card__heading">
+                    <div class="ct-order-card__title">Tavolo {{ tableNumber(o) }}</div>
+                    <div class="ct-order-card__meta">
+                      <span><i class="bi bi-clock"></i> {{ formatElapsed(o.opened_at) }}</span>
+                      <span v-if="o.covers">·</span>
+                      <span v-if="o.covers">{{ o.covers }} cop.</span>
+                    </div>
+                  </div>
+                  <span
+                    class="chip"
+                    :class="{
+                      ok: o._topStatus === 'pronto',
+                      warn: o._topStatus === 'lavorazione',
+                    }"
+                  >
+                    <template v-if="o._topStatus === 'pronto'">Pronto</template>
+                    <template v-else-if="o._topStatus === 'lavorazione'">In lavorazione</template>
+                    <template v-else>Consegnato</template>
+                  </span>
+                </header>
+                <div class="ct-order-card__body">
+                  <div
+                    v-for="(group, courseKey) in o._grouped"
+                    :key="`c-${o.documentId || o.id}-${courseKey}`"
+                    class="ct-order-course"
+                  >
+                    <div class="ct-order-course__label">
+                      <span class="ct-order-course__label-dot"></span>
+                      {{ COURSE_LABELS[courseKey] || `Portata ${courseKey}` }}
+                    </div>
+                    <ul class="ct-order-course__list">
+                      <li
+                        v-for="(it, idx) in group"
+                        :key="`it-${o.documentId || o.id}-${courseKey}-${idx}`"
+                        class="ct-order-course__item"
+                      >
+                        <span class="ct-order-course__qty">×{{ it.quantity || 1 }}</span>
+                        <span class="ct-order-course__name">{{ it.name }}</span>
+                        <span
+                          v-if="monitorDept === 'all' && itemStation(it)"
+                          class="ct-order-course__station"
+                        >
+                          {{ ROLE_LABELS[itemStation(it)] || itemStation(it) }}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </article>
+
+              <div v-if="filteredMonitorOrders.length === 0" class="ct-orders-empty">
+                <i class="bi bi-inbox"></i>
+                Nessun ordine attivo per questo reparto.
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- ===== Cameriere (sala) ===== -->
         <OrdersTableGrid
-          v-if="mode === 'cameriere'"
+          v-else-if="mode === 'cameriere'"
           :tables="tables"
           :orders="orders"
           @view-order="handleViewOrder"
           @open-table="handleOpenTable"
         />
+
+        <!-- ===== Staff cucina/bar/etc. — kanban ===== -->
         <KitchenBoard
           v-else
           :orders="orders"
@@ -647,6 +871,12 @@ watch(() => route.path, async () => {
 }
 .ord-tabs .pf-tab {
   text-decoration: none;
+}
+
+.ct-order-card { cursor: pointer; }
+.ct-order-card:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
 }
 
 @media (max-width: 860px) {

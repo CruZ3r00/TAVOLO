@@ -28,10 +28,10 @@ function classifyCategory(category) {
   const value = cleanCategory(category).toLowerCase();
   if (!value) return STAFF_ROLES.CUCINA;
 
-  if (/(bevande|bibite|drink|cocktail|vino|vini|birra|birre|amari|liquori|distillati|aperitivi|bar|caffe|caffè|acqua|soft drink|analcolic)/.test(value)) {
+  if (/(bevande|bibite|drink|cocktail|vino|vini|birra|birre|amari|liquori|distillati|aperitivi|\bbar\b|caffe|caffè|acqua|soft drink|analcolic)/.test(value)) {
     return STAFF_ROLES.BAR;
   }
-  if (/(senza glutine|gluten free|gluten-free|sg|celiac|celiach)/.test(value)) {
+  if (/(senza glutine|gluten free|gluten-free|\bsg\b|celiac|celiach)/.test(value)) {
     return STAFF_ROLES.CUCINA_SG;
   }
   if (/(pizza|pizze|pizzeria|focaccia|calzone)/.test(value)) {
@@ -106,6 +106,42 @@ async function stationForCategory(strapi, owner, category) {
   } catch (_err) {
     return classifyCategory(clean);
   }
+}
+
+/**
+ * Eager-load di tutto il routing categoria->station per un owner.
+ * Una sola query DB; sostituisce N chiamate sequenziali a stationForCategory
+ * quando si serializzano molti item.
+ *
+ * Restituisce una funzione lookup(category) -> station che applica fallback a
+ * classifyCategory per categorie non ancora in tabella.
+ */
+async function loadRoutingMap(strapi, owner) {
+  const ownerId = owner && owner.id;
+  const proRouting = ownerHasProfessionalRouting(owner);
+  const map = new Map();
+
+  if (proRouting && ownerId && strapi.db.connection) {
+    try {
+      const rows = await strapi.db.connection('restaurant_category_routing')
+        .select(['category', 'staff_role'])
+        .where('owner_id', ownerId);
+      for (const row of rows || []) {
+        const key = categoryKey(row.category);
+        const station = normalizeStation(row.staff_role);
+        if (key && station) map.set(key, station);
+      }
+    } catch (err) {
+      strapi.log.warn(`category routing: loadRoutingMap fallita per user ${ownerId}: ${err.message}`);
+    }
+  }
+
+  return function lookup(category) {
+    const clean = cleanCategory(category);
+    if (!clean) return STAFF_ROLES.CUCINA;
+    if (!proRouting) return STAFF_ROLES.CUCINA;
+    return map.get(categoryKey(clean)) || classifyCategory(clean);
+  };
 }
 
 async function listMenuCategories(strapi, ownerId) {
@@ -198,6 +234,7 @@ module.exports = {
   ownerHasProfessionalRouting,
   ensureCategoryRouting,
   stationForCategory,
+  loadRoutingMap,
   listCategoryRouting,
   updateCategoryRouting,
 };

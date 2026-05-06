@@ -1,0 +1,656 @@
+/* ============================================================
+   ComforTables redesign — extra tokens & components
+   Imported after design-system.css and tavolo-screens.css.
+   Adds the building blocks introduced in the ComforTables
+   handoff (ct-tokens.css) without duplicating what already
+   exists in the codebase.
+   ============================================================ */
+
+:root {
+  /* Mirrors of ct-tokens accent fallbacks — used when an oklch
+     accent is preferred over the existing Tavolo accent palette. */
+  --ct-ac: var(--ac);
+  --ct-ac-2: color-mix(in oklab, var(--ac) 70%, black 30%);
+  --ct-ac-soft: color-mix(in oklab, var(--ac) 14%, white 86%);
+  --ct-ac-ink: color-mix(in oklab, var(--ac) 70%, black 30%);
+}
+
+/* ------------------------------------------------------------
+   Lock pill — visible on locked tabs / disabled features
+   ------------------------------------------------------------ */
+.lock-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  margin-left: 4px;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  border-radius: 4px;
+}
+
+.pf-tab--locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.pf-tab--locked:hover {
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------
+   Live indicator (small pulsing dot used in headers)
+   ------------------------------------------------------------ */
+.live-dot {
+  width: 8px; height: 8px;
+  border-radius: 999px;
+  background: var(--ok);
+  display: inline-block;
+  animation: ct-pulse-dot 1.6s infinite;
+}
+@keyframes ct-pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--ok) 60%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in oklab, var(--ok) 0%, transparent); }
+}
+
+/* ------------------------------------------------------------
+   Profile hero — banner sopra le tab
+   ------------------------------------------------------------ */
+.ct-pf-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.ct-pf-hero__avatar {
+  width: 56px; height: 56px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--ac), color-mix(in oklab, var(--ac) 70%, black 30%));
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--ac) 30%, transparent);
+}
+.ct-pf-hero__body { flex: 1; min-width: 0; }
+.ct-pf-hero__name { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
+.ct-pf-hero__sub { color: var(--ink-3); font-size: 13px; }
+.ct-pf-hero__chips {
+  display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------
+   Card sections (used inside Profile + Orders)
+   ------------------------------------------------------------ */
+.ct-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ct-card__head {
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.ct-card__icon {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: var(--ac-soft);
+  color: var(--ac);
+  display: grid; place-items: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.ct-card__title-wrap { flex: 1; min-width: 0; }
+.ct-card__title { font-size: 15.5px; font-weight: 700; margin: 0; }
+.ct-card__subtitle {
+  margin: 4px 0 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.ct-card__body { display: flex; flex-direction: column; gap: 12px; }
+.ct-card__footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 4px;
+}
+.ct-stack { display: grid; gap: 14px; }
+
+/* ------------------------------------------------------------
+   Locked / pro upsell panel
+   ------------------------------------------------------------ */
+.ct-locked-panel {
+  padding: 40px 24px;
+  text-align: center;
+  background: var(--bg-sunk);
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.ct-locked-panel__ico {
+  width: 52px; height: 52px;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--warn) 30%, transparent);
+  font-size: 22px;
+}
+.ct-locked-panel h4 { margin: 0; font-size: 16px; }
+.ct-locked-panel p {
+  margin: 0;
+  max-width: 420px;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+/* ------------------------------------------------------------
+   Staff toggle grid (Profile · Staff attivi)
+   ------------------------------------------------------------ */
+.ct-staff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.ct-staff-item {
+  display: grid;
+  grid-template-columns: 40px 1fr 42px;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: background var(--dur), border-color var(--dur), transform var(--dur);
+}
+.ct-staff-item:hover:not(:disabled):not(.is-locked) {
+  border-color: color-mix(in oklab, var(--ac) 40%, var(--line));
+  transform: translateY(-1px);
+}
+.ct-staff-item.is-active {
+  background: color-mix(in oklab, var(--ok) 6%, var(--paper));
+  border-color: color-mix(in oklab, var(--ok) 30%, var(--line));
+}
+.ct-staff-item.is-locked,
+.ct-staff-item:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+.ct-staff-item__ico {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--bg-sunk);
+  color: var(--ac);
+  font-size: 18px;
+}
+.ct-staff-item.is-active .ct-staff-item__ico {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+.ct-staff-item__main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ct-staff-item__main strong { font-size: 14px; font-weight: 700; }
+.ct-staff-item__main em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.ct-staff-item__chips {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;
+}
+.ct-staff-item__toggle {
+  width: 38px; height: 22px;
+  border-radius: 999px;
+  justify-self: end;
+  position: relative;
+  background: var(--bg-active);
+  transition: background var(--dur);
+  margin-top: 8px;
+}
+.ct-staff-item__toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+  transition: left var(--dur) var(--ease-out);
+}
+.ct-staff-item.is-active .ct-staff-item__toggle { background: var(--ok); }
+.ct-staff-item.is-active .ct-staff-item__toggle::after { left: 18px; }
+
+/* ------------------------------------------------------------
+   Department routing (Profile · Reparti)
+   ------------------------------------------------------------ */
+.ct-routing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.ct-routing-col {
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ct-routing-col__head {
+  display: flex; align-items: center; gap: 8px;
+}
+.ct-routing-col__ico {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ac);
+  display: grid; place-items: center;
+}
+.ct-routing-col__title { font-size: 14px; font-weight: 700; }
+.ct-routing-col__count {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-family: var(--f-mono);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.ct-routing-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.ct-routing-row strong {
+  font-size: 13px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ct-routing-row em {
+  font-style: normal;
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+@media (max-width: 720px) {
+  .ct-routing-grid { grid-template-columns: 1fr; }
+  .ct-routing-row { grid-template-columns: 1fr; }
+}
+
+/* ------------------------------------------------------------
+   POS / token / device list
+   ------------------------------------------------------------ */
+.ct-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.ct-platform-card {
+  padding: 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex; flex-direction: column;
+  gap: 4px;
+}
+.ct-platform-card__ico { font-size: 22px; color: var(--ac); }
+.ct-platform-card strong { font-size: 13.5px; margin-top: 4px; }
+.ct-platform-card span { font-size: 11px; color: var(--ink-3); }
+
+.ct-token-result {
+  padding: 16px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--ac) 4%, var(--paper));
+  border: 1px solid color-mix(in oklab, var(--ac) 30%, var(--line));
+  display: flex; flex-direction: column; gap: 12px;
+}
+.ct-token-row {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.ct-token-code {
+  flex: 1; min-width: 200px;
+  padding: 10px 14px;
+  font-family: var(--f-mono);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  user-select: all;
+  word-break: break-all;
+}
+
+.ct-device-list {
+  display: flex; flex-direction: column; gap: 8px;
+  list-style: none;
+  margin: 0; padding: 0;
+}
+.ct-device-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  gap: 12px;
+}
+.ct-device-name {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 600; font-size: 14px;
+}
+.ct-device-name__dot {
+  width: 8px; height: 8px;
+  border-radius: 999px;
+  background: var(--ink-4);
+}
+.ct-device-name__dot.on {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ok) 18%, transparent);
+}
+.ct-device-meta {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-family: var(--f-mono);
+  margin-top: 3px;
+}
+
+/* ------------------------------------------------------------
+   Subscription banner
+   ------------------------------------------------------------ */
+.ct-sub-banner {
+  padding: 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg,
+    color-mix(in oklab, var(--ac) 6%, var(--paper)),
+    var(--paper));
+  border: 1px solid color-mix(in oklab, var(--ac) 22%, var(--line));
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap;
+}
+.ct-sub-banner__title {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
+}
+.ct-sub-banner__sub { color: var(--ink-3); font-size: 13px; margin-top: 4px; }
+
+/* ------------------------------------------------------------
+   Department selector (Owner Ordini)
+   ------------------------------------------------------------ */
+.ct-dept-bar {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  background: var(--bg-sunk);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.ct-dept-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur), color var(--dur), border-color var(--dur);
+}
+.ct-dept-pill:hover:not(:disabled):not(.active) {
+  background: var(--paper);
+  color: var(--ink);
+}
+.ct-dept-pill.active {
+  background: var(--paper);
+  color: var(--ac);
+  font-weight: 600;
+  border-color: var(--line);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+}
+.ct-dept-pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.ct-dept-bar__note {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--ink-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------
+   Stat cards (Owner Ordini KPI strip)
+   ------------------------------------------------------------ */
+.ct-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.ct-stat {
+  padding: 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex; align-items: center; gap: 12px;
+}
+.ct-stat__ico {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--ac-soft);
+  color: var(--ac);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.ct-stat--ok    .ct-stat__ico { background: var(--ok-bg);    color: var(--ok-ink); }
+.ct-stat--warn  .ct-stat__ico { background: var(--warn-bg);  color: var(--warn-ink); }
+.ct-stat--muted .ct-stat__ico { background: var(--bg-sunk);  color: var(--ink-3); }
+.ct-stat__label {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.ct-stat__value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1100px) { .ct-stat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .ct-stat-grid { grid-template-columns: 1fr; } }
+
+/* ------------------------------------------------------------
+   Order cards grid (Owner Ordini)
+   ------------------------------------------------------------ */
+.ct-orders-section { margin-top: 18px; }
+.ct-orders-section__head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px; flex-wrap: wrap;
+}
+.ct-orders-section__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.ct-orders-section__title i { color: var(--ac); }
+.ct-orders-live {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.ct-orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+.ct-orders-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: var(--ink-3);
+  font-size: 13.5px;
+  background: var(--bg-sunk);
+  border-radius: 12px;
+  border: 1px dashed var(--line);
+}
+.ct-orders-empty i { display: block; font-size: 28px; opacity: 0.5; margin-bottom: 8px; }
+
+.ct-order-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: transform var(--dur), box-shadow var(--dur), border-color var(--dur);
+  display: flex;
+  flex-direction: column;
+}
+.ct-order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in oklab, var(--ac) 25%, var(--line));
+}
+.ct-order-card__head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg-sunk);
+  border-bottom: 1px solid var(--line);
+}
+.ct-order-card__pill {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  display: grid; place-items: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ac);
+}
+.ct-order-card__heading { flex: 1; min-width: 0; }
+.ct-order-card__title { font-weight: 600; font-size: 14px; }
+.ct-order-card__meta {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  display: flex; gap: 8px; align-items: center;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.ct-order-card__meta i { font-size: 11px; }
+.ct-order-card__body {
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.ct-order-course {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ct-order-course__label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ct-order-course__label-dot {
+  width: 6px; height: 6px; border-radius: 999px; background: var(--ac);
+}
+.ct-order-course__list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ct-order-course__item {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  padding: 5px 8px;
+  background: var(--bg-sunk);
+  border-radius: 6px;
+}
+.ct-order-course__qty {
+  font-family: var(--f-mono);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ac);
+  text-align: center;
+}
+.ct-order-course__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ct-order-course__station {
+  font-size: 10px;
+  color: var(--ink-3);
+  font-family: var(--f-mono);
+}
+
+@media (max-width: 720px) {
+  .ct-orders-grid { grid-template-columns: 1fr; }
+}
+
+/* ------------------------------------------------------------
+   Subtle stagger on lists
+   ------------------------------------------------------------ */
+.ct-stagger > *      { animation: ct-fade-in 320ms var(--ease-out) both; }
+.ct-stagger > *:nth-child(1) { animation-delay: 30ms; }
+.ct-stagger > *:nth-child(2) { animation-delay: 80ms; }
+.ct-stagger > *:nth-child(3) { animation-delay: 130ms; }
+.ct-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.ct-stagger > *:nth-child(5) { animation-delay: 230ms; }
+.ct-stagger > *:nth-child(6) { animation-delay: 280ms; }
+.ct-stagger > *:nth-child(7) { animation-delay: 320ms; }
+.ct-stagger > *:nth-child(8) { animation-delay: 360ms; }
+.ct-stagger > *:nth-child(9) { animation-delay: 400ms; }
+.ct-stagger > *:nth-child(10){ animation-delay: 440ms; }
+@keyframes ct-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ct-fade-in { animation: ct-fade-in 240ms var(--ease-out) both; }

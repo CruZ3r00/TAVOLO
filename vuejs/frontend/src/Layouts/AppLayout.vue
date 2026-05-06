@@ -16,7 +16,7 @@ const props = defineProps({
 });
 
 const username = ref('');
-const restaurantName = ref('Tavolo');
+const restaurantName = ref('ComforTables');
 const restaurantSub = ref('');
 const store = useStore();
 const route = useRoute();
@@ -40,7 +40,7 @@ const checkLog = async () => {
     if (response.ok) {
       const userData = await response.json();
       username.value = userData.username;
-      restaurantName.value = userData.restaurant_name || userData.username || 'Tavolo';
+      restaurantName.value = userData.restaurant_name || userData.username || 'ComforTables';
       const city = userData.city || userData.address || '';
       const tables = userData.coperti_invernali ? `${userData.coperti_invernali} coperti` : '';
       restaurantSub.value = [city, tables].filter(Boolean).join(' · ') || 'Gestionale';
@@ -160,7 +160,7 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
   <!-- ============== APP variant: sidebar + bottom nav ============== -->
   <div v-if="variantResolved === 'app'" class="app-shell-app">
     <MobileTopBar
-      :title="pageTitle || 'Tavolo'"
+      :title="pageTitle || 'ComforTables'"
       :has-notifications="pendingCount > 0"
       :username="username"
       :restaurant-name="restaurantName"
@@ -195,7 +195,7 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
         <div v-if="mobileMenuOpen" class="mobile-drawer-backdrop" @click="closeMobileMenu">
           <aside class="mobile-drawer" @click.stop>
             <header class="mobile-drawer-h">
-              <span class="tv-brand-mark">T</span>
+              <span class="tv-brand-mark">C</span>
               <div>
                 <div class="md-side-name">{{ restaurantName }}</div>
                 <div class="md-side-sub">{{ restaurantSub }}</div>
@@ -224,8 +224,8 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
     <nav class="nav">
       <div class="nav-inner">
         <router-link :to="isLoggedIn ? defaultAppRoute : '/landing'" class="brand" @click="closeMobileMenu">
-          <span class="tv-brand-mark">T</span>
-          <span class="brand-text">Tavolo</span>
+          <span class="tv-brand-mark">C</span>
+          <span class="brand-text">ComforTables</span>
           <span class="brand-tag">beta</span>
         </router-link>
 
@@ -294,8 +294,8 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
     <footer class="app-footer">
       <div class="app-footer-inner">
         <div class="app-footer-brand">
-          <span class="tv-brand-mark sm">T</span>
-          <span>Tavolo</span>
+          <span class="tv-brand-mark sm">C</span>
+          <span>ComforTables</span>
           <span class="app-footer-tag">Il gestionale dei ristoranti moderni</span>
         </div>
         <nav class="app-footer-nav">
@@ -303,7 +303,7 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
           <router-link to="/privacy-policy">Privacy</router-link>
           <router-link to="/contact-us">Contatti</router-link>
         </nav>
-        <div class="app-footer-copy">&copy; {{ new Date().getFullYear() }} Tavolo</div>
+        <div class="app-footer-copy">&copy; {{ new Date().getFullYear() }} ComforTables</div>
       </div>
     </footer>
   </div>

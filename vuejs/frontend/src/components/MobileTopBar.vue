@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 
 const props = defineProps({
-  title: { type: String, default: 'Tavolo' },
+  title: { type: String, default: 'ComforTables' },
   hasNotifications: { type: Boolean, default: false },
   username: { type: String, default: '' },
   restaurantName: { type: String, default: '' },
@@ -13,7 +13,7 @@ const props = defineProps({
 const emit = defineEmits(['menu']);
 
 const avatarLetter = computed(() => {
-  const src = props.restaurantName || props.username || 'T';
+  const src = props.restaurantName || props.username || 'C';
   return src.charAt(0).toUpperCase();
 });
 </script>
@@ -25,7 +25,7 @@ const avatarLetter = computed(() => {
     </button>
     <span v-else class="tv-mobile-top-spacer" aria-hidden="true"></span>
     <div class="tv-mobile-top-title">
-      <span class="tv-brand-mark sm">T</span>
+      <span class="tv-brand-mark sm">C</span>
       <strong>{{ title }}</strong>
     </div>
     <div class="tv-mobile-top-right">

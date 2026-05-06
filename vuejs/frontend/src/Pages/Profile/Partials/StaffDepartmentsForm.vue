@@ -3,6 +3,32 @@ import { computed, onMounted, ref } from 'vue';
 import { useStore } from 'vuex';
 import { fetchStaffSettings, updateCategoryRouting, updateStaffSetting } from '@/utils';
 
+const props = defineProps({
+    /**
+     * 'all'        — toggle reparti + smistamento categorie (default)
+     * 'staff'      — solo toggle reparti (Staff attivi)
+     * 'routing'    — solo smistamento categorie (Reparti)
+     */
+    mode: { type: String, default: 'all' },
+});
+
+const showToggles = computed(() => props.mode === 'all' || props.mode === 'staff');
+const showRouting = computed(() => props.mode === 'all' || props.mode === 'routing');
+const sectionTitle = computed(() => {
+    if (props.mode === 'staff') return 'Profili staff attivi';
+    if (props.mode === 'routing') return 'Smistamento categorie ai reparti';
+    return 'Reparti staff';
+});
+const sectionDescription = computed(() => {
+    if (props.mode === 'staff') return 'Scegli quali account operativi possono accedere al gestionale. Ogni reparto ha la sua coda di lavoro.';
+    if (props.mode === 'routing') return 'Scegli dove indirizzare ogni categoria del menu. Ogni reparto vede solo le proprie code.';
+    return 'Scegli quali account operativi possono accedere al ristorante e dove inviare le categorie.';
+});
+const sectionIcon = computed(() => {
+    if (props.mode === 'routing') return 'bi-diagram-3';
+    return 'bi-people';
+});
+
 const store = useStore();
 const token = computed(() => store.getters.getToken);
 
@@ -136,10 +162,10 @@ onMounted(loadDepartments);
 <template>
     <div class="profile-section">
         <div class="section-header">
-            <div class="section-icon"><i class="bi bi-people"></i></div>
+            <div class="section-icon"><i :class="['bi', sectionIcon]"></i></div>
             <div>
-                <h3 class="section-title">Reparti staff</h3>
-                <p class="section-description">Scegli quali account operativi possono accedere al ristorante e dove inviare le categorie.</p>
+                <h3 class="section-title">{{ sectionTitle }}</h3>
+                <p class="section-description">{{ sectionDescription }}</p>
             </div>
         </div>
 
@@ -162,79 +188,115 @@ onMounted(loadDepartments);
                 <span>Caricamento reparti...</span>
             </div>
 
-            <div v-else class="staff-grid">
-                <div
-                    v-if="routingNotice"
-                    class="staff-inline-note"
-                    :class="{ 'staff-inline-note--locked': categoryTotal > 0 && !routingAllowed }"
-                >
-                    {{ routingNotice }}
+            <!-- Mode 'routing' on plans without routing rights → upsell -->
+            <div
+                v-else-if="mode === 'routing' && !routingAllowed && categoryTotal > 0"
+                class="ct-locked-panel"
+            >
+                <div class="ct-locked-panel__ico">
+                    <i class="bi bi-lock-fill"></i>
                 </div>
+                <h4>Disponibile con il piano Professionale</h4>
+                <p>
+                    Con l'Essenziale tutte le categorie arrivano in Cucina. Passa al
+                    Professionale per smistare bar, pizzeria e cucina senza glutine in
+                    code separate.
+                </p>
+                <router-link to="/profile/show?section=abbonamento" class="btn btn-accent">
+                    Scopri il Professionale <i class="bi bi-arrow-right"></i>
+                </router-link>
+            </div>
 
-                <div
-                    v-for="department in departments"
-                    :key="department.role"
-                    class="staff-card"
-                    :class="{ active: department.active && department.plan_allowed, disabled: !department.plan_allowed }"
-                >
-                    <span class="staff-card-icon">
-                        <i :class="['bi', roleIcon(department.role)]"></i>
-                    </span>
-                    <span class="staff-card-main">
-                        <strong>{{ department.label }}</strong>
-                        <em>{{ department.username || 'Account in preparazione' }}</em>
-                    </span>
+            <template v-else>
+                <!-- ============ STAFF TOGGLE GRID (mode 'all' o 'staff') ============ -->
+                <div v-if="showToggles" class="ct-staff-grid ct-stagger">
                     <button
+                        v-for="department in departments"
+                        :key="`tog-${department.role}`"
                         type="button"
-                        class="staff-toggle"
-                        :class="{ on: department.active && department.plan_allowed, locked: !department.can_toggle }"
+                        class="ct-staff-item"
+                        :class="{
+                            'is-active': department.active && department.plan_allowed,
+                            'is-locked': !department.can_toggle,
+                        }"
                         :disabled="savingRole === department.role || !department.can_toggle"
                         :aria-label="department.can_toggle ? `${department.active ? 'Disattiva' : 'Attiva'} ${department.label}` : `${department.label} bloccato`"
                         @click="toggleDepartment(department)"
                     >
-                        <span v-if="savingRole === department.role" class="ds-spinner"></span>
-                        <i v-else-if="department.active && department.plan_allowed" class="bi bi-check2"></i>
-                        <i v-else-if="!department.can_toggle" class="bi bi-lock"></i>
-                    </button>
-                    <span v-if="department.role === 'cameriere'" class="staff-plan-note">Sempre attivo</span>
-                    <span v-else-if="!department.plan_allowed" class="staff-plan-note">Richiede Professionale</span>
-
-                    <div v-if="routableRoles.has(department.role)" class="staff-categories">
-                        <div class="staff-categories-head">
-                            <span>Categorie</span>
-                            <small>{{ departmentCategories(department).length }}</small>
-                        </div>
-                        <div v-if="departmentCategories(department).length === 0" class="staff-empty-categories">
-                            Nessuna categoria assegnata.
-                        </div>
-                        <label
-                            v-for="category in departmentCategories(department)"
-                            :key="`${department.role}-${category.category}`"
-                            class="staff-category-row"
-                        >
-                            <span>
-                                <strong>{{ category.category }}</strong>
-                                <em>{{ category.item_count }} elementi</em>
+                        <span class="ct-staff-item__ico">
+                            <i :class="['bi', roleIcon(department.role)]"></i>
+                        </span>
+                        <span class="ct-staff-item__main">
+                            <strong>{{ department.label }}</strong>
+                            <em>{{ department.username || 'Account in preparazione' }}</em>
+                            <span class="ct-staff-item__chips">
+                                <span v-if="department.role === 'cameriere'" class="chip">Sempre attivo</span>
+                                <span v-else-if="!department.plan_allowed" class="chip warn">Richiede PRO</span>
                             </span>
-                            <select
-                                class="staff-category-select"
-                                :value="categoryRole(category, department.role)"
-                                :disabled="categorySelectDisabled(category)"
-                                :title="categorySelectTitle(category)"
-                                @change="moveCategory(category.category, $event.target.value, categoryRole(category, department.role))"
+                        </span>
+                        <span class="ct-staff-item__toggle" aria-hidden="true">
+                            <span v-if="savingRole === department.role" class="ds-spinner" style="position:absolute;top:3px;left:10px;"></span>
+                        </span>
+                    </button>
+                </div>
+
+                <!-- ============ CATEGORY ROUTING (mode 'all' o 'routing') ============ -->
+                <div v-if="showRouting" :class="['routing-wrap', { 'has-toggles': showToggles }]">
+                    <div
+                        v-if="routingNotice"
+                        class="staff-inline-note"
+                        :class="{ 'staff-inline-note--locked': categoryTotal > 0 && !routingAllowed }"
+                    >
+                        {{ routingNotice }}
+                    </div>
+
+                    <div class="ct-routing-grid ct-stagger" v-if="routableDepartments.length > 0">
+                        <div
+                            v-for="department in routableDepartments"
+                            :key="`rt-${department.role}`"
+                            class="ct-routing-col"
+                        >
+                            <div class="ct-routing-col__head">
+                                <span class="ct-routing-col__ico">
+                                    <i :class="['bi', roleIcon(department.role)]"></i>
+                                </span>
+                                <span class="ct-routing-col__title">{{ department.label }}</span>
+                                <span class="ct-routing-col__count">
+                                    {{ departmentCategories(department).length }} categorie
+                                </span>
+                            </div>
+                            <div v-if="departmentCategories(department).length === 0" class="staff-empty-categories">
+                                Nessuna categoria assegnata.
+                            </div>
+                            <div
+                                v-for="category in departmentCategories(department)"
+                                :key="`row-${department.role}-${category.category}`"
+                                class="ct-routing-row"
                             >
-                                <option
-                                    v-for="target in routableDepartments"
-                                    :key="target.role"
-                                    :value="target.role"
+                                <span>
+                                    <strong>{{ category.category }}</strong>
+                                    <em>{{ category.item_count }} elementi</em>
+                                </span>
+                                <select
+                                    class="ds-input"
+                                    :value="categoryRole(category, department.role)"
+                                    :disabled="categorySelectDisabled(category)"
+                                    :title="categorySelectTitle(category)"
+                                    @change="moveCategory(category.category, $event.target.value, categoryRole(category, department.role))"
                                 >
-                                    {{ target.label }}
-                                </option>
-                            </select>
-                        </label>
+                                    <option
+                                        v-for="target in routableDepartments"
+                                        :key="target.role"
+                                        :value="target.role"
+                                    >
+                                        {{ target.label }}
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </template>
         </div>
     </div>
 </template>
@@ -461,5 +523,11 @@ onMounted(loadDepartments);
     .staff-category-row {
         grid-template-columns: 1fr;
     }
+}
+
+.routing-wrap.has-toggles {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px dashed var(--line);
 }
 </style>

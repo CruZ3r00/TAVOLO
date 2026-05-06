@@ -403,11 +403,11 @@ as $$
 declare
   v text := lower(coalesce(p_category, ''));
 begin
-  if v ~ '(bevande|bibite|drink|cocktail|vino|vini|birra|birre|amari|liquori|distillati|aperitivi|bar|caffe|caffè|acqua|soft drink|analcolic)' then
+  if v ~ '(bevande|bibite|drink|cocktail|vino|vini|birra|birre|amari|liquori|distillati|aperitivi|\ybar\y|caffe|caffè|acqua|soft drink|analcolic)' then
     return 'bar';
   end if;
 
-  if v ~ '(senza glutine|gluten free|gluten-free|sg|celiac|celiach)' then
+  if v ~ '(senza glutine|gluten free|gluten-free|\ysg\y|celiac|celiach)' then
     return 'cucina_sg';
   end if;
 

@@ -26,15 +26,19 @@ const buildSslConfig = (env) => {
   const caPath = cleanPath(env('DATABASE_SSL_CA', undefined));
   const ca = readOptionalFile(caPath);
   const missingConfiguredCa = !!caPath && !ca;
-  const failOnMissingCa = env.bool('DATABASE_SSL_FAIL_ON_MISSING_CA', false);
   const configuredRejectUnauthorized = env.bool('DATABASE_SSL_REJECT_UNAUTHORIZED', true);
 
-  if (missingConfiguredCa && configuredRejectUnauthorized && failOnMissingCa) {
-    throw new Error(`DATABASE_SSL_CA punta a un file non esistente: ${caPath}`);
-  }
-
+  // Fail loud: se l'operatore vuole TLS verificato (default) e il CA configurato
+  // non e' raggiungibile, non degradiamo silenziosamente rejectUnauthorized.
+  // L'unico modo di partire senza CA e' un acknowledgement esplicito
+  // DATABASE_SSL_REJECT_UNAUTHORIZED=false. Vedi lessons.md: production deve
+  // fallire rumorosamente.
   if (missingConfiguredCa && configuredRejectUnauthorized) {
-    console.warn('[database] DATABASE_SSL_REJECT_UNAUTHORIZED=false per CA mancante.');
+    throw new Error(
+      `[database] DATABASE_SSL_CA punta a un file non esistente (${caPath}). ` +
+      `Imposta DATABASE_SSL_REJECT_UNAUTHORIZED=false per acconsentire al downgrade, ` +
+      `oppure correggi il path al certificato.`
+    );
   }
 
   return {
@@ -43,9 +47,7 @@ const buildSslConfig = (env) => {
     ca,
     capath: env('DATABASE_SSL_CAPATH', undefined),
     cipher: env('DATABASE_SSL_CIPHER', undefined),
-    rejectUnauthorized: missingConfiguredCa
-      ? false
-      : configuredRejectUnauthorized,
+    rejectUnauthorized: configuredRejectUnauthorized,
   };
 };
 

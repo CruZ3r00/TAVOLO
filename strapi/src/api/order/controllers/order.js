@@ -35,6 +35,7 @@ const {
 const {
   normalizeStation,
   stationForCategory: stationForCategoryByOwner,
+  loadRoutingMap,
 } = require('../../../utils/category-routing');
 
 const { ApplicationError } = errors;
@@ -99,24 +100,26 @@ function sendError(ctx, err) {
 /* Serializers                                                        */
 /* ------------------------------------------------------------------ */
 
-function serializeItem(item) {
+function serializeItem(item, routingLookup) {
   if (!item) return null;
+  const category = item.category || (item.fk_element ? item.fk_element.category : null) || null;
   return {
     documentId: item.documentId,
     name: item.name,
     price: item.price,
     quantity: item.quantity,
-    category: item.category || (item.fk_element ? item.fk_element.category : null) || null,
+    category,
     course: parseInt(item.course, 10) || 1,
     notes: item.notes || null,
     status: item.status,
+    station: routingLookup ? routingLookup(category) : null,
     fk_element: item.fk_element ? { documentId: item.fk_element.documentId } : null,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };
 }
 
-function serializeOrder(order, includeItems) {
+function serializeOrder(order, includeItems, routingLookup) {
   if (!order) return null;
   const result = {
     documentId: order.documentId,
@@ -147,7 +150,7 @@ function serializeOrder(order, includeItems) {
     updatedAt: order.updatedAt,
   };
   if (includeItems) {
-    result.items = (order.fk_items || []).map(serializeItem);
+    result.items = (order.fk_items || []).map((item) => serializeItem(item, routingLookup));
   }
   return result;
 }
@@ -275,27 +278,92 @@ function stationForActor(actor, query) {
   return null;
 }
 
-async function filterItemsForStation(order, owner, station) {
+function filterItemsForStation(order, routingLookup, station) {
   if (!station || !order || !Array.isArray(order.fk_items)) return order;
 
-  const filtered = [];
-  for (const item of order.fk_items) {
-    const itemStation = await stationForCategoryByOwner(strapi, owner, item.category || (item.fk_element && item.fk_element.category));
-    if (itemStation === station) filtered.push(item);
-  }
+  const filtered = order.fk_items.filter((item) => {
+    const itemStation = routingLookup(item.category || (item.fk_element && item.fk_element.category));
+    return itemStation === station;
+  });
   return { ...order, fk_items: filtered };
 }
 
-async function filterOrdersForStation(orders, owner, station) {
+function filterOrdersForStation(orders, routingLookup, station) {
   if (!station) return orders;
   const filtered = [];
   for (const order of orders || []) {
-    const stationOrder = await filterItemsForStation(order, owner, station);
+    const stationOrder = filterItemsForStation(order, routingLookup, station);
     if ((stationOrder.fk_items || []).some((item) => item.status !== 'served')) {
       filtered.push(stationOrder);
     }
   }
   return filtered;
+}
+
+/**
+ * Filtra a livello SQL gli ordini che hanno almeno un item non-servito
+ * routato verso `station` per l'owner. Restituisce IDs ordinati + total per
+ * paginazione corretta. Sostituisce il post-filter in JS che rompeva total/pageCount.
+ */
+async function listOrderIdsForStation(strapi, params) {
+  const { ownerId, station, statusFilter, tableFilter, from, to, linkedFilter, page, pageSize } = params;
+  const conn = strapi.db.connection;
+
+  const applyFilters = (q) => {
+    let query = q
+      .innerJoin('orders_fk_user_lnk as ul', 'ul.order_id', 'o.id')
+      .innerJoin('order_items_fk_order_lnk as il', 'il.order_id', 'o.id')
+      .innerJoin('order_items as oi', 'oi.id', 'il.order_item_id')
+      .innerJoin('restaurant_category_routing as rcr', 'rcr.owner_id', 'ul.user_id')
+      .whereRaw('LOWER(TRIM(rcr.category)) = LOWER(TRIM(oi.category))')
+      .where('ul.user_id', ownerId)
+      .where('rcr.staff_role', station)
+      .where('oi.status', '<>', 'served');
+
+    if (statusFilter && statusFilter.length) {
+      query = query.whereIn('o.status', statusFilter);
+    }
+    if (tableFilter) {
+      query = query
+        .innerJoin('orders_fk_table_lnk as tl', 'tl.order_id', 'o.id')
+        .innerJoin('tables as t', 't.id', 'tl.table_id')
+        .where('t.document_id', tableFilter);
+    }
+    if (from) query = query.where('o.opened_at', '>=', from);
+    if (to) query = query.where('o.opened_at', '<', to);
+
+    if (linkedFilter === true) {
+      query = query.whereExists(function () {
+        this.select('*')
+          .from('reservations_fk_order_lnk as rl')
+          .whereRaw('rl.order_id = o.id');
+      });
+    } else if (linkedFilter === false) {
+      query = query.whereNotExists(function () {
+        this.select('*')
+          .from('reservations_fk_order_lnk as rl')
+          .whereRaw('rl.order_id = o.id');
+      });
+    }
+    return query;
+  };
+
+  const idsQuery = applyFilters(conn('orders as o'))
+    .select('o.id')
+    .min('o.opened_at as opened_at_min')
+    .groupBy('o.id')
+    .orderBy('opened_at_min', 'desc')
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+
+  const countQuery = applyFilters(conn('orders as o'))
+    .countDistinct('o.id as cnt')
+    .first();
+
+  const [rows, countRow] = await Promise.all([idsQuery, countQuery]);
+  const ids = (rows || []).map((r) => r.id);
+  const total = parseInt(countRow && countRow.cnt, 10) || 0;
+  return { ids, total };
 }
 
 /* ================================================================== */
@@ -461,36 +529,79 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       }
 
       const linkedRaw = typeof q.linked_reservation === 'string' ? q.linked_reservation.trim() : null;
+      let linkedFilter = null;
       if (linkedRaw === 'true' || linkedRaw === '1') {
+        linkedFilter = true;
         filters.fk_reservation = { id: { $notNull: true } };
       } else if (linkedRaw === 'false' || linkedRaw === '0') {
+        linkedFilter = false;
         filters.fk_reservation = { id: { $null: true } };
       }
 
-      const [results, total] = await Promise.all([
-        strapi.documents('api::order.order').findMany({
-          filters,
-          populate: {
-            fk_table: true,
-            fk_items: { populate: ['fk_element'] },
-            fk_reservation: true,
-          },
-          sort: ['opened_at:desc'],
-          pagination: { page, pageSize },
-        }),
-        strapi.documents('api::order.order').count({ filters }),
-      ]);
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
 
-      const stationResults = await filterOrdersForStation(results || [], actor.owner, station);
+      let results;
+      let total;
+
+      if (station) {
+        // Filtro a livello SQL via JOIN su restaurant_category_routing.
+        // Necessario per paginazione/total corretti: il vecchio post-filter
+        // in JS contava il subset di una pagina invece del totale filtrato.
+        const { ids, total: filteredTotal } = await listOrderIdsForStation(strapi, {
+          ownerId,
+          station,
+          statusFilter,
+          tableFilter,
+          from,
+          to,
+          linkedFilter,
+          page,
+          pageSize,
+        });
+        total = filteredTotal;
+
+        if (ids.length === 0) {
+          results = [];
+        } else {
+          const populated = await strapi.documents('api::order.order').findMany({
+            filters: { id: { $in: ids } },
+            populate: {
+              fk_table: true,
+              fk_items: { populate: ['fk_element'] },
+              fk_reservation: true,
+            },
+            sort: ['opened_at:desc'],
+            pagination: { page: 1, pageSize: ids.length },
+          });
+          // Restringe gli item alla station richiesta (kanban di reparto).
+          results = (populated || []).map((o) => filterItemsForStation(o, routingLookup, station));
+        }
+      } else {
+        const [findResults, countTotal] = await Promise.all([
+          strapi.documents('api::order.order').findMany({
+            filters,
+            populate: {
+              fk_table: true,
+              fk_items: { populate: ['fk_element'] },
+              fk_reservation: true,
+            },
+            sort: ['opened_at:desc'],
+            pagination: { page, pageSize },
+          }),
+          strapi.documents('api::order.order').count({ filters }),
+        ]);
+        results = findResults || [];
+        total = countTotal;
+      }
 
       ctx.body = {
-        data: stationResults.map((o) => serializeOrder(o, true)),
+        data: results.map((o) => serializeOrder(o, true, routingLookup)),
         meta: {
           pagination: {
             page,
             pageSize,
-            total: station ? stationResults.length : total,
-            pageCount: station ? Math.ceil(stationResults.length / pageSize) : Math.ceil(total / pageSize),
+            total,
+            pageCount: Math.ceil(total / pageSize),
           },
         },
       };
@@ -522,13 +633,11 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
       const station = stationForActor(actor, ctx.request.query || {});
-      const order = await filterItemsForStation(
-        await loadOrder(documentId, actor.ownerId),
-        actor.owner,
-        station
-      );
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      const loaded = await loadOrder(documentId, actor.ownerId);
+      const order = filterItemsForStation(loaded, routingLookup, station);
 
-      ctx.body = { data: serializeOrder(order, true) };
+      ctx.body = { data: serializeOrder(order, true, routingLookup) };
     } catch (err) {
       sendError(ctx, err);
     }
@@ -642,10 +751,12 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       // Ricalcola totale
       const totalResult = await recalculateTotal(strapi, documentId);
 
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+
       ctx.status = 201;
       ctx.body = {
         data: {
-          item: serializeItem(createdItem),
+          item: serializeItem(createdItem, routingLookup),
           order: {
             total_amount: totalResult.total,
             lock_version: totalResult.lock_version,
@@ -720,9 +831,11 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         limit: 1,
       });
 
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+
       ctx.body = {
         data: {
-          item: serializeItem(updatedItems && updatedItems[0]),
+          item: serializeItem(updatedItems && updatedItems[0], routingLookup),
           order: {
             total_amount: totalResult.total,
             lock_version: totalResult.lock_version,
@@ -828,8 +941,10 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (!item) throw appError('ITEM_NOT_FOUND', 'Item non trovato.');
 
       const station = stationForActor(actor, ctx.request.query || {});
+      let routingLookup = null;
       if (station) {
-        const itemStation = await stationForCategoryByOwner(strapi, actor.owner, item.category || (item.fk_element && item.fk_element.category));
+        routingLookup = await loadRoutingMap(strapi, actor.owner);
+        const itemStation = routingLookup(item.category || (item.fk_element && item.fk_element.category));
         if (itemStation !== station) {
           throw appError('NOT_OWNER', 'Questo reparto non puo lavorare questa categoria.');
         }
@@ -853,7 +968,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         data: { status: nextStatus },
       });
 
-      ctx.body = { data: { item: serializeItem(updated) } };
+      ctx.body = { data: { item: serializeItem(updated, routingLookup) } };
     } catch (err) {
       sendError(ctx, err);
     }

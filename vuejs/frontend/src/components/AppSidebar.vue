@@ -5,7 +5,7 @@ import { STAFF_ROLES, canSeeNavItem, staffRole } from '@/staffAccess';
 
 const props = defineProps({
   username: { type: String, default: '' },
-  restaurantName: { type: String, default: 'Tavolo' },
+  restaurantName: { type: String, default: 'ComforTables' },
   restaurantSub: { type: String, default: '' },
   pendingCount: { type: Number, default: 0 },
   activeOrdersCount: { type: Number, default: 0 },
@@ -76,9 +76,9 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
 <template>
   <aside class="md-side">
     <div class="md-side-brand">
-      <span class="tv-brand-mark">T</span>
+      <span class="tv-brand-mark">C</span>
       <div>
-        <div class="md-side-name">Tavolo</div>
+        <div class="md-side-name">ComforTables</div>
         <div class="md-side-sub">Gestionale</div>
       </div>
     </div>
