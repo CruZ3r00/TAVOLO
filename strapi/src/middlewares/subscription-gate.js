@@ -8,6 +8,7 @@ const BYPASS_PREFIXES = [
   '/api/billing/',
   '/api/menus/public/',
   '/api/reservations/public',
+  '/api/takeaways/public',
 ];
 
 function isBypassed(path) {
@@ -41,6 +42,9 @@ function isStaffApiAllowed(role, method, path) {
     if (/^\/api\/reservations\/[^/]+\/status$/.test(path)) return method === 'PATCH';
     if (/^\/api\/reservations\/[^/]+\/seat$/.test(path)) return method === 'POST';
     if (path === '/api/orders') return method === 'GET' || method === 'POST';
+    if (path === '/api/takeaways') return method === 'POST';
+    if (/^\/api\/takeaways\/[^/]+$/.test(path)) return method === 'PATCH';
+    if (/^\/api\/takeaways\/[^/]+\/(accept|reject|send|pickup)$/.test(path)) return method === 'POST';
     if (/^\/api\/orders\/[^/]+$/.test(path)) return method === 'GET';
     if (/^\/api\/orders\/[^/]+\/total$/.test(path)) return method === 'GET';
     if (/^\/api\/orders\/[^/]+\/items$/.test(path)) return method === 'POST';
@@ -48,6 +52,7 @@ function isStaffApiAllowed(role, method, path) {
       return method === 'PATCH' || method === 'DELETE';
     }
     if (/^\/api\/orders\/[^/]+\/items\/[^/]+\/status$/.test(path)) return method === 'PATCH';
+    if (/^\/api\/orders\/[^/]+\/close$/.test(path)) return method === 'POST';
     return false;
   }
 

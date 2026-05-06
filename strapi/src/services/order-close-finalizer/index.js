@@ -86,6 +86,7 @@ async function finalize({
         if (fiscal.status) updateData.fiscal_status = fiscal.status;
         if (fiscal.receipt_id !== undefined) updateData.fiscal_receipt_id = fiscal.receipt_id;
         if (fiscal.event_id !== undefined) updateData.fiscal_event_id = fiscal.event_id;
+        if (order.service_type === 'takeaway') updateData.takeaway_status = 'closed';
 
         await strapi.documents('api::order.order').update({
           documentId,
@@ -117,6 +118,11 @@ async function finalize({
             closed_at: closedAtISO,
             total_amount: totalResult.total,
             covers: order.covers || null,
+            service_type: order.service_type || 'table',
+            customer_name: order.customer_name || null,
+            customer_phone: order.customer_phone || null,
+            customer_email: order.customer_email || null,
+            pickup_at: order.pickup_at || null,
           };
           const reservation = order.fk_reservation || null;
           const table = order.fk_table || null;
@@ -130,6 +136,7 @@ async function finalize({
             paymentReference: paymentResult.transactionId,
             userId,
             isWalkin: reservation ? !!reservation.is_walkin : false,
+            isTakeaway: order.service_type === 'takeaway',
           });
 
           const dateKey = statsService.dateKeyUTC(closedAtISO);
@@ -152,6 +159,7 @@ async function finalize({
             items: itemsCount,
             isWalkin: reservation ? !!reservation.is_walkin : false,
             hasReservation: !!reservation && !reservation.is_walkin,
+            isTakeaway: order.service_type === 'takeaway',
           });
 
           await statsService.updateElementStats(strapi, {

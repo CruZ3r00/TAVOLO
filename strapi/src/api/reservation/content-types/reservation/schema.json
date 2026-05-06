@@ -21,6 +21,10 @@
       "required": false,
       "maxLength": 32
     },
+    "customer_email": {
+      "type": "email",
+      "required": false
+    },
     "date": {
       "type": "date",
       "required": true

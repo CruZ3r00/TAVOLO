@@ -4,6 +4,7 @@ import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 const props = defineProps({
   item: { type: Object, required: true },
   tableNumber: { type: [Number, String], default: '?' },
+  takeaway: { type: Boolean, default: false },
   busy: { type: Boolean, default: false },
 });
 
@@ -47,11 +48,16 @@ const onAdvance = () => {
 </script>
 
 <template>
-  <article class="kic" :class="[`kic-${item.status}`, { 'kic-prio': isLong, 'kic-busy': busy }]">
+  <article class="kic" :class="[`kic-${item.status}`, { 'kic-prio': isLong, 'kic-busy': busy, 'kic-takeaway': takeaway }]">
     <div class="kic-info">
       <header class="kic-header">
         <span class="kic-table">
-          <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>T{{ tableNumber }}
+          <template v-if="takeaway">
+            <i class="bi bi-bag-check" aria-hidden="true"></i>A{{ tableNumber }}
+          </template>
+          <template v-else>
+            <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>T{{ tableNumber }}
+          </template>
         </span>
         <span class="kic-badge" :class="`st-${item.status}`">
           <template v-if="item.status === 'taken'"><i class="bi bi-clipboard-check"/>Da fare</template>
@@ -108,6 +114,7 @@ const onAdvance = () => {
     </button>
     <button
       v-else-if="item.status === 'ready'"
+      v-show="!takeaway"
       type="button"
       class="kic-action kic-action-ready"
       :disabled="busy"
@@ -122,6 +129,14 @@ const onAdvance = () => {
 
 <style scoped>
 .kic-busy { opacity: 0.6; pointer-events: none; }
+.kic-takeaway {
+  border-left: 4px solid var(--ac);
+}
+.kic-takeaway .kic-table {
+  background: color-mix(in oklab, var(--ac) 10%, var(--paper));
+  color: var(--ac);
+  border-color: color-mix(in oklab, var(--ac) 35%, var(--line));
+}
 .kic-action:disabled { opacity: 0.6; cursor: not-allowed; }
 .kic-course,
 .kic-category {

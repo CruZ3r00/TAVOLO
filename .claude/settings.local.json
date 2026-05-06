@@ -7,7 +7,9 @@
       "Read(//tmp/**)",
       "Bash(unzip -o \"c:/Users/filip/Downloads/cms-handoff.zip\")",
       "Bash(cp *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_evaluate"
     ]
   },
   "enableAllProjectMcpServers": true,

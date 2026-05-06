@@ -9,14 +9,38 @@ const props = defineProps({
 
 const emit = defineEmits(['advance']);
 
+const takeawayDailyNumbers = computed(() => {
+  const map = new Map();
+  const sameDay = (iso) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear()
+      && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate();
+  };
+  const todays = props.orders
+    .filter(o => o?.service_type === 'takeaway' && sameDay(o.opened_at))
+    .sort((a, b) => new Date(a.opened_at || 0) - new Date(b.opened_at || 0));
+  todays.forEach((o, i) => map.set(o.documentId, i + 1));
+  return map;
+});
+
 const allItems = computed(() => {
   const items = [];
   for (const order of props.orders) {
     if (order.status !== 'active' || !order.items) continue;
+    const isTakeaway = order.service_type === 'takeaway';
     const tNum = order.table?.number ?? '?';
+    const takeawayNum = takeawayDailyNumbers.value.get(order.documentId) ?? '?';
     for (const item of order.items) {
       if (item.status === 'served') continue;
-      items.push({ ...item, _tableNumber: tNum, _orderDocumentId: order.documentId });
+      items.push({
+        ...item,
+        _tableNumber: isTakeaway ? takeawayNum : tNum,
+        _orderDocumentId: order.documentId,
+        _takeaway: isTakeaway,
+      });
     }
   }
   items.sort((a, b) => {
@@ -76,6 +100,7 @@ const readyGroups = computed(() => groupByCourse(readyItems.value));
             :key="item.documentId"
             :item="item"
             :table-number="item._tableNumber"
+            :takeaway="item._takeaway"
             :busy="busyItemIds.has(item.documentId)"
             @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
           />
@@ -104,6 +129,7 @@ const readyGroups = computed(() => groupByCourse(readyItems.value));
             :key="item.documentId"
             :item="item"
             :table-number="item._tableNumber"
+            :takeaway="item._takeaway"
             :busy="busyItemIds.has(item.documentId)"
             @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
           />
@@ -132,6 +158,7 @@ const readyGroups = computed(() => groupByCourse(readyItems.value));
             :key="item.documentId"
             :item="item"
             :table-number="item._tableNumber"
+            :takeaway="item._takeaway"
             :busy="busyItemIds.has(item.documentId)"
             @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
           />

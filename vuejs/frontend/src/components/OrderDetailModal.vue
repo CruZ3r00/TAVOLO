@@ -53,6 +53,9 @@ const silentReload = async () => {
 };
 
 const isActive = computed(() => order.value?.status === 'active');
+const isTakeaway = computed(() => order.value?.service_type === 'takeaway');
+const canEditItems = computed(() => isActive.value && (!isTakeaway.value || !order.value?.sent_to_departments_at));
+const canCheckout = computed(() => isActive.value && (!isTakeaway.value || order.value?.takeaway_status === 'picked_up'));
 const totalAmount = computed(() => parseFloat(order.value?.total_amount || 0).toFixed(2));
 const tableNumber = computed(() => order.value?.table?.number ?? '?');
 const itemsSorted = computed(() => {
@@ -105,7 +108,7 @@ const handleStaleError = async (err) => {
 };
 
 const handleIncrement = async (item) => {
-    if (!isActive.value) return;
+    if (!canEditItems.value) return;
     const oldQty = item.quantity;
     // Optimistic
     item.quantity = oldQty + 1;
@@ -130,7 +133,7 @@ const handleIncrement = async (item) => {
 };
 
 const handleDecrement = async (item) => {
-    if (!isActive.value || item.quantity <= 1) return;
+    if (!canEditItems.value || item.quantity <= 1) return;
     const oldQty = item.quantity;
     item.quantity = oldQty - 1;
     setBusy(item.documentId, true);
@@ -154,6 +157,7 @@ const handleDecrement = async (item) => {
 };
 
 const handleDelete = async (item) => {
+    if (!canEditItems.value) return;
     setBusy(item.documentId, true);
     // Optimistic: rimuovi dalla lista
     const oldItems = [...order.value.items];
@@ -198,6 +202,7 @@ const handleServe = async (item) => {
 };
 
 const openAddItem = () => {
+    if (!canEditItems.value) return;
     emit('open-add-item', {
         orderDocumentId: props.orderDocumentId,
         lockVersion: order.value?.lock_version ?? 0,
@@ -205,6 +210,7 @@ const openAddItem = () => {
 };
 
 const openCheckout = () => {
+    if (!canCheckout.value) return;
     emit('open-checkout', order.value);
 };
 
@@ -230,7 +236,8 @@ defineExpose({ onItemAdded, silentReload });
             <div class="modal-title-wrap">
                 <i class="bi bi-receipt" aria-hidden="true"></i>
                 <h2 class="modal-title">
-                    Ordine - Tavolo {{ tableNumber }}
+                    <template v-if="isTakeaway">Asporto · {{ order?.customer_name || 'Cliente' }}</template>
+                    <template v-else>Ordine - Tavolo {{ tableNumber }}</template>
                 </h2>
                 <OrderStatusBadge v-if="order" :status="order.status" />
             </div>
@@ -278,6 +285,16 @@ defineExpose({ onItemAdded, silentReload });
                             <span class="odm-info-label">Coperti</span>
                             <span class="odm-info-value">{{ order.covers }}</span>
                         </div>
+                        <div v-if="isTakeaway" class="odm-info-item">
+                            <span class="odm-info-label">Ritiro</span>
+                            <span class="odm-info-value">
+                                {{ new Date(order.pickup_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) }}
+                            </span>
+                        </div>
+                        <div v-if="isTakeaway && order.customer_phone" class="odm-info-item">
+                            <span class="odm-info-label">Telefono</span>
+                            <span class="odm-info-value">{{ order.customer_phone }}</span>
+                        </div>
                         <div class="odm-info-item">
                             <span class="odm-info-label">Piatti</span>
                             <span class="odm-info-value">{{ order.items?.length || 0 }}</span>
@@ -302,7 +319,7 @@ defineExpose({ onItemAdded, silentReload });
                                 v-for="item in group.items"
                                 :key="item.documentId"
                                 :item="item"
-                                :order-active="isActive"
+                                :order-active="canEditItems"
                                 :busy="busyItemIds.has(item.documentId)"
                                 @increment="handleIncrement"
                                 @decrement="handleDecrement"
@@ -318,8 +335,17 @@ defineExpose({ onItemAdded, silentReload });
                             <span class="odm-total-label">Totale</span>
                             <span class="odm-total-value">&euro; {{ totalAmount }}</span>
                         </div>
+                        <p v-if="isTakeaway && !canEditItems" class="odm-takeaway-lock">
+                            <i class="bi bi-send"></i>
+                            Asporto inviato ai reparti: non è più modificabile.
+                        </p>
+                        <p v-if="isTakeaway && isActive && !canCheckout" class="odm-takeaway-lock">
+                            <i class="bi bi-box-arrow-up"></i>
+                            Prima di chiudere il conto segnala "Preso dalla cucina".
+                        </p>
                         <div v-if="isActive" class="odm-actions">
                             <button
+                                v-if="canEditItems"
                                 type="button"
                                 class="ds-btn ds-btn-secondary"
                                 @click="openAddItem"
@@ -330,6 +356,7 @@ defineExpose({ onItemAdded, silentReload });
                             <button
                                 type="button"
                                 class="ds-btn ds-btn-primary"
+                                :disabled="!canCheckout"
                                 @click="openCheckout"
                             >
                                 <i class="bi bi-receipt-cutoff" aria-hidden="true"></i>
@@ -500,6 +527,20 @@ defineExpose({ onItemAdded, silentReload });
     border-top: 1px solid var(--line);
     padding-top: var(--s-4);
 }
+.odm-takeaway-lock {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--bg-2);
+    color: var(--ink-2);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+.odm-takeaway-lock i { color: var(--ac); }
 .odm-total {
     display: flex;
     align-items: center;

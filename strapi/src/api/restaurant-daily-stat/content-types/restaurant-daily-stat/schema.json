@@ -50,6 +50,12 @@
       "required": true,
       "min": 0
     },
+    "takeaway_count": {
+      "type": "integer",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
     "fk_user": {
       "type": "relation",
       "relation": "manyToOne",

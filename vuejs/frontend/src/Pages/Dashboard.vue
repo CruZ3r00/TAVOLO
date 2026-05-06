@@ -113,7 +113,9 @@ const loadStats = async () => {
       }, tkn).catch(() => ({ data: [] })),
     ]);
     tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
-    activeOrders.value = Array.isArray(ordersResp?.data) ? ordersResp.data : [];
+    activeOrders.value = Array.isArray(ordersResp?.data)
+      ? ordersResp.data.filter(o => o.service_type !== 'takeaway')
+      : [];
     todayReservations.value = Array.isArray(resvResp?.data) ? resvResp.data : [];
   } catch (_e) { /* silent */ }
   finally { loading.value = false; }

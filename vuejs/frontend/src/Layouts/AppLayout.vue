@@ -58,7 +58,7 @@ const refreshCounts = async () => {
       canReadReservations
         ? fetchReservations({ status: 'pending', pageSize: 1 }, token)
         : Promise.resolve(null),
-      fetchOrders({ status: 'active', pageSize: 1 }, token),
+      fetchOrders({ status: 'active', service_type: 'table', pageSize: 1 }, token),
     ]);
     pendingCount.value = canReadReservations ? (r?.meta?.pagination?.total ?? 0) : 0;
     activeOrdersCount.value = o?.meta?.pagination?.total ?? 0;

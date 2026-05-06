@@ -6,6 +6,9 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import ReservationCard from '@/components/ReservationCard.vue';
 import OccupiedOrderCard from '@/components/OccupiedOrderCard.vue';
 import ReservationCreateModal from '@/components/ReservationCreateModal.vue';
+import TakeawayCreateModal from '@/components/TakeawayCreateModal.vue';
+import TakeawayEditModal from '@/components/TakeawayEditModal.vue';
+import TakeawayOrderCard from '@/components/TakeawayOrderCard.vue';
 import SeatReservationModal from '@/components/SeatReservationModal.vue';
 import WalkinModal from '@/components/WalkinModal.vue';
 import TableManagerModal from '@/components/TableManagerModal.vue';
@@ -18,9 +21,14 @@ import {
   updateReservationStatus,
   reservationErrorMessage,
   fetchOrders,
+  fetchTakeaways,
   fetchTables,
   closeOrder,
   addOrderItem,
+  acceptTakeaway,
+  rejectTakeaway,
+  sendTakeawayToDepartments,
+  pickupTakeaway,
   orderErrorMessage,
 } from '@/utils';
 
@@ -32,6 +40,7 @@ const POLL_INTERVAL_MS = 20000;
 
 const reservations = ref([]);
 const activeOrders = ref([]);
+const takeaways = ref([]);
 const tables = ref([]);
 const loading = ref(false);
 const refreshing = ref(false);
@@ -40,6 +49,9 @@ const toast = ref(null);
 const busyIds = ref(new Set());
 
 const showCreateModal = ref(false);
+const showTakeawayCreate = ref(false);
+const showTakeawayEdit = ref(false);
+const takeawayEditOrder = ref(null);
 const showSeatModal = ref(false);
 const seatTargetReservation = ref(null);
 const showWalkinModal = ref(false);
@@ -55,6 +67,7 @@ const checkoutOrder = ref(null);
 const orderDetailRef = ref(null);
 
 const activeTab = ref('pending'); // mobile single-column view
+const activeSection = ref('reservations');
 const fromDate = ref(todayISO());
 
 function todayISO() {
@@ -64,13 +77,6 @@ function todayISO() {
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-
-const todayLabel = computed(() => {
-  const [y, m, d] = todayISO().split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('it-IT', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
-});
 
 const buildParams = () => {
   const params = {
@@ -84,10 +90,28 @@ const buildParams = () => {
   return params;
 };
 
+const buildTakeawayParams = () => {
+  const params = {
+    pageSize: 100,
+    status: 'active',
+    service_type: 'takeaway',
+  };
+  if (fromDate.value) {
+    params.pickup_from = `${fromDate.value}T00:00:00.000Z`;
+  }
+  return params;
+};
+
 const loadData = async ({ silent = false } = {}) => {
   if (!token.value) return;
   if (silent) refreshing.value = true; else loading.value = true;
   try {
+    if (activeSection.value === 'takeaway') {
+      const takeawayResp = await fetchTakeaways(buildTakeawayParams(), token.value);
+      takeaways.value = Array.isArray(takeawayResp?.data) ? takeawayResp.data : [];
+      errorMessage.value = '';
+      return;
+    }
     const [resvResp, ordersResp, tablesResp] = await Promise.all([
       fetchReservations(buildParams(), token.value),
       fetchOrders({ status: 'active', linked_reservation: true, pageSize: 100 }, token.value)
@@ -104,7 +128,9 @@ const loadData = async ({ silent = false } = {}) => {
     }
     tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
   } catch (err) {
-    errorMessage.value = reservationErrorMessage(err);
+    errorMessage.value = activeSection.value === 'takeaway'
+      ? orderErrorMessage(err)
+      : reservationErrorMessage(err);
   } finally {
     loading.value = false;
     refreshing.value = false;
@@ -114,6 +140,13 @@ const loadData = async ({ silent = false } = {}) => {
 const visibleReservations = computed(() => {
   if (!fromDate.value) return reservations.value;
   return reservations.value.filter(r => (r.date || '').slice(0, 10) >= fromDate.value);
+});
+const visibleTakeaways = computed(() => {
+  const list = Array.isArray(takeaways.value) ? [...takeaways.value] : [];
+  const filtered = !fromDate.value
+    ? list
+    : list.filter(o => String(o.pickup_at || '').slice(0, 10) >= fromDate.value);
+  return filtered.sort((a, b) => new Date(a.pickup_at || 0) - new Date(b.pickup_at || 0));
 });
 const byStatus = (s) => visibleReservations.value.filter(r => r.status === s);
 const pendingList = computed(() => byStatus('pending'));
@@ -137,6 +170,20 @@ const occupiedOrders = computed(() => {
   return list;
 });
 const occupiedTotalCount = computed(() => orphanReservations.value.length + occupiedOrders.value.length);
+const takeawayWaitingList = computed(() => visibleTakeaways.value.filter(o => ['pending_acceptance', 'confirmed'].includes(o.takeaway_status)));
+const takeawayPreparingList = computed(() => visibleTakeaways.value.filter(o => o.takeaway_status === 'sent_to_departments'));
+const takeawayReadyList = computed(() => visibleTakeaways.value.filter(o => ['ready', 'picked_up'].includes(o.takeaway_status)));
+
+const takeawayDailyNumbers = computed(() => {
+  const map = new Map();
+  const refDate = fromDate.value || todayISO();
+  const list = (Array.isArray(takeaways.value) ? takeaways.value : [])
+    .filter(o => String(o.opened_at || '').slice(0, 10) === refDate)
+    .sort((a, b) => new Date(a.opened_at || 0) - new Date(b.opened_at || 0));
+  list.forEach((o, i) => map.set(o.documentId, i + 1));
+  return map;
+});
+const dailyNumberOf = (o) => takeawayDailyNumbers.value.get(o.documentId) ?? '?';
 
 // Week strip data — 3 days before, selected day, 3 days after.
 // Strip recenters on `fromDate.value` so the selected day is always visible.
@@ -158,7 +205,9 @@ const weekDays = computed(() => {
     const iso = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
     const dayName = d.toLocaleDateString('it-IT', { weekday: 'short' }).slice(0, 3);
     const num = pad2(d.getDate());
-    const count = reservations.value.filter(r => (r.date || '').slice(0, 10) === iso).length;
+    const count = activeSection.value === 'takeaway'
+      ? takeaways.value.filter(o => (o.pickup_at || '').slice(0, 10) === iso).length
+      : reservations.value.filter(r => (r.date || '').slice(0, 10) === iso).length;
     out.push({ iso, dayName, num, count, isToday: iso === todayIso });
   }
   return out;
@@ -263,6 +312,75 @@ const onCreated = (created) => {
   showToast('success', 'Prenotazione creata.');
 };
 
+const upsertTakeaway = (order) => {
+  if (!order?.documentId) return;
+  const idx = takeaways.value.findIndex(o => o.documentId === order.documentId);
+  if (idx === -1) takeaways.value = [...takeaways.value, order];
+  else takeaways.value.splice(idx, 1, { ...takeaways.value[idx], ...order });
+};
+const setTakeawayBusy = (documentId, value) => {
+  const s = new Set(busyIds.value);
+  if (value) s.add(documentId); else s.delete(documentId);
+  busyIds.value = s;
+};
+const onTakeawayCreated = (created) => {
+  upsertTakeaway(created);
+  showToast('success', 'Asporto creato.');
+};
+const handleTakeawayAccept = async (order) => {
+  setTakeawayBusy(order.documentId, true);
+  try {
+    upsertTakeaway(await acceptTakeaway(order.documentId, token.value));
+    showToast('success', 'Asporto accettato. Email inviata.');
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
+  } finally {
+    setTakeawayBusy(order.documentId, false);
+  }
+};
+const handleTakeawayReject = async (order) => {
+  setTakeawayBusy(order.documentId, true);
+  try {
+    await rejectTakeaway(order.documentId, token.value);
+    takeaways.value = takeaways.value.filter(o => o.documentId !== order.documentId);
+    showToast('success', 'Asporto rifiutato. Email inviata.');
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
+  } finally {
+    setTakeawayBusy(order.documentId, false);
+  }
+};
+const handleTakeawaySend = async (order) => {
+  setTakeawayBusy(order.documentId, true);
+  try {
+    upsertTakeaway(await sendTakeawayToDepartments(order.documentId, token.value));
+    showToast('success', 'Asporto inviato ai reparti.');
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
+  } finally {
+    setTakeawayBusy(order.documentId, false);
+  }
+};
+const handleTakeawayPickup = async (order) => {
+  setTakeawayBusy(order.documentId, true);
+  try {
+    upsertTakeaway(await pickupTakeaway(order.documentId, token.value));
+    showToast('success', 'Asporto ritirato dalla cucina.');
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
+  } finally {
+    setTakeawayBusy(order.documentId, false);
+  }
+};
+const handleTakeawayEdit = (order) => {
+  takeawayEditOrder.value = order;
+  showTakeawayEdit.value = true;
+};
+const onTakeawayEdited = (order) => {
+  upsertTakeaway(order);
+  showToast('success', 'Asporto aggiornato.');
+};
+
 let pollHandle = null;
 const startPolling = () => {
   if (pollHandle) clearInterval(pollHandle);
@@ -290,6 +408,12 @@ const goDate = (iso) => {
   fromDate.value = iso;
   loadData();
 };
+const switchSection = (section) => {
+  if (activeSection.value === section) return;
+  activeSection.value = section;
+  activeTab.value = section === 'takeaway' ? 'takeaway_waiting' : 'pending';
+  loadData();
+};
 </script>
 
 <template>
@@ -297,18 +421,26 @@ const goDate = (iso) => {
     <div class="md-main">
       <header class="md-top">
         <div>
-          <div class="overline">Prenotazioni · oggi</div>
-          <h1>Prenotazioni</h1>
-          <p>
+          <div class="overline">{{ activeSection === 'takeaway' ? 'Asporto · oggi' : 'Prenotazioni · oggi' }}</div>
+          <h1>{{ activeSection === 'takeaway' ? 'Asporto' : 'Prenotazioni' }}</h1>
+          <p v-if="activeSection === 'reservations'">
             <span v-if="pendingList.length"><strong>{{ pendingList.length }} in attesa</strong> · </span>
             {{ confirmedList.length }} confermate · {{ occupiedTotalCount }} in sala
           </p>
+          <p v-else>
+            <span v-if="takeawayWaitingList.length"><strong>{{ takeawayWaitingList.length }} in attesa</strong> · </span>
+            {{ takeawayPreparingList.length }} in preparazione · {{ takeawayReadyList.length }} pronti
+          </p>
         </div>
         <div class="md-top-tools">
-          <span class="md-today-pill" aria-label="Data odierna">
-            <i class="bi bi-calendar3"></i>
-            <span>{{ todayLabel }}</span>
-          </span>
+          <div class="res-section-toggle" aria-label="Sezione prenotazioni">
+            <button type="button" :class="{ active: activeSection === 'reservations' }" @click="switchSection('reservations')">
+              <i class="bi bi-calendar-check"></i><span>Prenotazioni</span>
+            </button>
+            <button type="button" :class="{ active: activeSection === 'takeaway' }" @click="switchSection('takeaway')">
+              <i class="bi bi-bag-check"></i><span>Asporto</span>
+            </button>
+          </div>
           <button type="button" class="btn btn-sm" @click="loadData({ silent: true })" :disabled="loading || refreshing">
             <span v-if="refreshing" class="spin-icon"></span>
             <i v-else class="bi bi-arrow-clockwise"></i>
@@ -317,11 +449,14 @@ const goDate = (iso) => {
           <button type="button" class="btn btn-sm" @click="showTableManager = true">
             <i class="bi bi-grid-3x3-gap"></i><span>Tavoli</span>
           </button>
-          <button type="button" class="btn btn-sm" @click="showWalkinModal = true">
+          <button v-if="activeSection === 'reservations'" type="button" class="btn btn-sm" @click="showWalkinModal = true">
             <i class="bi bi-person-plus"></i><span>Walk-in</span>
           </button>
-          <button type="button" class="btn btn-sm btn-primary" @click="showCreateModal = true">
+          <button v-if="activeSection === 'reservations'" type="button" class="btn btn-sm btn-primary" @click="showCreateModal = true">
             <i class="bi bi-plus-lg"></i><span>Nuova prenotazione</span>
+          </button>
+          <button v-else type="button" class="btn btn-sm btn-primary" @click="showTakeawayCreate = true">
+            <i class="bi bi-plus-lg"></i><span>Nuovo asporto</span>
           </button>
         </div>
       </header>
@@ -353,7 +488,7 @@ const goDate = (iso) => {
           >
             <span class="kr-week-name">{{ d.dayName }}</span>
             <span class="kr-week-num">{{ d.num }}</span>
-            <span class="kr-week-c">{{ d.count > 0 ? `${d.count} pers.` : '— libero' }}</span>
+            <span class="kr-week-c">{{ d.count > 0 ? `${d.count} ${activeSection === 'takeaway' ? 'ord.' : 'pers.'}` : '— libero' }}</span>
           </button>
         </div>
         <Transition name="fade">
@@ -371,7 +506,7 @@ const goDate = (iso) => {
       </div>
 
       <!-- Mobile tabs -->
-      <div class="kr-tabs res-mobile-tabs">
+      <div v-if="activeSection === 'reservations'" class="kr-tabs res-mobile-tabs">
         <button
           type="button"
           class="kr-tab"
@@ -405,7 +540,7 @@ const goDate = (iso) => {
       </div>
 
       <!-- Skeleton during initial load -->
-      <div v-if="loading && reservations.length === 0" class="kr-kanban res-kanban-desktop">
+      <div v-if="activeSection === 'reservations' && loading && reservations.length === 0" class="kr-kanban res-kanban-desktop">
         <section v-for="col in 3" :key="`sk-col-${col}`" class="kr-col">
           <header class="kr-col-h">
             <Skeleton width="120px" height="14px" />
@@ -423,7 +558,7 @@ const goDate = (iso) => {
       </div>
 
       <!-- Desktop kanban -->
-      <div v-else class="kr-kanban res-kanban-desktop">
+      <div v-else-if="activeSection === 'reservations'" class="kr-kanban res-kanban-desktop">
         <!-- Richieste -->
         <section class="kr-col">
           <header class="kr-col-h">
@@ -499,7 +634,7 @@ const goDate = (iso) => {
       </div>
 
       <!-- Mobile single column -->
-      <div v-if="!loading" class="res-mobile-view">
+      <div v-if="activeSection === 'reservations' && !loading" class="res-mobile-view">
         <template v-if="activeTab === 'pending'">
           <div v-if="pendingList.length" class="kr-col-list">
             <ReservationCard
@@ -556,10 +691,83 @@ const goDate = (iso) => {
           </div>
         </template>
       </div>
+
+      <div v-if="activeSection === 'takeaway'" class="kr-kanban res-kanban-desktop takeaway-kanban">
+        <section class="kr-col">
+          <header class="kr-col-h">
+            <span><i class="bi bi-hourglass-split"></i> IN ATTESA</span>
+            <span class="kr-col-c">{{ takeawayWaitingList.length }}</span>
+          </header>
+          <div v-if="takeawayWaitingList.length" class="kr-col-list">
+            <TakeawayOrderCard
+              v-for="o in takeawayWaitingList"
+              :key="o.documentId"
+              :order="o"
+              :busy="busyIds.has(o.documentId)"
+              :daily-number="dailyNumberOf(o)"
+              @accept="handleTakeawayAccept"
+              @reject="handleTakeawayReject"
+              @open="handleOpenOrder"
+              @edit="handleTakeawayEdit"
+              @send="handleTakeawaySend"
+            />
+          </div>
+          <div v-else class="kr-col-empty">
+            <i class="bi bi-inbox"></i>
+            <span>Nessun asporto in attesa</span>
+          </div>
+        </section>
+
+        <section class="kr-col">
+          <header class="kr-col-h">
+            <span><i class="bi bi-fire"></i> IN PREPARAZIONE</span>
+            <span class="kr-col-c">{{ takeawayPreparingList.length }}</span>
+          </header>
+          <div v-if="takeawayPreparingList.length" class="kr-col-list">
+            <TakeawayOrderCard
+              v-for="o in takeawayPreparingList"
+              :key="o.documentId"
+              :order="o"
+              :busy="busyIds.has(o.documentId)"
+              :daily-number="dailyNumberOf(o)"
+              @open="handleOpenOrder"
+            />
+          </div>
+          <div v-else class="kr-col-empty">
+            <i class="bi bi-inbox"></i>
+            <span>Nessun asporto in lavorazione</span>
+          </div>
+        </section>
+
+        <section class="kr-col">
+          <header class="kr-col-h">
+            <span><i class="bi bi-check2-circle"></i> PRONTO</span>
+            <span class="kr-col-c">{{ takeawayReadyList.length }}</span>
+          </header>
+          <div v-if="takeawayReadyList.length" class="kr-col-list">
+            <TakeawayOrderCard
+              v-for="o in takeawayReadyList"
+              :key="o.documentId"
+              :order="o"
+              :busy="busyIds.has(o.documentId)"
+              :daily-number="dailyNumberOf(o)"
+              @open="handleOpenOrder"
+              @pickup="handleTakeawayPickup"
+              @checkout="handleCheckout"
+            />
+          </div>
+          <div v-else class="kr-col-empty">
+            <i class="bi bi-calendar-x"></i>
+            <span>Nessun asporto pronto</span>
+          </div>
+        </section>
+      </div>
     </div>
 
     <!-- Modals -->
     <ReservationCreateModal :show="showCreateModal" :token="token" @close="showCreateModal = false" @created="onCreated" />
+    <TakeawayCreateModal :show="showTakeawayCreate" :token="token" @close="showTakeawayCreate = false" @created="onTakeawayCreated" />
+    <TakeawayEditModal :show="showTakeawayEdit" :order="takeawayEditOrder" :token="token" @close="showTakeawayEdit = false" @updated="onTakeawayEdited" />
     <SeatReservationModal :show="showSeatModal" :reservation="seatTargetReservation" :tables="tables" :token="token" @close="showSeatModal = false" @seated="onSeated" />
     <WalkinModal :show="showWalkinModal" :tables="tables" :token="token" @close="showWalkinModal = false" @created="onWalkinCreated" />
     <TableManagerModal :show="showTableManager" :token="token" :tables="tables" :editing-table="null" @close="showTableManager = false" @updated="onTableManagerUpdated" />
@@ -570,23 +778,35 @@ const goDate = (iso) => {
 </template>
 
 <style scoped>
-.md-today-pill {
+.res-section-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 14px;
+  gap: 3px;
+  min-height: 34px;
+  padding: 3px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  background: var(--bg-2, var(--paper));
-  font-family: var(--f-sans);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink-2, var(--ink));
-  white-space: nowrap;
-  text-transform: capitalize;
+  background: var(--bg-2);
 }
-.md-today-pill i { color: var(--ac); font-size: 14px; }
+.res-section-toggle button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.res-section-toggle button.active {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
 
 .kr-week-bar {
   display: flex;
@@ -670,6 +890,10 @@ const goDate = (iso) => {
 
 @media (max-width: 860px) {
   .res-kanban-desktop { display: none; }
+  .takeaway-kanban {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
   .res-mobile-tabs { display: flex; }
   .res-mobile-view { display: block; }
   .md-toast { left: 16px; right: 16px; bottom: 88px; max-width: none; }

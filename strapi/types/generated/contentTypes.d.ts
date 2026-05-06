@@ -577,9 +577,14 @@ export interface ApiOrderArchiveOrderArchive
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    customer_email: Schema.Attribute.Email;
     customer_name: Schema.Attribute.String &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 120;
+      }>;
+    customer_phone: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 32;
       }>;
     duration_minutes: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
@@ -621,11 +626,15 @@ export interface ApiOrderArchiveOrderArchive
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 255;
       }>;
+    pickup_at: Schema.Attribute.DateTime;
     publishedAt: Schema.Attribute.DateTime;
     reservation_document_id: Schema.Attribute.String &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 64;
       }>;
+    service_type: Schema.Attribute.Enumeration<['table', 'takeaway']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'table'>;
     table_area: Schema.Attribute.String &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 32;
@@ -738,6 +747,15 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    customer_email: Schema.Attribute.Email;
+    customer_name: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    customer_phone: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 32;
+      }>;
     fiscal_event_id: Schema.Attribute.String &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 80;
@@ -776,10 +794,27 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     payment_status: Schema.Attribute.Enumeration<['unpaid', 'paid']> &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'unpaid'>;
+    picked_up_at: Schema.Attribute.DateTime;
+    pickup_at: Schema.Attribute.DateTime;
     publishedAt: Schema.Attribute.DateTime;
+    ready_at: Schema.Attribute.DateTime;
+    sent_to_departments_at: Schema.Attribute.DateTime;
+    service_type: Schema.Attribute.Enumeration<['table', 'takeaway']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'table'>;
     status: Schema.Attribute.Enumeration<['active', 'closed']> &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'active'>;
+    takeaway_status: Schema.Attribute.Enumeration<
+      [
+        'pending_acceptance',
+        'confirmed',
+        'sent_to_departments',
+        'ready',
+        'picked_up',
+        'closed',
+      ]
+    >;
     total_amount: Schema.Attribute.Decimal &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<0>;
@@ -1040,6 +1075,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    customer_email: Schema.Attribute.Email;
     customer_name: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
@@ -1154,6 +1190,15 @@ export interface ApiRestaurantDailyStatRestaurantDailyStat
       Schema.Attribute.DefaultTo<0>;
     revenue: Schema.Attribute.Decimal &
       Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<0>;
+    takeaway_count: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
       Schema.Attribute.DefaultTo<0>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &

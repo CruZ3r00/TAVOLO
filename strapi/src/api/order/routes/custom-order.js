@@ -9,6 +9,48 @@ module.exports = {
       config: { policies: [], middlewares: [] },
     },
     {
+      method: 'POST',
+      path: '/takeaways',
+      handler: 'order.createTakeawayAuthenticated',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
+      path: '/takeaways/public/:userDocumentId',
+      handler: 'order.createTakeawayPublic',
+      config: { auth: false, policies: [], middlewares: [] },
+    },
+    {
+      method: 'PATCH',
+      path: '/takeaways/:documentId',
+      handler: 'order.updateTakeaway',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
+      path: '/takeaways/:documentId/accept',
+      handler: 'order.acceptTakeaway',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
+      path: '/takeaways/:documentId/reject',
+      handler: 'order.rejectTakeaway',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
+      path: '/takeaways/:documentId/send',
+      handler: 'order.sendTakeawayToDepartments',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
+      path: '/takeaways/:documentId/pickup',
+      handler: 'order.pickupTakeaway',
+      config: { policies: [], middlewares: [] },
+    },
+    {
       method: 'GET',
       path: '/orders',
       handler: 'order.list',

@@ -1,3 +1,49 @@
+# Plan — Take-Away Orders Design (2026-05-06)
+
+## Obiettivo
+
+Progettare l'inserimento e la gestione degli ordini take-away nel gestionale senza legarli ai tavoli, riusando dove sensato la pipeline ordini esistente: routing categorie -> reparti, preparazione nei reparti, avviso sala/cassa, modifica prima dell'invio e chiusura conto.
+
+## Checklist
+
+- [x] Leggere `CLAUDE.md` e `lessons.md`.
+- [x] Tentare il contesto via code-review graph MCP e dichiarare fallback locale se non disponibile.
+- [x] Rileggere i vincoli esistenti di prenotazioni, ordini, tavoli e routing categorie.
+- [x] Raccogliere decisioni prodotto/operative dall'utente prima di implementare.
+- [x] Scrivere specifica tecnica/API/UI definitiva.
+- [x] Verificare la specifica con l'utente.
+- [x] Implementare solo dopo approvazione esplicita.
+
+## Implementazione
+
+- [x] Estendere `Order`/`OrderItem` flow per `service_type=takeaway` senza tavolo.
+- [x] Aggiungere API autenticate e pubbliche per asporto.
+- [x] Aggiungere invio ai reparti a T-15 minuti con sweep periodico/recupero.
+- [x] Aggiungere email cliente per prenotazioni/asporti pubblici.
+- [x] Integrare Asporto dentro `Reservations.vue` con toggle.
+- [x] Evidenziare asporti nei reparti e banner in Sala per ritiro.
+- [x] Aggiungere migrazione DB, SQL manuale e ADR.
+- [ ] Verificare con runtime/build quando `node`/`npm` sono disponibili.
+
+## Review
+
+- `git diff --check` OK.
+- `npm run build` non eseguibile in questo ambiente: `npm` non e' disponibile nel `PATH`.
+- `node --version` non eseguibile in questo ambiente: `node` non e' disponibile nel `PATH`.
+- Il grafo MCP richiesto dalle istruzioni repo non espone risorse/tool in questa sessione; fallback locale tracciato.
+
+## Note provvisorie
+
+- Il grafo MCP non espone strumenti/risorse in questa sessione; esplorazione fatta con fallback locale mirato.
+- Gli ordini attuali sono tavolo-centrici, ma `Order.fk_table` e' tecnicamente opzionale nello schema.
+- `OrderItem` salva gia categoria/portata e viene routato ai reparti tramite `category-routing`.
+- La pagina `Reservations.vue` ha gia il flusso di chiusura conto usando `CheckoutModal` sugli ordini collegati.
+- Take-away/asporto: richiesto anche da API pubbliche, nome+telefono obbligatori, email obbligatoria per richieste pubbliche, accettazione/rifiuto manuale, invio ai reparti 15 minuti prima o manuale anticipato, nessun tavolo/capienza, chiusura conto obbligatoria.
+- La configurazione email Strapi esiste via plugin `email`/nodemailer; serve salvare email strutturata almeno su Reservation/Take-away invece che solo nelle note.
+- Asporto gestionale sempre `confirmed`; asporto pubblico `pending_acceptance` con email "richiesta ricevuta"; accettazione/rifiuto devono inviare email di risposta.
+- Se l'orario di ritiro e' entro 15 minuti, l'asporto confermato va inviato ai reparti comunque, anche come recupero dopo downtime/server riavviato.
+
+
 # Plan — Verify Owner Tabs And Department Category Editing (2026-05-05)
 
 ## Obiettivo

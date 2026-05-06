@@ -708,6 +708,7 @@ ul{list-style:none}
             <div class="fgrp"><label>Nome e Cognome *</label><input type="text" name="name" required placeholder="Mario Rossi"></div>
             <div class="fgrp"><label>Telefono *</label><input type="tel" name="phone" required placeholder="+39 333 0000000"></div>
           </div>
+          <div class="fgrp fgrp--full"><label>Email *</label><input type="email" name="email" required placeholder="mario@email.it"></div>
           <div class="frow">
             <div class="fgrp"><label>Data *</label><input type="date" name="date" id="resDate" required></div>
             <div class="fgrp"><label>Orario *</label>
@@ -722,13 +723,13 @@ ul{list-style:none}
             <label>Coperti *</label>
             <select name="guests" required><option value="1">1 persona</option><option value="2" selected>2 persone</option><option value="3">3 persone</option><option value="4">4 persone</option><option value="5">5 persone</option><option value="6">6 persone</option><option value="7">7 persone</option><option value="8">8 persone</option><option value="10+">10+ (contattaci)</option></select>
           </div>
-          <div class="fgrp fgrp--full"><label>Note o richieste speciali</label><textarea placeholder="Allergie, occasioni speciali, richieste particolari…" rows="3"></textarea></div>
+          <div class="fgrp fgrp--full"><label>Note o richieste speciali</label><textarea name="notes" placeholder="Allergie, occasioni speciali, richieste particolari…" rows="3"></textarea></div>
           <button type="submit" class="btn btn-p fsubmit">Conferma Prenotazione</button>
         </form>
         <div class="res-form form-ok" id="formOk">
           <div class="form-ok__ic"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#2E7D32" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>
           <h3>Prenotazione ricevuta!</h3>
-          <p>Ti ricontatteremo al numero indicato per confermare il tavolo. A presto da Al Grande!</p>
+          <p>Ti invieremo una mail appena il ristorante confermera' il tavolo. A presto da Al Grande!</p>
         </div>
       </div>
     </div>
@@ -1103,6 +1104,7 @@ resForm.addEventListener('submit', async e => {
   const payload = {
     customer_name:    fd.get('name').trim(),
     phone:            fd.get('phone').trim(),
+    customer_email:   fd.get('email').trim(),
     date:             fd.get('date'),
     time:             timeFormatted,
     number_of_people: numPeople,

@@ -73,10 +73,22 @@ onUnmounted(() => {
    sia sempre rispetto al viewport. */
 .modal-bg.modal-bg--centered {
     position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
     inset: 0 !important;
-    display: grid !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     place-items: center !important;
     z-index: 800;
+}
+.modal-bg.modal-bg--centered > .modal {
+    margin: auto !important;
 }
 .scale-enter-active, .scale-leave-active {
     transition: opacity 180ms ease, transform 180ms ease;

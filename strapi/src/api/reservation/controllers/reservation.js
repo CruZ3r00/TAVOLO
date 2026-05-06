@@ -40,6 +40,9 @@ const {
   resolveStaffContext,
   assertStaffRole,
 } = require('../../../utils/staff-access');
+const {
+  sendReservationEmail,
+} = require('../../../utils/customer-email');
 
 const { ApplicationError } = errors;
 
@@ -73,6 +76,7 @@ const ERROR_STATUS = {
   TABLE_ALREADY_OCCUPIED: 409,
   RESERVATION_ALREADY_SEATED: 409,
   RESERVATION_CONTENTION: 503,
+  EMAIL_DELIVERY_FAILED: 503,
 };
 
 function appError(code, message, details) {
@@ -92,7 +96,7 @@ function assertTransition(from, to) {
   }
 }
 
-function validateCreatePayload(body, { phoneOptional = false } = {}) {
+function validateCreatePayload(body, { phoneOptional = false, emailRequired = false } = {}) {
   if (!body || typeof body !== 'object') {
     throw appError('INVALID_PAYLOAD', 'Body mancante o non oggetto.');
   }
@@ -103,6 +107,14 @@ function validateCreatePayload(body, { phoneOptional = false } = {}) {
   const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
   if (!phoneOptional && !phone) throw appError('INVALID_PAYLOAD', 'phone obbligatorio.');
   if (phone.length > 32) throw appError('INVALID_PAYLOAD', 'phone troppo lungo.');
+
+  const customer_email = typeof body.customer_email === 'string'
+    ? body.customer_email.trim().toLowerCase()
+    : (typeof body.email === 'string' ? body.email.trim().toLowerCase() : '');
+  if (emailRequired && !customer_email) throw appError('INVALID_PAYLOAD', 'customer_email obbligatoria.');
+  if (customer_email && !/^\S+@\S+\.\S+$/.test(customer_email)) {
+    throw appError('INVALID_PAYLOAD', 'customer_email non valida.');
+  }
 
   const date = typeof body.date === 'string' ? body.date.trim() : '';
   const time = typeof body.time === 'string' ? body.time.trim() : '';
@@ -130,6 +142,7 @@ function validateCreatePayload(body, { phoneOptional = false } = {}) {
   return {
     customer_name,
     phone: phone || null,
+    customer_email: customer_email || null,
     date,
     time: time.length === 5 ? `${time}:00` : time,
     datetime: datetimeISO,
@@ -167,6 +180,7 @@ function serializeReservation(row) {
     documentId: row.documentId,
     customer_name: row.customer_name,
     phone: row.phone,
+    customer_email: row.customer_email || null,
     date: row.date,
     time: row.time,
     datetime: row.datetime,
@@ -329,6 +343,7 @@ async function createWithCapacityCheck({ targetUserId, payload, status, enforceC
         data: {
           customer_name: payload.customer_name,
           phone: payload.phone,
+          customer_email: payload.customer_email,
           date: payload.date,
           time: payload.time,
           datetime: payload.datetime,
@@ -408,7 +423,7 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
       }
       const targetUser = users[0];
 
-      const payload = validateCreatePayload(ctx.request.body);
+      const payload = validateCreatePayload(ctx.request.body, { emailRequired: true });
 
       const created = await createWithCapacityCheck({
         targetUserId: targetUser.id,
@@ -416,6 +431,20 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
         status: 'pending',
         enforceCapacity: process.env.PUBLIC_RESERVATIONS_ENFORCE_CAPACITY !== 'false',
       });
+
+      try {
+        await sendReservationEmail(strapi, {
+          reservation: created,
+          restaurantName: targetUser.restaurant_name || targetUser.username || 'Tavolo',
+          type: 'received',
+        });
+      } catch (emailErr) {
+        await strapi.documents('api::reservation.reservation').delete({ documentId: created.documentId })
+          .catch((cleanupErr) => {
+            strapi.log.error(`cleanup prenotazione pubblica fallito: ${cleanupErr.message}`);
+          });
+        throw emailErr;
+      }
 
       ctx.status = 201;
       ctx.body = { data: serializeReservation(created) };
@@ -528,6 +557,14 @@ module.exports = createCoreController('api::reservation.reservation', ({ strapi 
       }
 
       assertTransition(reservation.status, nextStatus);
+
+      if (reservation.customer_email && (nextStatus === 'confirmed' || nextStatus === 'cancelled')) {
+        await sendReservationEmail(strapi, {
+          reservation,
+          restaurantName: actor.owner.restaurant_name || actor.owner.username || 'Tavolo',
+          type: nextStatus === 'confirmed' ? 'confirmed' : 'rejected',
+        });
+      }
 
       const updated = await strapi.documents('api::reservation.reservation').update({
         documentId: reservation.documentId,

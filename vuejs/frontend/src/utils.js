@@ -412,6 +412,92 @@ export const createWalkin = async (body, token) => {
 };
 
 // ============================================================================
+// Take-away / Asporto API
+// ============================================================================
+
+export const fetchTakeaways = async (params = {}, token) => (
+    fetchOrders({ ...params, service_type: 'takeaway' }, token)
+);
+
+export const createTakeaway = async (body, token) => {
+    const resp = await fetch(`${API_BASE}/api/takeaways`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+export const updateTakeaway = async (documentId, body, token) => {
+    const resp = await fetch(`${API_BASE}/api/takeaways/${documentId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+export const acceptTakeaway = async (documentId, token) => {
+    const resp = await fetch(`${API_BASE}/api/takeaways/${documentId}/accept`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+export const rejectTakeaway = async (documentId, token) => {
+    const resp = await fetch(`${API_BASE}/api/takeaways/${documentId}/reject`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+    });
+    if (resp.status === 204) return true;
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+export const sendTakeawayToDepartments = async (documentId, token) => {
+    const resp = await fetch(`${API_BASE}/api/takeaways/${documentId}/send`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+export const pickupTakeaway = async (documentId, token) => {
+    const resp = await fetch(`${API_BASE}/api/takeaways/${documentId}/pickup`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    const payload = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw buildOrderError(resp, payload);
+    return payload.data;
+};
+
+// ============================================================================
 // Tables API — ADR-0002
 // ============================================================================
 
@@ -673,6 +759,8 @@ export const orderErrorMessage = (err) => {
             return 'Esiste gia un tavolo con questo numero.';
         case 'ORDER_NOT_FOUND':
             return 'Ordine non trovato.';
+        case 'RESTAURANT_NOT_FOUND':
+            return 'Ristorante non trovato.';
         case 'ORDER_NOT_ACTIVE':
             return 'Ordine gia chiuso.';
         case 'ITEM_NOT_FOUND':
@@ -695,6 +783,10 @@ export const orderErrorMessage = (err) => {
             return 'Timeout nel pagamento. Riprova.';
         case 'PAYMENT_UNAVAILABLE':
             return 'Servizio di pagamento non disponibile. Riprova.';
+        case 'POS_DEVICE_NOT_FOUND':
+            return 'Nessun dispositivo POS/RT collegato. Collega l\'app del dispositivo e riprova.';
+        case 'EMAIL_DELIVERY_FAILED':
+            return 'Email al cliente non inviata. Controlla la configurazione SMTP e riprova.';
         default:
             return err.message || 'Si e\' verificato un errore durante l\'operazione.';
     }
@@ -737,6 +829,8 @@ export const reservationErrorMessage = (err) => {
             return err.message || 'Dati non validi. Controlla i campi e riprova.';
         case 'RESERVATION_CONTENTION':
             return 'Troppe richieste concorrenti in questo momento. Riprova tra qualche secondo.';
+        case 'EMAIL_DELIVERY_FAILED':
+            return 'Email al cliente non inviata. Controlla la configurazione SMTP e riprova.';
         default:
             return err.message || 'Si è verificato un errore durante l\'operazione.';
     }

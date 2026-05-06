@@ -80,19 +80,14 @@ const submit = async () => {
     if (!validate()) return;
     submitting.value = true;
     try {
-        const notesWithEmail = (() => {
-            const email = form.value.email.trim();
-            const base = form.value.notes.trim();
-            if (!email) return base || null;
-            return base ? `${base}\nEmail: ${email}` : `Email: ${email}`;
-        })();
         const payload = {
             customer_name: form.value.customer_name.trim(),
             phone: form.value.phone.trim(),
+            customer_email: form.value.email.trim() || undefined,
             date: form.value.date,
             time: form.value.time.length === 5 ? `${form.value.time}:00` : form.value.time,
             number_of_people: parseInt(form.value.guests, 10),
-            notes: notesWithEmail,
+            notes: form.value.notes.trim() || null,
             status: form.value.status,
         };
         const created = await createReservation(payload, props.token);

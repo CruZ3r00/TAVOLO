@@ -76,6 +76,7 @@ async function openOrderForTableTx({ trx, userId, tableDocumentId, covers, reser
 
   const data = {
     status: 'active',
+    service_type: 'table',
     opened_at: new Date().toISOString(),
     total_amount: 0,
     payment_status: 'unpaid',

@@ -15,6 +15,7 @@ import { STAFF_ROLES, effectiveUserId, staffRole } from '@/staffAccess';
 import {
   fetchTables, fetchOrders, closeOrder,
   addOrderItem, updateItemStatus, orderErrorMessage,
+  pickupTakeaway,
   createWalkin, reservationErrorMessage,
 } from '@/utils';
 
@@ -102,7 +103,8 @@ const walkinErrors = ref({});
 const orderDetailRef = ref(null);
 
 const stats = computed(() => {
-  const activeOrders = orders.value.filter(o => o.status === 'active');
+  const tableOrders = orders.value.filter(o => o.service_type !== 'takeaway');
+  const activeOrders = tableOrders.filter(o => o.status === 'active');
   const occupied = tables.value.filter(t => t.status === 'occupied').length;
   const free = tables.value.filter(t => t.status !== 'occupied' && t.status !== 'reserved').length;
   let readyTables = 0;
@@ -111,6 +113,9 @@ const stats = computed(() => {
   }
   return { occupied, free, total: tables.value.length, readyTables };
 });
+const readyTakeaways = computed(() => orders.value
+  .filter(o => o.service_type === 'takeaway' && o.status === 'active' && o.takeaway_status === 'ready')
+  .sort((a, b) => new Date(a.pickup_at || 0) - new Date(b.pickup_at || 0)));
 
 const kitchenStats = computed(() => {
   let total = 0;
@@ -186,10 +191,45 @@ const monitorActiveIcon = computed(() => (
   monitorDept.value === 'all' ? 'bi-grid-3x3-gap' : (ROLE_ICONS[monitorDept.value] || 'bi-grid-3x3-gap')
 ));
 const tableNumber = (order) => order?.table?.number ?? order?.fk_table?.number ?? order?.table_number ?? '?';
+const takeawayDailyNumbers = computed(() => {
+  const map = new Map();
+  const sameDay = (iso) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear()
+      && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate();
+  };
+  const list = (orders.value || [])
+    .filter(o => o?.service_type === 'takeaway' && sameDay(o.opened_at))
+    .sort((a, b) => new Date(a.opened_at || 0) - new Date(b.opened_at || 0));
+  list.forEach((o, i) => map.set(o.documentId, i + 1));
+  return map;
+});
+const takeawayDailyNumber = (order) => takeawayDailyNumbers.value.get(order?.documentId) ?? '?';
+const orderPill = (order) => order?.service_type === 'takeaway' ? `A${takeawayDailyNumber(order)}` : `T${tableNumber(order)}`;
+const orderTitle = (order) => order?.service_type === 'takeaway'
+  ? `Asporto · ${order.customer_name || 'Cliente'}`
+  : `Tavolo ${tableNumber(order)}`;
 const setMonitorDept = (key, allowed) => {
   if (!allowed) return;
   monitorDept.value = key;
   loadData({ silent: true });
+};
+
+const filterOrdersForView = (rows) => {
+  const list = Array.isArray(rows) ? rows : [];
+  if (mode.value === 'cameriere') {
+    return list.filter(o => o.service_type !== 'takeaway' || o.takeaway_status === 'ready');
+  }
+  if (isOwnerProductionMode.value && !effectiveStation.value) {
+    return list.filter(o => (
+      o.service_type !== 'takeaway'
+      || ['sent_to_departments', 'ready'].includes(o.takeaway_status)
+    ));
+  }
+  return list;
 };
 
 const loadData = async ({ silent = false } = {}) => {
@@ -201,7 +241,7 @@ const loadData = async ({ silent = false } = {}) => {
       fetchOrders({ status: 'active', pageSize: 100, station: effectiveStation.value }, token.value),
     ]);
     tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
-    orders.value = Array.isArray(ordersResp?.data) ? ordersResp.data : [];
+    orders.value = filterOrdersForView(ordersResp?.data);
     errorMessage.value = '';
   } catch (err) {
     errorMessage.value = orderErrorMessage(err);
@@ -352,6 +392,17 @@ const handleKitchenAdvance = async ({ item, next, orderDocumentId }) => {
     const s2 = new Set(busyItemIds.value);
     s2.delete(item.documentId);
     busyItemIds.value = s2;
+  }
+};
+
+const handleTakeawayPickupFromSala = async (order) => {
+  if (!order?.documentId) return;
+  try {
+    await pickupTakeaway(order.documentId, token.value);
+    showToast('success', `Asporto ${order.customer_name || ''} ritirato dalla cucina.`);
+    await loadData({ silent: true });
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
   }
 };
 
@@ -607,9 +658,9 @@ watch(() => route.path, async () => {
                 @keydown.enter="handleViewOrder(o)"
               >
                 <header class="ct-order-card__head">
-                  <span class="ct-order-card__pill">T{{ tableNumber(o) }}</span>
+                  <span class="ct-order-card__pill" :class="{ takeaway: o.service_type === 'takeaway' }">{{ orderPill(o) }}</span>
                   <div class="ct-order-card__heading">
-                    <div class="ct-order-card__title">Tavolo {{ tableNumber(o) }}</div>
+                    <div class="ct-order-card__title">{{ orderTitle(o) }}</div>
                     <div class="ct-order-card__meta">
                       <span><i class="bi bi-clock"></i> {{ formatElapsed(o.opened_at) }}</span>
                       <span v-if="o.covers">·</span>
@@ -667,13 +718,33 @@ watch(() => route.path, async () => {
         </template>
 
         <!-- ===== Cameriere (sala) ===== -->
-        <OrdersTableGrid
-          v-else-if="mode === 'cameriere'"
-          :tables="tables"
-          :orders="orders"
-          @view-order="handleViewOrder"
-          @open-table="handleOpenTable"
-        />
+        <template v-else-if="mode === 'cameriere'">
+          <section v-if="readyTakeaways.length" class="takeaway-ready-alert">
+            <header>
+              <i class="bi bi-bag-check"></i>
+              <strong>Asporto pronto da ritirare</strong>
+              <span>{{ readyTakeaways.length }}</span>
+            </header>
+            <div class="takeaway-ready-list">
+              <article v-for="o in readyTakeaways" :key="o.documentId" class="takeaway-ready-row">
+                <div>
+                  <strong>{{ o.customer_name || 'Cliente' }}</strong>
+                  <span>{{ o.customer_phone || 'Telefono non disponibile' }}</span>
+                </div>
+                <button type="button" class="ds-btn ds-btn-primary ds-btn-sm" @click="handleTakeawayPickupFromSala(o)">
+                  <i class="bi bi-box-arrow-up"></i>
+                  <span>Preso dalla cucina</span>
+                </button>
+              </article>
+            </div>
+          </section>
+          <OrdersTableGrid
+            :tables="tables"
+            :orders="orders"
+            @view-order="handleViewOrder"
+            @open-table="handleOpenTable"
+          />
+        </template>
 
         <!-- ===== Staff cucina/bar/etc. — kanban ===== -->
         <KitchenBoard
@@ -878,8 +949,64 @@ watch(() => route.path, async () => {
   outline: 2px solid var(--ac);
   outline-offset: 2px;
 }
+:deep(.ct-order-card__pill.takeaway) {
+  background: color-mix(in oklab, var(--ac) 12%, var(--paper));
+  color: var(--ac);
+  border-color: color-mix(in oklab, var(--ac) 35%, var(--line));
+}
+.takeaway-ready-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--ok) 35%, var(--line));
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ok) 9%, var(--paper));
+}
+.takeaway-ready-alert header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ok-ink, var(--ok));
+}
+.takeaway-ready-alert header span {
+  min-width: 24px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-weight: 800;
+}
+.takeaway-ready-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+.takeaway-ready-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+}
+.takeaway-ready-row strong,
+.takeaway-ready-row span {
+  display: block;
+}
+.takeaway-ready-row span {
+  color: var(--ink-3);
+  font-size: 12px;
+}
 
 @media (max-width: 860px) {
   .md-toast { left: 16px; right: 16px; bottom: 88px; max-width: none; }
+  .takeaway-ready-row { align-items: stretch; flex-direction: column; }
 }
 </style>
