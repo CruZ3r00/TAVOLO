@@ -4,8 +4,41 @@
     <meta charset="UTF-8">
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#ffffff">
     <title>Tavolo — Il gestionale dei ristoranti moderni</title>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var themeMeta = document.querySelector('meta[name="theme-color"]');
+        var media = null;
+        var stored = null;
+
+        try {
+          stored = window.localStorage && window.localStorage.getItem('ct-theme');
+        } catch (_err) {}
+
+        function systemPrefersDark() {
+          return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+
+        function applyTheme() {
+          var choice = stored === 'light' || stored === 'dark' ? stored : 'system';
+          var theme = choice === 'system' ? (systemPrefersDark() ? 'dark' : 'light') : choice;
+          root.setAttribute('data-theme', theme);
+          root.style.colorScheme = theme;
+          if (themeMeta) themeMeta.setAttribute('content', theme === 'dark' ? '#171a20' : '#ffffff');
+        }
+
+        applyTheme();
+
+        if (window.matchMedia) {
+          media = window.matchMedia('(prefers-color-scheme: dark)');
+          if (media.addEventListener) media.addEventListener('change', applyTheme);
+          else if (media.addListener) media.addListener(applyTheme);
+        }
+      }());
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">

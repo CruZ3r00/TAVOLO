@@ -452,9 +452,14 @@
 
 html {
   font-size: 16px;
+  color-scheme: light;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
@@ -1324,6 +1329,72 @@ select.ds-input {
   background-position: right 12px center;
   background-size: 14px;
   padding-right: 36px;
+}
+
+.form-control,
+.form-select,
+.form-check-input {
+  background-color: var(--bg-elev);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.form-control::placeholder {
+  color: var(--ink-4);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  background-color: var(--bg-elev);
+  border-color: var(--ac);
+  color: var(--ink);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ac) 22%, transparent);
+}
+
+.form-control:disabled,
+.form-select:disabled,
+.form-control[readonly] {
+  background-color: var(--bg-sunk);
+  color: var(--ink-3);
+}
+
+.form-select {
+  --bs-form-select-bg-img: none;
+}
+
+.form-check-input:checked {
+  background-color: var(--ac);
+  border-color: var(--ac);
+}
+
+.dropdown-menu,
+.list-group-item,
+.modal-content,
+.popover,
+.toast {
+  background-color: var(--paper);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.dropdown-item,
+.modal-title {
+  color: var(--ink);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: var(--bg-hover);
+  color: var(--ink);
+}
+
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--ink);
+  --bs-table-border-color: var(--line);
+  --bs-table-striped-bg: var(--bg-sunk);
+  --bs-table-hover-bg: var(--bg-hover);
 }
 
 .field {
