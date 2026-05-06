@@ -185,7 +185,7 @@ const monitorActiveTitle = computed(() => (
 const monitorActiveIcon = computed(() => (
   monitorDept.value === 'all' ? 'bi-grid-3x3-gap' : (ROLE_ICONS[monitorDept.value] || 'bi-grid-3x3-gap')
 ));
-const tableNumber = (order) => order?.fk_table?.number ?? order?.table_number ?? order?.table ?? '?';
+const tableNumber = (order) => order?.table?.number ?? order?.fk_table?.number ?? order?.table_number ?? '?';
 const setMonitorDept = (key, allowed) => {
   if (!allowed) return;
   monitorDept.value = key;
