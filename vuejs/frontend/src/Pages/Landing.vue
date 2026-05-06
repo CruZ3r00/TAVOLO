@@ -1,41 +1,84 @@
 <script setup>
-import { onMounted, nextTick } from 'vue';
+import { defineAsyncComponent, nextTick, onMounted, ref } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
+
+const LandingHeroScene = defineAsyncComponent(() => import('@/components/LandingHeroScene.vue'));
+
+const canUseHeroScene = ref(false);
+
+const supportsWebGL = () => {
+  if (typeof window === 'undefined') return false;
+  const canvas = document.createElement('canvas');
+  return !!(
+    window.WebGLRenderingContext
+    && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+  );
+};
 
 const serviceProblems = [
   'ordini che non arrivano al reparto giusto',
   'confusione tra sala e cucina',
+  'richieste take away gestite fuori dal flusso',
   'stati non chiari: in preparazione, pronto, servito',
-  'troppe comunicazioni a voce',
 ];
 
 const flowSteps = [
   {
     title: 'Il cameriere inserisce l’ordine',
-    body: 'Dal tavolo o da una prenotazione, con note e quantità già ordinate.',
+    body: 'Dal tavolo, da una prenotazione o da una richiesta take away.',
+    code: 'T7',
+    meta: 'Sala · nuovo ordine',
+    items: ['Risotto ai funghi', 'Acqua naturale', 'Tiramisù'],
+    status: 'Preso',
+    icon: 'bi-pencil-square',
+    tilt: '-1.8deg',
   },
   {
     title: 'Ogni reparto vede solo i suoi piatti',
     body: 'Cucina, bar, pizzeria e altri reparti ricevono la propria coda.',
+    code: 'K',
+    meta: 'Cucina · reparto',
+    items: ['Risotto ai funghi', 'Tagliata media', 'Verdure grigliate'],
+    status: 'In preparazione',
+    icon: 'bi-fire',
+    tilt: '1.2deg',
   },
   {
     title: 'Gli stati avanzano',
     body: 'Da preso a in preparazione, poi pronto, senza chiamate continue.',
+    code: 'B',
+    meta: 'Bar · sincronizzato',
+    items: ['Acqua naturale', 'Calice rosso', 'Caffè'],
+    status: 'Pronto',
+    icon: 'bi-check2-circle',
+    tilt: '-0.8deg',
   },
   {
     title: 'La sala serve senza errori',
-    body: 'Il cameriere vede cosa è pronto e chiude il giro al tavolo.',
+    body: 'Il cameriere vede cosa è pronto, chiude il tavolo o consegna l’asporto.',
+    code: 'A12',
+    meta: 'Asporto · ritiro 19:10',
+    items: ['Burger classico', 'Patate', 'Bibita'],
+    status: 'Da ritirare',
+    icon: 'bi-bag-check',
+    tilt: '1.7deg',
   },
 ];
 
 const features = [
   { icon: 'bi-grid-3x3-gap', title: 'Gestione tavoli', body: 'Tavoli liberi, occupati e ordini aperti sempre visibili.' },
   { icon: 'bi-calendar-check', title: 'Prenotazioni e walk-in', body: 'Prenotazioni, arrivi senza prenotazione e sala nello stesso flusso.' },
+  { icon: 'bi-bag-check', title: 'Take away da telefono e sito', body: 'Ordini da telefono o sito web gestiti nella stessa coda operativa.' },
   { icon: 'bi-receipt', title: 'Ordini multi-reparto', body: 'Un ordine unico può andare a cucina, bar, pizzeria e altri reparti.' },
   { icon: 'bi-funnel', title: 'Filtri per reparto', body: 'Ogni reparto lavora solo le categorie che gli competono.' },
   { icon: 'bi-arrow-repeat', title: 'Stati ordine in tempo reale', body: 'Preparazione, pronto e servito aggiornati durante il servizio.' },
   { icon: 'bi-people', title: 'Ruoli operativi', body: 'Owner, cameriere, cucina, bar e pizzeria con accessi separati.' },
-  { icon: 'bi-diagram-3', title: 'Coordinamento reparti', body: 'Sala, cucina e bar restano sincronizzati senza messaggi sparsi.' },
+];
+
+const heroMetrics = [
+  { value: 'Sala', label: 'tavoli e walk-in' },
+  { value: 'Cucina', label: 'reparti sincronizzati' },
+  { value: 'Asporto', label: 'telefono e sito' },
 ];
 
 const plans = [
@@ -74,6 +117,9 @@ const plans = [
 
 onMounted(() => {
   nextTick(() => { document.title = 'COMFORTABLES · Gestionale ristorante in tempo reale'; });
+  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const compactViewport = window.matchMedia?.('(max-width: 720px)').matches;
+  canUseHeroScene.value = !compactViewport && !prefersReducedMotion && supportsWebGL();
 });
 </script>
 
@@ -81,42 +127,80 @@ onMounted(() => {
   <AppLayout variant="public" page-title="COMFORTABLES">
     <div class="dashboard-public">
       <section class="public-hero">
+        <div class="public-hero-scene-wrap">
+          <LandingHeroScene v-if="canUseHeroScene" />
+          <div v-else class="public-hero-static" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
         <div class="public-container">
-          <div class="public-hero-head">
-            <span class="public-eyebrow">
-              <span class="tv-pulse"></span>
-              Gestionale per ristoranti piccoli e medi
-            </span>
-            <h1>
-              Gestisci sala, ordini e reparti <em>in tempo reale.</em>
-            </h1>
-            <p>
-              COMFORTABLES collega tavoli, prenotazioni e reparti: il cameriere prende
-              l’ordine, ogni reparto vede solo ciò che deve preparare, e la sala segue
-              tutto senza confusione.
-            </p>
-            <div class="public-cta" aria-label="Azioni principali">
-              <router-link to="/register" class="btn btn-lg btn-accent btn-pill">
-                Prova gratis 14 giorni <i class="bi bi-arrow-right" aria-hidden="true"></i>
-              </router-link>
-              <a href="#come-funziona" class="btn btn-lg btn-pill">
-                <i class="bi bi-play-circle" aria-hidden="true"></i> Guarda come funziona
-              </a>
+          <div class="public-hero-grid">
+            <div class="public-hero-head">
+              <span class="public-eyebrow">
+                <span class="tv-pulse"></span>
+                Gestionale SaaS per ristoranti operativi
+              </span>
+              <h1>
+                Sala, cucina e take away sotto controllo <em>in tempo reale.</em>
+              </h1>
+              <p>
+                COMFORTABLES collega tavoli, prenotazioni, reparti e ordini da asporto:
+                il lavoro entra in un unico flusso, ogni postazione vede cosa deve fare
+                e il servizio resta leggibile anche quando il locale accelera.
+              </p>
+              <div class="public-cta" aria-label="Azioni principali">
+                <router-link to="/register" class="btn btn-lg btn-accent btn-pill">
+                  Prova gratis 14 giorni <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                </router-link>
+                <a href="#come-funziona" class="btn btn-lg btn-pill">
+                  <i class="bi bi-play-circle" aria-hidden="true"></i> Guarda come funziona
+                </a>
+              </div>
+              <div class="public-microcopy">Login e registrazione restano leggeri anche su browser datati.</div>
+              <dl class="public-hero-metrics" aria-label="Aree operative coperte">
+                <div v-for="metric in heroMetrics" :key="metric.value">
+                  <dt>{{ metric.value }}</dt>
+                  <dd>{{ metric.label }}</dd>
+                </div>
+              </dl>
             </div>
-            <div class="public-microcopy">Nessun vincolo. Puoi disdire quando vuoi.</div>
+
+            <div class="public-ops-panel" aria-label="Anteprima flusso operativo">
+              <div class="public-ops-top">
+                <span>Servizio live</span>
+                <strong>18:42</strong>
+              </div>
+              <div class="public-ops-cols">
+                <article>
+                  <span class="public-ops-k">T7</span>
+                  <strong>Risotto, acqua, tiramisù</strong>
+                  <small>In cucina · 3 item</small>
+                </article>
+                <article class="is-accent">
+                  <span class="public-ops-k">A12</span>
+                  <strong>Take away dal sito</strong>
+                  <small>Ritiro 19:10 · da accettare</small>
+                </article>
+                <article>
+                  <span class="public-ops-k">B</span>
+                  <strong>Bar sincronizzato</strong>
+                  <small>2 bevande pronte</small>
+                </article>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="public-problem" aria-labelledby="problem-title">
+      <section class="public-problem public-context" aria-labelledby="problem-title">
         <div class="public-container">
-          <div class="public-split">
+          <div class="public-context-inner">
             <div class="public-section-copy">
-              <div class="overline">Il problema</div>
-              <h2 id="problem-title">Quando il servizio si complica</h2>
+              <div class="overline">Dal caos al controllo</div>
+              <h2 id="problem-title">Meno confusione. Più controllo.</h2>
               <p>
-                Nei momenti pieni basta poco: un piatto detto a voce, una comanda
-                persa, un reparto che non sa cosa deve preparare.
+                Quando il servizio accelera, ogni ordine resta nel suo flusso:
+                sala, reparti e asporto lavorano sulla stessa verità.
               </p>
             </div>
             <ul class="public-problem-list">
@@ -129,15 +213,39 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="public-solution" aria-labelledby="solution-title">
+      <section class="public-takeaway" aria-labelledby="takeaway-title">
         <div class="public-container">
-          <div class="public-section-h">
-            <div class="overline">La soluzione</div>
-            <h2 id="solution-title">Un flusso unico, chiaro</h2>
-            <p>
-              Con COMFORTABLES ogni ordine segue un flusso preciso: viene inserito in sala,
-              distribuito automaticamente ai reparti e aggiornato in tempo reale fino al servizio.
-            </p>
+          <div class="public-takeaway-inner">
+            <div class="public-section-copy">
+              <div class="overline">Take away integrato</div>
+              <h2 id="takeaway-title">Ordini da telefono e sito, senza una seconda gestione.</h2>
+              <p>
+                L’asporto entra nello stesso pannello del servizio: puoi accettare la richiesta,
+                mandarla ai reparti, seguirne la preparazione e segnare il ritiro quando il cliente arriva.
+              </p>
+            </div>
+            <div class="public-takeaway-flow" aria-label="Flusso take away">
+              <div>
+                <i class="bi bi-phone" aria-hidden="true"></i>
+                <span>Telefono</span>
+              </div>
+              <div>
+                <i class="bi bi-globe2" aria-hidden="true"></i>
+                <span>Sito web</span>
+              </div>
+              <div class="is-main">
+                <i class="bi bi-kanban" aria-hidden="true"></i>
+                <span>Coda operativa</span>
+              </div>
+              <div>
+                <i class="bi bi-fire" aria-hidden="true"></i>
+                <span>Reparti</span>
+              </div>
+              <div>
+                <i class="bi bi-bag-check" aria-hidden="true"></i>
+                <span>Ritiro</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -148,11 +256,31 @@ onMounted(() => {
             <div class="overline">Come funziona</div>
             <h2 id="flow-title">Dal tavolo al reparto, senza passaggi a voce.</h2>
           </div>
-          <div class="public-flow-grid">
-            <article v-for="(step, index) in flowSteps" :key="step.title" class="public-flow-step">
-              <span class="public-flow-number">{{ index + 1 }}</span>
-              <h3>{{ step.title }}</h3>
+          <div class="public-order-stack" aria-label="Flusso ordini sovrapposti">
+            <article
+              v-for="(step, index) in flowSteps"
+              :key="step.title"
+              class="public-order-card"
+              :style="{ '--card-index': index, '--card-tilt': step.tilt, zIndex: 20 + index }"
+            >
+              <div class="public-order-head">
+                <span class="public-order-code">{{ step.code }}</span>
+                <div>
+                  <small>{{ step.meta }}</small>
+                  <h3>{{ step.title }}</h3>
+                </div>
+                <span class="public-order-status">
+                  <i :class="['bi', step.icon]" aria-hidden="true"></i>
+                  {{ step.status }}
+                </span>
+              </div>
               <p>{{ step.body }}</p>
+              <ul class="public-order-items">
+                <li v-for="item in step.items" :key="item">
+                  <i class="bi bi-dot" aria-hidden="true"></i>
+                  <span>{{ item }}</span>
+                </li>
+              </ul>
             </article>
           </div>
         </div>
@@ -172,20 +300,6 @@ onMounted(() => {
               <h3>{{ feature.title }}</h3>
               <p>{{ feature.body }}</p>
             </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="public-benefit" aria-labelledby="benefit-title">
-        <div class="public-container">
-          <div class="public-benefit-inner">
-            <div>
-              <div class="overline">Beneficio chiave</div>
-              <h2 id="benefit-title">Meno confusione. Più controllo.</h2>
-            </div>
-            <p>
-              Ogni persona vede solo ciò che deve fare. Tutto il resto è già organizzato.
-            </p>
           </div>
         </div>
       </section>
@@ -233,17 +347,13 @@ onMounted(() => {
         <div class="public-container">
           <div class="public-cta-inner">
             <div>
-              <div class="overline" style="color: color-mix(in oklab, white 60%, transparent);">Prova gratuita</div>
               <h3>Prova gratis 14 giorni.</h3>
-              <p>Nessun vincolo. Puoi disdire quando vuoi.</p>
+              <p>Nessun vincolo, nessuna carta richiesta.</p>
             </div>
             <div class="public-cta-actions">
-              <router-link to="/register" class="btn btn-lg btn-pill btn-accent">
+              <router-link to="/register" class="btn btn-sm btn-pill btn-accent">
                 Prova gratis 14 giorni <i class="bi bi-arrow-right" aria-hidden="true"></i>
               </router-link>
-              <a href="#come-funziona" class="btn btn-lg btn-pill">
-                <i class="bi bi-play-circle" aria-hidden="true"></i> Guarda come funziona
-              </a>
             </div>
           </div>
         </div>
@@ -264,10 +374,10 @@ onMounted(() => {
 
 .public-hero {
   position: relative;
-  padding: 80px 0 72px;
+  min-height: 590px;
+  padding: 64px 0 58px;
   background:
-    radial-gradient(60% 60% at 80% 0%, color-mix(in oklab, var(--ac) 12%, transparent), transparent 60%),
-    radial-gradient(50% 50% at 0% 30%, color-mix(in oklab, var(--info) 8%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in oklab, var(--bg) 90%, white 10%), var(--bg)),
     var(--bg);
   overflow: hidden;
 }
@@ -283,62 +393,202 @@ onMounted(() => {
   pointer-events: none;
 }
 .public-hero .public-container { position: relative; z-index: 1; }
+.public-hero-scene-wrap {
+  position: absolute;
+  inset: 0 0 0 42%;
+  z-index: 0;
+  opacity: 0.95;
+}
+.public-hero-scene-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(closest-side at 52% 46%, color-mix(in oklab, var(--ac) 18%, transparent), transparent 70%),
+    linear-gradient(90deg, var(--bg), color-mix(in oklab, var(--bg) 24%, transparent) 34%, transparent 70%);
+  pointer-events: none;
+}
+.public-hero-static {
+  position: absolute;
+  inset: 16% 8% 8% 0;
+  transform: rotateX(58deg) rotateZ(-28deg);
+  transform-style: preserve-3d;
+}
+.public-hero-static span {
+  position: absolute;
+  width: 118px;
+  height: 74px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--paper) 82%, transparent);
+  box-shadow: var(--shadow-md);
+}
+.public-hero-static span:nth-child(1) { left: 8%; top: 40%; }
+.public-hero-static span:nth-child(2) { left: 30%; top: 16%; }
+.public-hero-static span:nth-child(3) { left: 55%; top: 44%; }
+.public-hero-static span:nth-child(4) {
+  left: 70%;
+  top: 18%;
+  background: color-mix(in oklab, var(--ac) 14%, var(--paper));
+}
 
-.public-hero-head { text-align: center; max-width: 920px; margin: 0 auto; }
+.public-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(340px, 0.72fr);
+  gap: 42px;
+  align-items: center;
+}
+
+.public-hero-head { text-align: left; max-width: 720px; }
 .public-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
   background: var(--paper); border: 1px solid var(--line);
   padding: 6px 14px 6px 10px; border-radius: 999px;
   font-size: 12.5px; font-weight: 500; color: var(--ink-2);
-  margin-bottom: 28px; box-shadow: var(--shadow-xs);
+  margin-bottom: 18px; box-shadow: var(--shadow-xs);
 }
 .public-hero h1 {
-  font-size: clamp(36px, 5vw, 60px); line-height: 1.05;
-  letter-spacing: -0.035em; font-weight: 600;
-  margin: 0 0 24px; color: var(--ink); text-wrap: balance;
+  font-size: 54px; line-height: 1.03;
+  letter-spacing: 0; font-weight: 650;
+  margin: 0 0 18px; color: var(--ink); text-wrap: balance;
 }
 .public-hero p {
-  font-size: clamp(15px, 1.6vw, 19px); line-height: 1.55;
-  color: var(--ink-2); max-width: 760px; margin: 0 auto 32px; text-wrap: pretty;
+  font-size: 17px; line-height: 1.5;
+  color: var(--ink-2); max-width: 660px; margin: 0 0 24px; text-wrap: pretty;
 }
-.public-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+.public-cta { display: flex; gap: 10px; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 10px; }
 .public-microcopy { font-size: 13px; color: var(--ink-3); }
+.public-hero-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0 0;
+  max-width: 610px;
+}
+.public-hero-metrics div {
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--paper) 82%, transparent);
+  box-shadow: var(--shadow-xs);
+}
+.public-hero-metrics dt {
+  margin: 0 0 3px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+.public-hero-metrics dd {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.public-ops-panel {
+  justify-self: end;
+  width: min(360px, 100%);
+  padding: 14px;
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--paper) 86%, transparent);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(12px);
+}
+.public-ops-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 3px 11px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.public-ops-top strong { color: var(--ink); font-feature-settings: "tnum"; }
+.public-ops-cols { display: grid; gap: 8px; }
+.public-ops-cols article {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-elev);
+}
+.public-ops-cols article.is-accent {
+  border-color: color-mix(in oklab, var(--ac) 34%, var(--line));
+  background: color-mix(in oklab, var(--ac) 7%, var(--paper));
+}
+.public-ops-k {
+  grid-row: span 2;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-sunk);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 13px;
+}
+.public-ops-cols strong {
+  color: var(--ink);
+  font-size: 13.5px;
+  min-width: 0;
+}
+.public-ops-cols small {
+  color: var(--ink-3);
+  font-size: 12px;
+}
 
 .public-problem,
+.public-takeaway,
 .public-flow,
-.public-benefit,
 .public-plans {
-  padding: 72px 0;
+  padding: 50px 0;
   background: var(--bg);
 }
-.public-solution,
 .public-features {
-  padding: 72px 0;
+  padding: 50px 0;
   background: var(--bg-sunk, var(--bg-2));
 }
 
-.public-section-h { max-width: 760px; margin: 0 auto 44px; text-align: center; }
+.public-section-h { max-width: 760px; margin: 0 auto 30px; text-align: center; }
 .public-section-h h2,
-.public-section-copy h2,
-.public-benefit h2 {
-  font-size: clamp(28px, 3.6vw, 44px); line-height: 1.1;
-  letter-spacing: -0.03em; font-weight: 600; margin: 12px 0 0;
+.public-section-copy h2 {
+  font-size: 34px; line-height: 1.12;
+  letter-spacing: 0; font-weight: 650; margin: 12px 0 0;
   color: var(--ink); text-wrap: balance;
 }
 .public-section-h p,
-.public-section-copy p,
-.public-benefit p {
+.public-section-copy p {
   margin: 16px 0 0;
-  font-size: 16px;
+  font-size: 15px;
   color: var(--ink-2);
   line-height: 1.6;
 }
 
-.public-split {
+.public-split,
+.public-context-inner {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 40px;
+  gap: 30px;
   align-items: center;
+}
+.public-context {
+  padding-top: 42px;
+  padding-bottom: 42px;
+}
+.public-context-inner {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper);
+  box-shadow: var(--shadow-xs);
+}
+.public-context .public-section-copy h2 {
+  font-size: 30px;
+}
+.public-context .public-section-copy p {
+  margin-top: 10px;
 }
 .public-section-copy { max-width: 520px; }
 .public-problem-list {
@@ -346,7 +596,7 @@ onMounted(() => {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 12px;
+  gap: 9px;
 }
 .public-problem-list li {
   display: flex;
@@ -355,38 +605,111 @@ onMounted(() => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 16px 18px;
+  padding: 13px 16px;
   color: var(--ink-2);
   box-shadow: var(--shadow-xs);
 }
 .public-problem-list i { color: var(--warn, var(--ac)); font-size: 18px; }
 
-.public-flow-grid {
+.public-takeaway-inner {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-}
-.public-flow-step {
-  position: relative;
+  grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1fr);
+  gap: 28px;
+  align-items: center;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
   background: var(--paper);
+  box-shadow: var(--shadow-xs);
+}
+.public-takeaway-flow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.public-takeaway-flow div {
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 22px;
-  min-height: 190px;
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
 }
-.public-flow-number {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: var(--ac-soft);
+.public-takeaway-flow div.is-main {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-md);
+}
+.public-takeaway-flow i {
   color: var(--ac);
-  font-weight: 700;
-  margin-bottom: 18px;
+  font-size: 21px;
 }
-.public-flow-step h3,
+.public-takeaway-flow .is-main i { color: var(--paper); }
+
+.public-order-stack {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 8px 0 20px;
+  perspective: 1200px;
+}
+.public-order-card {
+  position: sticky;
+  top: calc(84px + (var(--card-index) * 12px));
+  margin-top: -14px;
+  min-height: 154px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--paper) 96%, white 4%), var(--paper)),
+    var(--paper);
+  box-shadow: 0 18px 46px -26px rgb(0 0 0 / 0.28), var(--shadow-xs);
+  transform: rotateX(2.5deg) rotateZ(var(--card-tilt)) translateY(calc(var(--card-index) * 2px));
+  transform-origin: center top;
+  transition: transform var(--dur), box-shadow var(--dur), border-color var(--dur);
+}
+.public-order-card:first-child { margin-top: 0; }
+.public-order-card:hover {
+  border-color: color-mix(in oklab, var(--ac) 30%, var(--line));
+  box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.34), var(--shadow-sm);
+  transform: rotateX(1.5deg) rotateZ(var(--card-tilt)) translateY(calc(var(--card-index) * 2px - 2px));
+}
+.public-order-head {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.public-order-code {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--bg-sunk);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.public-order-head small {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+.public-order-head h3,
 .public-feature h3 {
   margin: 0 0 8px;
   font-size: 18px;
@@ -394,42 +717,62 @@ onMounted(() => {
   font-weight: 600;
   color: var(--ink);
 }
-.public-flow-step p,
+.public-order-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--ac-soft);
+  color: var(--ac-ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.public-order-card p,
 .public-feature p {
   margin: 0;
   font-size: 14px;
   color: var(--ink-2);
   line-height: 1.5;
 }
+.public-order-items {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+.public-order-items li {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.public-order-items i {
+  color: var(--ac);
+  font-size: 15px;
+  line-height: 1;
+}
 
 .public-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .public-feature {
   background: var(--paper); border: 1px solid var(--line);
-  border-radius: 14px; padding: 24px;
+  border-radius: 14px; padding: 18px;
   transition: transform var(--dur), box-shadow var(--dur), border-color var(--dur);
 }
 .public-feature:hover {
   transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--line-strong);
 }
 .public-feature-icon {
-  width: 44px; height: 44px;
+  width: 38px; height: 38px;
   background: var(--ac-soft); border-radius: 10px;
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--ac); font-size: 22px; margin-bottom: 16px;
+  color: var(--ac); font-size: 19px; margin-bottom: 12px;
 }
-
-.public-benefit-inner {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  padding: 42px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
-  gap: 28px;
-  align-items: center;
-  box-shadow: var(--shadow-xs);
-}
-.public-benefit p { margin: 0; font-size: 18px; }
 
 .public-plans-grid {
   display: grid;
@@ -442,7 +785,7 @@ onMounted(() => {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 18px;
-  padding: 30px;
+  padding: 24px;
   box-shadow: var(--shadow-xs);
 }
 .public-plan-highlight {
@@ -467,7 +810,7 @@ onMounted(() => {
   margin-bottom: 10px;
 }
 .public-plan h3 {
-  margin: 0 0 12px;
+  margin: 0 0 9px;
   color: var(--ink);
   font-size: 26px;
   letter-spacing: -0.03em;
@@ -476,28 +819,28 @@ onMounted(() => {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .public-plan-price span {
   color: var(--ink);
-  font-size: 34px;
+  font-size: 31px;
   line-height: 1;
   font-weight: 700;
   letter-spacing: -0.035em;
 }
 .public-plan-price small { color: var(--ink-3); font-size: 14px; }
 .public-plan p {
-  margin: 0 0 20px;
+  margin: 0 0 15px;
   color: var(--ink-2);
   font-size: 15px;
   line-height: 1.55;
 }
 .public-plan ul {
   list-style: none;
-  margin: 0 0 24px;
+  margin: 0 0 18px;
   padding: 0;
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 .public-plan li {
   display: flex;
@@ -511,17 +854,17 @@ onMounted(() => {
   margin-top: 2px;
 }
 
-.public-cta-box { padding: 72px 0 80px; background: var(--bg); }
+.public-cta-box { padding: 18px 0 42px; background: var(--bg); }
 .public-cta-inner {
   background: var(--ink); color: var(--paper);
-  border-radius: 24px; padding: 56px;
+  border-radius: 16px; padding: 18px 22px;
   display: flex; align-items: center; justify-content: space-between;
-  gap: 32px; flex-wrap: wrap;
+  gap: 16px; flex-wrap: wrap;
   background:
     radial-gradient(80% 80% at 100% 0%, color-mix(in oklab, var(--ac) 50%, var(--ink)), var(--ink) 70%);
 }
-.public-cta-inner h3 { margin: 8px 0 12px; font-size: 28px; letter-spacing: -0.03em; font-weight: 600; }
-.public-cta-inner p { margin: 0; opacity: 0.78; font-size: 15px; max-width: 440px; }
+.public-cta-inner h3 { margin: 0 0 4px; font-size: 18px; letter-spacing: 0; font-weight: 650; }
+.public-cta-inner p { margin: 0; opacity: 0.78; font-size: 13px; max-width: 440px; }
 .public-cta-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .public-cta-inner :deep(.btn) {
   background: color-mix(in oklab, var(--paper) 12%, transparent);
@@ -535,30 +878,121 @@ onMounted(() => {
 .public-cta-inner :deep(.btn-accent:hover) { background: color-mix(in oklab, var(--paper) 90%, var(--ac)); }
 
 @media (max-width: 1080px) {
+  .public-hero {
+    min-height: 0;
+    padding: 58px 0;
+  }
+  .public-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+  .public-hero-scene-wrap {
+    inset: 18% 0 auto 25%;
+    height: 320px;
+    opacity: 0.5;
+  }
+  .public-ops-panel {
+    display: none;
+  }
+  .public-takeaway-inner {
+    grid-template-columns: 1fr;
+  }
   .public-features-grid { grid-template-columns: 1fr 1fr; }
-  .public-flow-grid { grid-template-columns: 1fr 1fr; }
+  .public-order-card {
+    top: calc(72px + (var(--card-index) * 10px));
+  }
 }
 @media (max-width: 820px) {
   .public-split,
-  .public-benefit-inner,
+  .public-context-inner,
+  .public-takeaway-inner,
   .public-plans-grid {
     grid-template-columns: 1fr;
   }
+  .public-hero h1 {
+    font-size: 42px;
+  }
+  .public-section-h h2,
+  .public-section-copy h2 {
+    font-size: 30px;
+  }
+  .public-takeaway-flow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .public-ops-panel {
+    display: none;
+  }
 }
 @media (max-width: 720px) {
-  .public-hero { padding: 56px 0; }
+  .public-hero { padding: 34px 0 42px; }
+  .public-hero-scene-wrap {
+    display: none;
+  }
+  .public-hero h1 {
+    font-size: 34px;
+  }
+  .public-hero p {
+    font-size: 15px;
+  }
+  .public-hero-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .public-hero-metrics div {
+    padding: 9px 8px;
+  }
+  .public-hero-metrics dt {
+    font-size: 14px;
+  }
+  .public-hero-metrics dd {
+    font-size: 11.5px;
+  }
   .public-problem,
-  .public-solution,
+  .public-takeaway,
   .public-flow,
   .public-features,
-  .public-benefit,
-  .public-plans { padding: 56px 0; }
+  .public-plans { padding: 40px 0; }
   .public-features-grid,
-  .public-flow-grid { grid-template-columns: 1fr; }
-  .public-flow-step { min-height: 0; }
-  .public-cta-box { padding: 40px 0; }
+  .public-takeaway-flow { grid-template-columns: 1fr; }
+  .public-takeaway-flow div.is-main {
+    transform: none;
+  }
+  .public-order-stack { padding-top: 0; }
+  .public-order-card {
+    position: relative;
+    top: auto;
+    margin-top: 10px;
+    transform: none;
+  }
+  .public-order-card:hover {
+    transform: none;
+  }
+  .public-order-head {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+  .public-order-code {
+    width: 42px;
+    height: 42px;
+  }
+  .public-order-status {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .public-cta-box { padding: 16px 0 36px; }
   .public-cta-inner,
-  .public-benefit-inner { padding: 32px; }
-  .public-cta-inner h3 { font-size: 22px; }
+  .public-takeaway-inner { padding: 22px; }
+  .public-cta-inner h3 { font-size: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-order-card {
+    position: relative;
+    top: auto;
+    margin-top: 10px;
+    transform: none;
+  }
+  .public-order-card:hover {
+    transform: none;
+  }
 }
 </style>

@@ -47,7 +47,10 @@ onUnmounted(() => {
               role="dialog"
               aria-modal="true"
             >
-              <div class="modal" :class="{ wide, slim }">
+              <div
+                class="ds-modal"
+                :class="{ 'ds-modal-wide': wide, 'ds-modal-slim': slim }"
+              >
                 <div class="modal-h">
                   <slot v-if="showSlot" name="title" />
                   <button type="button" class="modal-close" @click="emit('close')" aria-label="Chiudi">
@@ -87,7 +90,7 @@ onUnmounted(() => {
     place-items: center !important;
     z-index: 800;
 }
-.modal-bg.modal-bg--centered > .modal {
+.modal-bg.modal-bg--centered > .ds-modal {
     margin: auto !important;
 }
 .scale-enter-active, .scale-leave-active {
@@ -96,7 +99,7 @@ onUnmounted(() => {
 .scale-enter-from, .scale-leave-to {
     opacity: 0;
 }
-.scale-enter-from .modal, .scale-leave-to .modal {
+.scale-enter-from .ds-modal, .scale-leave-to .ds-modal {
     transform: translateY(8px) scale(0.98);
 }
 </style>

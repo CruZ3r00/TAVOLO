@@ -1528,10 +1528,15 @@ select.ds-input {
 }
 .modal,
 .ds-modal {
+  position: relative;
+  inset: auto;
+  z-index: auto;
   background: var(--bg-elev);
   border: 1px solid var(--line);
   border-radius: var(--r-xl);
   width: min(640px, 100%);
+  height: auto;
+  min-height: 0;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
