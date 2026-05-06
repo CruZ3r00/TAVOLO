@@ -8,6 +8,7 @@ import { canSeeNavItem, defaultRouteForUser, effectiveUserId } from '@/staffAcce
 import AppSidebar from '@/components/AppSidebar.vue';
 import MobileBottomNav from '@/components/MobileBottomNav.vue';
 import MobileTopBar from '@/components/MobileTopBar.vue';
+import ThemeToggle from '@/components/ThemeToggle.vue';
 
 const props = defineProps({
   // 'app' = sidebar + bottom nav, 'public' = top nav, 'auto' = decide da auth + path
@@ -236,6 +237,8 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
         </div>
 
         <div class="nav-tools">
+          <ThemeToggle class="nav-theme-toggle" />
+          <ThemeToggle compact class="nav-theme-toggle-mobile" />
           <template v-if="isLoggedIn">
             <router-link :to="defaultAppRoute" class="btn btn-primary btn-sm nav-cta">
               <i class="bi bi-speedometer2"/> Vai alla dashboard
@@ -270,6 +273,8 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 
       <Transition name="panel">
         <div v-if="mobileMenuOpen" class="mobile-nav-panel">
+          <ThemeToggle class="mobile-theme-toggle" />
+          <hr class="mobile-sep">
           <router-link to="/landing" class="mobile-link" @click="closeMobileMenu">Home</router-link>
           <router-link to="/who-are-us" class="mobile-link" @click="closeMobileMenu">Chi siamo</router-link>
           <router-link to="/contact-us" class="mobile-link" @click="closeMobileMenu">Contattaci</router-link>
@@ -423,6 +428,10 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 .public-link.is-active { color: var(--ink); font-weight: 500; }
 
 .nav-tools { margin-left: auto; display: flex; align-items: center; gap: var(--s-2); }
+.nav-theme-toggle-mobile { display: none; }
+.mobile-theme-toggle {
+  align-self: flex-start;
+}
 .user-menu { position: relative; }
 .avatar {
   width: 36px; height: 36px;
@@ -519,6 +528,8 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
   .public-links { display: none; }
   .hamburger { display: flex; }
   .nav-cta { display: none; }
+  .nav-theme-toggle { display: none; }
+  .nav-theme-toggle-mobile { display: inline-flex; }
   .brand-tag { display: none; }
   .nav-inner { padding: 0 var(--s-4); gap: var(--s-3); }
   .app-footer-inner { flex-direction: column; align-items: flex-start; gap: 12px; }

@@ -5,6 +5,7 @@ import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
 import { API_BASE } from '@/utils';
 import { defaultRouteForUser } from '@/staffAccess';
+import ThemeToggle from '@/components/ThemeToggle.vue';
 
 useHead({
   title: 'Accedi · ComforTables',
@@ -71,6 +72,7 @@ const submit = async () => {
 <template>
   <div class="au-shell">
     <div class="au-pane">
+      <ThemeToggle compact class="au-theme-toggle" />
       <router-link to="/" class="au-brand">
         <span class="tv-brand-mark">C</span>
         <span class="brand-text">ComforTables</span>
@@ -210,6 +212,12 @@ const submit = async () => {
 
 <style scoped>
 .au-shell .brand-text { font-family: var(--f-sans); font-size: 18px; letter-spacing: -0.025em; font-weight: 600; }
+.au-theme-toggle {
+  position: absolute;
+  top: 28px;
+  right: 28px;
+  z-index: 2;
+}
 .au-spinner {
   width: 16px; height: 16px;
   border: 2px solid color-mix(in oklab, var(--ac-contrast) 30%, transparent);
@@ -218,4 +226,11 @@ const submit = async () => {
   animation: au-spin 650ms linear infinite;
 }
 @keyframes au-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 720px) {
+  .au-theme-toggle {
+    top: 16px;
+    right: 16px;
+  }
+}
 </style>

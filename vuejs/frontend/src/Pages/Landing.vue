@@ -937,7 +937,8 @@ onMounted(() => {
     opacity: 0.5;
   }
   .public-ops-panel {
-    display: none;
+    justify-self: start;
+    width: min(420px, 100%);
   }
   .public-takeaway-inner {
     grid-template-columns: 1fr;
@@ -965,16 +966,16 @@ onMounted(() => {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .public-ops-panel {
-    display: none;
+    justify-self: start;
   }
 }
 @media (max-width: 720px) {
   .public-hero { padding: 34px 0 42px; }
   .public-hero-scene-wrap {
     display: block;
-    inset: 2% -26% auto 18%;
-    height: 285px;
-    opacity: 0.28;
+    inset: 0 -34% auto 6%;
+    height: 340px;
+    opacity: 0.42;
   }
   .public-hero-scene-wrap::after {
     background:
@@ -1005,15 +1006,20 @@ onMounted(() => {
   .public-features,
   .public-plans { padding: 34px 0; }
   .public-card-scroll .public-container {
-    min-height: 0;
+    min-height: 570px;
+    perspective: 1000px;
   }
   .public-stack-card {
-    position: relative;
-    top: auto;
-    transform: none;
+    position: sticky;
+  }
+  .public-stack-card-a {
+    top: 72px;
+    transform: rotateX(2deg) rotateZ(-0.5deg);
   }
   .public-stack-card-b {
-    margin-top: 10px;
+    top: 94px;
+    margin-top: 18px;
+    transform: rotateX(1.4deg) rotateZ(0.6deg);
   }
   .public-features-grid,
   .public-problem-list,
@@ -1023,13 +1029,14 @@ onMounted(() => {
   }
   .public-order-stack { padding-top: 0; }
   .public-order-card {
-    position: relative;
-    top: auto;
-    margin-top: 10px;
-    transform: none;
+    position: sticky;
+    top: calc(72px + (var(--card-index) * 10px));
+    margin-top: -10px;
+    transform: rotateX(2deg) rotateZ(var(--card-tilt)) translateY(calc(var(--card-index) * 2px));
   }
+  .public-order-card:first-child { margin-top: 0; }
   .public-order-card:hover {
-    transform: none;
+    transform: rotateX(1.4deg) rotateZ(var(--card-tilt)) translateY(calc(var(--card-index) * 2px - 2px));
   }
   .public-order-head {
     grid-template-columns: 42px minmax(0, 1fr);

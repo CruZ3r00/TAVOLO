@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import ThemeToggle from '@/components/ThemeToggle.vue';
 
 const props = defineProps({
   title: { type: String, default: 'ComforTables' },
@@ -29,6 +30,7 @@ const avatarLetter = computed(() => {
       <strong>{{ title }}</strong>
     </div>
     <div class="tv-mobile-top-right">
+      <ThemeToggle compact />
       <router-link v-if="showReservations" to="/reservations" class="tv-mobile-top-btn" aria-label="Notifiche">
         <i class="bi bi-bell" aria-hidden="true"></i>
         <span v-if="hasNotifications" class="tv-mobile-top-dot" aria-hidden="true"></span>

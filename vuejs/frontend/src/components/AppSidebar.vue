@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { STAFF_ROLES, canSeeNavItem, staffRole } from '@/staffAccess';
+import ThemeToggle from '@/components/ThemeToggle.vue';
 
 const props = defineProps({
   username: { type: String, default: '' },
@@ -99,6 +100,9 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
     </router-link>
 
     <div v-if="sysItems.length > 0" class="md-side-section mt">SISTEMA</div>
+    <div class="md-side-theme">
+      <ThemeToggle />
+    </div>
     <router-link
       v-for="it in sysItems"
       :key="it.id"
@@ -149,6 +153,44 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
 }
 .md-side-user.active { background: var(--bg-sunk, var(--bg-2)); border-radius: 8px; }
 .md-side-user.active .md-side-user-cta { color: var(--ac); }
+.md-side-theme {
+  padding: 4px 8px 8px;
+}
+.md-side-theme :deep(.theme-toggle) {
+  width: 100%;
+  justify-content: space-between;
+}
 :deep(.md-side-item.danger) { color: var(--danger); }
 :deep(.md-side-item.danger i) { color: var(--danger); }
+
+@media (min-width: 861px) and (max-width: 1199px) {
+  .md-side-theme {
+    display: flex;
+    justify-content: center;
+    padding: 6px 4px 10px;
+  }
+  .md-side-theme :deep(.theme-toggle) {
+    width: 40px;
+    padding: 0;
+  }
+  .md-side-theme :deep(.theme-toggle-label) {
+    display: none;
+  }
+  .md-side-theme :deep(.theme-toggle-track) {
+    width: 28px;
+  }
+  .md-side-theme :deep(.theme-toggle-thumb) {
+    display: none;
+  }
+  .md-side-theme :deep(.theme-toggle-track i:first-child) {
+    display: none;
+  }
+  .md-side-theme :deep(.theme-toggle:not(.is-dark) .theme-toggle-track i:first-child) {
+    display: block;
+    grid-column: 1 / -1;
+  }
+  .md-side-theme :deep(.theme-toggle:not(.is-dark) .theme-toggle-track i:nth-child(2)) {
+    display: none;
+  }
+}
 </style>

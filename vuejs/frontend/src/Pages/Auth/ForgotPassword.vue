@@ -70,8 +70,8 @@ const submit = handleSubmit(async () => {
 <template>
   <AuthenticationCard>
     <router-link to="/" class="auth-brand">
-      <div class="auth-brand-icon" aria-hidden="true">T</div>
-      <span class="auth-brand-name">Tavolo</span>
+      <div class="auth-brand-icon" aria-hidden="true">C</div>
+      <span class="auth-brand-name">ComforTables</span>
     </router-link>
 
     <p class="auth-overline">Recupero</p>
