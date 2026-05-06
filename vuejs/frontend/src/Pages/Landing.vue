@@ -16,10 +16,10 @@ const supportsWebGL = () => {
 };
 
 const serviceProblems = [
-  'ordini che non arrivano al reparto giusto',
-  'confusione tra sala e cucina',
-  'richieste take away gestite fuori dal flusso',
-  'stati non chiari: in preparazione, pronto, servito',
+  { icon: 'bi-signpost-split', title: 'Ordini smistati', body: 'Ogni comanda arriva al reparto giusto.' },
+  { icon: 'bi-chat-square-text', title: 'Meno passaggi a voce', body: 'Sala e cucina leggono lo stesso stato.' },
+  { icon: 'bi-bag-check', title: 'Asporto nel flusso', body: 'Take away da telefono e sito nella stessa coda.' },
+  { icon: 'bi-activity', title: 'Stati chiari', body: 'Preso, in preparazione, pronto, servito.' },
 ];
 
 const flowSteps = [
@@ -192,9 +192,9 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="public-problem public-context" aria-labelledby="problem-title">
+      <section class="public-card-scroll" aria-labelledby="problem-title">
         <div class="public-container">
-          <div class="public-context-inner">
+          <article class="public-context-inner public-stack-card public-stack-card-a">
             <div class="public-section-copy">
               <div class="overline">Dal caos al controllo</div>
               <h2 id="problem-title">Meno confusione. Più controllo.</h2>
@@ -204,18 +204,15 @@ onMounted(() => {
               </p>
             </div>
             <ul class="public-problem-list">
-              <li v-for="item in serviceProblems" :key="item">
-                <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
-                <span>{{ item }}</span>
+              <li v-for="item in serviceProblems" :key="item.title">
+                <i :class="['bi', item.icon]" aria-hidden="true"></i>
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.body }}</span>
               </li>
             </ul>
-          </div>
-        </div>
-      </section>
+          </article>
 
-      <section class="public-takeaway" aria-labelledby="takeaway-title">
-        <div class="public-container">
-          <div class="public-takeaway-inner">
+          <article class="public-takeaway-inner public-stack-card public-stack-card-b" aria-labelledby="takeaway-title">
             <div class="public-section-copy">
               <div class="overline">Take away integrato</div>
               <h2 id="takeaway-title">Ordini da telefono e sito, senza una seconda gestione.</h2>
@@ -246,6 +243,24 @@ onMounted(() => {
                 <span>Ritiro</span>
               </div>
             </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="public-features" aria-labelledby="features-title">
+        <div class="public-container">
+          <div class="public-section-h">
+            <div class="overline">Funzionalità operative</div>
+            <h2 id="features-title">Tutto quello che serve durante il servizio.</h2>
+          </div>
+          <div class="public-features-grid">
+            <article v-for="feature in features" :key="feature.title" class="public-feature">
+              <div class="public-feature-icon">
+                <i :class="['bi', feature.icon]" aria-hidden="true"></i>
+              </div>
+              <h3>{{ feature.title }}</h3>
+              <p>{{ feature.body }}</p>
+            </article>
           </div>
         </div>
       </section>
@@ -281,24 +296,6 @@ onMounted(() => {
                   <span>{{ item }}</span>
                 </li>
               </ul>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="public-features" aria-labelledby="features-title">
-        <div class="public-container">
-          <div class="public-section-h">
-            <div class="overline">Funzionalità operative</div>
-            <h2 id="features-title">Tutto quello che serve durante il servizio.</h2>
-          </div>
-          <div class="public-features-grid">
-            <article v-for="feature in features" :key="feature.title" class="public-feature">
-              <div class="public-feature-icon">
-                <i :class="['bi', feature.icon]" aria-hidden="true"></i>
-              </div>
-              <h3>{{ feature.title }}</h3>
-              <p>{{ feature.body }}</p>
             </article>
           </div>
         </div>
@@ -539,19 +536,22 @@ onMounted(() => {
   font-size: 12px;
 }
 
-.public-problem,
-.public-takeaway,
+.public-card-scroll,
 .public-flow,
 .public-plans {
-  padding: 50px 0;
+  padding: 36px 0 42px;
   background: var(--bg);
 }
 .public-features {
-  padding: 50px 0;
+  padding: 42px 0;
   background: var(--bg-sunk, var(--bg-2));
 }
+.public-card-scroll .public-container {
+  min-height: 470px;
+  perspective: 1200px;
+}
 
-.public-section-h { max-width: 760px; margin: 0 auto 30px; text-align: center; }
+.public-section-h { max-width: 760px; margin: 0 auto 24px; text-align: center; }
 .public-section-h h2,
 .public-section-copy h2 {
   font-size: 34px; line-height: 1.12;
@@ -573,21 +573,33 @@ onMounted(() => {
   gap: 30px;
   align-items: center;
 }
-.public-context {
-  padding-top: 42px;
-  padding-bottom: 42px;
-}
 .public-context-inner {
-  padding: 24px;
+  padding: 20px 22px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--paper);
-  box-shadow: var(--shadow-xs);
+  box-shadow: 0 18px 48px -34px rgb(0 0 0 / 0.3), var(--shadow-xs);
 }
-.public-context .public-section-copy h2 {
-  font-size: 30px;
+.public-stack-card {
+  position: sticky;
+  transform-origin: center top;
+  transition: transform var(--dur), box-shadow var(--dur);
 }
-.public-context .public-section-copy p {
+.public-stack-card-a {
+  top: 84px;
+  z-index: 1;
+  transform: rotateX(2.2deg) rotateZ(-0.6deg);
+}
+.public-stack-card-b {
+  top: 114px;
+  z-index: 2;
+  margin-top: 28px;
+  transform: rotateX(1.6deg) rotateZ(0.7deg);
+}
+.public-stack-card-a .public-section-copy h2 {
+  font-size: 28px;
+}
+.public-stack-card-a .public-section-copy p {
   margin-top: 10px;
 }
 .public-section-copy { max-width: 520px; }
@@ -596,31 +608,53 @@ onMounted(() => {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 9px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 .public-problem-list li {
-  display: flex;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 2px 10px;
   align-items: center;
-  gap: 12px;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 13px 16px;
+  padding: 12px;
   color: var(--ink-2);
   box-shadow: var(--shadow-xs);
 }
-.public-problem-list i { color: var(--warn, var(--ac)); font-size: 18px; }
+.public-problem-list i {
+  grid-row: span 2;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--ac-soft);
+  color: var(--ac);
+  font-size: 16px;
+}
+.public-problem-list strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.public-problem-list span {
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.35;
+}
 
 .public-takeaway-inner {
   display: grid;
   grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1fr);
-  gap: 28px;
+  gap: 22px;
   align-items: center;
-  padding: 28px;
+  padding: 22px;
   border: 1px solid var(--line);
   border-radius: 22px;
   background: var(--paper);
-  box-shadow: var(--shadow-xs);
+  box-shadow: 0 22px 58px -36px rgb(0 0 0 / 0.34), var(--shadow-xs);
 }
 .public-takeaway-flow {
   display: grid;
@@ -628,13 +662,13 @@ onMounted(() => {
   gap: 8px;
 }
 .public-takeaway-flow div {
-  min-height: 92px;
+  min-height: 76px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--bg-sunk);
@@ -652,7 +686,7 @@ onMounted(() => {
 }
 .public-takeaway-flow i {
   color: var(--ac);
-  font-size: 21px;
+  font-size: 19px;
 }
 .public-takeaway-flow .is-main i { color: var(--paper); }
 
@@ -947,12 +981,23 @@ onMounted(() => {
   .public-hero-metrics dd {
     font-size: 11.5px;
   }
-  .public-problem,
-  .public-takeaway,
+  .public-card-scroll,
   .public-flow,
   .public-features,
-  .public-plans { padding: 40px 0; }
+  .public-plans { padding: 34px 0; }
+  .public-card-scroll .public-container {
+    min-height: 0;
+  }
+  .public-stack-card {
+    position: relative;
+    top: auto;
+    transform: none;
+  }
+  .public-stack-card-b {
+    margin-top: 10px;
+  }
   .public-features-grid,
+  .public-problem-list,
   .public-takeaway-flow { grid-template-columns: 1fr; }
   .public-takeaway-flow div.is-main {
     transform: none;
@@ -985,6 +1030,17 @@ onMounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .public-card-scroll .public-container {
+    min-height: 0;
+  }
+  .public-stack-card {
+    position: relative;
+    top: auto;
+    transform: none;
+  }
+  .public-stack-card-b {
+    margin-top: 10px;
+  }
   .public-order-card {
     position: relative;
     top: auto;
