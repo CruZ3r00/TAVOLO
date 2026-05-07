@@ -5,6 +5,16 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 const LandingHeroScene = defineAsyncComponent(() => import('@/components/LandingHeroScene.vue'));
 
 const canUseHeroScene = ref(false);
+const canUseFeatureFlipDeck = ref(false);
+
+const LandingFeatureFlipDeck = defineAsyncComponent({
+  loader: () => import('@/components/LandingFeatureFlipDeck.vue'),
+  onError(error, _retry, fail) {
+    console.warn('Landing feature deck unavailable', error);
+    canUseFeatureFlipDeck.value = false;
+    fail(error);
+  },
+});
 
 const supportsWebGL = () => {
   if (typeof window === 'undefined') return false;
@@ -121,6 +131,7 @@ onMounted(() => {
   nextTick(() => { document.title = 'COMFORTABLES · Gestionale ristorante in tempo reale'; });
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   canUseHeroScene.value = !prefersReducedMotion && supportsWebGL();
+  canUseFeatureFlipDeck.value = canUseHeroScene.value;
 });
 </script>
 
@@ -254,7 +265,12 @@ onMounted(() => {
             <div class="overline">Funzionalità operative</div>
             <h2 id="features-title">Tutto quello che serve durante il servizio.</h2>
           </div>
-          <div class="public-features-grid">
+          <LandingFeatureFlipDeck
+            v-if="canUseFeatureFlipDeck"
+            :features="features"
+            @scene-error="canUseFeatureFlipDeck = false"
+          />
+          <div v-else class="public-features-grid">
             <article v-for="feature in features" :key="feature.title" class="public-feature">
               <div class="public-feature-icon">
                 <i :class="['bi', feature.icon]" aria-hidden="true"></i>

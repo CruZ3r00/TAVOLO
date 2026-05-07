@@ -4,11 +4,9 @@ import ThemeToggle from '@/components/ThemeToggle.vue';
 
 const props = defineProps({
   title: { type: String, default: 'ComforTables' },
-  hasNotifications: { type: Boolean, default: false },
   username: { type: String, default: '' },
   restaurantName: { type: String, default: '' },
   showMenuButton: { type: Boolean, default: false },
-  showReservations: { type: Boolean, default: false },
   showProfile: { type: Boolean, default: false },
 });
 const emit = defineEmits(['menu']);
@@ -31,10 +29,6 @@ const avatarLetter = computed(() => {
     </div>
     <div class="tv-mobile-top-right">
       <ThemeToggle compact />
-      <router-link v-if="showReservations" to="/reservations" class="tv-mobile-top-btn" aria-label="Notifiche">
-        <i class="bi bi-bell" aria-hidden="true"></i>
-        <span v-if="hasNotifications" class="tv-mobile-top-dot" aria-hidden="true"></span>
-      </router-link>
       <router-link v-if="showProfile" to="/profile/show" class="tv-mobile-top-avatar" aria-label="Profilo">
         <span>{{ avatarLetter }}</span>
       </router-link>
