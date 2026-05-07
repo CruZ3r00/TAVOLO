@@ -1,21 +1,31 @@
--- Category routing patch for staff departments.
---
--- Execute on Supabase/Postgres BEFORE deploying the Strapi patch when possible.
--- It is safe to run more than once.
---
--- Rule:
--- - categories are classified automatically only when first seen;
--- - if the classified department is active and unblocked, use it;
--- - otherwise route to cucina;
--- - rows with locked = true are treated as manual choices and are not changed.
+'use strict';
 
+/**
+ * Patch v1 della funzione `ensure_restaurant_category_routing`:
+ *   - le categorie sono classificate automaticamente solo alla prima vista;
+ *   - se il dipartimento classificato è attivo e non bloccato, viene usato;
+ *   - altrimenti il routing fallback è cucina;
+ *   - le righe con `locked = true` sono scelte manuali e non vengono toccate.
+ *
+ * Inoltre forza il re-routing delle righe NON locked verso il dipartimento
+ * disponibile più appropriato.
+ *
+ * Idempotente: CREATE OR REPLACE FUNCTION + UPDATE condizionato.
+ *
+ * Storia: prima dell'introduzione di questa migration, lo script viveva
+ * come `docs/sql/category_routing_active_staff_patch.sql`.
+ */
+
+module.exports = {
+  async up(knex) {
+    await knex.raw(`
 create or replace function public.ensure_restaurant_category_routing(
   p_owner_id integer,
   p_category text
 )
 returns void
 language plpgsql
-as $$
+as $fn$
 declare
   v_category text := nullif(btrim(coalesce(p_category, '')), '');
   v_role text;
@@ -47,7 +57,7 @@ begin
   values (p_owner_id, v_category, v_role)
   on conflict (owner_id, category_key) do nothing;
 end;
-$$;
+$fn$;
 
 with desired as (
   select
@@ -74,3 +84,10 @@ set staff_role = desired.staff_role,
 from desired
 where desired.id = routing.id
   and routing.staff_role is distinct from desired.staff_role;
+    `);
+  },
+
+  async down() {
+    // Irreversibile.
+  },
+};

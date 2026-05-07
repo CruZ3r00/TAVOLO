@@ -1,5 +1,8 @@
 'use strict';
 
-const { factories } = require('@strapi/strapi');
-
-module.exports = factories.createCoreController('api::pos-pairing-token.pos-pairing-token');
+/**
+ * Internal-only content-type. Nessuna rotta REST esposta (vedi routes/).
+ * Token single-use generati da `controllers/pos-device.createPairingToken`
+ * e consumati da `controllers/pos-device.registerByToken`.
+ */
+module.exports = {};

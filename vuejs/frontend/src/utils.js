@@ -58,29 +58,6 @@ export const fetchMenuElements = async (id) => {
 }
 
 /**
- * Recupera il menu pubblico di un ristorante tramite la nuova API pubblica.
- * GET /api/menus/public/:userDocumentId
- */
-export const fetchPublicMenu = async (userDocumentId) => {
-    try {
-        const response = await fetch(`${API_BASE}/api/menus/public/${userDocumentId}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
-        if (response.ok) {
-            const data = await response.json();
-            return data;
-        }
-        return null;
-    } catch (error) {
-        console.error('Errore nel recupero del menu pubblico:', error);
-        return null;
-    }
-};
-
-/**
  * URL base delle API Strapi
  */
 export const API_BASE = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
@@ -310,10 +287,6 @@ const buildReservationError = (resp, payload) => {
     err.details = payload?.error?.details || null;
     return err;
 };
-
-export const isSubscriptionRequiredError = (err) => (
-    err?.status === 402 || err?.code === 'SUBSCRIPTION_REQUIRED'
-);
 
 /**
  * Lista paginata delle prenotazioni del ristoratore corrente.
@@ -624,22 +597,6 @@ export const openOrder = async (body, token) => {
  */
 export const fetchOrder = async (documentId, token) => {
     const resp = await fetch(`${API_BASE}/api/orders/${documentId}`, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-        },
-    });
-    const payload = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw buildOrderError(resp, payload);
-    return payload.data;
-};
-
-/**
- * Totale derivato in tempo reale.
- */
-export const fetchOrderTotal = async (documentId, token) => {
-    const resp = await fetch(`${API_BASE}/api/orders/${documentId}/total`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',

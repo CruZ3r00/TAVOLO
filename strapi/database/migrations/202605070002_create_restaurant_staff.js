@@ -1,14 +1,29 @@
--- Staff accounts and category routing for restaurant operations.
---
--- Execute on Supabase/Postgres BEFORE deploying the Strapi patch that calls
--- public.sync_owner_staff_accounts(owner_id).
---
--- The paying account remains public.up_users (owner). Staff users never own a
--- Stripe customer/subscription: they are normal Strapi users linked to the
--- owner through Strapi's fk_owner relation table and public.restaurant_staff.
--- restaurant_staff.active is the owner preference. up_users.blocked is derived
--- from owner preference plus the current plan/subscription.
+'use strict';
 
+/**
+ * Crea l'infrastruttura DB per il sistema staff multi-utente:
+ *   - tabella `restaurant_staff` (link owner ↔ staff users)
+ *   - tabella `restaurant_category_routing` (smistamento categoria → reparto)
+ *   - funzioni PG: is_active_tavolo_subscription, staff_username_for_role,
+ *     synthetic_staff_email, ensure_owner_role_link, copy_owner_auth_role_link,
+ *     upsert_staff_account, sync_owner_staff_accounts, *_trigger,
+ *     classify_staff_role_for_category, ensure_restaurant_category_routing,
+ *     route_category_from_element_link, route_category_from_element_update,
+ *     set_restaurant_staff_updated_at
+ *   - trigger su up_users (insert/update subscription)
+ *   - trigger su elements/elements_fk_user_lnk per category routing
+ *   - backfill iniziale per owner/staff esistenti
+ *
+ * Idempotente: tutti i CREATE TABLE/FUNCTION/TRIGGER usano IF NOT EXISTS
+ * o OR REPLACE. Il backfill usa ON CONFLICT DO UPDATE/NOTHING.
+ *
+ * Storia: prima dell'introduzione di questa migration, lo script viveva
+ * come `docs/sql/restaurant_staff.sql` da applicare manualmente al DB.
+ */
+
+module.exports = {
+  async up(knex) {
+    await knex.raw(`
 create extension if not exists pgcrypto;
 
 create table if not exists public.restaurant_staff (
@@ -24,12 +39,12 @@ create table if not exists public.restaurant_staff (
   constraint restaurant_staff_owner_user_unique unique (owner_id, user_id)
 );
 
-do $$
+do $do$
 begin
   alter table public.restaurant_staff drop constraint if exists restaurant_staff_role_check;
   alter table public.restaurant_staff add constraint restaurant_staff_role_check
     check (role in ('gestione', 'cameriere', 'cucina', 'bar', 'pizzeria', 'cucina_sg'));
-end $$;
+end $do$;
 
 drop index if exists public.restaurant_staff_owner_role_unique_idx;
 
@@ -61,12 +76,12 @@ create index if not exists restaurant_category_routing_owner_role_idx
 create or replace function public.set_restaurant_staff_updated_at()
 returns trigger
 language plpgsql
-as $$
+as $fn$
 begin
   new.updated_at = now();
   return new;
 end;
-$$;
+$fn$;
 
 drop trigger if exists restaurant_staff_set_updated_at on public.restaurant_staff;
 create trigger restaurant_staff_set_updated_at
@@ -89,20 +104,20 @@ create or replace function public.is_active_tavolo_subscription(
 returns boolean
 language sql
 stable
-as $$
+as $fn$
   select coalesce(p_status, '') in ('active', 'trialing')
     and case
       when p_period_end is not null then p_period_end >= now()
       when p_end_subscription is not null then p_end_subscription >= current_date
       else true
     end;
-$$;
+$fn$;
 
 create or replace function public.staff_username_for_role(p_owner_id integer, p_owner_username text, p_role text)
 returns text
 language plpgsql
 stable
-as $$
+as $fn$
 declare
   v_restaurant_name text;
   v_base text;
@@ -133,20 +148,20 @@ begin
     end
   );
 end;
-$$;
+$fn$;
 
 create or replace function public.synthetic_staff_email(p_owner_id integer, p_role text)
 returns text
 language sql
 immutable
-as $$
+as $fn$
   select concat('staff+', p_owner_id::text, '.', replace(p_role, '_', ''), '@staff.local.tavolo');
-$$;
+$fn$;
 
 create or replace function public.ensure_owner_role_link(p_staff_id integer, p_owner_id integer)
 returns void
 language plpgsql
-as $$
+as $fn$
 begin
   if to_regclass('public.up_users_fk_owner_lnk') is not null then
     insert into public.up_users_fk_owner_lnk (user_id, inv_user_id)
@@ -154,12 +169,12 @@ begin
     on conflict do nothing;
   end if;
 end;
-$$;
+$fn$;
 
 create or replace function public.copy_owner_auth_role_link(p_staff_id integer, p_owner_id integer)
 returns void
 language plpgsql
-as $$
+as $fn$
 declare
   v_role_id integer;
 begin
@@ -178,7 +193,7 @@ begin
     on conflict do nothing;
   end if;
 end;
-$$;
+$fn$;
 
 create or replace function public.upsert_staff_account(
   p_owner public.up_users,
@@ -187,7 +202,7 @@ create or replace function public.upsert_staff_account(
 )
 returns integer
 language plpgsql
-as $$
+as $fn$
 declare
   v_staff_id integer;
   v_username text;
@@ -297,12 +312,12 @@ begin
 
   return v_staff_id;
 end;
-$$;
+$fn$;
 
 create or replace function public.sync_owner_staff_accounts(p_owner_id integer)
 returns void
 language plpgsql
-as $$
+as $fn$
 declare
   v_owner public.up_users%rowtype;
   v_has_subscription boolean;
@@ -369,19 +384,19 @@ begin
 
   end if;
 end;
-$$;
+$fn$;
 
 create or replace function public.sync_owner_staff_accounts_trigger()
 returns trigger
 language plpgsql
-as $$
+as $fn$
 begin
   if coalesce(new.staff_role, 'owner') = 'owner' then
     perform public.sync_owner_staff_accounts(new.id);
   end if;
   return new;
 end;
-$$;
+$fn$;
 
 drop trigger if exists up_users_sync_staff_after_insert on public.up_users;
 create trigger up_users_sync_staff_after_insert
@@ -399,15 +414,15 @@ create or replace function public.classify_staff_role_for_category(p_category te
 returns text
 language plpgsql
 immutable
-as $$
+as $fn$
 declare
   v text := lower(coalesce(p_category, ''));
 begin
-  if v ~ '(bevande|bibite|drink|cocktail|vino|vini|birra|birre|amari|liquori|distillati|aperitivi|\ybar\y|caffe|caffè|acqua|soft drink|analcolic)' then
+  if v ~ '(bevande|bibite|drink|cocktail|vino|vini|birra|birre|amari|liquori|distillati|aperitivi|\\ybar\\y|caffe|caffè|acqua|soft drink|analcolic)' then
     return 'bar';
   end if;
 
-  if v ~ '(senza glutine|gluten free|gluten-free|\ysg\y|celiac|celiach)' then
+  if v ~ '(senza glutine|gluten free|gluten-free|\\ysg\\y|celiac|celiach)' then
     return 'cucina_sg';
   end if;
 
@@ -417,7 +432,7 @@ begin
 
   return 'cucina';
 end;
-$$;
+$fn$;
 
 create or replace function public.ensure_restaurant_category_routing(
   p_owner_id integer,
@@ -425,7 +440,7 @@ create or replace function public.ensure_restaurant_category_routing(
 )
 returns void
 language plpgsql
-as $$
+as $fn$
 declare
   v_category text := nullif(btrim(coalesce(p_category, '')), '');
   v_role text;
@@ -457,12 +472,12 @@ begin
   values (p_owner_id, v_category, v_role)
   on conflict (owner_id, category_key) do nothing;
 end;
-$$;
+$fn$;
 
 create or replace function public.route_category_from_element_link()
 returns trigger
 language plpgsql
-as $$
+as $fn$
 declare
   v_category text;
 begin
@@ -473,12 +488,12 @@ begin
   perform public.ensure_restaurant_category_routing(new.user_id, v_category);
   return new;
 end;
-$$;
+$fn$;
 
 create or replace function public.route_category_from_element_update()
 returns trigger
 language plpgsql
-as $$
+as $fn$
 declare
   v_owner_id integer;
 begin
@@ -496,9 +511,9 @@ begin
   perform public.ensure_restaurant_category_routing(v_owner_id, new.category);
   return new;
 end;
-$$;
+$fn$;
 
-do $$
+do $do$
 begin
   if to_regclass('public.elements_fk_user_lnk') is not null then
     drop trigger if exists elements_category_routing_after_link on public.elements_fk_user_lnk;
@@ -506,14 +521,16 @@ begin
     after insert on public.elements_fk_user_lnk
     for each row execute function public.route_category_from_element_link();
   end if;
-end $$;
+end $do$;
 
 drop trigger if exists elements_category_routing_after_update on public.elements;
 create trigger elements_category_routing_after_update
 after update of category on public.elements
 for each row execute function public.route_category_from_element_update();
+    `);
 
--- Backfill existing staff mappings.
+    // Backfill staff and routing (no-op se DB vuoto, idempotente)
+    await knex.raw(`
 insert into public.restaurant_staff (owner_id, user_id, role, display_name)
 select owner.id, staff.id, staff.staff_role, staff.username
 from public.up_users staff
@@ -525,7 +542,6 @@ set role = excluded.role,
     display_name = excluded.display_name,
     active = true;
 
--- Backfill routing for existing element categories.
 insert into public.restaurant_category_routing (owner_id, category, staff_role)
 select distinct lnk.user_id, el.category, public.classify_staff_role_for_category(el.category)
 from public.elements el
@@ -533,8 +549,7 @@ join public.elements_fk_user_lnk lnk on lnk.element_id = el.id
 where nullif(btrim(coalesce(el.category, '')), '') is not null
 on conflict (owner_id, category_key) do nothing;
 
--- Reconcile all current owners at the end of the migration.
-do $$
+do $do$
 declare
   v_owner_id integer;
 begin
@@ -543,4 +558,11 @@ begin
   loop
     perform public.sync_owner_staff_accounts(v_owner_id);
   end loop;
-end $$;
+end $do$;
+    `);
+  },
+
+  async down() {
+    // Irreversibile in sicurezza: il sistema staff è core, non droppiamo via down().
+  },
+};

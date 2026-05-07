@@ -1,21 +1,33 @@
--- Persistent category routing patch.
---
--- Safe to run multiple times on Supabase/Postgres.
---
--- Rules:
--- - the waiter department is always active while the owner subscription is valid;
--- - new categories are classified automatically only on first sight;
--- - manual owner assignments set locked = true and are never overwritten here;
--- - Starter/Essenziale routing override is enforced by the Strapi API at read time:
---   all order items are treated as Cucina regardless of saved category routing.
+'use strict';
 
+/**
+ * Patch v2 (definitiva): `ensure_restaurant_category_routing` ora insert-only
+ * (le assegnazioni manuali con `locked = true` non vengono mai sovrascritte),
+ * e `sync_owner_staff_accounts` aggiornata per:
+ *   - cameriere sempre attivo se subscription valida;
+ *   - gestione attiva solo se piano pro;
+ *   - bar/pizzeria/cucina_sg attivi solo se piano pro.
+ *
+ * L'override "starter → tutto in cucina" viene applicato lato API a read-time
+ * (vedi `strapi/src/utils/category-routing.js`), non in DB.
+ *
+ * Idempotente: CREATE OR REPLACE FUNCTION + reconcile finale via
+ * sync_owner_staff_accounts su tutti gli owner esistenti.
+ *
+ * Storia: prima dell'introduzione di questa migration, lo script viveva
+ * come `docs/sql/category_routing_manual_assignments_patch.sql`.
+ */
+
+module.exports = {
+  async up(knex) {
+    await knex.raw(`
 create or replace function public.ensure_restaurant_category_routing(
   p_owner_id integer,
   p_category text
 )
 returns void
 language plpgsql
-as $$
+as $fn$
 declare
   v_category text := nullif(btrim(coalesce(p_category, '')), '');
   v_role text;
@@ -30,12 +42,12 @@ begin
   values (p_owner_id, v_category, v_role, false)
   on conflict (owner_id, category_key) do nothing;
 end;
-$$;
+$fn$;
 
 create or replace function public.sync_owner_staff_accounts(p_owner_id integer)
 returns void
 language plpgsql
-as $$
+as $fn$
 declare
   v_owner public.up_users%rowtype;
   v_has_subscription boolean;
@@ -113,9 +125,9 @@ begin
       and rs.user_id = staff.id;
   end if;
 end;
-$$;
+$fn$;
 
-do $$
+do $do$
 declare
   v_owner_id integer;
 begin
@@ -124,4 +136,11 @@ begin
   loop
     perform public.sync_owner_staff_accounts(v_owner_id);
   end loop;
-end $$;
+end $do$;
+    `);
+  },
+
+  async down() {
+    // Irreversibile.
+  },
+};

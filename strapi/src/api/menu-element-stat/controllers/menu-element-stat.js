@@ -1,5 +1,7 @@
 'use strict';
 
-const { createCoreController } = require('@strapi/strapi').factories;
-
-module.exports = createCoreController('api::menu-element-stat.menu-element-stat');
+/**
+ * Internal-only content-type. Nessuna rotta REST esposta (vedi routes/).
+ * I dati sono scritti/letti da `services/stats.js` via `strapi.db.query`.
+ */
+module.exports = {};

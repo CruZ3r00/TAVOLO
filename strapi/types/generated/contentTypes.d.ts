@@ -1001,65 +1001,6 @@ export interface ApiPosPairingTokenPosPairingToken
   };
 }
 
-export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
-  collectionName: 'preferences';
-  info: {
-    description: '';
-    displayName: 'Preferences';
-    pluralName: 'preferences';
-    singularName: 'preference';
-  };
-  options: {
-    draftAndPublish: true;
-  };
-  attributes: {
-    background: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMaxLength<{
-        maxLength: 7;
-        minLength: 7;
-      }> &
-      Schema.Attribute.DefaultTo<'#FFFFFF'>;
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    details: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMaxLength<{
-        maxLength: 7;
-        minLength: 7;
-      }> &
-      Schema.Attribute.DefaultTo<'#111111'>;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::preference.preference'
-    > &
-      Schema.Attribute.Private;
-    primary_color: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMaxLength<{
-        maxLength: 7;
-        minLength: 7;
-      }> &
-      Schema.Attribute.DefaultTo<'#1C1C1C'>;
-    publishedAt: Schema.Attribute.DateTime;
-    second_color: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMaxLength<{
-        maxLength: 7;
-        minLength: 7;
-      }> &
-      Schema.Attribute.DefaultTo<'#E0E0E0'>;
-    theme: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.DefaultTo<'classic'>;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-  };
-}
-
 export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
   collectionName: 'reservations';
   info: {
@@ -1797,10 +1738,6 @@ export interface PluginUsersPermissionsUser
       'manyToOne',
       'plugin::users-permissions.user'
     >;
-    fk_prefs: Schema.Attribute.Relation<
-      'oneToOne',
-      'api::preference.preference'
-    >;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1885,7 +1822,6 @@ declare module '@strapi/strapi' {
       'api::pos-device.pos-device': ApiPosDevicePosDevice;
       'api::pos-job.pos-job': ApiPosJobPosJob;
       'api::pos-pairing-token.pos-pairing-token': ApiPosPairingTokenPosPairingToken;
-      'api::preference.preference': ApiPreferencePreference;
       'api::reservation.reservation': ApiReservationReservation;
       'api::restaurant-daily-stat.restaurant-daily-stat': ApiRestaurantDailyStatRestaurantDailyStat;
       'api::table.table': ApiTableTable;
