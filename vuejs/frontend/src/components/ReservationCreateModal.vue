@@ -12,7 +12,7 @@ const emit = defineEmits(['close', 'created']);
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-const form = ref({
+const reservationForm = ref({
     customer_name: '',
     phone: '',
     email: '',
@@ -28,7 +28,7 @@ const errorMessage = ref('');
 const fieldErrors = ref({});
 
 const reset = () => {
-    form.value = {
+    reservationForm.value = {
         customer_name: '',
         phone: '',
         email: '',
@@ -50,23 +50,23 @@ const minDate = computed(() => todayISO());
 
 const validate = () => {
     const errs = {};
-    if (!form.value.customer_name.trim()) errs.customer_name = 'Inserisci il nome.';
-    if (!form.value.phone.trim()) errs.phone = 'Inserisci il telefono.';
-    if (!form.value.date) errs.date = 'Seleziona la data.';
-    if (!form.value.time) errs.time = 'Seleziona l\'ora.';
-    const g = parseInt(form.value.guests, 10);
+    if (!reservationForm.value.customer_name.trim()) errs.customer_name = 'Inserisci il nome.';
+    if (!reservationForm.value.phone.trim()) errs.phone = 'Inserisci il telefono.';
+    if (!reservationForm.value.date) errs.date = 'Seleziona la data.';
+    if (!reservationForm.value.time) errs.time = 'Seleziona l\'ora.';
+    const g = parseInt(reservationForm.value.guests, 10);
     if (!Number.isFinite(g) || g < 1) errs.guests = 'Inserisci un numero valido (min 1).';
     if (g > 50) errs.guests = 'Massimo 50 persone per prenotazione.';
-    if (form.value.date) {
+    if (reservationForm.value.date) {
         // Confronto a livello di giorno — accetta oggi
-        const selected = new Date(`${form.value.date}T00:00:00`);
+        const selected = new Date(`${reservationForm.value.date}T00:00:00`);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         if (selected < today) errs.date = 'La data non può essere nel passato.';
     }
     // Verifica combinazione data+ora futura (margine lasciato al backend >15min)
-    if (form.value.date && form.value.time) {
-        const combined = new Date(`${form.value.date}T${form.value.time}`);
+    if (reservationForm.value.date && reservationForm.value.time) {
+        const combined = new Date(`${reservationForm.value.date}T${reservationForm.value.time}`);
         if (combined.getTime() < Date.now()) {
             errs.time = 'L\'orario selezionato è nel passato.';
         }
@@ -81,14 +81,14 @@ const submit = async () => {
     submitting.value = true;
     try {
         const payload = {
-            customer_name: form.value.customer_name.trim(),
-            phone: form.value.phone.trim(),
-            customer_email: form.value.email.trim() || undefined,
-            date: form.value.date,
-            time: form.value.time.length === 5 ? `${form.value.time}:00` : form.value.time,
-            number_of_people: parseInt(form.value.guests, 10),
-            notes: form.value.notes.trim() || null,
-            status: form.value.status,
+            customer_name: reservationForm.value.customer_name.trim(),
+            phone: reservationForm.value.phone.trim(),
+            customer_email: reservationForm.value.email.trim() || undefined,
+            date: reservationForm.value.date,
+            time: reservationForm.value.time.length === 5 ? `${reservationForm.value.time}:00` : reservationForm.value.time,
+            number_of_people: parseInt(reservationForm.value.guests, 10),
+            notes: reservationForm.value.notes.trim() || null,
+            status: reservationForm.value.status,
         };
         const created = await createReservation(payload, props.token);
         emit('created', created);
@@ -128,7 +128,7 @@ const onClose = () => {
                     <label class="ds-label" for="res-name">Nome cliente *</label>
                     <input
                         id="res-name"
-                        v-model="form.customer_name"
+                        v-model="reservationForm.customer_name"
                         type="text"
                         class="ds-input"
                         placeholder="Es. Mario Rossi"
@@ -143,7 +143,7 @@ const onClose = () => {
                         <label class="ds-label" for="res-phone">Telefono *</label>
                         <input
                             id="res-phone"
-                            v-model="form.phone"
+                            v-model="reservationForm.phone"
                             type="tel"
                             class="ds-input"
                             placeholder="+39 320 1234567"
@@ -156,7 +156,7 @@ const onClose = () => {
                         <label class="ds-label" for="res-email">Email</label>
                         <input
                             id="res-email"
-                            v-model="form.email"
+                            v-model="reservationForm.email"
                             type="email"
                             class="ds-input"
                             placeholder="mario@esempio.com"
@@ -169,7 +169,7 @@ const onClose = () => {
                         <label class="ds-label" for="res-date">Data *</label>
                         <input
                             id="res-date"
-                            v-model="form.date"
+                            v-model="reservationForm.date"
                             type="date"
                             class="ds-input"
                             :min="minDate"
@@ -182,7 +182,7 @@ const onClose = () => {
                         <label class="ds-label" for="res-time">Ora *</label>
                         <input
                             id="res-time"
-                            v-model="form.time"
+                            v-model="reservationForm.time"
                             type="time"
                             class="ds-input"
                             step="300"
@@ -195,7 +195,7 @@ const onClose = () => {
                         <label class="ds-label" for="res-guests">Persone *</label>
                         <input
                             id="res-guests"
-                            v-model.number="form.guests"
+                            v-model.number="reservationForm.guests"
                             type="number"
                             min="1"
                             max="50"
@@ -209,7 +209,7 @@ const onClose = () => {
 
                 <div class="ds-field">
                     <label class="ds-label" for="res-status">Stato iniziale</label>
-                    <select id="res-status" v-model="form.status" class="ds-input ds-select">
+                    <select id="res-status" v-model="reservationForm.status" class="ds-input ds-select">
                         <option value="confirmed">Confermata (default)</option>
                         <option value="pending">In attesa</option>
                     </select>
@@ -222,7 +222,7 @@ const onClose = () => {
                     <label class="ds-label" for="res-notes">Note</label>
                     <textarea
                         id="res-notes"
-                        v-model="form.notes"
+                        v-model="reservationForm.notes"
                         class="ds-input"
                         rows="3"
                         placeholder="Allergie, richieste speciali, tavolo preferito..."

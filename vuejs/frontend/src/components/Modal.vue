@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue';
+import TeleportCompat from '@/lib/compat/teleport.js';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -37,7 +38,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <Teleport to="body">
+    <TeleportCompat to="body">
         <Transition name="scale">
             <div
               v-if="show"
@@ -66,7 +67,7 @@ onUnmounted(() => {
               </div>
             </div>
         </Transition>
-    </Teleport>
+    </TeleportCompat>
 </template>
 
 <style>

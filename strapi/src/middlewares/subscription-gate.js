@@ -3,6 +3,10 @@
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
 const { KITCHEN_LIKE_ROLES, resolveStaffContext } = require('../utils/staff-access');
 
+const AUTH_CONTEXT_CACHE_TTL_MS = parseInt(process.env.SUBSCRIPTION_GATE_CACHE_TTL_MS || '5000', 10);
+const AUTH_CONTEXT_CACHE_MAX = parseInt(process.env.SUBSCRIPTION_GATE_CACHE_MAX || '200', 10);
+const authContextCache = new Map();
+
 const BYPASS_PREFIXES = [
   '/api/auth/',
   '/api/billing/',
@@ -83,6 +87,57 @@ async function userFromBearer(strapi, authorization) {
   }
 }
 
+function pruneAuthContextCache() {
+  if (authContextCache.size <= AUTH_CONTEXT_CACHE_MAX) return;
+  const now = Date.now();
+  for (const [key, entry] of authContextCache.entries()) {
+    if (!entry || entry.expiresAt <= now) authContextCache.delete(key);
+    if (authContextCache.size <= AUTH_CONTEXT_CACHE_MAX) return;
+  }
+  while (authContextCache.size > AUTH_CONTEXT_CACHE_MAX) {
+    const oldest = authContextCache.keys().next().value;
+    authContextCache.delete(oldest);
+  }
+}
+
+async function authContextFromBearer(strapi, authorization) {
+  const match = String(authorization || '').match(/^Bearer\s+(.+)$/i);
+  if (!match) return { user: null, actor: null };
+
+  const token = match[1];
+  const now = Date.now();
+  const cached = authContextCache.get(token);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise || cached.value;
+  }
+
+  const promise = (async () => {
+    const user = await userFromBearer(strapi, authorization);
+    const actor = user ? await resolveStaffContext(strapi, user) : null;
+    return { user, actor };
+  })();
+
+  authContextCache.set(token, {
+    expiresAt: now + AUTH_CONTEXT_CACHE_TTL_MS,
+    promise,
+    value: null,
+  });
+  pruneAuthContextCache();
+
+  try {
+    const value = await promise;
+    authContextCache.set(token, {
+      expiresAt: Date.now() + AUTH_CONTEXT_CACHE_TTL_MS,
+      promise: null,
+      value,
+    });
+    return value;
+  } catch (err) {
+    authContextCache.delete(token);
+    throw err;
+  }
+}
+
 module.exports = (_config, { strapi }) => {
   return async (ctx, next) => {
     const path = ctx.path || '';
@@ -91,12 +146,11 @@ module.exports = (_config, { strapi }) => {
       return next();
     }
 
-    const user = await userFromBearer(strapi, ctx.request.headers.authorization);
+    const { user, actor } = await authContextFromBearer(strapi, ctx.request.headers.authorization);
     if (!user) {
       return next();
     }
 
-    const actor = await resolveStaffContext(strapi, user);
     const billingUser = actor && actor.owner ? actor.owner : user;
 
     if (actor && actor.isStaff && actor.staffActive === false) {

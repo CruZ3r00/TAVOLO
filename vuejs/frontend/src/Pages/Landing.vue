@@ -127,10 +127,17 @@ const plans = [
   },
 ];
 
+// Su legacy build (Vue 2.7 / browser molto vecchi) Three.js puo' fallire al
+// runtime anche se WebGL formalmente esiste: l'import del modulo three usa
+// sintassi che plugin-legacy transpila ma alcuni edge case (proxy, async iter)
+// non hanno equivalente eseguibile. Forziamo i fallback statici sempre.
+// eslint-disable-next-line no-undef
+const isModernBuild = typeof __MODERN__ !== 'undefined' ? __MODERN__ : true;
+
 onMounted(() => {
   nextTick(() => { document.title = 'COMFORTABLES · Gestionale ristorante in tempo reale'; });
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  canUseHeroScene.value = !prefersReducedMotion && supportsWebGL();
+  canUseHeroScene.value = isModernBuild && !prefersReducedMotion && supportsWebGL();
   canUseFeatureFlipDeck.value = canUseHeroScene.value;
 });
 </script>

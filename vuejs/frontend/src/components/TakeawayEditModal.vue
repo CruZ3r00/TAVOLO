@@ -11,7 +11,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated']);
 
-const form = ref({ customer_name: '', customer_phone: '', customer_email: '', date: '', time: '' });
+const takeawayForm = ref({ customer_name: '', customer_phone: '', customer_email: '', date: '', time: '' });
 const saving = ref(false);
 const errorMessage = ref('');
 const fieldErrors = ref({});
@@ -33,7 +33,7 @@ const splitPickup = (value) => {
 watch(() => props.show, (v) => {
   if (!v || !props.order) return;
   const pickup = splitPickup(props.order.pickup_at);
-  form.value = {
+  takeawayForm.value = {
     customer_name: props.order.customer_name || '',
     customer_phone: props.order.customer_phone || '',
     customer_email: props.order.customer_email || '',
@@ -49,15 +49,15 @@ const emailRequired = computed(() => props.order?.takeaway_status === 'pending_a
 
 const validate = () => {
   const errs = {};
-  if (!form.value.customer_name.trim()) errs.customer_name = 'Inserisci il nome.';
-  if (!form.value.customer_phone.trim()) errs.customer_phone = 'Inserisci il telefono.';
-  if (emailRequired.value && !form.value.customer_email.trim()) {
+  if (!takeawayForm.value.customer_name.trim()) errs.customer_name = 'Inserisci il nome.';
+  if (!takeawayForm.value.customer_phone.trim()) errs.customer_phone = 'Inserisci il telefono.';
+  if (emailRequired.value && !takeawayForm.value.customer_email.trim()) {
     errs.customer_email = 'Inserisci l\'email per rispondere al cliente.';
   }
-  if (form.value.customer_email && !/^\S+@\S+\.\S+$/.test(form.value.customer_email.trim())) {
+  if (takeawayForm.value.customer_email && !/^\S+@\S+\.\S+$/.test(takeawayForm.value.customer_email.trim())) {
     errs.customer_email = 'Email non valida.';
   }
-  const dt = new Date(`${form.value.date}T${form.value.time || '00:00'}`);
+  const dt = new Date(`${takeawayForm.value.date}T${takeawayForm.value.time || '00:00'}`);
   if (Number.isNaN(dt.getTime()) || dt.getTime() < Date.now()) {
     errs.time = 'Scegli un orario futuro.';
   }
@@ -71,11 +71,11 @@ const submit = async () => {
   errorMessage.value = '';
   try {
     const updated = await updateTakeaway(props.order.documentId, {
-      customer_name: form.value.customer_name.trim(),
-      customer_phone: form.value.customer_phone.trim(),
-      customer_email: form.value.customer_email.trim() || undefined,
-      date: form.value.date,
-      time: form.value.time.length === 5 ? `${form.value.time}:00` : form.value.time,
+      customer_name: takeawayForm.value.customer_name.trim(),
+      customer_phone: takeawayForm.value.customer_phone.trim(),
+      customer_email: takeawayForm.value.customer_email.trim() || undefined,
+      date: takeawayForm.value.date,
+      time: takeawayForm.value.time.length === 5 ? `${takeawayForm.value.time}:00` : takeawayForm.value.time,
     }, props.token);
     emit('updated', updated);
     emit('close');
@@ -99,29 +99,29 @@ const submit = async () => {
         </div>
         <div class="ds-field">
           <label class="ds-label" for="te-name">Nome cliente *</label>
-          <input id="te-name" v-model="form.customer_name" class="ds-input" type="text" maxlength="120">
+          <input id="te-name" v-model="takeawayForm.customer_name" class="ds-input" type="text" maxlength="120">
           <p v-if="fieldErrors.customer_name" class="ds-helper te-err">{{ fieldErrors.customer_name }}</p>
         </div>
         <div class="form-row-2">
           <div class="ds-field">
             <label class="ds-label" for="te-phone">Telefono *</label>
-            <input id="te-phone" v-model="form.customer_phone" class="ds-input" type="tel" maxlength="32">
+            <input id="te-phone" v-model="takeawayForm.customer_phone" class="ds-input" type="tel" maxlength="32">
             <p v-if="fieldErrors.customer_phone" class="ds-helper te-err">{{ fieldErrors.customer_phone }}</p>
           </div>
           <div class="ds-field">
             <label class="ds-label" for="te-email">Email{{ emailRequired ? ' *' : '' }}</label>
-            <input id="te-email" v-model="form.customer_email" class="ds-input" type="email">
+            <input id="te-email" v-model="takeawayForm.customer_email" class="ds-input" type="email">
             <p v-if="fieldErrors.customer_email" class="ds-helper te-err">{{ fieldErrors.customer_email }}</p>
           </div>
         </div>
         <div class="form-row-2">
           <div class="ds-field">
             <label class="ds-label" for="te-date">Data ritiro *</label>
-            <input id="te-date" v-model="form.date" class="ds-input" type="date" :min="minDate">
+            <input id="te-date" v-model="takeawayForm.date" class="ds-input" type="date" :min="minDate">
           </div>
           <div class="ds-field">
             <label class="ds-label" for="te-time">Ora ritiro *</label>
-            <input id="te-time" v-model="form.time" class="ds-input" type="time" step="300">
+            <input id="te-time" v-model="takeawayForm.time" class="ds-input" type="time" step="300">
             <p v-if="fieldErrors.time" class="ds-helper te-err">{{ fieldErrors.time }}</p>
           </div>
         </div>

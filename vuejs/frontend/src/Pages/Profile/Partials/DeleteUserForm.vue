@@ -12,21 +12,21 @@ const router = useRouter();
 const confirmingUserDeletion = ref(false);
 const passwordInput = ref(null);
 
-const form = reactive({
+const deletionForm = reactive({
     password: '',
     error: '',
     processing: false,
 });
 
 const confirmUserDeletion = () => {
-    form.error = '';
+    deletionForm.error = '';
     confirmingUserDeletion.value = true;
     setTimeout(() => passwordInput.value?.focus(), 250);
 };
 
 const deleteUser = async () => {
-    form.processing = true;
-    form.error = '';
+    deletionForm.processing = true;
+    deletionForm.error = '';
     try {
         const tkn = storeVx.getters.getToken;
         const response = await fetch(`${API_BASE}/api/account/destroy`, {
@@ -35,11 +35,11 @@ const deleteUser = async () => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${tkn}`,
             },
-            body: JSON.stringify({ password: form.password }),
+            body: JSON.stringify({ password: deletionForm.password }),
         });
         const data = await response.json();
         if (!response.ok) {
-            form.error = data?.error?.message || data?.message || 'Password errata';
+            deletionForm.error = data?.error?.message || data?.message || 'Password errata';
             return;
         }
         storeVx.dispatch('logout');
@@ -48,17 +48,17 @@ const deleteUser = async () => {
         closeModal();
         router.push('/login');
     } catch (e) {
-        form.error = 'Errore di rete. Riprova.';
+        deletionForm.error = 'Errore di rete. Riprova.';
     } finally {
-        form.processing = false;
-        form.password = '';
+        deletionForm.processing = false;
+        deletionForm.password = '';
     }
 };
 
 const closeModal = () => {
     confirmingUserDeletion.value = false;
-    form.password = '';
-    form.error = '';
+    deletionForm.password = '';
+    deletionForm.error = '';
 };
 </script>
 
@@ -100,14 +100,14 @@ const closeModal = () => {
             <div class="ds-field">
                 <TextInput
                     ref="passwordInput"
-                    v-model="form.password"
+                    v-model="deletionForm.password"
                     type="password"
                     placeholder="La tua password"
                     autocomplete="current-password"
                     @keyup.enter="deleteUser"
                 />
                 <Transition name="fade">
-                    <p v-if="form.error" class="field-error">{{ form.error }}</p>
+                    <p v-if="deletionForm.error" class="field-error">{{ deletionForm.error }}</p>
                 </Transition>
             </div>
 
@@ -115,10 +115,10 @@ const closeModal = () => {
                 <button @click="closeModal" class="ds-btn ds-btn-secondary">Annulla</button>
                 <button
                     class="ds-btn ds-btn-danger"
-                    :disabled="form.processing || !form.password"
+                    :disabled="deletionForm.processing || !deletionForm.password"
                     @click="deleteUser"
                 >
-                    <span v-if="form.processing" class="ds-spinner"></span>
+                    <span v-if="deletionForm.processing" class="ds-spinner"></span>
                     <span v-else>Elimina account</span>
                 </button>
             </div>

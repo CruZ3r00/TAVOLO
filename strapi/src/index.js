@@ -269,16 +269,23 @@ module.exports = {
 
 function startTakeawaySweep(strapi) {
   const run = async () => {
+    if (strapi.takeawaySweepRunning) return;
+    strapi.takeawaySweepRunning = true;
     try {
       const sent = await sweepDueTakeaways(strapi);
       if (sent > 0) strapi.log.info(`Asporto: inviati ai reparti ${sent} ordini in scadenza.`);
     } catch (err) {
       strapi.log.warn(`Asporto: sweep invio reparti fallito: ${err.message}`);
+    } finally {
+      strapi.takeawaySweepRunning = false;
     }
   };
   run();
   if (strapi.takeawaySweepInterval) clearInterval(strapi.takeawaySweepInterval);
   strapi.takeawaySweepInterval = setInterval(run, 60000);
+  if (typeof strapi.takeawaySweepInterval.unref === 'function') {
+    strapi.takeawaySweepInterval.unref();
+  }
 }
 
 async function configureUsersPermissionsEmail(strapi) {

@@ -1,11 +1,39 @@
-import { createRouter, createWebHistory } from 'vue-router'
+// Compat vue-router 3 (Vue 2.7 / legacy build) + vue-router 4 (Vue 3 / modern build).
+// vue-router 4 esporta `createRouter`/`createWebHistory`; v3 espone la classe `VueRouter`
+// con `mode: 'history'`. Su Vue 2 + vue-router 3 e' obbligatorio `Vue.use(VueRouter)`
+// PRIMA di istanziare il router (altrimenti `new VueRouter()` fallisce). Lo facciamo
+// qui (side-effect a load time) perche' gli ES modules import sono "hoisted" e il
+// router viene istanziato al top-level prima delle istruzioni in main.legacy.js.
+// Le guard hanno la stessa API in entrambe le versioni.
+import * as VueNS from 'vue'
+import * as VueRouterNS from 'vue-router'
 import { store } from '@/store'; //usato per storage di jwt
 import { fetchBillingStatus } from '@/utils';
 import { STAFF_ROLES, canAccessRoute, defaultRouteForUser, staffRole } from '@/staffAccess';
 
+const VueDefault = VueNS.default || VueNS;
+const VueRouterDefault = VueRouterNS.default || VueRouterNS;
+const isV4 = typeof VueRouterNS.createRouter === 'function';
+
+if (!isV4 && VueDefault && typeof VueDefault.use === 'function') {
+  VueDefault.use(VueRouterDefault);
+}
+
+const createRouter = isV4
+  ? VueRouterNS.createRouter
+  : (options) => new VueRouterDefault({ mode: 'history', routes: options.routes });
+const createWebHistory = isV4
+  ? VueRouterNS.createWebHistory
+  : () => undefined; // su v3 il `history` viene gestito via `mode: 'history'` sopra
+
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
 const SUBSCRIPTION_CHECK_TIMEOUT_MS = 5000;
+const SUBSCRIPTION_CHECK_CACHE_MS = 15000;
+const SUBSCRIPTION_CHECK_FAILURE_BACKOFF_MS = 10000;
 const PRO_STAFF_ROLES = new Set([STAFF_ROLES.GESTIONE, STAFF_ROLES.BAR, STAFF_ROLES.PIZZERIA, STAFF_ROLES.CUCINA_SG]);
+let billingCache = { token: null, value: null, expiresAt: 0 };
+let billingInFlight = null;
+let lastBillingFailureAt = 0;
 
 const withTimeout = (promise, ms) => {
     let timeoutId;
@@ -18,6 +46,42 @@ const withTimeout = (promise, ms) => {
     });
 
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+};
+
+const getBillingStatusCached = async (token) => {
+    const now = Date.now();
+    if (billingCache.token === token && billingCache.value && billingCache.expiresAt > now) {
+        return billingCache.value;
+    }
+    if (billingInFlight && billingInFlight.token === token) {
+        return billingInFlight.promise;
+    }
+    if (now - lastBillingFailureAt < SUBSCRIPTION_CHECK_FAILURE_BACKOFF_MS) {
+        return null;
+    }
+
+    const promise = withTimeout(fetchBillingStatus(token), SUBSCRIPTION_CHECK_TIMEOUT_MS)
+        .then((billing) => {
+            billingCache = {
+                token,
+                value: billing,
+                expiresAt: Date.now() + SUBSCRIPTION_CHECK_CACHE_MS,
+            };
+            lastBillingFailureAt = 0;
+            return billing;
+        })
+        .catch((err) => {
+            lastBillingFailureAt = Date.now();
+            throw err;
+        })
+        .finally(() => {
+            if (billingInFlight && billingInFlight.promise === promise) {
+                billingInFlight = null;
+            }
+        });
+
+    billingInFlight = { token, promise };
+    return promise;
 };
 
 const routes = [
@@ -180,10 +244,7 @@ router.beforeEach(async (to, from, next) => {
 
     if (isAuthenticated && to.matched.some(record => record.meta.requiresSubscription)) {
         try {
-            const billing = await withTimeout(
-                fetchBillingStatus(store.getters.getToken),
-                SUBSCRIPTION_CHECK_TIMEOUT_MS
-            );
+            const billing = await getBillingStatusCached(store.getters.getToken);
 
             if (billing) {
                 const user = { ...(store.getters.getUser || {}), ...billing };

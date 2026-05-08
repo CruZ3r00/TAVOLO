@@ -135,60 +135,60 @@ onMounted(async () => {
       </div>
 
       <!-- ===== Content ===== -->
+      <!-- Niente <Transition> con multipli v-else-if: Vue 2.7 ha edge case con
+           catene lunghe v-else-if dentro <Transition mode="out-in">. Senza il
+           Transition la pagina renderizza identica, manca solo l'animazione di
+           cross-fade (accettabile sul legacy). -->
       <div class="pf-content">
-        <Transition name="fade" mode="out-in">
-          <div v-if="activeSection === 'profilo'" :key="'profilo'" class="pf-stack">
-            <UpdateProfileInformationForm :user="userinfo" />
-          </div>
+        <div v-if="activeSection === 'profilo'" class="pf-stack">
+          <UpdateProfileInformationForm :user="userinfo" />
+        </div>
 
-          <StaffDepartmentsForm
-            v-else-if="activeSection === 'staff'"
-            :key="'staff'"
-            mode="staff"
-          />
+        <StaffDepartmentsForm
+          v-else-if="activeSection === 'staff'"
+          mode="staff"
+        />
 
-          <StaffDepartmentsForm
-            v-else-if="activeSection === 'reparti' && isPro"
-            :key="'reparti'"
-            mode="routing"
-          />
+        <StaffDepartmentsForm
+          v-else-if="activeSection === 'reparti' && isPro"
+          mode="routing"
+        />
 
-          <div v-else-if="activeSection === 'reparti'" :key="'reparti-locked'" class="ct-card">
-            <div class="ct-card__head">
-              <span class="ct-card__icon"><i class="bi bi-diagram-3"></i></span>
-              <div class="ct-card__title-wrap">
-                <h3 class="ct-card__title">Smistamento categorie ai reparti</h3>
-                <p class="ct-card__subtitle">
-                  Funzione del piano Professionale.
-                </p>
-              </div>
-            </div>
-            <div class="ct-locked-panel">
-              <div class="ct-locked-panel__ico">
-                <i class="bi bi-lock-fill"></i>
-              </div>
-              <h4>Disponibile con il piano Professionale</h4>
-              <p>
-                Con l'Essenziale tutte le categorie arrivano in Cucina. Passa al
-                Professionale per smistare bar, pizzeria e cucina senza glutine in
-                code separate.
+        <div v-else-if="activeSection === 'reparti'" class="ct-card">
+          <div class="ct-card__head">
+            <span class="ct-card__icon"><i class="bi bi-diagram-3"></i></span>
+            <div class="ct-card__title-wrap">
+              <h3 class="ct-card__title">Smistamento categorie ai reparti</h3>
+              <p class="ct-card__subtitle">
+                Funzione del piano Professionale.
               </p>
-              <button type="button" class="btn btn-accent" @click="setSection('abbonamento', false)">
-                Scopri il Professionale <i class="bi bi-arrow-right"></i>
-              </button>
             </div>
           </div>
-
-          <div v-else-if="activeSection === 'sicurezza'" :key="'sicurezza'" class="pf-stack">
-            <UpdatePasswordForm :id="userinfo.id" />
-            <TwoFactorAuthenticationForm :requires-confirmation="confirmsTwoFactorAuthentication" />
+          <div class="ct-locked-panel">
+            <div class="ct-locked-panel__ico">
+              <i class="bi bi-lock-fill"></i>
+            </div>
+            <h4>Disponibile con il piano Professionale</h4>
+            <p>
+              Con l'Essenziale tutte le categorie arrivano in Cucina. Passa al
+              Professionale per smistare bar, pizzeria e cucina senza glutine in
+              code separate.
+            </p>
+            <button type="button" class="btn btn-accent" @click="setSection('abbonamento', false)">
+              Scopri il Professionale <i class="bi bi-arrow-right"></i>
+            </button>
           </div>
+        </div>
 
-          <WebsiteConfigForm v-else-if="activeSection === 'sito'" :key="'sito'" />
-          <PosCassaForm v-else-if="activeSection === 'poscassa'" :key="'poscassa'" />
-          <SubscriptionForm v-else-if="activeSection === 'abbonamento'" :key="'abbonamento'" />
-          <DeleteUserForm v-else-if="activeSection === 'delete'" :key="'delete'" />
-        </Transition>
+        <div v-else-if="activeSection === 'sicurezza'" class="pf-stack">
+          <UpdatePasswordForm :id="userinfo.id" />
+          <TwoFactorAuthenticationForm :requires-confirmation="confirmsTwoFactorAuthentication" />
+        </div>
+
+        <WebsiteConfigForm v-else-if="activeSection === 'sito'" />
+        <PosCassaForm v-else-if="activeSection === 'poscassa'" />
+        <SubscriptionForm v-else-if="activeSection === 'abbonamento'" />
+        <DeleteUserForm v-else-if="activeSection === 'delete'" />
       </div>
     </div>
   </AppLayout>

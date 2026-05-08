@@ -2,6 +2,7 @@
 import { ref, computed, onBeforeUnmount, watch } from 'vue';
 import { useStore } from 'vuex';
 import { importMenuAnalyze, importMenuBulk } from '@/utils';
+import TeleportCompat from '@/lib/compat/teleport.js';
 
 const props = defineProps({
   currentCount: { type: Number, default: 0 },
@@ -265,7 +266,7 @@ defineExpose({ trigger });
     />
 
     <!-- Modale review elementi estratti -->
-    <Teleport to="body">
+    <TeleportCompat to="body">
       <div v-if="showReviewModal" class="importer-backdrop" @click.self="requestClose">
         <div class="importer-modal" role="dialog" aria-modal="true" aria-labelledby="importerReviewTitle">
           <div class="importer-header">
@@ -496,10 +497,10 @@ defineExpose({ trigger });
           </div>
         </div>
       </div>
-    </Teleport>
+    </TeleportCompat>
 
     <!-- Modale scelta modalità -->
-    <Teleport to="body">
+    <TeleportCompat to="body">
       <div v-if="showModeModal" class="importer-backdrop mode-backdrop" @click.self="showModeModal = false">
         <div class="mode-modal" role="dialog" aria-modal="true" aria-labelledby="modeModalTitle">
           <div class="mode-header">
@@ -541,10 +542,10 @@ defineExpose({ trigger });
           </div>
         </div>
       </div>
-    </Teleport>
+    </TeleportCompat>
 
     <!-- Modale conferma distruttiva per replace -->
-    <Teleport to="body">
+    <TeleportCompat to="body">
       <div
         v-if="showReplaceConfirmModal"
         class="importer-backdrop mode-backdrop"
@@ -590,17 +591,17 @@ defineExpose({ trigger });
           </div>
         </div>
       </div>
-    </Teleport>
+    </TeleportCompat>
 
     <!-- Spinner submit globale quando attivo -->
-    <Teleport to="body">
+    <TeleportCompat to="body">
       <div v-if="isSubmitting && !showReplaceConfirmModal" class="importer-backdrop submit-backdrop">
         <div class="submit-panel">
           <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
           <p class="submit-text">Importazione in corso...</p>
         </div>
       </div>
-    </Teleport>
+    </TeleportCompat>
   </div>
 </template>
 

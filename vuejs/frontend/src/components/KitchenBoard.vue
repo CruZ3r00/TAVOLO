@@ -83,14 +83,14 @@ const readyGroups = computed(() => groupByCourse(readyItems.value));
     <section class="kt-col kt-taken">
       <header class="kt-col-h">
         <div>
-          <i class="bi bi-clipboard-check"/>
+          <i class="bi bi-clipboard-check"></i>
           <strong>Da fare</strong>
         </div>
         <span class="kt-col-c">{{ takenItems.length }}</span>
       </header>
       <div class="kt-col-body">
         <div v-if="!takenItems.length" class="kt-empty">
-          <i class="bi bi-inbox"/>
+          <i class="bi bi-inbox"></i>
           <p>Nessuna portata in attesa</p>
         </div>
         <section v-for="group in takenGroups" :key="group.course" class="kt-course">
@@ -112,14 +112,14 @@ const readyGroups = computed(() => groupByCourse(readyItems.value));
     <section class="kt-col kt-preparing">
       <header class="kt-col-h">
         <div>
-          <i class="bi bi-fire"/>
+          <i class="bi bi-fire"></i>
           <strong>In preparazione</strong>
         </div>
         <span class="kt-col-c">{{ preparingItems.length }}</span>
       </header>
       <div class="kt-col-body">
         <div v-if="!preparingItems.length" class="kt-empty">
-          <i class="bi bi-inbox"/>
+          <i class="bi bi-inbox"></i>
           <p>Niente in lavorazione</p>
         </div>
         <section v-for="group in preparingGroups" :key="group.course" class="kt-course">
@@ -141,14 +141,14 @@ const readyGroups = computed(() => groupByCourse(readyItems.value));
     <section class="kt-col kt-ready">
       <header class="kt-col-h">
         <div>
-          <i class="bi bi-check2-circle"/>
+          <i class="bi bi-check2-circle"></i>
           <strong>Pronti</strong>
         </div>
         <span class="kt-col-c">{{ readyItems.length }}</span>
       </header>
       <div class="kt-col-body">
         <div v-if="!readyItems.length" class="kt-empty">
-          <i class="bi bi-inbox"/>
+          <i class="bi bi-inbox"></i>
           <p>Nessun piatto pronto</p>
         </div>
         <section v-for="group in readyGroups" :key="group.course" class="kt-course">

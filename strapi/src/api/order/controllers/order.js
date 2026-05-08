@@ -533,7 +533,7 @@ async function listOrderIdsForStation(strapi, params) {
       .innerJoin('order_items_fk_order_lnk as il', 'il.order_id', 'o.id')
       .innerJoin('order_items as oi', 'oi.id', 'il.order_item_id')
       .innerJoin('restaurant_category_routing as rcr', 'rcr.owner_id', 'ul.user_id')
-      .whereRaw('LOWER(TRIM(rcr.category)) = LOWER(TRIM(oi.category))')
+      .whereRaw('rcr.category_key = LOWER(TRIM(oi.category))')
       .where('ul.user_id', ownerId)
       .where('rcr.staff_role', station)
       .where('oi.status', '<>', 'served')

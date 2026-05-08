@@ -13,7 +13,7 @@ const emit = defineEmits(['close', 'created']);
 
 // table_id === 'auto' → lascia che il backend crei il tavolo automaticamente.
 // table_id === '<documentId>' → usa un tavolo libero esistente.
-const form = ref({
+const walkinForm = ref({
     table_id: 'auto',
     number_of_people: 2,
     customer_name: '',
@@ -30,7 +30,7 @@ const freeTables = computed(() =>
 
 watch(() => props.show, (v) => {
     if (!v) return;
-    form.value = {
+    walkinForm.value = {
         table_id: 'auto',
         number_of_people: 2,
         customer_name: '',
@@ -43,21 +43,21 @@ watch(() => props.show, (v) => {
 });
 
 const selectTable = (table) => {
-    form.value.table_id = table.documentId;
+    walkinForm.value.table_id = table.documentId;
 };
 
 const selectAuto = () => {
-    form.value.table_id = 'auto';
+    walkinForm.value.table_id = 'auto';
 };
 
 const validate = () => {
     const errs = {};
-    const name = form.value.customer_name.trim();
+    const name = walkinForm.value.customer_name.trim();
     if (!name) errs.customer_name = 'Nome tavolo obbligatorio.';
     else if (name.length > 120) errs.customer_name = 'Nome troppo lungo.';
-    const phone = form.value.phone.trim();
+    const phone = walkinForm.value.phone.trim();
     if (phone && phone.length > 32) errs.phone = 'Telefono troppo lungo.';
-    const n = parseInt(form.value.number_of_people, 10);
+    const n = parseInt(walkinForm.value.number_of_people, 10);
     if (!Number.isFinite(n) || n < 1) errs.number_of_people = 'Numero persone (min 1).';
     else if (n > 50) errs.number_of_people = 'Massimo 50 persone.';
     fieldErrors.value = errs;
@@ -68,17 +68,17 @@ const buildPayload = (force = false) => {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const payload = {
-        customer_name: form.value.customer_name.trim(),
-        number_of_people: parseInt(form.value.number_of_people, 10),
+        customer_name: walkinForm.value.customer_name.trim(),
+        number_of_people: parseInt(walkinForm.value.number_of_people, 10),
         date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
         time: `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
     };
-    if (form.value.table_id && form.value.table_id !== 'auto') {
-        payload.table_id = form.value.table_id;
+    if (walkinForm.value.table_id && walkinForm.value.table_id !== 'auto') {
+        payload.table_id = walkinForm.value.table_id;
     }
-    const phone = form.value.phone.trim();
+    const phone = walkinForm.value.phone.trim();
     if (phone) payload.phone = phone;
-    const notes = form.value.notes.trim();
+    const notes = walkinForm.value.notes.trim();
     if (notes) payload.notes = notes;
     if (force) payload.force = true;
     return payload;
@@ -93,7 +93,7 @@ const submit = async () => {
         emit('created', result);
         emit('close');
     } catch (err) {
-        if (err?.code === 'OVERBOOKING' && form.value.table_id === 'auto') {
+        if (err?.code === 'OVERBOOKING' && walkinForm.value.table_id === 'auto') {
             const d = err.details || {};
             const msg =
                 `Posti finiti: capienza ${d.capacity ?? '?'}, occupati ${d.current ?? '?'}, ` +
@@ -152,7 +152,7 @@ const onClose = () => {
                 <div class="walkin-table-grid">
                     <button
                         type="button"
-                        :class="['walkin-table-btn', 'walkin-auto-btn', { selected: form.table_id === 'auto' }]"
+                        :class="['walkin-table-btn', 'walkin-auto-btn', { selected: walkinForm.table_id === 'auto' }]"
                         @click="selectAuto"
                     >
                         <i class="bi bi-magic walkin-auto-icon" aria-hidden="true"></i>
@@ -163,7 +163,7 @@ const onClose = () => {
                         v-for="t in freeTables"
                         :key="t.documentId"
                         type="button"
-                        :class="['walkin-table-btn', { selected: form.table_id === t.documentId }]"
+                        :class="['walkin-table-btn', { selected: walkinForm.table_id === t.documentId }]"
                         @click="selectTable(t)"
                     >
                         <span class="walkin-table-num">T{{ t.number }}</span>
@@ -172,7 +172,7 @@ const onClose = () => {
                         </span>
                     </button>
                 </div>
-                <p v-if="form.table_id === 'auto'" class="ds-helper walkin-hint">
+                <p v-if="walkinForm.table_id === 'auto'" class="ds-helper walkin-hint">
                     <i class="bi bi-info-circle" aria-hidden="true"></i>
                     Verrà creato un nuovo tavolo se ci sono abbastanza posti.
                 </p>
@@ -186,7 +186,7 @@ const onClose = () => {
                         <label class="ds-label" for="walkin-guests">Persone *</label>
                         <input
                             id="walkin-guests"
-                            v-model.number="form.number_of_people"
+                            v-model.number="walkinForm.number_of_people"
                             type="number"
                             min="1"
                             max="50"
@@ -200,7 +200,7 @@ const onClose = () => {
                         <label class="ds-label" for="walkin-name">Nome tavolo *</label>
                         <input
                             id="walkin-name"
-                            v-model="form.customer_name"
+                            v-model="walkinForm.customer_name"
                             type="text"
                             class="ds-input"
                             placeholder="Es. Rossi"
@@ -215,7 +215,7 @@ const onClose = () => {
                     <label class="ds-label" for="walkin-phone">Telefono (opzionale)</label>
                     <input
                         id="walkin-phone"
-                        v-model="form.phone"
+                        v-model="walkinForm.phone"
                         type="tel"
                         class="ds-input"
                         placeholder="+39 320 1234567"
@@ -228,7 +228,7 @@ const onClose = () => {
                     <label class="ds-label" for="walkin-notes">Note</label>
                     <textarea
                         id="walkin-notes"
-                        v-model="form.notes"
+                        v-model="walkinForm.notes"
                         class="ds-input"
                         rows="2"
                         placeholder="Allergie, richieste speciali..."

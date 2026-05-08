@@ -634,8 +634,11 @@ const switchSection = (section) => {
       </div>
 
       <!-- Mobile single column -->
+      <!-- Sostituiti i `<template v-if/v-else-if/v-else>` con `<div>` espliciti
+           per compat Vue 2.7: il compiler ha edge case con catene v-else-if di
+           <template> contenenti multipli children. -->
       <div v-if="activeSection === 'reservations' && !loading" class="res-mobile-view">
-        <template v-if="activeTab === 'pending'">
+        <div v-if="activeTab === 'pending'" class="res-mobile-tab">
           <div v-if="pendingList.length" class="kr-col-list">
             <ReservationCard
               v-for="r in pendingList"
@@ -650,8 +653,8 @@ const switchSection = (section) => {
             <i class="bi bi-inbox"></i>
             <span>Nessuna richiesta in attesa</span>
           </div>
-        </template>
-        <template v-else-if="activeTab === 'confirmed'">
+        </div>
+        <div v-else-if="activeTab === 'confirmed'" class="res-mobile-tab">
           <div v-if="confirmedList.length" class="kr-col-list">
             <ReservationCard
               v-for="r in confirmedList"
@@ -666,8 +669,8 @@ const switchSection = (section) => {
             <i class="bi bi-calendar-x"></i>
             <span>Nessuna prenotazione confermata</span>
           </div>
-        </template>
-        <template v-else>
+        </div>
+        <div v-else class="res-mobile-tab">
           <div v-if="occupiedTotalCount" class="kr-col-list">
             <OccupiedOrderCard
               v-for="o in occupiedOrders"
@@ -689,7 +692,7 @@ const switchSection = (section) => {
             <i class="bi bi-door-open"></i>
             <span>Nessun tavolo in servizio</span>
           </div>
-        </template>
+        </div>
       </div>
 
       <div v-if="activeSection === 'takeaway'" class="kr-kanban res-kanban-desktop takeaway-kanban">

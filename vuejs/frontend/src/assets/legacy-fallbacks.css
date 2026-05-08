@@ -1,0 +1,172 @@
+/* ============================================================================
+   Fallback CSS per browser che non supportano color-mix() / oklab.
+   Caricato SOLO dal legacy build (main.legacy.js).
+
+   Browser target: SeaMonkey vecchi (Gecko ~38-52), Chrome 37, Android 4.4+,
+   IE 11. `color-mix()` e' arrivato su Firefox 113 (2023), quindi tutti questi
+   target rientrano nel `@supports not`.
+
+   I valori statici qui sono coerenti col tema "light" (default). Se l'utente
+   ha forzato dark, alcune zone potrebbero avere contrasto subottimale, ma
+   restano leggibili. La prio: garantire visibilita' di tutti gli elementi
+   interattivi (bottoni, link, header).
+   ============================================================================ */
+
+@supports not (background: color-mix(in oklab, white, black)) {
+
+  /* --- Header / Nav (AppLayout public variant) --- */
+  /* Sopra il contenuto, deve essere opaco per non confondersi con la pagina. */
+  .nav {
+    background: #fbfaf8;
+  }
+  [data-theme="dark"] .nav {
+    background: #171a20;
+  }
+
+  /* --- Sidebar app variant --- */
+  .app-shell-sidebar,
+  .md-side {
+    background: #ffffff;
+  }
+  [data-theme="dark"] .app-shell-sidebar,
+  [data-theme="dark"] .md-side {
+    background: #20242c;
+  }
+
+  /* --- Mobile drawer --- */
+  .mobile-drawer-backdrop {
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .mobile-drawer {
+    background: #ffffff;
+  }
+  [data-theme="dark"] .mobile-drawer {
+    background: #20242c;
+  }
+
+  /* --- Modali --- */
+  .modal-bg,
+  .modal-bg.modal-bg--centered {
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .ds-modal {
+    background: #ffffff;
+  }
+  [data-theme="dark"] .ds-modal {
+    background: #20242c;
+  }
+
+  /* --- Hover di bottoni che usavano color-mix --- */
+  .btn-primary:hover:not(:disabled) {
+    background: #a93c38;
+    border-color: #a93c38;
+  }
+  [data-accent="green"] .btn-primary:hover:not(:disabled) {
+    background: #116c49;
+    border-color: #116c49;
+  }
+  [data-accent="blue"] .btn-primary:hover:not(:disabled) {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: #fdeceb;
+    border-color: #c24132;
+  }
+  .btn-dark:hover:not(:disabled) {
+    background: #c84f4b;
+    border-color: #c84f4b;
+  }
+
+  /* --- User dropdown items --- */
+  .user-dropdown-item:hover {
+    background: #ece9e3;
+  }
+  .user-dropdown-item--danger:hover {
+    background: #fdeceb;
+  }
+
+  /* --- Toast / notifiche --- */
+  .md-toast-error {
+    background: #fdeceb;
+    color: #8f2c22;
+    border: 1px solid #c24132;
+  }
+  .md-toast-success {
+    background: #e8f7ef;
+    color: #116044;
+    border: 1px solid #16875a;
+  }
+
+  /* --- Import overlay (MenuSetter) --- */
+  .import-overlay {
+    background: rgba(0, 0, 0, 0.85);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  /* --- Auth submit hover --- */
+  .auth-submit:hover:not(:disabled) {
+    background: #1f1c1a;
+  }
+
+  /* --- Status badges che usavano color-mix per pastel backgrounds --- */
+  .status-badge-pending,
+  .ds-badge-warn { background: #fff3d6; color: #7c4a03; }
+  .status-badge-confirmed,
+  .ds-badge-ok { background: #e8f7ef; color: #116044; }
+  .status-badge-at_restaurant,
+  .ds-badge-info { background: #eaf1ff; color: #1e40af; }
+  .status-badge-completed,
+  .ds-badge-muted { background: #ece9e3; color: #5b5650; }
+  .status-badge-cancelled,
+  .ds-badge-danger { background: #fdeceb; color: #8f2c22; }
+}
+
+/* ============================================================================
+   Fallback per `gap` su flexbox.
+   `gap` su flex e' arrivato su Firefox 63 (2018). Browser pre-Firefox 63,
+   pre-Chrome 84, pre-Safari 14 cadono qui. Usiamo un compromesso: spaziamo
+   i figli con margin per i pattern piu' visibili. Non e' perfetto ma evita
+   layout collassati.
+   ============================================================================ */
+
+@supports not (gap: 1px) {
+  .nav-inner > *,
+  .public-links > *,
+  .nav-tools > *,
+  .brand > * {
+    margin-right: 12px;
+  }
+  .nav-inner > *:last-child,
+  .public-links > *:last-child,
+  .nav-tools > *:last-child,
+  .brand > *:last-child {
+    margin-right: 0;
+  }
+}
+
+/* ============================================================================
+   Fallback per CSS Grid (Gecko < 52).
+   Su SeaMonkey 2.46+ (Firefox 49) la grid c'e'; piu' vecchi no. Convertiamo
+   i pattern tipici (place-items: center) in flex equivalenti.
+   ============================================================================ */
+
+@supports not (display: grid) {
+  .theme-toggle-track {
+    display: -webkit-box !important;
+    display: -ms-flexbox !important;
+    display: flex !important;
+    -webkit-box-pack: justify;
+    -ms-flex-pack: justify;
+    justify-content: space-between;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+  }
+  .avatar {
+    display: inline-block !important;
+    line-height: 36px;
+    text-align: center;
+  }
+}

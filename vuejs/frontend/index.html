@@ -46,6 +46,12 @@
   </head>
   <body>
     <div id="app"></div>
+    <!--
+      Entry per il modern build (Vue 3). In produzione, la scelta tra modern e
+      legacy avviene server-side (Strapi UA-detect) o tramite bootstrap shell
+      separato (vedi Fase 3 in todo.md). In dev `npm run dev` usa questo file;
+      `npm run dev:legacy` usa index.legacy.html.
+    -->
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

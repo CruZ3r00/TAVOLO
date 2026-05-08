@@ -1,5 +1,5 @@
 <script setup>
-import { useHead } from '@vueuse/head';
+import { useHead } from '@/lib/compat/head.js';
 import { useRouter } from 'vue-router';
 import { ref, computed } from 'vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';

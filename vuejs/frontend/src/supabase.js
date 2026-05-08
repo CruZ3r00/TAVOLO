@@ -1,13 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+// Re-export sottile per retro-compatibilita': la logica e' in `@/lib/realtime`,
+// che gestisce automaticamente la disabilitazione del client su legacy build.
+// Per nuovo codice importare direttamente da '@/lib/realtime'.
 
-const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim();
-const supabaseAnonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
-
-const hasPlaceholderValue = (value) => !value || value.includes('<') || value.includes('>');
-
-export const isSupabaseRealtimeConfigured = !hasPlaceholderValue(supabaseUrl)
-  && !hasPlaceholderValue(supabaseAnonKey);
-
-export const supabase = isSupabaseRealtimeConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+export { supabase, isSupabaseRealtimeConfigured } from './lib/realtime.js';

@@ -9,6 +9,7 @@ import AppSidebar from '@/components/AppSidebar.vue';
 import MobileBottomNav from '@/components/MobileBottomNav.vue';
 import MobileTopBar from '@/components/MobileTopBar.vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';
+import TeleportCompat from '@/lib/compat/teleport.js';
 
 const props = defineProps({
   // 'app' = sidebar + bottom nav, 'public' = top nav, 'auto' = decide da auth + path
@@ -116,6 +117,10 @@ const variantResolved = computed(() => {
   if (props.variant !== 'auto') return props.variant;
   return isLoggedIn.value ? 'app' : 'public';
 });
+// Computed esplicito: il compiler-sfc Vue 2.7 a volte ottimizza-out i nodi
+// con `v-if="isGuest"` adiacenti a `v-if="isLoggedIn"`, scartandoli dal
+// render output. Usare un nome diverso evita l'ottimizzazione errata.
+const isGuest = computed(() => !isLoggedIn.value);
 
 const userInitial = computed(() => (username.value || 'U').charAt(0).toUpperCase());
 const currentUser = computed(() => store.getters.getUser || null);
@@ -188,7 +193,7 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
       :user="currentUser"
     />
 
-    <Teleport to="body">
+    <TeleportCompat to="body">
       <Transition name="drawer">
         <div v-if="mobileMenuOpen" class="mobile-drawer-backdrop" @click="closeMobileMenu">
           <aside class="mobile-drawer" @click.stop>
@@ -198,23 +203,23 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
                 <div class="md-side-name">{{ restaurantName }}</div>
                 <div class="md-side-sub">{{ restaurantSub }}</div>
               </div>
-              <button class="fm-close" @click="closeMobileMenu" aria-label="Chiudi"><i class="bi bi-x-lg"/></button>
+              <button class="fm-close" @click="closeMobileMenu" aria-label="Chiudi"><i class="bi bi-x-lg"></i></button>
             </header>
             <nav class="mobile-drawer-nav">
-              <router-link v-if="showNav('manager')" to="/dashboard" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-speedometer2"/> Manager</router-link>
-              <router-link v-if="showNav('sala')" to="/orders" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-grid-3x3-gap"/> Sala</router-link>
-              <router-link v-if="showNav('cucina')" to="/kitchen" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-fire"/> Cucina</router-link>
-              <router-link v-if="showNav('prenotazioni')" to="/reservations" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-calendar-check"/> Prenotazioni</router-link>
-              <router-link v-if="showNav('menu')" to="/menu-handler" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-journal-text"/> Menu</router-link>
+              <router-link v-if="showNav('manager')" to="/dashboard" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-speedometer2"></i> Manager</router-link>
+              <router-link v-if="showNav('sala')" to="/orders" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-grid-3x3-gap"></i> Sala</router-link>
+              <router-link v-if="showNav('cucina')" to="/kitchen" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-fire"></i> Cucina</router-link>
+              <router-link v-if="showNav('prenotazioni')" to="/reservations" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-calendar-check"></i> Prenotazioni</router-link>
+              <router-link v-if="showNav('menu')" to="/menu-handler" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-journal-text"></i> Menu</router-link>
               <hr v-if="showNav('sito') || showNav('profilo')" class="mobile-drawer-sep">
-              <router-link v-if="showNav('sito')" to="/profile/show?section=sito" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-globe2"/> Sito pubblico</router-link>
-              <router-link v-if="showNav('profilo')" to="/profile/show" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-person"/> Profilo</router-link>
-              <router-link to="/logout" class="md-side-item md-side-item--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"/> Esci</router-link>
+              <router-link v-if="showNav('sito')" to="/profile/show?section=sito" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-globe2"></i> Sito pubblico</router-link>
+              <router-link v-if="showNav('profilo')" to="/profile/show" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-person"></i> Profilo</router-link>
+              <router-link to="/logout" class="md-side-item md-side-item--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"></i> Esci</router-link>
             </nav>
           </aside>
         </div>
       </Transition>
-    </Teleport>
+    </TeleportCompat>
   </div>
 
   <!-- ============== PUBLIC variant: landing/auth top nav ============== -->
@@ -236,31 +241,31 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
         <div class="nav-tools">
           <ThemeToggle class="nav-theme-toggle" />
           <ThemeToggle compact class="nav-theme-toggle-mobile" />
-          <template v-if="isLoggedIn">
-            <router-link :to="defaultAppRoute" class="btn btn-primary btn-sm nav-cta">
-              <i class="bi bi-speedometer2"/> Vai alla dashboard
-            </router-link>
-            <div class="user-menu">
-              <button class="avatar" @click.stop="toggleUserMenu" :aria-expanded="userMenuOpen">
-                <span>{{ userInitial }}</span>
-              </button>
-              <Transition name="fade">
-                <ul v-if="userMenuOpen" class="user-dropdown" role="menu">
-                  <li class="user-dropdown-header">
-                    <div class="user-dropdown-name">{{ username || 'Utente' }}</div>
-                    <div class="user-dropdown-role">Operatore</div>
-                  </li>
-                  <li><router-link to="/profile/show" class="user-dropdown-item" @click="closeUserMenu"><i class="bi bi-person"/><span>Profilo</span></router-link></li>
-                  <li><hr class="user-dropdown-sep"></li>
-                  <li><router-link to="/logout" class="user-dropdown-item user-dropdown-item--danger" @click="closeUserMenu"><i class="bi bi-box-arrow-right"/><span>Esci</span></router-link></li>
-                </ul>
-              </Transition>
-            </div>
-          </template>
-          <template v-else>
-            <router-link to="/login" class="btn btn-ghost btn-sm nav-cta">Accedi</router-link>
-            <router-link to="/register" class="btn btn-primary btn-sm nav-cta">Inizia ora</router-link>
-          </template>
+          <router-link
+            v-if="isLoggedIn"
+            :to="defaultAppRoute"
+            class="btn btn-primary btn-sm nav-cta"
+          >
+            <i class="bi bi-speedometer2"></i> Vai alla dashboard
+          </router-link>
+          <div v-if="isLoggedIn" class="user-menu">
+            <button class="avatar" @click.stop="toggleUserMenu" :aria-expanded="userMenuOpen">
+              <span>{{ userInitial }}</span>
+            </button>
+            <Transition name="fade">
+              <ul v-if="userMenuOpen" class="user-dropdown" role="menu">
+                <li class="user-dropdown-header">
+                  <div class="user-dropdown-name">{{ username || 'Utente' }}</div>
+                  <div class="user-dropdown-role">Operatore</div>
+                </li>
+                <li><router-link to="/profile/show" class="user-dropdown-item" @click="closeUserMenu"><i class="bi bi-person"></i><span>Profilo</span></router-link></li>
+                <li><hr class="user-dropdown-sep"></li>
+                <li><router-link to="/logout" class="user-dropdown-item user-dropdown-item--danger" @click="closeUserMenu"><i class="bi bi-box-arrow-right"></i><span>Esci</span></router-link></li>
+              </ul>
+            </Transition>
+          </div>
+          <router-link v-if="isGuest" to="/login" class="btn btn-ghost btn-sm nav-cta">Accedi</router-link>
+          <router-link v-if="isGuest" to="/register" class="btn btn-primary btn-sm nav-cta">Inizia ora</router-link>
 
           <button class="hamburger" :class="{ 'is-open': mobileMenuOpen }" @click="toggleMobileMenu" :aria-expanded="mobileMenuOpen" aria-label="Menu">
             <span></span><span></span><span></span>
@@ -270,21 +275,17 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 
       <Transition name="panel">
         <div v-if="mobileMenuOpen" class="mobile-nav-panel">
-          <ThemeToggle class="mobile-theme-toggle" />
+          <ThemeToggle class="mobile-theme-toggle"></ThemeToggle>
           <hr class="mobile-sep">
           <router-link to="/landing" class="mobile-link" @click="closeMobileMenu">Home</router-link>
           <router-link to="/who-are-us" class="mobile-link" @click="closeMobileMenu">Chi siamo</router-link>
           <router-link to="/contact-us" class="mobile-link" @click="closeMobileMenu">Contattaci</router-link>
           <hr class="mobile-sep">
-          <template v-if="isLoggedIn">
-            <router-link :to="defaultAppRoute" class="mobile-link" @click="closeMobileMenu"><i class="bi bi-speedometer2"/><span>Dashboard</span></router-link>
-            <router-link v-if="showNav('profilo')" to="/profile/show" class="mobile-link" @click="closeMobileMenu"><i class="bi bi-person"/><span>Profilo</span></router-link>
-            <router-link to="/logout" class="mobile-link mobile-link--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"/><span>Esci</span></router-link>
-          </template>
-          <template v-else>
-            <router-link to="/login" class="mobile-link" @click="closeMobileMenu">Accedi</router-link>
-            <router-link to="/register" class="mobile-link mobile-link--primary" @click="closeMobileMenu">Inizia ora</router-link>
-          </template>
+          <router-link v-if="isLoggedIn" :to="defaultAppRoute" class="mobile-link" @click="closeMobileMenu"><i class="bi bi-speedometer2"></i><span>Dashboard</span></router-link>
+          <router-link v-if="isLoggedIn && showNav('profilo')" to="/profile/show" class="mobile-link" @click="closeMobileMenu"><i class="bi bi-person"></i><span>Profilo</span></router-link>
+          <router-link v-if="isLoggedIn" to="/logout" class="mobile-link mobile-link--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"></i><span>Esci</span></router-link>
+          <router-link v-if="isGuest" to="/login" class="mobile-link" @click="closeMobileMenu">Accedi</router-link>
+          <router-link v-if="isGuest" to="/register" class="mobile-link mobile-link--primary" @click="closeMobileMenu">Inizia ora</router-link>
         </div>
       </Transition>
     </nav>

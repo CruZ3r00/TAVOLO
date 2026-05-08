@@ -60,9 +60,9 @@ const onAdvance = () => {
           </template>
         </span>
         <span class="kic-badge" :class="`st-${item.status}`">
-          <template v-if="item.status === 'taken'"><i class="bi bi-clipboard-check"/>Da fare</template>
-          <template v-else-if="item.status === 'preparing'"><i class="bi bi-fire"/>In preparazione</template>
-          <template v-else-if="item.status === 'ready'"><i class="bi bi-check2-circle"/>Pronto</template>
+          <template v-if="item.status === 'taken'"><i class="bi bi-clipboard-check"></i>Da fare</template>
+          <template v-else-if="item.status === 'preparing'"><i class="bi bi-fire"></i>In preparazione</template>
+          <template v-else-if="item.status === 'ready'"><i class="bi bi-check2-circle"></i>Pronto</template>
         </span>
       </header>
       <div class="kic-body">
@@ -72,20 +72,20 @@ const onAdvance = () => {
         </div>
         <div class="kic-meta">
           <span class="kic-course">
-            <i class="bi bi-layers"/>{{ parseInt(item.course, 10) || 1 }}a
+            <i class="bi bi-layers"></i>{{ parseInt(item.course, 10) || 1 }}a
           </span>
           <span v-if="item.category" class="kic-category">
             {{ item.category }}
           </span>
           <span class="kic-timer">
-            <i class="bi bi-clock"/>{{ elapsed }}
+            <i class="bi bi-clock"></i>{{ elapsed }}
           </span>
           <span v-if="isLong" class="kic-prio-flag">
-            <i class="bi bi-flag-fill"/>Oltre 15 min
+            <i class="bi bi-flag-fill"></i>Oltre 15 min
           </span>
         </div>
         <p v-if="item.notes" class="kic-notes">
-          <i class="bi bi-chat-text"/>{{ item.notes }}
+          <i class="bi bi-chat-text"></i>{{ item.notes }}
         </p>
       </div>
     </div>
@@ -97,9 +97,9 @@ const onAdvance = () => {
       :disabled="busy"
       @click="onAdvance"
     >
-      <i class="bi bi-fire"/>
+      <i class="bi bi-fire"></i>
       <span>Inizia preparazione</span>
-      <i class="bi bi-arrow-right"/>
+      <i class="bi bi-arrow-right"></i>
     </button>
     <button
       v-else-if="item.status === 'preparing'"
@@ -108,9 +108,9 @@ const onAdvance = () => {
       :disabled="busy"
       @click="onAdvance"
     >
-      <i class="bi bi-check2-circle"/>
+      <i class="bi bi-check2-circle"></i>
       <span>Segna come pronto</span>
-      <i class="bi bi-arrow-right"/>
+      <i class="bi bi-arrow-right"></i>
     </button>
     <button
       v-else-if="item.status === 'ready'"
@@ -120,9 +120,9 @@ const onAdvance = () => {
       :disabled="busy"
       @click="onAdvance"
     >
-      <i class="bi bi-check-lg"/>
+      <i class="bi bi-check-lg"></i>
       <span>Servito al tavolo</span>
-      <i class="bi bi-arrow-right"/>
+      <i class="bi bi-arrow-right"></i>
     </button>
   </article>
 </template>

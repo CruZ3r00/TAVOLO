@@ -1,16 +1,13 @@
 <script setup>
-import { useHead } from '@vueuse/head';
-import { useForm, defineRule, configure } from 'vee-validate';
+import { ref } from 'vue';
 import * as yup from 'yup';
+import { useHead } from '@/lib/compat/head.js';
+import { useFormState } from '@/lib/validation/form.js';
 import AuthenticationCard from '@/components/AuthenticationCard.vue';
 import InputError from '@/components/InputError.vue';
 import InputLabel from '@/components/InputLabel.vue';
 import TextInput from '@/components/TextInput.vue';
-import { ref } from 'vue';
 import { API_BASE } from '@/utils';
-
-const errorMessage = ref('');
-const successMessage = ref('');
 
 useHead({
   title: 'Password dimenticata',
@@ -19,52 +16,42 @@ useHead({
   ],
 });
 
-defineRule('required', (value) => (value ? true : 'This field is required'));
-defineRule('email', (value) =>
-  /^\S+@\S+\.\S+$/.test(value) || 'Please enter a valid email address.'
-);
-configure({
-  generateMessage: (ctx) => {
-    const messages = {
-      required: `The field ${ctx.field} is required.`,
-      email: 'Please enter a valid email address.',
-    };
-    return messages[ctx.rule.name] || 'Invalid field.';
+const errorMessage = ref('');
+const successMessage = ref('');
+
+const schema = yup.object({
+  email: yup.string()
+    .required('The email is mandatory.')
+    .email('Please enter a valid email address.'),
+});
+
+const { values, errors, isSubmitting, handleSubmit } = useFormState({
+  schema,
+  initialValues: { email: '' },
+  onSubmit: async (vals, { reset }) => {
+    errorMessage.value = '';
+    successMessage.value = '';
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: vals.email }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        errorMessage.value = data?.error?.message || data.message || 'Errore durante la richiesta.';
+      } else {
+        successMessage.value = 'Se esiste un account con questa email, riceverai il link per reimpostare la password.';
+      }
+    } catch (error) {
+      console.error('Errore:', error);
+      errorMessage.value = 'An unexpected error occurred';
+    }
+    reset({ email: '' });
   },
 });
 
-const schema = yup.object({
-  email: yup.string().required('The email is mandatory.').email('Please enter a valid email address.'),
-});
-
-const { values, errors, isSubmitting, handleSubmit } = useForm({
-  validationSchema: schema,
-});
-
-const submit = handleSubmit(async () => {
-  errorMessage.value = '';
-  successMessage.value = '';
-  try {
-    const response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: values.email }),
-        });
-
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      errorMessage.value = data?.error?.message || data.message || 'Errore durante la richiesta.';
-    } else {
-      successMessage.value = 'Se esiste un account con questa email, riceverai il link per reimpostare la password.';
-    }
-  } catch (error) {
-    console.error('Errore:', error);
-    errorMessage.value = 'An unexpected error occurred';
-  }
-
-  values.email = '';
-});
+const submit = handleSubmit;
 </script>
 
 <template>

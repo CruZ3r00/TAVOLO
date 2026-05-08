@@ -1,11 +1,13 @@
 <script setup>
     import { ref, nextTick } from 'vue';
-    import { useHead } from '@vueuse/head';
-    import { useForm, defineRule, configure } from 'vee-validate';
+    import * as yup from 'yup';
+    import { useHead } from '@/lib/compat/head.js';
+    import { useFormState } from '@/lib/validation/form.js';
     import AuthenticationCard from '@/components/AuthenticationCard.vue';
     import InputError from '@/components/InputError.vue';
     import InputLabel from '@/components/InputLabel.vue';
     import TextInput from '@/components/TextInput.vue';
+    import { API_BASE } from '@/utils';
 
     useHead({
         title: 'Verifica a due fattori',
@@ -14,44 +16,81 @@
         ],
     });
 
-    defineRule('required', (value) => (value ? true : 'Questo campo è obbligatorio.'));
-    defineRule('numeric', (value) => /^[0-9]+$/.test(value) || 'Il codice deve essere numerico.');
+    const recovery = ref(false);
+    const recoveryCodeInput = ref(null);
+    const codeInput = ref(null);
+    const errorMessage = ref('');
 
-    configure({
-        generateMessage: (ctx) => {
-            const messages = {
-            required: `Il campo ${ctx.field} è obbligatorio.`,
-            numeric: 'Il codice deve essere numerico.',
-            };
-            return messages[ctx.rule.name] || 'Campo non valido.';
+    // Schema dinamico: in modalita' "code" valida `code`, in modalita' "recovery"
+    // valida `recovery_code`. Ricostruisco la useFormState ad ogni toggle non e'
+    // pratico, quindi usiamo un singolo schema con required condizionale via .when.
+    const schema = yup.object({
+        code: yup.string().when('$recovery', {
+            is: false,
+            then: (s) => s.required('Codice obbligatorio.').matches(/^[0-9]+$/, 'Il codice deve essere numerico.'),
+            otherwise: (s) => s.notRequired(),
+        }),
+        recovery_code: yup.string().when('$recovery', {
+            is: true,
+            then: (s) => s.required('Codice di recupero obbligatorio.'),
+            otherwise: (s) => s.notRequired(),
+        }),
+    });
+
+    // Workaround: yup `.when('$recovery')` richiede `context: { recovery }` al
+    // validate. La form.js attuale non supporta context. Soluzione: schema fisso
+    // sui due campi e validazione manuale in onSubmit.
+    const simpleSchema = yup.object({
+        code: yup.string(),
+        recovery_code: yup.string(),
+    });
+
+    const { values: challengeForm, errors, isSubmitting, handleSubmit, setError } = useFormState({
+        schema: simpleSchema,
+        initialValues: { code: '', recovery_code: '' },
+        onSubmit: async (vals) => {
+            errorMessage.value = '';
+            // Validazione manuale del campo attivo.
+            if (!recovery.value) {
+                if (!vals.code) { setError('code', 'Codice obbligatorio.'); return; }
+                if (!/^[0-9]+$/.test(vals.code)) { setError('code', 'Il codice deve essere numerico.'); return; }
+            } else if (!vals.recovery_code) {
+                setError('recovery_code', 'Codice di recupero obbligatorio.');
+                return;
+            }
+
+            try {
+                const resp = await fetch(`${API_BASE}/api/auth/two-factor-challenge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(recovery.value
+                        ? { recovery_code: vals.recovery_code }
+                        : { code: vals.code }),
+                });
+                if (!resp.ok) {
+                    const data = await resp.json().catch(() => ({}));
+                    errorMessage.value = data?.error?.message || data.message || 'Codice non valido.';
+                }
+            } catch (err) {
+                console.error('2FA error:', err);
+                errorMessage.value = 'Errore di rete. Riprova.';
+            }
         },
     });
 
-    const recovery = ref(false);
-    const form = useForm({
-        code: '',
-        recovery_code: '',
-    });
-
-    const recoveryCodeInput = ref(null);
-    const codeInput = ref(null);
-
     const toggleRecovery = async () => {
-        recovery.value ^= true;
+        recovery.value = !recovery.value;
         await nextTick();
-
         if (recovery.value) {
-            recoveryCodeInput.value.focus();
-            form.code = '';
+            recoveryCodeInput.value?.focus?.();
+            challengeForm.code = '';
         } else {
-            codeInput.value.focus();
-            form.recovery_code = '';
+            codeInput.value?.focus?.();
+            challengeForm.recovery_code = '';
         }
     };
 
-    const submit = () => {
-        form.post(route('two-factor.login'));
-    };
+    const submit = handleSubmit;
 </script>
 
 <template>
@@ -72,20 +111,27 @@
             </template>
         </p>
 
+        <Transition name="fade">
+            <div v-if="errorMessage" class="ds-alert ds-alert-error">
+                <i class="bi bi-exclamation-circle"></i>
+                <span>{{ errorMessage }}</span>
+            </div>
+        </Transition>
+
         <form @submit.prevent="submit" class="auth-form">
             <div v-if="!recovery" class="ds-field">
                 <InputLabel for="code" value="Codice" />
                 <TextInput
                     id="code"
                     ref="codeInput"
-                    v-model="form.code"
+                    v-model="challengeForm.code"
                     type="text"
                     inputmode="numeric"
                     autofocus
                     autocomplete="one-time-code"
                     placeholder="000000"
                 />
-                <InputError :message="form.errors?.code" />
+                <InputError :message="errors.code" />
             </div>
 
             <div v-else class="ds-field">
@@ -93,12 +139,12 @@
                 <TextInput
                     id="recovery_code"
                     ref="recoveryCodeInput"
-                    v-model="form.recovery_code"
+                    v-model="challengeForm.recovery_code"
                     type="text"
                     autocomplete="one-time-code"
                     placeholder="Il tuo codice di recupero"
                 />
-                <InputError :message="form.errors?.recovery_code" />
+                <InputError :message="errors.recovery_code" />
             </div>
 
             <div class="tfa-actions">
@@ -107,8 +153,8 @@
                     <template v-else>Usa il codice di autenticazione</template>
                 </button>
 
-                <button type="submit" class="ds-btn ds-btn-primary" :disabled="form.processing">
-                    <span v-if="form.processing" class="ds-spinner"></span>
+                <button type="submit" class="ds-btn ds-btn-primary" :disabled="isSubmitting">
+                    <span v-if="isSubmitting" class="ds-spinner"></span>
                     <span v-else>Accedi</span>
                 </button>
             </div>
@@ -162,4 +208,6 @@
   color: color-mix(in oklab, var(--ac) 80%, var(--ink));
   text-decoration: underline;
 }
+.fade-enter-active, .fade-leave-active { transition: opacity 180ms, transform 180ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>
