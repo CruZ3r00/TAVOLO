@@ -10,6 +10,9 @@
     "build:modern": "vite build --outDir dist/modern",
     "build:legacy": "vite build --config vite.config.legacy.mjs --outDir dist/legacy",
     "build:all": "npm run build:modern && npm run build:legacy",
+    "build:prod:modern": "vite build --base=/modern/ --outDir dist/modern",
+    "build:prod:legacy": "vite build --config vite.config.legacy.mjs --base=/legacy/ --outDir dist/legacy",
+    "build:prod": "npm run build:prod:modern && npm run build:prod:legacy && node scripts/generate-unified-index.cjs",
     "preview": "vite preview",
     "postinstall": "node scripts/patch-legacy-build.cjs"
   },
