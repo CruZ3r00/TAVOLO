@@ -121,6 +121,38 @@
   .ds-badge-muted { background: #ece9e3; color: #5b5650; }
   .status-badge-cancelled,
   .ds-badge-danger { background: #fdeceb; color: #8f2c22; }
+
+  /* --- Landing: card sovrapposte sempre opache e leggibili --- */
+  .public-context-inner,
+  .public-takeaway-inner,
+  .public-order-card,
+  .public-feature,
+  .public-feature-stack-card,
+  .feature-stack-card,
+  .public-plan,
+  .plan-orbit .public-plan {
+    background: #ffffff;
+    color: #2d2824;
+  }
+  [data-theme="dark"] .public-context-inner,
+  [data-theme="dark"] .public-takeaway-inner,
+  [data-theme="dark"] .public-order-card,
+  [data-theme="dark"] .public-feature,
+  [data-theme="dark"] .public-feature-stack-card,
+  [data-theme="dark"] .feature-stack-card,
+  [data-theme="dark"] .public-plan,
+  [data-theme="dark"] .plan-orbit .public-plan {
+    background: #2b3039;
+    color: #f7f2eb;
+  }
+  .public-plan-focus,
+  .public-plan-note {
+    background: #f6f1e9;
+  }
+  [data-theme="dark"] .public-plan-focus,
+  [data-theme="dark"] .public-plan-note {
+    background: #20242c;
+  }
 }
 
 /* ============================================================================

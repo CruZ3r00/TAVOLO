@@ -22,3 +22,5 @@
 
 - For interactive UI changes, verify the actual event path: clickable control type, route guard, target route metadata, state watcher/reload path, and runtime/API availability.
 - If the runtime is unavailable (`node`/`npm` missing or servers not listening), say exactly which functional checks could not be run instead of presenting static inspection as end-to-end verification.
+- When adding small Three.js scenes that must be verified by Playwright canvas pixel checks, set `preserveDrawingBuffer: true` on those focused renderers or the visual scene can render while `gl.readPixels()` still observes an empty presented buffer.
+- Keep important landing copy in DOM cards over the canvas; use Three.js as depth/motion support so legacy and reduced-motion fallbacks stay readable.

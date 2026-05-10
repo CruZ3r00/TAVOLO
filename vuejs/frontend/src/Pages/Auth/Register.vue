@@ -296,8 +296,8 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
           <div class="au-trial">
             <i class="bi bi-gift"></i>
             <div>
-              <strong>14 giorni gratis</strong>
-              <span>Nessun addebito ora. Inserisci la carta solo alla fine del periodo. Annulli quando vuoi.</span>
+              <strong>Iscriviti ora</strong>
+              <span>Scegli il piano piu adatto e completa la registrazione in modo guidato.</span>
             </div>
           </div>
           <p class="fl-help">Cliccando su "Continua" andrai alla pagina di scelta del piano. Lì potrai scegliere Essenziale o Professionale e completare la registrazione tramite Stripe.</p>
@@ -329,7 +329,7 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
 
     <aside class="au-side">
       <div class="au-side-content">
-        <div class="overline" style="color: color-mix(in oklab, white 60%, transparent);">14 giorni gratis</div>
+        <div class="overline" style="color: color-mix(in oklab, white 60%, transparent);">Iscriviti ora</div>
         <h2>Inizia subito. Senza carta. Senza setup.</h2>
         <p>Crea l'account in 2 minuti. Stampante fiscale e POS si configurano dopo, quando vuoi.</p>
         <ol class="au-steps">

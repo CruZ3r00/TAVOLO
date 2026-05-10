@@ -6,12 +6,22 @@ const LandingHeroScene = defineAsyncComponent(() => import('@/components/Landing
 
 const canUseHeroScene = ref(false);
 const canUseFeatureFlipDeck = ref(false);
+const canUsePlanOrbit = ref(false);
 
 const LandingFeatureFlipDeck = defineAsyncComponent({
   loader: () => import('@/components/LandingFeatureFlipDeck.vue'),
   onError(error, _retry, fail) {
     console.warn('Landing feature deck unavailable', error);
     canUseFeatureFlipDeck.value = false;
+    fail(error);
+  },
+});
+
+const LandingPlansOrbit = defineAsyncComponent({
+  loader: () => import('@/components/LandingPlansOrbit.vue'),
+  onError(error, _retry, fail) {
+    console.warn('Landing plans orbit unavailable', error);
+    canUsePlanOrbit.value = false;
     fail(error);
   },
 });
@@ -99,38 +109,43 @@ const plans = [
     name: 'Essenziale',
     price: '€ 39,99',
     period: '/ mese',
-    label: 'Per partire ordinati',
-    body: 'Per locali che vogliono gestire sala, ordini e cucina senza complicare il servizio.',
+    label: 'Flusso unico, subito chiaro',
+    body: 'Per locali che vogliono gestire sala, tavoli, asporto e cucina in un unico flusso operativo.',
+    focus: 'Tutte le comande arrivano a un profilo cucina centrale. Il profilo cameriere resta sempre attivo e la cucina vede l’intera coda da preparare.',
     features: [
-      'Vista sala e tavoli',
-      'Prenotazioni e walk-in',
-      'Ordini verso cucina',
-      'Account cameriere e cucina',
-      'Menu digitale con QR',
+      'Vista sala, tavoli, prenotazioni e walk-in',
+      'Ordini e take away verso un unico profilo cucina',
+      'Account cameriere e cucina sempre inclusi',
+      'Menu digitale con QR e gestione stati ordine',
+      'Ideale quando un solo banco coordina tutte le preparazioni',
     ],
+    note: 'Puoi comunque revisionare gli ordini e seguire lo stato del servizio senza configurare reparti separati.',
   },
   {
     key: 'pro',
     name: 'Professionale',
     price: '€ 74,99',
     period: '/ mese',
-    label: 'Per più reparti al lavoro',
-    body: 'Per ristoranti, pizzerie e bar con cucina che devono dividere le comande tra più postazioni.',
+    label: 'Reparti guidati e ruoli privati',
+    body: 'Per ristoranti, pizzerie e bar con piu postazioni che devono separare automaticamente le comande.',
+    focus: 'Sblocca profili semi custom guidati: cucina, bar, pizzeria e cucina SG ricevono solo le categorie assegnate, con revisione manuale sempre possibile.',
     features: [
       'Tutto del piano Essenziale',
-      'Reparti bar, pizzeria e cucina SG',
-      'Smistamento automatico per categoria',
-      'Ruoli staff più specifici',
-      'Statistiche storiche e report',
+      'Smistamento automatico delle comande per ambiente',
+      'Account privato per ogni tipo di impiegato',
+      'Ogni reparto vede solo le informazioni necessarie',
+      'Accesso in anteprima beta alle nuove funzionalita',
+      'A breve: gestione ingredienti e magazzino',
     ],
+    note: 'Pensato per ridurre rumore in servizio: il bar non legge la cucina, la pizzeria non riceve il banco e la cucina SG resta separata.',
     highlighted: true,
   },
 ];
 
 // Su legacy build (Vue 2.7 / browser molto vecchi) Three.js puo' fallire al
-// runtime anche se WebGL formalmente esiste: l'import del modulo three usa
-// sintassi che plugin-legacy transpila ma alcuni edge case (proxy, async iter)
-// non hanno equivalente eseguibile. Forziamo i fallback statici sempre.
+// runtime anche se WebGL formalmente esiste. Per questo il hero resta legato a
+// WebGL + modern build; feature e piani sono DOM/CSS e possono girare anche in
+// legacy, salvo preferenza di movimento ridotto.
 // eslint-disable-next-line no-undef
 const isModernBuild = typeof __MODERN__ !== 'undefined' ? __MODERN__ : true;
 
@@ -138,7 +153,8 @@ onMounted(() => {
   nextTick(() => { document.title = 'COMFORTABLES · Gestionale ristorante in tempo reale'; });
   const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   canUseHeroScene.value = isModernBuild && !prefersReducedMotion && supportsWebGL();
-  canUseFeatureFlipDeck.value = canUseHeroScene.value;
+  canUseFeatureFlipDeck.value = !prefersReducedMotion;
+  canUsePlanOrbit.value = !prefersReducedMotion;
 });
 </script>
 
@@ -169,7 +185,7 @@ onMounted(() => {
               </p>
               <div class="public-cta" aria-label="Azioni principali">
                 <router-link to="/register" class="btn btn-lg btn-accent btn-pill">
-                  Prova gratis 14 giorni <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                  Iscriviti ora <i class="bi bi-arrow-right" aria-hidden="true"></i>
                 </router-link>
                 <a href="#come-funziona" class="btn btn-lg btn-pill">
                   <i class="bi bi-play-circle" aria-hidden="true"></i> Guarda come funziona
@@ -182,30 +198,6 @@ onMounted(() => {
                   <dd>{{ metric.label }}</dd>
                 </div>
               </dl>
-            </div>
-
-            <div class="public-ops-panel" aria-label="Anteprima flusso operativo">
-              <div class="public-ops-top">
-                <span>Servizio live</span>
-                <strong>18:42</strong>
-              </div>
-              <div class="public-ops-cols">
-                <article>
-                  <span class="public-ops-k">T7</span>
-                  <strong>Risotto, acqua, tiramisù</strong>
-                  <small>In cucina · 3 item</small>
-                </article>
-                <article class="is-accent">
-                  <span class="public-ops-k">A12</span>
-                  <strong>Take away dal sito</strong>
-                  <small>Ritiro 19:10 · da accettare</small>
-                </article>
-                <article>
-                  <span class="public-ops-k">B</span>
-                  <strong>Bar sincronizzato</strong>
-                  <small>2 bevande pronte</small>
-                </article>
-              </div>
             </div>
           </div>
         </div>
@@ -268,7 +260,7 @@ onMounted(() => {
 
       <section class="public-features" aria-labelledby="features-title">
         <div class="public-container">
-          <div class="public-section-h">
+          <div v-if="!canUseFeatureFlipDeck" class="public-section-h public-features-fallback-heading">
             <div class="overline">Funzionalità operative</div>
             <h2 id="features-title">Tutto quello che serve durante il servizio.</h2>
           </div>
@@ -276,9 +268,19 @@ onMounted(() => {
             v-if="canUseFeatureFlipDeck"
             :features="features"
             @scene-error="canUseFeatureFlipDeck = false"
-          />
-          <div v-else class="public-features-grid">
-            <article v-for="feature in features" :key="feature.title" class="public-feature">
+          >
+            <div class="public-section-h">
+              <div class="overline">Funzionalità operative</div>
+              <h2 id="features-title">Tutto quello che serve durante il servizio.</h2>
+            </div>
+          </LandingFeatureFlipDeck>
+          <div v-else class="public-features-stack-fallback" aria-label="Funzionalità operative">
+            <article
+              v-for="(feature, index) in features"
+              :key="feature.title"
+              class="public-feature public-feature-stack-card"
+              :style="{ '--feature-index': index, '--feature-tilt': index % 2 ? '0.55deg' : '-0.55deg', zIndex: 20 + index }"
+            >
               <div class="public-feature-icon">
                 <i :class="['bi', feature.icon]" aria-hidden="true"></i>
               </div>
@@ -327,7 +329,7 @@ onMounted(() => {
 
       <section class="public-plans" aria-labelledby="plans-title">
         <div class="public-container">
-          <div class="public-section-h">
+          <div v-if="!canUsePlanOrbit" class="public-section-h public-plans-fallback-heading">
             <div class="overline">Piani</div>
             <h2 id="plans-title">Scegli in base a come lavora il tuo locale.</h2>
             <p>
@@ -335,12 +337,27 @@ onMounted(() => {
               e quanto dettaglio hai nella gestione del servizio.
             </p>
           </div>
-          <div class="public-plans-grid">
+          <LandingPlansOrbit
+            v-if="canUsePlanOrbit"
+            :plans="plans"
+            @scene-error="canUsePlanOrbit = false"
+          >
+            <div class="public-section-h">
+              <div class="overline">Piani</div>
+              <h2 id="plans-title">Scegli in base a come lavora il tuo locale.</h2>
+              <p>
+                I piani non cambiano solo il prezzo: cambiano quanti reparti puoi coordinare
+                e quanto dettaglio hai nella gestione del servizio.
+              </p>
+            </div>
+          </LandingPlansOrbit>
+          <div v-else class="public-plans-grid public-plans-fallback-stack">
             <article
-              v-for="plan in plans"
+              v-for="(plan, index) in plans"
               :key="plan.key"
               class="public-plan"
               :class="{ 'public-plan-highlight': plan.highlighted }"
+              :style="{ '--plan-index': index, '--plan-tilt': index % 2 ? '0.65deg' : '-0.65deg', zIndex: 30 + index }"
             >
               <div v-if="plan.highlighted" class="public-plan-tag">Consigliato</div>
               <div class="public-plan-label">{{ plan.label }}</div>
@@ -350,35 +367,22 @@ onMounted(() => {
                 <small>{{ plan.period }}</small>
               </div>
               <p>{{ plan.body }}</p>
+              <div class="public-plan-focus">{{ plan.focus }}</div>
               <ul>
                 <li v-for="feature in plan.features" :key="feature">
                   <i class="bi bi-check2" aria-hidden="true"></i>
                   <span>{{ feature }}</span>
                 </li>
               </ul>
+              <div v-if="plan.note" class="public-plan-note">{{ plan.note }}</div>
               <router-link to="/register" class="btn btn-lg btn-pill" :class="{ 'btn-accent': plan.highlighted }">
-                Prova gratis 14 giorni
+                Iscriviti ora
               </router-link>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="public-cta-box">
-        <div class="public-container">
-          <div class="public-cta-inner">
-            <div>
-              <h3>Prova gratis 14 giorni.</h3>
-              <p>Nessun vincolo, nessuna carta richiesta.</p>
-            </div>
-            <div class="public-cta-actions">
-              <router-link to="/register" class="btn btn-sm btn-pill btn-accent">
-                Prova gratis 14 giorni <i class="bi bi-arrow-right" aria-hidden="true"></i>
-              </router-link>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   </AppLayout>
 </template>
@@ -386,7 +390,7 @@ onMounted(() => {
 <style scoped>
 .dashboard-public {
   font-family: var(--f-sans);
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
   line-height: 1.5;
   background: var(--bg);
 }
@@ -441,6 +445,7 @@ onMounted(() => {
   height: 74px;
   border: 1px solid var(--line);
   border-radius: 14px;
+  background: var(--paper);
   background: color-mix(in oklab, var(--paper) 82%, transparent);
   box-shadow: var(--shadow-md);
 }
@@ -500,6 +505,7 @@ onMounted(() => {
   padding: 11px 14px;
   border: 1px solid var(--line);
   border-radius: 12px;
+  background: var(--paper);
   background: color-mix(in oklab, var(--paper) 82%, transparent);
   box-shadow: var(--shadow-xs);
 }
@@ -520,6 +526,7 @@ onMounted(() => {
   padding: 14px;
   border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
   border-radius: 18px;
+  background: var(--paper);
   background: color-mix(in oklab, var(--paper) 86%, transparent);
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(12px);
@@ -546,6 +553,7 @@ onMounted(() => {
 }
 .public-ops-cols article.is-accent {
   border-color: color-mix(in oklab, var(--ac) 34%, var(--line));
+  background: var(--paper);
   background: color-mix(in oklab, var(--ac) 7%, var(--paper));
 }
 .public-ops-k {
@@ -576,9 +584,25 @@ onMounted(() => {
   padding: 36px 0 42px;
   background: var(--bg);
 }
+.public-flow {
+  --flow-sticky-top: 84px;
+  --flow-heading-space: clamp(88px, 12vh, 108px);
+  --flow-handoff-space: clamp(210px, 26vh, 250px);
+  --flow-handoff-pull: clamp(-250px, -26vh, -210px);
+}
+.public-flow .public-container {
+  min-height: calc(100vh - var(--flow-sticky-top) + var(--flow-handoff-space));
+  perspective: 1200px;
+}
 .public-features {
+  --feature-fallback-sticky-top: 84px;
+  --feature-fallback-heading-space: clamp(150px, 20vh, 184px);
   padding: 42px 0;
   background: var(--bg-sunk, var(--bg-2));
+}
+.public-plans {
+  --plan-fallback-sticky-top: 84px;
+  --plan-fallback-heading-space: clamp(164px, 22vh, 206px);
 }
 .public-card-scroll .public-container {
   min-height: 470px;
@@ -726,18 +750,30 @@ onMounted(() => {
 
 .public-order-stack {
   max-width: 780px;
-  margin: 0 auto;
-  padding: 8px 0 20px;
+  margin: var(--flow-handoff-pull) auto 0;
+  min-height: calc(100vh - var(--flow-sticky-top) - var(--flow-heading-space) + var(--flow-handoff-space));
+  padding: 0 0 20px;
   perspective: 1200px;
+}
+.public-flow .public-section-h {
+  position: sticky;
+  top: var(--flow-sticky-top);
+  z-index: 35;
+  min-height: calc(var(--flow-heading-space) + var(--flow-handoff-space));
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 .public-order-card {
   position: sticky;
-  top: calc(84px + (var(--card-index) * 12px));
+  top: calc(var(--flow-sticky-top) + var(--flow-heading-space) + (var(--card-index) * 12px));
   margin-top: -14px;
   min-height: 154px;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 16px;
+  background: var(--paper);
   background:
     linear-gradient(135deg, color-mix(in oklab, var(--paper) 96%, white 4%), var(--paper)),
     var(--paper);
@@ -781,7 +817,7 @@ onMounted(() => {
 .public-feature h3 {
   margin: 0 0 8px;
   font-size: 18px;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   font-weight: 600;
   color: var(--ink);
 }
@@ -827,21 +863,66 @@ onMounted(() => {
 }
 
 .public-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.public-features-fallback-heading {
+  position: sticky;
+  top: var(--feature-fallback-sticky-top);
+  z-index: 35;
+  min-height: var(--feature-fallback-heading-space);
+  margin-bottom: 0;
+}
+.public-features-stack-fallback {
+  min-height: 560px;
+  max-width: 730px;
+  margin: 0 auto;
+  padding: 0 0 24px;
+  perspective: 1200px;
+}
 .public-feature {
   background: var(--paper); border: 1px solid var(--line);
   border-radius: 14px; padding: 18px;
   transition: transform var(--dur), box-shadow var(--dur), border-color var(--dur);
 }
+.public-feature-stack-card {
+  position: sticky;
+  top: calc(var(--feature-fallback-sticky-top) + var(--feature-fallback-heading-space) + (var(--feature-index) * 10px));
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  margin-top: -8px;
+  min-height: clamp(140px, 21vh, 178px);
+  padding: 18px 24px 18px 26px;
+  background: var(--paper);
+  box-shadow: 0 18px 46px -28px rgb(0 0 0 / 0.28), var(--shadow-xs);
+  transform: rotateX(2deg) rotateZ(var(--feature-tilt)) translateY(calc(var(--feature-index) * 2px));
+}
+.public-feature-stack-card:first-child {
+  margin-top: 0;
+}
 .public-feature:hover {
   transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--line-strong);
 }
+.public-feature-stack-card:hover {
+  transform: rotateX(1.4deg) rotateZ(var(--feature-tilt)) translateY(calc(var(--feature-index) * 2px - 2px));
+}
 .public-feature-icon {
-  width: 38px; height: 38px;
+  grid-row: 1 / span 2;
+  width: 46px; height: 46px;
   background: var(--ac-soft); border-radius: 10px;
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--ac); font-size: 19px; margin-bottom: 12px;
+  color: var(--ac); font-size: 21px; margin: 0;
 }
-
+.public-feature-stack-card h3,
+.public-feature-stack-card p {
+  grid-column: 2;
+}
+.public-plans-fallback-heading {
+  position: sticky;
+  top: var(--plan-fallback-sticky-top);
+  z-index: 35;
+  min-height: var(--plan-fallback-heading-space);
+  margin-bottom: 0;
+}
 .public-plans-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -850,6 +931,8 @@ onMounted(() => {
 }
 .public-plan {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -881,7 +964,8 @@ onMounted(() => {
   margin: 0 0 9px;
   color: var(--ink);
   font-size: 26px;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
+  font-weight: 650;
 }
 .public-plan-price {
   display: flex;
@@ -894,14 +978,30 @@ onMounted(() => {
   font-size: 31px;
   line-height: 1;
   font-weight: 700;
-  letter-spacing: -0.035em;
+  letter-spacing: 0;
 }
 .public-plan-price small { color: var(--ink-3); font-size: 14px; }
 .public-plan p {
-  margin: 0 0 15px;
+  margin: 0 0 12px;
   color: var(--ink-2);
   font-size: 15px;
   line-height: 1.55;
+}
+.public-plan-focus,
+.public-plan-note {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-sunk);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+.public-plan-focus {
+  margin-bottom: 14px;
+}
+.public-plan-note {
+  margin: 0 0 16px;
 }
 .public-plan ul {
   list-style: none;
@@ -921,29 +1021,21 @@ onMounted(() => {
   color: var(--ok);
   margin-top: 2px;
 }
-
-.public-cta-box { padding: 18px 0 42px; background: var(--bg); }
-.public-cta-inner {
-  background: var(--ink); color: var(--paper);
-  border-radius: 16px; padding: 18px 22px;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; flex-wrap: wrap;
-  background:
-    radial-gradient(80% 80% at 100% 0%, color-mix(in oklab, var(--ac) 50%, var(--ink)), var(--ink) 70%);
+.public-plan .btn {
+  margin-top: auto;
+  align-self: flex-start;
 }
-.public-cta-inner h3 { margin: 0 0 4px; font-size: 18px; letter-spacing: 0; font-weight: 650; }
-.public-cta-inner p { margin: 0; opacity: 0.78; font-size: 13px; max-width: 440px; }
-.public-cta-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.public-cta-inner :deep(.btn) {
-  background: color-mix(in oklab, var(--paper) 12%, transparent);
-  border-color: color-mix(in oklab, var(--paper) 25%, transparent);
+.public-plan-highlight .btn {
+  background: var(--ac);
+  border-color: var(--ac);
+  color: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+.public-plan-highlight .btn:hover {
+  background: color-mix(in oklab, var(--ac) 88%, black 12%);
+  border-color: color-mix(in oklab, var(--ac) 88%, black 12%);
   color: var(--paper);
 }
-.public-cta-inner :deep(.btn:hover) { background: color-mix(in oklab, var(--paper) 22%, transparent); }
-.public-cta-inner :deep(.btn-accent) {
-  background: var(--paper); color: var(--ink); border-color: var(--paper);
-}
-.public-cta-inner :deep(.btn-accent:hover) { background: color-mix(in oklab, var(--paper) 90%, var(--ac)); }
 
 @media (max-width: 1080px) {
   .public-hero {
@@ -967,8 +1059,21 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
   .public-features-grid { grid-template-columns: 1fr 1fr; }
+  .public-features {
+    --feature-fallback-sticky-top: 72px;
+    --feature-fallback-heading-space: clamp(140px, 20vh, 174px);
+  }
+  .public-feature-stack-card {
+    top: calc(var(--feature-fallback-sticky-top) + var(--feature-fallback-heading-space) + (var(--feature-index) * 10px));
+  }
+  .public-flow {
+    --flow-sticky-top: 72px;
+    --flow-heading-space: clamp(104px, 15vh, 126px);
+    --flow-handoff-space: clamp(190px, 24vh, 230px);
+    --flow-handoff-pull: clamp(-230px, -24vh, -190px);
+  }
   .public-order-card {
-    top: calc(72px + (var(--card-index) * 10px));
+    top: calc(var(--flow-sticky-top) + var(--flow-heading-space) + (var(--card-index) * 10px));
   }
 }
 @media (max-width: 820px) {
@@ -987,6 +1092,26 @@ onMounted(() => {
   }
   .public-takeaway-flow {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .public-plans {
+    --plan-fallback-sticky-top: 72px;
+    --plan-fallback-heading-space: clamp(146px, 21vh, 190px);
+  }
+  .public-plans-fallback-stack {
+    display: block;
+    min-height: 780px;
+    max-width: 560px;
+    margin: 0 auto;
+    perspective: 1000px;
+  }
+  .public-plans-fallback-stack .public-plan {
+    position: sticky;
+    top: calc(var(--plan-fallback-sticky-top) + var(--plan-fallback-heading-space) + (var(--plan-index) * 14px));
+    margin-top: -12px;
+    transform: rotateX(1.8deg) rotateZ(var(--plan-tilt));
+  }
+  .public-plans-fallback-stack .public-plan:first-child {
+    margin-top: 0;
   }
   .public-ops-panel {
     justify-self: start;
@@ -1028,6 +1153,10 @@ onMounted(() => {
   .public-flow,
   .public-features,
   .public-plans { padding: 34px 0; }
+  .public-flow {
+    --flow-handoff-space: clamp(248px, 35vh, 308px);
+    --flow-handoff-pull: clamp(-308px, -35vh, -248px);
+  }
   .public-card-scroll .public-container {
     min-height: 570px;
     perspective: 1000px;
@@ -1047,13 +1176,33 @@ onMounted(() => {
   .public-features-grid,
   .public-problem-list,
   .public-takeaway-flow { grid-template-columns: 1fr; }
+  .public-features-stack-fallback {
+    min-height: 690px;
+  }
+  .public-feature-stack-card {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 13px;
+    top: calc(var(--feature-fallback-sticky-top) + var(--feature-fallback-heading-space) + (var(--feature-index) * 10px));
+    min-height: 142px;
+    margin-top: -8px;
+    padding: 16px 17px 16px 19px;
+    transform: rotateX(2deg) rotateZ(var(--feature-tilt)) translateY(calc(var(--feature-index) * 2px));
+  }
+  .public-feature-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 19px;
+  }
+  .public-feature-stack-card:hover {
+    transform: rotateX(1.4deg) rotateZ(var(--feature-tilt)) translateY(calc(var(--feature-index) * 2px - 2px));
+  }
   .public-takeaway-flow div.is-main {
     transform: none;
   }
   .public-order-stack { padding-top: 0; }
   .public-order-card {
     position: sticky;
-    top: calc(72px + (var(--card-index) * 10px));
+    top: calc(var(--flow-sticky-top) + var(--flow-heading-space) + (var(--card-index) * 10px));
     margin-top: -10px;
     transform: rotateX(2deg) rotateZ(var(--card-tilt)) translateY(calc(var(--card-index) * 2px));
   }
@@ -1072,10 +1221,10 @@ onMounted(() => {
     grid-column: 1 / -1;
     justify-self: start;
   }
-  .public-cta-box { padding: 16px 0 36px; }
-  .public-cta-inner,
   .public-takeaway-inner { padding: 22px; }
-  .public-cta-inner h3 { font-size: 18px; }
+  .public-plans-fallback-stack {
+    min-height: 760px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1090,6 +1239,19 @@ onMounted(() => {
     top: auto;
     transform: none;
   }
+  .public-flow .public-section-h {
+    position: relative;
+    top: auto;
+    min-height: 0;
+    margin-bottom: 24px;
+  }
+  .public-features-fallback-heading,
+  .public-plans-fallback-heading {
+    position: relative;
+    top: auto;
+    min-height: 0;
+    margin-bottom: 24px;
+  }
   .public-stack-card-b {
     margin-top: 10px;
   }
@@ -1099,7 +1261,22 @@ onMounted(() => {
     margin-top: 10px;
     transform: none;
   }
+  .public-features-stack-fallback,
+  .public-plans-fallback-stack {
+    min-height: 0;
+  }
+  .public-feature-stack-card,
+  .public-plans-fallback-stack .public-plan {
+    position: relative;
+    top: auto;
+    margin-top: 10px;
+    transform: none;
+  }
   .public-order-card:hover {
+    transform: none;
+  }
+  .public-feature-stack-card:hover,
+  .public-plans-fallback-stack .public-plan:hover {
     transform: none;
   }
 }

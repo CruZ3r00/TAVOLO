@@ -40,6 +40,36 @@ const renameLegacyHtml = () => {
   };
 };
 
+// In dev Vite serve sempre `index.html` come fallback SPA se non gli diciamo
+// esplicitamente il contrario. Per il legacy build quello rompe tutto: carica
+// `src/main.js` (Vue 3) mentre gli alias risolvono `vue` a Vue 2.
+const legacyDevHtmlFallback = () => ({
+  name: 'legacy-dev-html-fallback',
+  apply: 'serve',
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      if (!req.url || (req.method !== 'GET' && req.method !== 'HEAD')) {
+        next();
+        return;
+      }
+
+      const accept = req.headers.accept || '';
+      const wantsHtml = accept.includes('text/html') || accept.includes('*/*');
+      const pathname = req.url.split('?')[0];
+      const isViteInternal = pathname.startsWith('/@')
+        || pathname.startsWith('/__vite')
+        || pathname.startsWith('/node_modules/')
+        || pathname.startsWith('/src/');
+
+      if (wantsHtml && !isViteInternal && !path.posix.extname(pathname)) {
+        req.url = '/index.legacy.html';
+      }
+
+      next();
+    });
+  },
+});
+
 export default defineConfig({
   base: '/',
   define: {
@@ -47,6 +77,7 @@ export default defineConfig({
     __MODERN__: 'false',
   },
   plugins: [
+    legacyDevHtmlFallback(),
     scriptSetup({}),
     vue2(),
     renameLegacyHtml(),

@@ -38,7 +38,7 @@
   5. *EXPLAIN CHANGES*: High-level summary at each step
   6. *DOCUMENT RESULTS*: Add review section to todo.md
   7. *CAPTURE LESSONS*: Update lessons after corrections
-##CORE PRINCIPLES
+## CORE PRINCIPLES
   - *Simplicity First*: Make every change as simple as possible. Impact minimal code.
   - *No laziness*: Find root causes. No temporary fixes. Senior developer standards
   - *Minimal Impact*: Only touch what's necessary. No side effects with new bugs

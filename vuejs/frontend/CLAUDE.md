@@ -1,3 +1,48 @@
+## WORKFLOW ORCHESTRATION
+  ### 1. Plan Mode Default
+  - Enter in plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+  - If something goes sideways, STOP and replan immediately
+  - Use plan mode for verification steps, not just building
+  - Write detailed specs upfront to reduce ambiguity
+  ### 2. Subagent strategy
+  - Use subagent (starting with PMO) to keep the main context clean
+  - Offload research, exploration and parallel analysis to subagents
+  - Decide by yourself when it is needed more compute and start team agent
+  - One task per sub-agent, also if you need to start multiple backend agent (or others) for focused execution
+  ### 3. Self-improvement loop
+  - After ANY correction from the user: update lessons.md with the pattern
+  - After ANY bug or error in your own code: update lessons.md with the pattern
+  - Write rules for yourself that prevent the same mistake
+  - ruthlessly iterate on these lessons until mistake rate drops
+  - Review lessons.md on start for relevant project
+  ### 4. Verification before done
+  - Never mark a task complete without proving it works
+  - Diff behaviour between main and your changes when relevant
+  - Ask yourself: "Would a staff engineer approve this?"
+  - Run tests, check logs, demonstrate correctness
+  ### 5. Demand Elegance
+  - For non-trivial changes: pause and ask: "is there a more elegant way?"
+  - If a fix feels hacky: "Knowing everything i know now, implement the elegant solution"
+  - Skip this for simple, obvious fixes -- DO NOT over-engineer
+  - Challenge your own work before presenting it
+  ### 6. Autonomous bug fixing
+  - When given a bug report: just fix it. Don't ask for hand-holding
+  - Point at logs, errors, failing tests -- then resolve them
+  - Zero context switching required from the user
+  - Go fix failing CI tests without told how
+## TASK MANAGEMENT
+  1. *CONTEXT FRIENDLY*: Read the context from code-review-graph when possible or from CLAUDE.md in the projects
+  2. *PLAN FIRST*: Write plan to todo.md with checkable items
+  3. *VERIFY PLAN*: Check in before starting implementation
+  4. *TRACK PROGRESS*: Mark items complete as you go
+  5. *EXPLAIN CHANGES*: High-level summary at each step
+  6. *DOCUMENT RESULTS*: Add review section to todo.md
+  7. *CAPTURE LESSONS*: Update lessons after corrections
+## CORE PRINCIPLES
+  - *Simplicity First*: Make every change as simple as possible. Impact minimal code.
+  - *No laziness*: Find root causes. No temporary fixes. Senior developer standards
+  - *Minimal Impact*: Only touch what's necessary. No side effects with new bugs
+
 # Frontend (`vuejs/frontend/`)
 
 Vue 3 + Vite SPA. Bootstrap 5, Vuex (auth), Vue Router with role-based guards. Single owner + multi-staff (gestione, cameriere, cucina, bar, pizzeria, cucina_sg). UI/labels/comments in Italian.

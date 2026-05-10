@@ -448,3 +448,28 @@ Totale: ~3-4 settimane di lavoro focused.
 ## Lessons (post-task, da riempire)
 
 > Sezione che riempio a fine task con lezioni apprese (per `lessons.md`).
+# Plan - Landing Animations And Plans Detail (2026-05-09)
+
+## Obiettivo
+
+Allineare le animazioni della landing tra build modern e legacy: la sezione funzionalita deve usare lo stesso schema pinned con card che salgono dal basso e si sovrappongono; le card dei piani devono avere contenuti piu dettagliati e una comparsa desktop su cilindro invisibile, con fallback mobile/legacy a stack sovrapposto leggibile.
+
+## Checklist
+
+- [x] Leggere `CLAUDE.md`, `vuejs/frontend/CLAUDE.md` e `lessons.md`.
+- [x] Tentare il contesto via code-review graph MCP e dichiarare fallback locale se non disponibile.
+- [x] Mappare `Landing.vue`, `LandingFeatureFlipDeck.vue` e fallback legacy.
+- [x] Sostituire il flip della seconda sezione con stack pinned a card sovrapposte.
+- [x] Espandere contenuti piano Essenziale/Professionale con differenze operative.
+- [x] Aggiungere animazione piani desktop large con Three.js e fallback mobile/legacy a stack.
+- [x] Rendere opachi gli sfondi delle card sovrapposte per evitare testo illeggibile sul legacy.
+- [x] Verificare build/diff e documentare risultati.
+
+## Review
+
+- Code-review graph MCP tentato, ma `get_minimal_context` e' andato in timeout dopo 120s; fallback locale usato.
+- `npm install` eseguito in `vuejs/frontend` per ripristinare `three` mancante in `node_modules`; `package-lock.json` non risulta modificato.
+- `npm run build:modern` OK.
+- `npm run build:legacy` OK.
+- Playwright Chromium installato e usato su `http://127.0.0.1:5174/landing`: screenshot desktop/mobile, nessun errore console/page, card feature/piani opache e senza overflow, canvas Three.js non blank su desktop; mobile piani in stack e canvas piani nascosto come previsto.
+- Dev server Vite lasciato attivo su `http://127.0.0.1:5174/`.
