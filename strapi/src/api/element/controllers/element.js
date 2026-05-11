@@ -5,6 +5,7 @@
  */
 
 const { createCoreController } = require('@strapi/strapi').factories;
+const { ensureCategoryRouting } = require('../../../utils/category-routing');
 
 const trimString = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -140,6 +141,7 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
         },
         status: 'published',
       });
+      await ensureCategoryRouting(strapi, user.id, parsed.data.category);
 
       const menu = await ensureUserMenu(strapi, user.id);
       const existingConn = Array.isArray(menu.fk_elements)
@@ -191,6 +193,9 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
         data: parsed.data,
         status: 'published',
       });
+      if (parsed.data.category) {
+        await ensureCategoryRouting(strapi, user.id, parsed.data.category);
+      }
 
       ctx.body = { data: serializeElement(updated) };
     } catch (error) {

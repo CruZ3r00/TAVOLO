@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue';
+import TeleportCompat from '@/lib/compat/teleport.js';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -37,7 +38,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <Teleport to="body">
+    <TeleportCompat to="body">
         <Transition name="scale">
             <div
               v-if="show"
@@ -47,7 +48,10 @@ onUnmounted(() => {
               role="dialog"
               aria-modal="true"
             >
-              <div class="modal" :class="{ wide, slim }">
+              <div
+                class="ds-modal"
+                :class="{ 'ds-modal-wide': wide, 'ds-modal-slim': slim }"
+              >
                 <div class="modal-h">
                   <slot v-if="showSlot" name="title" />
                   <button type="button" class="modal-close" @click="emit('close')" aria-label="Chiudi">
@@ -63,7 +67,7 @@ onUnmounted(() => {
               </div>
             </div>
         </Transition>
-    </Teleport>
+    </TeleportCompat>
 </template>
 
 <style>
@@ -73,10 +77,22 @@ onUnmounted(() => {
    sia sempre rispetto al viewport. */
 .modal-bg.modal-bg--centered {
     position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
     inset: 0 !important;
-    display: grid !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     place-items: center !important;
     z-index: 800;
+}
+.modal-bg.modal-bg--centered > .ds-modal {
+    margin: auto !important;
 }
 .scale-enter-active, .scale-leave-active {
     transition: opacity 180ms ease, transform 180ms ease;
@@ -84,7 +100,7 @@ onUnmounted(() => {
 .scale-enter-from, .scale-leave-to {
     opacity: 0;
 }
-.scale-enter-from .modal, .scale-leave-to .modal {
+.scale-enter-from .ds-modal, .scale-leave-to .ds-modal {
     transform: translateY(8px) scale(0.98);
 }
 </style>

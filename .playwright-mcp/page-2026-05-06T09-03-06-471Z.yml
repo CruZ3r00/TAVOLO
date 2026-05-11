@@ -1,0 +1,70 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - link "T Tavolo" [ref=e5] [cursor=pointer]:
+      - /url: /
+      - generic [ref=e6]: T
+      - generic [ref=e7]: Tavolo
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - heading "Bentornato." [level=1] [ref=e10]
+        - paragraph [ref=e11]: Accedi per riprendere il servizio.
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: Email o username
+          - generic [ref=e15]:
+            - generic [ref=e16]: 
+            - textbox "Email o username " [ref=e17]:
+              - /placeholder: marta@osteriadelborgo.it
+        - generic [ref=e18]:
+          - generic [ref=e19]:
+            - generic [ref=e20]: Password
+            - link "Password dimenticata?" [ref=e21] [cursor=pointer]:
+              - /url: /forgot-password
+          - generic [ref=e22]:
+            - generic [ref=e23]: 
+            - textbox "Password Password dimenticata?  Mostra/nascondi password" [ref=e24]:
+              - /placeholder: ••••••••••
+            - button "Mostra/nascondi password" [ref=e25] [cursor=pointer]:
+              - generic [ref=e26]: 
+        - generic [ref=e29] [cursor=pointer]: Mantieni l'accesso su questo dispositivo
+        - button "Accedi " [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: Accedi
+          - generic [ref=e32]: 
+        - paragraph [ref=e33]:
+          - text: Non hai ancora un account?
+          - link "Registrati" [ref=e34] [cursor=pointer]:
+            - /url: /register
+    - contentinfo [ref=e35]:
+      - generic [ref=e36]: © 2026 Tavolo S.r.l.
+      - generic [ref=e37]:
+        - link "Termini" [ref=e38] [cursor=pointer]:
+          - /url: /terms
+        - link "Privacy" [ref=e39] [cursor=pointer]:
+          - /url: /privacy-policy
+        - link "Aiuto" [ref=e40] [cursor=pointer]:
+          - /url: /contact-us
+  - complementary [ref=e41]:
+    - generic [ref=e42]:
+      - generic [ref=e43]: Servizio in corso
+      - heading "Tutto sotto controllo, anche stasera." [level=2] [ref=e44]
+      - paragraph [ref=e45]: Coperti gestiti, tavoli aperti, scontrini fiscali stampati. Tavolo è la consolle di servizio della tua brigata.
+      - generic [ref=e46]:
+        - generic [ref=e49]: LIVE · Demo
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - text: Coperti
+            - strong [ref=e52]: "72"
+          - generic [ref=e53]:
+            - text: Incasso
+            - strong [ref=e54]: €1.284
+          - generic [ref=e55]:
+            - text: Tavoli
+            - strong [ref=e56]: 8/12
+        - generic [ref=e65]:
+          - generic [ref=e66]: 
+          - generic [ref=e67]: Stampante RT certificata · POS connesso
+      - generic [ref=e68]:
+        - paragraph [ref=e69]: "\"Ho ridotto del 30% il tempo medio al tavolo. La cucina riceve gli ordini in due tap.\""
+        - generic [ref=e70]:
+          - strong [ref=e71]: Marta Rossi
+          - text: · Osteria del Borgo, Mantova

@@ -17,7 +17,11 @@ const summary = computed(() => {
     .reduce((s, t) => s + (t.seats || 0), 0);
 
   // Tempo medio (in minuti) sugli ordini attivi
-  const activeOrders = props.orders.filter(o => o.status === 'active' && o.opened_at);
+  const activeOrders = props.orders.filter(o => (
+    o.status === 'active'
+    && o.opened_at
+    && o.service_type !== 'takeaway'
+  ));
   let avgMinutes = 0;
   if (activeOrders.length > 0) {
     const total = activeOrders.reduce((s, o) => {

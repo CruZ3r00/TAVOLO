@@ -77,7 +77,7 @@ const handleClick = () => {
 
       <template v-else-if="cardState === 'res'">
         <div class="sl-card-state">
-          <span class="sl-card-state-l"><i class="bi bi-calendar-check"/>Prenotato</span>
+          <span class="sl-card-state-l"><i class="bi bi-calendar-check"></i>Prenotato</span>
           <span class="sl-card-state-s">{{ table.reservationLabel || '—' }}</span>
         </div>
       </template>
@@ -85,33 +85,33 @@ const handleClick = () => {
       <template v-else>
         <div class="sl-card-total">{{ totalAmount }}</div>
         <div class="sl-card-row">
-          <span><i class="bi bi-receipt"/>{{ itemCount }} portate</span>
+          <span><i class="bi bi-receipt"></i>{{ itemCount }} portate</span>
           <span class="sl-card-time" :class="{ alert: isAlert }">
-            <i class="bi bi-clock"/>{{ minutes }}m
+            <i class="bi bi-clock"></i>{{ minutes }}m
           </span>
         </div>
         <div v-if="readyCount > 0" class="sl-card-flag">
-          <i class="bi bi-check2-circle"/>{{ readyCount }} pront{{ readyCount === 1 ? 'o' : 'i' }}
+          <i class="bi bi-check2-circle"></i>{{ readyCount }} pront{{ readyCount === 1 ? 'o' : 'i' }}
         </div>
         <div v-else-if="isAlert" class="sl-card-flag warn">
-          <i class="bi bi-exclamation-triangle-fill"/>Lungo
+          <i class="bi bi-exclamation-triangle-fill"></i>Lungo
         </div>
       </template>
     </div>
 
     <div class="sl-card-actions">
       <span v-if="cardState === 'free'" class="sl-card-action accent">
-        <i class="bi bi-plus-lg"/>Apri tavolo
+        <i class="bi bi-plus-lg"></i>Apri tavolo
       </span>
       <span v-else-if="cardState === 'res'" class="sl-card-action accent">
-        <i class="bi bi-door-open"/>Accomoda
+        <i class="bi bi-door-open"></i>Accomoda
       </span>
       <template v-else>
         <span class="sl-card-action">
-          <i class="bi bi-eye"/>Dettagli
+          <i class="bi bi-eye"></i>Dettagli
         </span>
         <span v-if="readyCount > 0" class="sl-card-action ok">
-          <i class="bi bi-check2-circle"/>Servi
+          <i class="bi bi-check2-circle"></i>Servi
         </span>
       </template>
     </div>

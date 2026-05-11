@@ -1,6 +1,11 @@
+<script setup>
+import ThemeToggle from '@/components/ThemeToggle.vue';
+</script>
+
 <template>
     <div class="auth-page">
         <div class="auth-bg-fx" aria-hidden="true"></div>
+        <ThemeToggle compact class="auth-theme-toggle" />
         <router-link to="/" class="auth-back" aria-label="Torna alla home">
             <i class="bi bi-arrow-left" aria-hidden="true"></i>
             <span>Torna alla home</span>
@@ -58,6 +63,13 @@
     transition: color 120ms, background 120ms, border-color 120ms, transform 120ms;
 }
 
+.auth-theme-toggle {
+    position: absolute;
+    top: var(--s-5);
+    right: var(--s-6);
+    z-index: 2;
+}
+
 .auth-back:hover {
     color: var(--ink);
     background: var(--bg-hover);
@@ -75,6 +87,10 @@
         left: var(--s-3);
         padding: 7px 10px;
         font-size: 12px;
+    }
+    .auth-theme-toggle {
+        top: var(--s-3);
+        right: var(--s-3);
     }
     .auth-back span { display: none; }
 }

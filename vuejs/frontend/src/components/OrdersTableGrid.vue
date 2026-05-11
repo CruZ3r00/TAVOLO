@@ -61,9 +61,11 @@ const filtered = computed(() => {
 <template>
   <div class="sala-wrap" v-if="tables.length">
     <SalaFiltersBar
-      v-model:filter="filter"
-      v-model:search="search"
+      :filter="filter"
+      :search="search"
       :counts="counts"
+      @update:filter="filter = $event"
+      @update:search="search = $event"
     />
     <SalaAreaSummary :tables="tables" :orders="orders" />
 

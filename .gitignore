@@ -1,4 +1,5 @@
-node_modules
+node_modules/
+.tools/
 .runtime/
 *.log
 strapi/.menu-upload/
@@ -19,3 +20,12 @@ restaurant-sites/*.html
 !restaurant-sites/fatimaelgrandi5@gmail.com.html
 restaurant-sites/*.html
 !restaurant-sites/fatimaelgrandi5@gmail.com.html
+strapi/.env.backup-before-fix
+.DS_Store
+.playwright-mcp/
+
+# Strapi runtime uploads
+strapi/public/uploads/
+
+# Strapi runtime uploads
+strapi/public/uploads/

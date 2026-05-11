@@ -1,13 +1,18 @@
 'use strict';
 
 const ACTIVE_STATUSES = new Set(['active', 'trialing']);
-const { resolveStaffContext } = require('../utils/staff-access');
+const { KITCHEN_LIKE_ROLES, resolveStaffContext } = require('../utils/staff-access');
+
+const AUTH_CONTEXT_CACHE_TTL_MS = parseInt(process.env.SUBSCRIPTION_GATE_CACHE_TTL_MS || '5000', 10);
+const AUTH_CONTEXT_CACHE_MAX = parseInt(process.env.SUBSCRIPTION_GATE_CACHE_MAX || '200', 10);
+const authContextCache = new Map();
 
 const BYPASS_PREFIXES = [
   '/api/auth/',
   '/api/billing/',
   '/api/menus/public/',
   '/api/reservations/public',
+  '/api/takeaways/public',
 ];
 
 function isBypassed(path) {
@@ -26,6 +31,10 @@ function hasValidSubscription(user) {
   return periodEndDate.getTime() >= Date.now();
 }
 
+function isProfessionalPlan(user) {
+  return String(user && user.subscription_plan || '').toLowerCase() === 'pro';
+}
+
 function isStaffApiAllowed(role, method, path) {
   if (role === 'owner' || role === 'gestione') return true;
   if (path === '/api/users/me') return method === 'GET';
@@ -37,6 +46,9 @@ function isStaffApiAllowed(role, method, path) {
     if (/^\/api\/reservations\/[^/]+\/status$/.test(path)) return method === 'PATCH';
     if (/^\/api\/reservations\/[^/]+\/seat$/.test(path)) return method === 'POST';
     if (path === '/api/orders') return method === 'GET' || method === 'POST';
+    if (path === '/api/takeaways') return method === 'POST';
+    if (/^\/api\/takeaways\/[^/]+$/.test(path)) return method === 'PATCH';
+    if (/^\/api\/takeaways\/[^/]+\/(accept|reject|send|pickup)$/.test(path)) return method === 'POST';
     if (/^\/api\/orders\/[^/]+$/.test(path)) return method === 'GET';
     if (/^\/api\/orders\/[^/]+\/total$/.test(path)) return method === 'GET';
     if (/^\/api\/orders\/[^/]+\/items$/.test(path)) return method === 'POST';
@@ -44,10 +56,11 @@ function isStaffApiAllowed(role, method, path) {
       return method === 'PATCH' || method === 'DELETE';
     }
     if (/^\/api\/orders\/[^/]+\/items\/[^/]+\/status$/.test(path)) return method === 'PATCH';
+    if (/^\/api\/orders\/[^/]+\/close$/.test(path)) return method === 'POST';
     return false;
   }
 
-  if (role === 'cucina') {
+  if (KITCHEN_LIKE_ROLES.has(role)) {
     if (path === '/api/tables') return method === 'GET';
     if (path === '/api/orders') return method === 'GET';
     if (/^\/api\/orders\/[^/]+$/.test(path)) return method === 'GET';
@@ -74,6 +87,57 @@ async function userFromBearer(strapi, authorization) {
   }
 }
 
+function pruneAuthContextCache() {
+  if (authContextCache.size <= AUTH_CONTEXT_CACHE_MAX) return;
+  const now = Date.now();
+  for (const [key, entry] of authContextCache.entries()) {
+    if (!entry || entry.expiresAt <= now) authContextCache.delete(key);
+    if (authContextCache.size <= AUTH_CONTEXT_CACHE_MAX) return;
+  }
+  while (authContextCache.size > AUTH_CONTEXT_CACHE_MAX) {
+    const oldest = authContextCache.keys().next().value;
+    authContextCache.delete(oldest);
+  }
+}
+
+async function authContextFromBearer(strapi, authorization) {
+  const match = String(authorization || '').match(/^Bearer\s+(.+)$/i);
+  if (!match) return { user: null, actor: null };
+
+  const token = match[1];
+  const now = Date.now();
+  const cached = authContextCache.get(token);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise || cached.value;
+  }
+
+  const promise = (async () => {
+    const user = await userFromBearer(strapi, authorization);
+    const actor = user ? await resolveStaffContext(strapi, user) : null;
+    return { user, actor };
+  })();
+
+  authContextCache.set(token, {
+    expiresAt: now + AUTH_CONTEXT_CACHE_TTL_MS,
+    promise,
+    value: null,
+  });
+  pruneAuthContextCache();
+
+  try {
+    const value = await promise;
+    authContextCache.set(token, {
+      expiresAt: Date.now() + AUTH_CONTEXT_CACHE_TTL_MS,
+      promise: null,
+      value,
+    });
+    return value;
+  } catch (err) {
+    authContextCache.delete(token);
+    throw err;
+  }
+}
+
 module.exports = (_config, { strapi }) => {
   return async (ctx, next) => {
     const path = ctx.path || '';
@@ -82,13 +146,23 @@ module.exports = (_config, { strapi }) => {
       return next();
     }
 
-    const user = await userFromBearer(strapi, ctx.request.headers.authorization);
+    const { user, actor } = await authContextFromBearer(strapi, ctx.request.headers.authorization);
     if (!user) {
       return next();
     }
 
-    const actor = await resolveStaffContext(strapi, user);
     const billingUser = actor && actor.owner ? actor.owner : user;
+
+    if (actor && actor.isStaff && actor.staffActive === false) {
+      ctx.status = 403;
+      ctx.body = {
+        error: {
+          code: 'STAFF_DISABLED',
+          message: 'Questo reparto e stato disattivato dal titolare.',
+        },
+      };
+      return;
+    }
 
     if (actor && !isStaffApiAllowed(actor.role, ctx.method, path)) {
       ctx.status = 403;
@@ -101,8 +175,39 @@ module.exports = (_config, { strapi }) => {
       return;
     }
 
-    if (hasValidSubscription(billingUser)) {
+    const activeSubscription = hasValidSubscription(billingUser);
+    if (
+      activeSubscription &&
+      (
+        actor.role === 'owner' ||
+        isProfessionalPlan(billingUser) ||
+        actor.role === 'cameriere' ||
+        actor.role === 'cucina'
+      )
+    ) {
       return next();
+    }
+
+    if (activeSubscription) {
+      ctx.status = 403;
+      ctx.body = {
+        error: {
+          code: 'STAFF_PLAN_FORBIDDEN',
+          message: 'Questo reparto richiede il piano Professionale.',
+        },
+      };
+      return;
+    }
+
+    if (actor && actor.role !== 'owner') {
+      ctx.status = 402;
+      ctx.body = {
+        error: {
+          code: 'SUBSCRIPTION_REQUIRED',
+          message: 'Abbonamento non attivo. Accedi con l\'account titolare per rinnovare.',
+        },
+      };
+      return;
     }
 
     ctx.status = 402;

@@ -1,3 +1,137 @@
+# Plan — Take-Away Orders Design (2026-05-06)
+
+## Obiettivo
+
+Progettare l'inserimento e la gestione degli ordini take-away nel gestionale senza legarli ai tavoli, riusando dove sensato la pipeline ordini esistente: routing categorie -> reparti, preparazione nei reparti, avviso sala/cassa, modifica prima dell'invio e chiusura conto.
+
+## Checklist
+
+- [x] Leggere `CLAUDE.md` e `lessons.md`.
+- [x] Tentare il contesto via code-review graph MCP e dichiarare fallback locale se non disponibile.
+- [x] Rileggere i vincoli esistenti di prenotazioni, ordini, tavoli e routing categorie.
+- [x] Raccogliere decisioni prodotto/operative dall'utente prima di implementare.
+- [x] Scrivere specifica tecnica/API/UI definitiva.
+- [x] Verificare la specifica con l'utente.
+- [x] Implementare solo dopo approvazione esplicita.
+
+## Implementazione
+
+- [x] Estendere `Order`/`OrderItem` flow per `service_type=takeaway` senza tavolo.
+- [x] Aggiungere API autenticate e pubbliche per asporto.
+- [x] Aggiungere invio ai reparti a T-15 minuti con sweep periodico/recupero.
+- [x] Aggiungere email cliente per prenotazioni/asporti pubblici.
+- [x] Integrare Asporto dentro `Reservations.vue` con toggle.
+- [x] Evidenziare asporti nei reparti e banner in Sala per ritiro.
+- [x] Aggiungere migrazione DB, SQL manuale e ADR.
+- [ ] Verificare con runtime/build quando `node`/`npm` sono disponibili.
+
+## Review
+
+- `git diff --check` OK.
+- `npm run build` non eseguibile in questo ambiente: `npm` non e' disponibile nel `PATH`.
+- `node --version` non eseguibile in questo ambiente: `node` non e' disponibile nel `PATH`.
+- Il grafo MCP richiesto dalle istruzioni repo non espone risorse/tool in questa sessione; fallback locale tracciato.
+
+## Note provvisorie
+
+- Il grafo MCP non espone strumenti/risorse in questa sessione; esplorazione fatta con fallback locale mirato.
+- Gli ordini attuali sono tavolo-centrici, ma `Order.fk_table` e' tecnicamente opzionale nello schema.
+- `OrderItem` salva gia categoria/portata e viene routato ai reparti tramite `category-routing`.
+- La pagina `Reservations.vue` ha gia il flusso di chiusura conto usando `CheckoutModal` sugli ordini collegati.
+- Take-away/asporto: richiesto anche da API pubbliche, nome+telefono obbligatori, email obbligatoria per richieste pubbliche, accettazione/rifiuto manuale, invio ai reparti 15 minuti prima o manuale anticipato, nessun tavolo/capienza, chiusura conto obbligatoria.
+- La configurazione email Strapi esiste via plugin `email`/nodemailer; serve salvare email strutturata almeno su Reservation/Take-away invece che solo nelle note.
+- Asporto gestionale sempre `confirmed`; asporto pubblico `pending_acceptance` con email "richiesta ricevuta"; accettazione/rifiuto devono inviare email di risposta.
+- Se l'orario di ritiro e' entro 15 minuti, l'asporto confermato va inviato ai reparti comunque, anche come recupero dopo downtime/server riavviato.
+
+
+# Plan — Verify Owner Tabs And Department Category Editing (2026-05-05)
+
+## Obiettivo
+
+Verificare e correggere due regressioni funzionali: i tab owner dentro `Ordini` devono navigare davvero tra `Cucina`, `Bar`, `Pizzeria`, `Cucina SG`; nella scheda Profilo > Reparti le categorie assegnate devono essere modificabili quando il piano lo consente, oppure mostrare chiaramente se il blocco dipende da assenza dati/piano.
+
+## Checklist
+
+- [x] Controllare router/guard/staff roles delle rotte dei reparti produttivi.
+- [x] Correggere il click dei tab owner e verificare che punti a una navigazione router esplicita.
+- [x] Controllare payload account/staff e form Reparti per categorie modificabili.
+- [x] Correggere modifica/salvataggio categoria -> reparto se il problema e nel codice.
+- [x] Verificare con controlli disponibili, distinguendo cio che non puo essere testato senza runtime.
+
+## Review
+
+- `git diff --check` OK.
+- Le rotte `/kitchen`, `/bar`, `/pizzeria`, `/kitchen-sg` includono `STAFF_ROLES.OWNER` e hanno `ordersMode` dedicato.
+- I tab owner in `Orders.vue` ora sono bottoni come nella pagina profilo e chiamano `router.push(...)` tramite `switchOwnerOrderMode`.
+- La scheda Reparti ora espone piano/motivo blocco ricevuti dal backend e usa il ruolo effettivo della categoria nel select.
+- Non ho potuto fare login/API/browser end-to-end: Strapi non risponde su `localhost:1337` o `localhost:1437`, e `npm`/`node` non sono disponibili nel PATH nemmeno con esecuzione fuori sandbox.
+
+
+# Plan — Strapi SSL CA Startup Fix (2026-05-05)
+
+## Obiettivo
+
+Evitare che `npm run dev` di Strapi fallisca quando `DATABASE_SSL_CA` punta a un certificato locale non presente sulla macchina di sviluppo.
+
+## Checklist
+
+- [x] Verificare causa in `strapi/config/database.js`.
+- [x] Rendere opzionale il file CA senza disattivare SSL.
+- [x] Verificare sintassi/config con gli strumenti disponibili.
+
+## Review
+
+- `git diff --check` OK.
+- `node` non disponibile nel `PATH` di questo ambiente, quindi non ho potuto fare un require diretto del config. La macchina dell'utente ha `npm`, quindi puo rilanciare `npm run dev`.
+
+## Follow-up
+
+- [x] Gestire anche `self-signed certificate in certificate chain` quando manca il CA in sviluppo.
+- [x] Evitare warning `fs.existsSync` con tipi non stringa.
+- [x] Mantenere errore esplicito in produzione se `DATABASE_SSL_CA` punta a un file assente.
+- [x] Rimuovere l'hard-fail automatico basato su `NODE_ENV`; il fail ora richiede `DATABASE_SSL_FAIL_ON_MISSING_CA=true`.
+
+# Plan — Persistent Category Routing By Department (2026-05-05)
+
+## Obiettivo
+
+Rendere persistente l'assegnazione delle categorie ai reparti: classificazione automatica solo al primo inserimento, modifica manuale dalla pagina Reparti, override sempre a Cucina per piano Essenziale/Starter, cameriere sempre attivo e non disattivabile.
+
+## Checklist
+
+- [x] Mappare routing categorie, account reparto e vincoli piano.
+- [x] Centralizzare la logica backend di routing categorie.
+- [x] Aggiungere API per leggere/salvare assegnazioni categoria -> reparto.
+- [x] Aggiornare pagina Reparti con categorie spostabili tra reparti.
+- [x] Correggere filtro ordini per Starter/Pro.
+- [x] Verificare con controlli disponibili.
+
+## Review
+
+- `git diff --check` OK.
+- `npm run build` non eseguibile in questo ambiente: `npm` non e disponibile nel `PATH`.
+- Aggiunta patch SQL opzionale in `docs/sql/category_routing_manual_assignments_patch.sql`.
+
+# Plan — Owner Orders Navigation (2026-05-05)
+
+## Obiettivo
+
+Rendere la navigazione owner piu semplice: sidebar desktop e bottom navbar mobile racchiudono in `Ordini` solo i reparti produttivi (`Cucina`, `Bar`, `Pizzeria`, `Cucina SG`), mentre `Manager`, `Sala`, `Prenotazioni` e `Menu` restano sezioni autonome. I reparti produttivi vengono scelti una alla volta da tab in testata pagina con lo stile del profilo. Le viste dedicate agli staff restano invariate.
+
+## Checklist
+
+- [x] Verificare struttura corrente di sidebar, bottom nav e pagina ordini.
+- [x] Limitare la nav del ruolo owner a un solo item `Ordini` per i reparti produttivi.
+- [x] Lasciare `Manager`, `Sala`, `Prenotazioni` e `Menu` come item owner separati.
+- [x] Aggiungere tabs owner in `Orders.vue` per Cucina, Bar, Pizzeria e Cucina SG.
+- [x] Verificare con gli strumenti disponibili.
+
+## Review
+
+- `git diff --check` OK.
+- `npm run build` non eseguibile in questo ambiente: `npm`/`node` non sono disponibili nel `PATH`.
+- Diff controllato sui file modificati; le viste staff mantengono la lista precedente per ruolo e la scheda owner `Ordini` include solo i reparti produttivi.
+
 # Plan — POS/Cassa Fiscale Integration (PC + Mobile)
 
 > **Scope ratificato con l'utente** (sessione 2026-04-26):
@@ -314,3 +448,28 @@ Totale: ~3-4 settimane di lavoro focused.
 ## Lessons (post-task, da riempire)
 
 > Sezione che riempio a fine task con lezioni apprese (per `lessons.md`).
+# Plan - Landing Animations And Plans Detail (2026-05-09)
+
+## Obiettivo
+
+Allineare le animazioni della landing tra build modern e legacy: la sezione funzionalita deve usare lo stesso schema pinned con card che salgono dal basso e si sovrappongono; le card dei piani devono avere contenuti piu dettagliati e una comparsa desktop su cilindro invisibile, con fallback mobile/legacy a stack sovrapposto leggibile.
+
+## Checklist
+
+- [x] Leggere `CLAUDE.md`, `vuejs/frontend/CLAUDE.md` e `lessons.md`.
+- [x] Tentare il contesto via code-review graph MCP e dichiarare fallback locale se non disponibile.
+- [x] Mappare `Landing.vue`, `LandingFeatureFlipDeck.vue` e fallback legacy.
+- [x] Sostituire il flip della seconda sezione con stack pinned a card sovrapposte.
+- [x] Espandere contenuti piano Essenziale/Professionale con differenze operative.
+- [x] Aggiungere animazione piani desktop large con Three.js e fallback mobile/legacy a stack.
+- [x] Rendere opachi gli sfondi delle card sovrapposte per evitare testo illeggibile sul legacy.
+- [x] Verificare build/diff e documentare risultati.
+
+## Review
+
+- Code-review graph MCP tentato, ma `get_minimal_context` e' andato in timeout dopo 120s; fallback locale usato.
+- `npm install` eseguito in `vuejs/frontend` per ripristinare `three` mancante in `node_modules`; `package-lock.json` non risulta modificato.
+- `npm run build:modern` OK.
+- `npm run build:legacy` OK.
+- Playwright Chromium installato e usato su `http://127.0.0.1:5174/landing`: screenshot desktop/mobile, nessun errore console/page, card feature/piani opache e senza overflow, canvas Three.js non blank su desktop; mobile piani in stack e canvas piani nascosto come previsto.
+- Dev server Vite lasciato attivo su `http://127.0.0.1:5174/`.

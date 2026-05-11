@@ -47,6 +47,19 @@ begin
       from public.order_items_fk_order_lnk l
      where l.order_item_id = v_source_id
      limit 1;
+  elsif TG_TABLE_NAME = 'orders_fk_user_lnk' then
+    v_order_id := coalesce(NEW.order_id, OLD.order_id);
+    v_source_id := v_order_id;
+    v_user_id := coalesce(NEW.user_id, OLD.user_id);
+  elsif TG_TABLE_NAME = 'order_items_fk_order_lnk' then
+    v_source_id := coalesce(NEW.order_item_id, OLD.order_item_id);
+    v_order_id := coalesce(NEW.order_id, OLD.order_id);
+  elsif TG_TABLE_NAME = 'tables_fk_user_lnk' then
+    v_source_id := coalesce(NEW.table_id, OLD.table_id);
+    v_user_id := coalesce(NEW.user_id, OLD.user_id);
+  elsif TG_TABLE_NAME = 'reservations_fk_user_lnk' then
+    v_source_id := coalesce(NEW.reservation_id, OLD.reservation_id);
+    v_user_id := coalesce(NEW.user_id, OLD.user_id);
   elsif TG_TABLE_NAME = 'tables' then
     v_source_id := coalesce(NEW.id, OLD.id);
 
@@ -105,6 +118,26 @@ for each row execute function public.emit_order_realtime_event();
 drop trigger if exists reservations_realtime_event_trigger on public.reservations;
 create trigger reservations_realtime_event_trigger
 after insert or update or delete on public.reservations
+for each row execute function public.emit_order_realtime_event();
+
+drop trigger if exists orders_user_link_realtime_event_trigger on public.orders_fk_user_lnk;
+create trigger orders_user_link_realtime_event_trigger
+after insert or update or delete on public.orders_fk_user_lnk
+for each row execute function public.emit_order_realtime_event();
+
+drop trigger if exists order_items_order_link_realtime_event_trigger on public.order_items_fk_order_lnk;
+create trigger order_items_order_link_realtime_event_trigger
+after insert or update or delete on public.order_items_fk_order_lnk
+for each row execute function public.emit_order_realtime_event();
+
+drop trigger if exists tables_user_link_realtime_event_trigger on public.tables_fk_user_lnk;
+create trigger tables_user_link_realtime_event_trigger
+after insert or update or delete on public.tables_fk_user_lnk
+for each row execute function public.emit_order_realtime_event();
+
+drop trigger if exists reservations_user_link_realtime_event_trigger on public.reservations_fk_user_lnk;
+create trigger reservations_user_link_realtime_event_trigger
+after insert or update or delete on public.reservations_fk_user_lnk
 for each row execute function public.emit_order_realtime_event();
 
 do $$

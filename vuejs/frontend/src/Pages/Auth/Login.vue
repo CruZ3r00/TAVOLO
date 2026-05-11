@@ -1,14 +1,15 @@
 <script setup>
-import { useHead } from '@vueuse/head';
+import { useHead } from '@/lib/compat/head.js';
 import { useRouter, useRoute } from 'vue-router';
 import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
 import { API_BASE } from '@/utils';
 import { defaultRouteForUser } from '@/staffAccess';
+import ThemeToggle from '@/components/ThemeToggle.vue';
 
 useHead({
-  title: 'Accedi · Tavolo',
-  meta: [{ name: 'description', content: 'Accedi a Tavolo per gestire il tuo ristorante' }],
+  title: 'Accedi · ComforTables',
+  meta: [{ name: 'description', content: 'Accedi a ComforTables per gestire il tuo ristorante' }],
 });
 
 const store = useStore();
@@ -71,9 +72,10 @@ const submit = async () => {
 <template>
   <div class="au-shell">
     <div class="au-pane">
+      <ThemeToggle compact class="au-theme-toggle" />
       <router-link to="/" class="au-brand">
-        <span class="tv-brand-mark">T</span>
-        <span class="brand-text">Tavolo</span>
+        <span class="tv-brand-mark">C</span>
+        <span class="brand-text">ComforTables</span>
       </router-link>
 
       <div class="au-form-wrap">
@@ -102,7 +104,7 @@ const submit = async () => {
           <i class="bi bi-check-circle-fill"></i>
           <div>
             <strong>Email confermata</strong>
-            <span>Ora puoi accedere al tuo account Tavolo.</span>
+            <span>Ora puoi accedere al tuo account ComforTables.</span>
           </div>
         </div>
 
@@ -165,7 +167,7 @@ const submit = async () => {
       </div>
 
       <footer class="au-foot">
-        <span>© {{ new Date().getFullYear() }} Tavolo S.r.l.</span>
+        <span>© {{ new Date().getFullYear() }} ComforTables</span>
         <div>
           <router-link to="/terms">Termini</router-link>
           <router-link to="/privacy-policy">Privacy</router-link>
@@ -178,7 +180,7 @@ const submit = async () => {
       <div class="au-side-content">
         <div class="overline" style="color: color-mix(in oklab, white 60%, transparent);">Servizio in corso</div>
         <h2>Tutto sotto controllo, anche stasera.</h2>
-        <p>Coperti gestiti, tavoli aperti, scontrini fiscali stampati. Tavolo è la consolle di servizio della tua brigata.</p>
+        <p>Coperti gestiti, tavoli aperti, scontrini fiscali stampati. ComforTables è la consolle di servizio della tua brigata.</p>
 
         <div class="au-side-mock">
           <div class="au-side-mock-h">
@@ -210,6 +212,12 @@ const submit = async () => {
 
 <style scoped>
 .au-shell .brand-text { font-family: var(--f-sans); font-size: 18px; letter-spacing: -0.025em; font-weight: 600; }
+.au-theme-toggle {
+  position: absolute;
+  top: 28px;
+  right: 28px;
+  z-index: 2;
+}
 .au-spinner {
   width: 16px; height: 16px;
   border: 2px solid color-mix(in oklab, var(--ac-contrast) 30%, transparent);
@@ -218,4 +226,11 @@ const submit = async () => {
   animation: au-spin 650ms linear infinite;
 }
 @keyframes au-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 720px) {
+  .au-theme-toggle {
+    top: 16px;
+    right: 16px;
+  }
+}
 </style>

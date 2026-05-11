@@ -9,23 +9,72 @@ const props = defineProps({
 
 const emit = defineEmits(['advance']);
 
+const takeawayDailyNumbers = computed(() => {
+  const map = new Map();
+  const sameDay = (iso) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear()
+      && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate();
+  };
+  const todays = props.orders
+    .filter(o => o?.service_type === 'takeaway' && sameDay(o.opened_at))
+    .sort((a, b) => new Date(a.opened_at || 0) - new Date(b.opened_at || 0));
+  todays.forEach((o, i) => map.set(o.documentId, i + 1));
+  return map;
+});
+
 const allItems = computed(() => {
   const items = [];
   for (const order of props.orders) {
     if (order.status !== 'active' || !order.items) continue;
+    const isTakeaway = order.service_type === 'takeaway';
     const tNum = order.table?.number ?? '?';
+    const takeawayNum = takeawayDailyNumbers.value.get(order.documentId) ?? '?';
     for (const item of order.items) {
       if (item.status === 'served') continue;
-      items.push({ ...item, _tableNumber: tNum, _orderDocumentId: order.documentId });
+      items.push({
+        ...item,
+        _tableNumber: isTakeaway ? takeawayNum : tNum,
+        _orderDocumentId: order.documentId,
+        _takeaway: isTakeaway,
+      });
     }
   }
-  items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  items.sort((a, b) => {
+    const ca = parseInt(a.course, 10) || 1;
+    const cb = parseInt(b.course, 10) || 1;
+    if (ca !== cb) return ca - cb;
+    return new Date(a.createdAt) - new Date(b.createdAt);
+  });
   return items;
 });
 
 const takenItems = computed(() => allItems.value.filter(i => i.status === 'taken'));
 const preparingItems = computed(() => allItems.value.filter(i => i.status === 'preparing'));
 const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready'));
+
+const groupByCourse = (items) => {
+  const groups = [];
+  const byCourse = new Map();
+  for (const item of items) {
+    const course = parseInt(item.course, 10) || 1;
+    let group = byCourse.get(course);
+    if (!group) {
+      group = { course, items: [] };
+      byCourse.set(course, group);
+      groups.push(group);
+    }
+    group.items.push(item);
+  }
+  return groups;
+};
+
+const takenGroups = computed(() => groupByCourse(takenItems.value));
+const preparingGroups = computed(() => groupByCourse(preparingItems.value));
+const readyGroups = computed(() => groupByCourse(readyItems.value));
 </script>
 
 <template>
@@ -34,24 +83,28 @@ const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready
     <section class="kt-col kt-taken">
       <header class="kt-col-h">
         <div>
-          <i class="bi bi-clipboard-check"/>
+          <i class="bi bi-clipboard-check"></i>
           <strong>Da fare</strong>
         </div>
         <span class="kt-col-c">{{ takenItems.length }}</span>
       </header>
       <div class="kt-col-body">
         <div v-if="!takenItems.length" class="kt-empty">
-          <i class="bi bi-inbox"/>
+          <i class="bi bi-inbox"></i>
           <p>Nessuna portata in attesa</p>
         </div>
-        <KitchenItemCard
-          v-for="item in takenItems"
-          :key="item.documentId"
-          :item="item"
-          :table-number="item._tableNumber"
-          :busy="busyItemIds.has(item.documentId)"
-          @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
-        />
+        <section v-for="group in takenGroups" :key="group.course" class="kt-course">
+          <header class="kt-course-h">{{ group.course }}a portata</header>
+          <KitchenItemCard
+            v-for="item in group.items"
+            :key="item.documentId"
+            :item="item"
+            :table-number="item._tableNumber"
+            :takeaway="item._takeaway"
+            :busy="busyItemIds.has(item.documentId)"
+            @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
+          />
+        </section>
       </div>
     </section>
 
@@ -59,24 +112,28 @@ const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready
     <section class="kt-col kt-preparing">
       <header class="kt-col-h">
         <div>
-          <i class="bi bi-fire"/>
+          <i class="bi bi-fire"></i>
           <strong>In preparazione</strong>
         </div>
         <span class="kt-col-c">{{ preparingItems.length }}</span>
       </header>
       <div class="kt-col-body">
         <div v-if="!preparingItems.length" class="kt-empty">
-          <i class="bi bi-inbox"/>
+          <i class="bi bi-inbox"></i>
           <p>Niente in lavorazione</p>
         </div>
-        <KitchenItemCard
-          v-for="item in preparingItems"
-          :key="item.documentId"
-          :item="item"
-          :table-number="item._tableNumber"
-          :busy="busyItemIds.has(item.documentId)"
-          @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
-        />
+        <section v-for="group in preparingGroups" :key="group.course" class="kt-course">
+          <header class="kt-course-h">{{ group.course }}a portata</header>
+          <KitchenItemCard
+            v-for="item in group.items"
+            :key="item.documentId"
+            :item="item"
+            :table-number="item._tableNumber"
+            :takeaway="item._takeaway"
+            :busy="busyItemIds.has(item.documentId)"
+            @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
+          />
+        </section>
       </div>
     </section>
 
@@ -84,24 +141,28 @@ const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready
     <section class="kt-col kt-ready">
       <header class="kt-col-h">
         <div>
-          <i class="bi bi-check2-circle"/>
+          <i class="bi bi-check2-circle"></i>
           <strong>Pronti</strong>
         </div>
         <span class="kt-col-c">{{ readyItems.length }}</span>
       </header>
       <div class="kt-col-body">
         <div v-if="!readyItems.length" class="kt-empty">
-          <i class="bi bi-inbox"/>
+          <i class="bi bi-inbox"></i>
           <p>Nessun piatto pronto</p>
         </div>
-        <KitchenItemCard
-          v-for="item in readyItems"
-          :key="item.documentId"
-          :item="item"
-          :table-number="item._tableNumber"
-          :busy="busyItemIds.has(item.documentId)"
-          @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
-        />
+        <section v-for="group in readyGroups" :key="group.course" class="kt-course">
+          <header class="kt-course-h">{{ group.course }}a portata</header>
+          <KitchenItemCard
+            v-for="item in group.items"
+            :key="item.documentId"
+            :item="item"
+            :table-number="item._tableNumber"
+            :takeaway="item._takeaway"
+            :busy="busyItemIds.has(item.documentId)"
+            @advance="(payload) => emit('advance', { ...payload, orderDocumentId: item._orderDocumentId })"
+          />
+        </section>
       </div>
     </section>
   </div>
@@ -122,3 +183,30 @@ const readyItems = computed(() => allItems.value.filter(i => i.status === 'ready
     <p>Quando la sala manderà gli ordini, li vedrai qui — divisi per stato e con il timer di preparazione.</p>
   </div>
 </template>
+
+<style scoped>
+.kt-course {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.kt-course + .kt-course {
+  margin-top: 12px;
+}
+.kt-course-h {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  color: var(--ink-2);
+  font-family: var(--f-sans, 'Geist', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+}
+</style>

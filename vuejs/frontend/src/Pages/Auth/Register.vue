@@ -1,11 +1,12 @@
 <script setup>
-import { useHead } from '@vueuse/head';
+import { useHead } from '@/lib/compat/head.js';
 import { useRouter } from 'vue-router';
 import { ref, computed } from 'vue';
+import ThemeToggle from '@/components/ThemeToggle.vue';
 
 useHead({
-  title: 'Registrazione · Tavolo',
-  meta: [{ name: 'description', content: 'Crea il tuo account Tavolo' }],
+  title: 'Registrazione · ComforTables',
+  meta: [{ name: 'description', content: 'Crea il tuo account ComforTables' }],
 });
 
 const router = useRouter();
@@ -33,7 +34,7 @@ const copertiInvernali = ref('');
 const copertiEstivi = ref('');
 const birthDate = ref('');
 
-// Step 3 — plan (we just continue to /choose-plan)
+// Step 3 — plan (we continue to /choose-plan for Essenziale/Professionale)
 const isLoading = ref(false);
 const errorMessage = ref('');
 
@@ -158,9 +159,10 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
 <template>
   <div class="au-shell">
     <div class="au-pane">
+      <ThemeToggle compact class="au-theme-toggle" />
       <router-link to="/" class="au-brand">
-        <span class="tv-brand-mark">T</span>
-        <span class="brand-text">Tavolo</span>
+        <span class="tv-brand-mark">C</span>
+        <span class="brand-text">ComforTables</span>
       </router-link>
 
       <div class="au-form-wrap">
@@ -169,7 +171,7 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
             {{ step === 1 ? "Crea l'account" : step === 2 ? 'Il tuo ristorante' : 'Scegli il piano' }}
           </h1>
           <p>
-            {{ step === 1 ? 'Iniziamo dai tuoi dati. Servono 30 secondi.' : step === 2 ? 'Servono per fatturazione e configurazione.' : 'Cambi quando vuoi, senza vincoli.' }}
+            {{ step === 1 ? 'Iniziamo dai tuoi dati. Servono 30 secondi.' : step === 2 ? 'Servono per fatturazione e configurazione.' : 'Scegli Essenziale o Professionale. Cambi quando vuoi.' }}
           </p>
         </div>
 
@@ -294,11 +296,11 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
           <div class="au-trial">
             <i class="bi bi-gift"></i>
             <div>
-              <strong>14 giorni gratis</strong>
-              <span>Nessun addebito ora. Inserisci la carta solo alla fine del periodo. Annulli quando vuoi.</span>
+              <strong>Iscriviti ora</strong>
+              <span>Scegli il piano piu adatto e completa la registrazione in modo guidato.</span>
             </div>
           </div>
-          <p class="fl-help">Cliccando su "Continua" andrai alla pagina di scelta del piano. Lì potrai confrontare i piani disponibili e completare la registrazione tramite Stripe.</p>
+          <p class="fl-help">Cliccando su "Continua" andrai alla pagina di scelta del piano. Lì potrai scegliere Essenziale o Professionale e completare la registrazione tramite Stripe.</p>
           <div class="au-actions-row">
             <button type="button" class="btn btn-lg" @click="goBack">
               <i class="bi bi-arrow-left"></i> Indietro
@@ -317,7 +319,7 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
       </div>
 
       <footer class="au-foot">
-        <span>© {{ new Date().getFullYear() }} Tavolo S.r.l.</span>
+        <span>© {{ new Date().getFullYear() }} ComforTables</span>
         <div>
           <router-link to="/terms">Termini</router-link>
           <router-link to="/privacy-policy">Privacy</router-link>
@@ -327,7 +329,7 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
 
     <aside class="au-side">
       <div class="au-side-content">
-        <div class="overline" style="color: color-mix(in oklab, white 60%, transparent);">14 giorni gratis</div>
+        <div class="overline" style="color: color-mix(in oklab, white 60%, transparent);">Iscriviti ora</div>
         <h2>Inizia subito. Senza carta. Senza setup.</h2>
         <p>Crea l'account in 2 minuti. Stampante fiscale e POS si configurano dopo, quando vuoi.</p>
         <ol class="au-steps">
@@ -347,6 +349,12 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
 
 <style scoped>
 .au-shell .brand-text { font-family: var(--f-sans); font-size: 18px; letter-spacing: -0.025em; font-weight: 600; }
+.au-theme-toggle {
+  position: absolute;
+  top: 28px;
+  right: 28px;
+  z-index: 2;
+}
 .au-spinner {
   width: 16px; height: 16px;
   border: 2px solid color-mix(in oklab, var(--ac-contrast) 30%, transparent);
@@ -355,4 +363,11 @@ const goBack = () => { if (step.value > 1) step.value -= 1; };
   animation: au-spin 650ms linear infinite;
 }
 @keyframes au-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 720px) {
+  .au-theme-toggle {
+    top: 16px;
+    right: 16px;
+  }
+}
 </style>

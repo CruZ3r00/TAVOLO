@@ -9,6 +9,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
 import './assets/design-system.css';
 import './assets/tavolo-screens.css';
+import './assets/comfortables.css';
 
 const app = createApp(App)
 app.use(store)

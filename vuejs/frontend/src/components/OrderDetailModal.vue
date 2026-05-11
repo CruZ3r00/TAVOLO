@@ -53,11 +53,34 @@ const silentReload = async () => {
 };
 
 const isActive = computed(() => order.value?.status === 'active');
+const isTakeaway = computed(() => order.value?.service_type === 'takeaway');
+const canEditItems = computed(() => isActive.value && (!isTakeaway.value || !order.value?.sent_to_departments_at));
+const canCheckout = computed(() => isActive.value && (!isTakeaway.value || order.value?.takeaway_status === 'picked_up'));
 const totalAmount = computed(() => parseFloat(order.value?.total_amount || 0).toFixed(2));
 const tableNumber = computed(() => order.value?.table?.number ?? '?');
 const itemsSorted = computed(() => {
     if (!order.value?.items) return [];
-    return [...order.value.items].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    return [...order.value.items].sort((a, b) => {
+        const ca = parseInt(a.course, 10) || 1;
+        const cb = parseInt(b.course, 10) || 1;
+        if (ca !== cb) return ca - cb;
+        return new Date(a.createdAt) - new Date(b.createdAt);
+    });
+});
+const itemsByCourse = computed(() => {
+    const groups = [];
+    const byCourse = new Map();
+    for (const item of itemsSorted.value) {
+        const course = parseInt(item.course, 10) || 1;
+        let group = byCourse.get(course);
+        if (!group) {
+            group = { course, items: [] };
+            byCourse.set(course, group);
+            groups.push(group);
+        }
+        group.items.push(item);
+    }
+    return groups;
 });
 
 const showToast = (type, message) => {
@@ -85,7 +108,7 @@ const handleStaleError = async (err) => {
 };
 
 const handleIncrement = async (item) => {
-    if (!isActive.value) return;
+    if (!canEditItems.value) return;
     const oldQty = item.quantity;
     // Optimistic
     item.quantity = oldQty + 1;
@@ -110,7 +133,7 @@ const handleIncrement = async (item) => {
 };
 
 const handleDecrement = async (item) => {
-    if (!isActive.value || item.quantity <= 1) return;
+    if (!canEditItems.value || item.quantity <= 1) return;
     const oldQty = item.quantity;
     item.quantity = oldQty - 1;
     setBusy(item.documentId, true);
@@ -134,6 +157,7 @@ const handleDecrement = async (item) => {
 };
 
 const handleDelete = async (item) => {
+    if (!canEditItems.value) return;
     setBusy(item.documentId, true);
     // Optimistic: rimuovi dalla lista
     const oldItems = [...order.value.items];
@@ -178,6 +202,7 @@ const handleServe = async (item) => {
 };
 
 const openAddItem = () => {
+    if (!canEditItems.value) return;
     emit('open-add-item', {
         orderDocumentId: props.orderDocumentId,
         lockVersion: order.value?.lock_version ?? 0,
@@ -185,6 +210,7 @@ const openAddItem = () => {
 };
 
 const openCheckout = () => {
+    if (!canCheckout.value) return;
     emit('open-checkout', order.value);
 };
 
@@ -210,7 +236,8 @@ defineExpose({ onItemAdded, silentReload });
             <div class="modal-title-wrap">
                 <i class="bi bi-receipt" aria-hidden="true"></i>
                 <h2 class="modal-title">
-                    Ordine - Tavolo {{ tableNumber }}
+                    <template v-if="isTakeaway">Asporto · {{ order?.customer_name || 'Cliente' }}</template>
+                    <template v-else>Ordine - Tavolo {{ tableNumber }}</template>
                 </h2>
                 <OrderStatusBadge v-if="order" :status="order.status" />
             </div>
@@ -258,6 +285,16 @@ defineExpose({ onItemAdded, silentReload });
                             <span class="odm-info-label">Coperti</span>
                             <span class="odm-info-value">{{ order.covers }}</span>
                         </div>
+                        <div v-if="isTakeaway" class="odm-info-item">
+                            <span class="odm-info-label">Ritiro</span>
+                            <span class="odm-info-value">
+                                {{ new Date(order.pickup_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) }}
+                            </span>
+                        </div>
+                        <div v-if="isTakeaway && order.customer_phone" class="odm-info-item">
+                            <span class="odm-info-label">Telefono</span>
+                            <span class="odm-info-value">{{ order.customer_phone }}</span>
+                        </div>
                         <div class="odm-info-item">
                             <span class="odm-info-label">Piatti</span>
                             <span class="odm-info-value">{{ order.items?.length || 0 }}</span>
@@ -269,17 +306,27 @@ defineExpose({ onItemAdded, silentReload });
                         <div v-if="itemsSorted.length === 0" class="odm-empty">
                             <p>Nessun piatto nell'ordine. Aggiungi il primo piatto.</p>
                         </div>
-                        <OrderItemRow
-                            v-for="item in itemsSorted"
-                            :key="item.documentId"
-                            :item="item"
-                            :order-active="isActive"
-                            :busy="busyItemIds.has(item.documentId)"
-                            @increment="handleIncrement"
-                            @decrement="handleDecrement"
-                            @delete="handleDelete"
-                            @serve="handleServe"
-                        />
+                        <section
+                            v-for="group in itemsByCourse"
+                            :key="group.course"
+                            class="odm-course-group"
+                        >
+                            <header class="odm-course-header">
+                                <span>{{ group.course }}a portata</span>
+                                <strong>{{ group.items.length }}</strong>
+                            </header>
+                            <OrderItemRow
+                                v-for="item in group.items"
+                                :key="item.documentId"
+                                :item="item"
+                                :order-active="canEditItems"
+                                :busy="busyItemIds.has(item.documentId)"
+                                @increment="handleIncrement"
+                                @decrement="handleDecrement"
+                                @delete="handleDelete"
+                                @serve="handleServe"
+                            />
+                        </section>
                     </div>
 
                     <!-- Footer con totale e azioni -->
@@ -288,18 +335,28 @@ defineExpose({ onItemAdded, silentReload });
                             <span class="odm-total-label">Totale</span>
                             <span class="odm-total-value">&euro; {{ totalAmount }}</span>
                         </div>
+                        <p v-if="isTakeaway && !canEditItems" class="odm-takeaway-lock">
+                            <i class="bi bi-send"></i>
+                            Asporto inviato ai reparti: non è più modificabile.
+                        </p>
+                        <p v-if="isTakeaway && isActive && !canCheckout" class="odm-takeaway-lock">
+                            <i class="bi bi-box-arrow-up"></i>
+                            Prima di chiudere il conto segnala "Preso dalla cucina".
+                        </p>
                         <div v-if="isActive" class="odm-actions">
                             <button
+                                v-if="canEditItems"
                                 type="button"
                                 class="ds-btn ds-btn-secondary"
                                 @click="openAddItem"
                             >
                                 <i class="bi bi-plus-lg" aria-hidden="true"></i>
-                                <span>Aggiungi piatto</span>
+                                <span>Aggiungi</span>
                             </button>
                             <button
                                 type="button"
                                 class="ds-btn ds-btn-primary"
+                                :disabled="!canCheckout"
                                 @click="openCheckout"
                             >
                                 <i class="bi bi-receipt-cutoff" aria-hidden="true"></i>
@@ -410,10 +467,48 @@ defineExpose({ onItemAdded, silentReload });
 .odm-items {
     display: flex;
     flex-direction: column;
-    gap: var(--s-2);
+    gap: var(--s-3);
     max-height: 360px;
     overflow-y: auto;
     padding-right: 4px;
+}
+.odm-course-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+}
+.odm-course-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    min-height: 30px;
+    padding: 6px 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    color: var(--ink);
+}
+.odm-course-header span {
+    font-size: 12px;
+    font-weight: 700;
+}
+.odm-course-header strong {
+    min-width: 24px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-sm);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-size: 11px;
 }
 .odm-empty {
     padding: var(--s-6);
@@ -432,6 +527,20 @@ defineExpose({ onItemAdded, silentReload });
     border-top: 1px solid var(--line);
     padding-top: var(--s-4);
 }
+.odm-takeaway-lock {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--bg-2);
+    color: var(--ink-2);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+.odm-takeaway-lock i { color: var(--ac); }
 .odm-total {
     display: flex;
     align-items: center;

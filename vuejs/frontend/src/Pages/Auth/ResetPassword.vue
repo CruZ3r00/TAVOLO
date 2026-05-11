@@ -1,8 +1,9 @@
 <script setup>
-    import { useHead } from '@vueuse/head';
-    import { computed, reactive, ref } from 'vue';
+    import { computed, ref } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
-    import { defineRule, configure } from 'vee-validate';
+    import * as yup from 'yup';
+    import { useHead } from '@/lib/compat/head.js';
+    import { useFormState } from '@/lib/validation/form.js';
     import AuthenticationCard from '@/components/AuthenticationCard.vue';
     import InputError from '@/components/InputError.vue';
     import InputLabel from '@/components/InputLabel.vue';
@@ -16,81 +17,61 @@
         ],
     });
 
-    defineRule('required', (value) => (value ? true : 'This field is required'));
-    defineRule('email', (value) =>
-        /^\S+@\S+\.\S+$/.test(value) || 'Please enter a valid email address'
-    );
-    defineRule('confirmed', (value, [other]) => value === other || 'The passwords do not match');
-    configure({
-        generateMessage: (ctx) => {
-            const messages = {
-            required: `The field ${ctx.field} is required.`,
-            email: 'Please enter a valid email address',
-            confirmed: 'The passwords do not match',
-            };
-            return messages[ctx.rule.name] || 'Invalid field';
+    const route = useRoute();
+    const router = useRouter();
+    const successMessage = ref('');
+    const errorMessage = ref('');
+    const resetCode = computed(() => String(route.query.code || '').trim());
+
+    const schema = yup.object({
+        password: yup.string().required('Password richiesta.'),
+        password_confirmation: yup.string()
+            .required('Conferma la password.')
+            .oneOf([yup.ref('password')], 'Le password non coincidono.'),
+    });
+
+    const { values: resetForm, errors, isSubmitting, handleSubmit } = useFormState({
+        schema,
+        initialValues: { password: '', password_confirmation: '' },
+        onSubmit: async (vals) => {
+            errorMessage.value = '';
+            successMessage.value = '';
+            if (!resetCode.value) {
+                errorMessage.value = 'Link di recupero non valido o incompleto.';
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: resetCode.value,
+                        password: vals.password,
+                        passwordConfirmation: vals.password_confirmation,
+                    }),
+                });
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    errorMessage.value = data?.error?.message || data.message || 'Reset password non riuscito.';
+                } else {
+                    successMessage.value = 'Password aggiornata. Ora puoi accedere.';
+                    setTimeout(() => router.push('/login?passwordReset=1'), 900);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                errorMessage.value = 'Errore di rete. Riprova.';
+            }
         },
     });
 
-    const route = useRoute();
-    const router = useRouter();
-    const isSubmitting = ref(false);
-    const successMessage = ref('');
-    const resetCode = computed(() => String(route.query.code || '').trim());
-
-    const form = reactive({
-        password: '',
-        password_confirmation: '',
-    });
-
-    const errorMessage = reactive({
-        value: '',
-    });
-
-    const submit = async () => {
-        if (!resetCode.value) {
-            errorMessage.value = 'Link di recupero non valido o incompleto.';
-            return;
-        }
-        if (form.password !== form.password_confirmation) {
-            errorMessage.value = 'Le password non coincidono.';
-            return;
-        }
-        isSubmitting.value = true;
-        errorMessage.value = '';
-        successMessage.value = '';
-        try {
-            const response = await fetch(`${API_BASE}/api/auth/reset-password`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    code: resetCode.value,
-                    password: form.password,
-                    passwordConfirmation: form.password_confirmation,
-                }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                errorMessage.value = data?.error?.message || data.message || 'Reset password non riuscito.';
-            } else {
-                successMessage.value = 'Password aggiornata. Ora puoi accedere.';
-                setTimeout(() => router.push('/login?passwordReset=1'), 900);
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            errorMessage.value = 'Errore di rete. Riprova.';
-        } finally {
-            isSubmitting.value = false;
-        }
-    };
+    const submit = handleSubmit;
 </script>
 
 <template>
     <AuthenticationCard>
         <router-link to="/" class="auth-brand">
-            <div class="auth-brand-icon" aria-hidden="true">T</div>
-            <span class="auth-brand-name">Tavolo</span>
+            <div class="auth-brand-icon" aria-hidden="true">C</div>
+            <span class="auth-brand-name">ComforTables</span>
         </router-link>
 
         <p class="auth-overline">Nuova password</p>
@@ -98,9 +79,9 @@
         <p class="auth-subtitle">Scegli una nuova password sicura per il tuo account.</p>
 
         <Transition name="fade">
-            <div v-if="errorMessage.value" class="ds-alert ds-alert-error">
+            <div v-if="errorMessage" class="ds-alert ds-alert-error">
                 <i class="bi bi-exclamation-circle"></i>
-                <span>{{ errorMessage.value }}</span>
+                <span>{{ errorMessage }}</span>
             </div>
         </Transition>
         <Transition name="fade">
@@ -113,12 +94,14 @@
         <form @submit.prevent="submit" class="auth-form">
             <div class="ds-field">
                 <InputLabel for="password" value="Nuova password" />
-                <TextInput id="password" v-model="form.password" type="password" required autocomplete="new-password" placeholder="Nuova password" />
+                <TextInput id="password" v-model="resetForm.password" type="password" required autocomplete="new-password" placeholder="Nuova password" />
+                <InputError :message="errors.password" />
             </div>
 
             <div class="ds-field">
                 <InputLabel for="password_confirmation" value="Conferma password" />
-                <TextInput id="password_confirmation" v-model="form.password_confirmation" type="password" required autocomplete="new-password" placeholder="Conferma password" />
+                <TextInput id="password_confirmation" v-model="resetForm.password_confirmation" type="password" required autocomplete="new-password" placeholder="Conferma password" />
+                <InputError :message="errors.password_confirmation" />
             </div>
 
             <button type="submit" class="ds-btn ds-btn-primary ds-btn-lg auth-submit" :disabled="isSubmitting || !resetCode">

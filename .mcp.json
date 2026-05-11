@@ -7,6 +7,19 @@
         "serve"
       ],
       "type": "stdio"
+    },
+    "playwright": {
+      "command": "/usr/bin/env",
+      "args": [
+        "PATH=/home/piocru/Desktop/Projects/TAVOLO/.tools/node-v22.21.1-linux-x64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "/home/piocru/Desktop/Projects/TAVOLO/.tools/playwright-mcp/node_modules/.bin/playwright-mcp",
+        "--headless",
+        "--no-sandbox",
+        "--isolated",
+        "--output-dir",
+        "/home/piocru/Desktop/Projects/TAVOLO/.playwright-mcp"
+      ],
+      "type": "stdio"
     }
   }
 }

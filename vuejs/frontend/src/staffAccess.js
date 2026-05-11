@@ -3,6 +3,9 @@ export const STAFF_ROLES = {
   GESTIONE: 'gestione',
   CAMERIERE: 'cameriere',
   CUCINA: 'cucina',
+  BAR: 'bar',
+  PIZZERIA: 'pizzeria',
+  CUCINA_SG: 'cucina_sg',
 };
 
 const knownRoles = new Set(Object.values(STAFF_ROLES));
@@ -28,6 +31,9 @@ export const defaultRouteForUser = (user) => {
   const role = staffRole(user);
   if (role === STAFF_ROLES.CAMERIERE) return '/orders';
   if (role === STAFF_ROLES.CUCINA) return '/kitchen';
+  if (role === STAFF_ROLES.BAR) return '/bar';
+  if (role === STAFF_ROLES.PIZZERIA) return '/pizzeria';
+  if (role === STAFF_ROLES.CUCINA_SG) return '/kitchen-sg';
   return '/dashboard';
 };
 
@@ -40,6 +46,9 @@ export const canAccessRoute = (user, route) => {
 export const canSeeNavItem = (user, id) => {
   const role = staffRole(user);
   if (role === STAFF_ROLES.CAMERIERE) return ['sala', 'prenotazioni', 'logout'].includes(id);
-  if (role === STAFF_ROLES.CUCINA) return ['cucina', 'logout'].includes(id);
+  if (role === STAFF_ROLES.CUCINA) return ['cucina', 'cucina_sg', 'logout'].includes(id);
+  if (role === STAFF_ROLES.BAR) return ['bar', 'logout'].includes(id);
+  if (role === STAFF_ROLES.PIZZERIA) return ['pizzeria', 'logout'].includes(id);
+  if (role === STAFF_ROLES.CUCINA_SG) return ['cucina_sg', 'logout'].includes(id);
   return true;
 };

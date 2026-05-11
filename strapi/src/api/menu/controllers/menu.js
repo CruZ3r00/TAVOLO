@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { createCoreController } = require('@strapi/strapi').factories;
+const { ensureCategoryRouting } = require('../../../utils/category-routing');
 
 const ALLOWED_MIME = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
 
@@ -587,6 +588,7 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
             },
             status: 'published',
           });
+          await ensureCategoryRouting(strapi, user.id, el.category);
           createdDocs.push(doc);
         }
 

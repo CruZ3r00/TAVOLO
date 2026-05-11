@@ -1,11 +1,12 @@
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { canSeeNavItem } from '@/staffAccess';
+import { STAFF_ROLES, canSeeNavItem, staffRole } from '@/staffAccess';
+import ThemeToggle from '@/components/ThemeToggle.vue';
 
 const props = defineProps({
   username: { type: String, default: '' },
-  restaurantName: { type: String, default: 'Tavolo' },
+  restaurantName: { type: String, default: 'ComforTables' },
   restaurantSub: { type: String, default: '' },
   pendingCount: { type: Number, default: 0 },
   activeOrdersCount: { type: Number, default: 0 },
@@ -14,14 +15,30 @@ const props = defineProps({
 });
 
 const route = useRoute();
+const isOwner = computed(() => staffRole(props.user) === STAFF_ROLES.OWNER);
 
-const roles = computed(() => [
-  { id: 'manager', icon: 'bi-speedometer2', label: 'Manager', path: '/dashboard' },
-  { id: 'sala', icon: 'bi-grid-3x3-gap', label: 'Sala', path: '/orders', badge: props.activeOrdersCount },
-  { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen', accent: true },
-  { id: 'prenotazioni', icon: 'bi-calendar-check', label: 'Prenotazioni', path: '/reservations', badge: props.pendingCount },
-  { id: 'menu', icon: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
-].filter((item) => canSeeNavItem(props.user, item.id)));
+const roles = computed(() => {
+  if (isOwner.value) {
+    return [
+      { id: 'manager', icon: 'bi-speedometer2', label: 'Manager', path: '/dashboard' },
+      { id: 'sala', icon: 'bi-grid-3x3-gap', label: 'Sala', path: '/orders', badge: props.activeOrdersCount },
+      { id: 'ordini', icon: 'bi-receipt', label: 'Ordini', path: '/kitchen', badge: props.activeOrdersCount },
+      { id: 'prenotazioni', icon: 'bi-calendar-check', label: 'Prenotazioni', path: '/reservations', badge: props.pendingCount },
+      { id: 'menu', icon: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
+    ];
+  }
+
+  return [
+    { id: 'manager', icon: 'bi-speedometer2', label: 'Manager', path: '/dashboard' },
+    { id: 'sala', icon: 'bi-grid-3x3-gap', label: 'Sala', path: '/orders', badge: props.activeOrdersCount },
+    { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen', accent: true },
+    { id: 'bar', icon: 'bi-cup-straw', label: 'Bar', path: '/bar', accent: true },
+    { id: 'pizzeria', icon: 'bi-record-circle', label: 'Pizzeria', path: '/pizzeria', accent: true },
+    { id: 'cucina_sg', icon: 'bi-shield-check', label: 'Cucina SG', path: '/kitchen-sg', accent: true },
+    { id: 'prenotazioni', icon: 'bi-calendar-check', label: 'Prenotazioni', path: '/reservations', badge: props.pendingCount },
+    { id: 'menu', icon: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
+  ].filter((item) => canSeeNavItem(props.user, item.id));
+});
 
 const sysItems = computed(() => [
   { id: 'sito', icon: 'bi-globe2', label: 'Sito pubblico', path: '/profile/show?section=sito' },
@@ -32,7 +49,16 @@ const canOpenProfile = computed(() => canSeeNavItem(props.user, 'profilo'));
 
 const activeKey = computed(() => {
   const p = route.path;
+  if (isOwner.value && (
+    p.startsWith('/kitchen-sg') ||
+    p.startsWith('/kitchen') ||
+    p.startsWith('/bar') ||
+    p.startsWith('/pizzeria')
+  )) return 'ordini';
+  if (p.startsWith('/kitchen-sg')) return 'cucina_sg';
   if (p.startsWith('/kitchen')) return 'cucina';
+  if (p.startsWith('/bar')) return 'bar';
+  if (p.startsWith('/pizzeria')) return 'pizzeria';
   if (p.startsWith('/orders')) return 'sala';
   if (p.startsWith('/reservations')) return 'prenotazioni';
   if (p.startsWith('/menu-handler')) return 'menu';
@@ -51,14 +77,14 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
 <template>
   <aside class="md-side">
     <div class="md-side-brand">
-      <span class="tv-brand-mark">T</span>
+      <span class="tv-brand-mark">C</span>
       <div>
-        <div class="md-side-name">Tavolo</div>
+        <div class="md-side-name">ComforTables</div>
         <div class="md-side-sub">Gestionale</div>
       </div>
     </div>
 
-    <div class="md-side-section">RUOLI</div>
+    <div class="md-side-section">{{ isOwner ? 'SEZIONI' : 'RUOLI' }}</div>
     <router-link
       v-for="r in roles"
       :key="r.id"
@@ -73,7 +99,10 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
       </span>
     </router-link>
 
-    <div class="md-side-section mt">SISTEMA</div>
+    <div v-if="sysItems.length > 0" class="md-side-section mt">SISTEMA</div>
+    <div class="md-side-theme">
+      <ThemeToggle />
+    </div>
     <router-link
       v-for="it in sysItems"
       :key="it.id"
@@ -124,6 +153,44 @@ const userInitial = computed(() => (props.username || 'U').charAt(0).toUpperCase
 }
 .md-side-user.active { background: var(--bg-sunk, var(--bg-2)); border-radius: 8px; }
 .md-side-user.active .md-side-user-cta { color: var(--ac); }
+.md-side-theme {
+  padding: 4px 8px 8px;
+}
+.md-side-theme :deep(.theme-toggle) {
+  width: 100%;
+  justify-content: space-between;
+}
 :deep(.md-side-item.danger) { color: var(--danger); }
 :deep(.md-side-item.danger i) { color: var(--danger); }
+
+@media (min-width: 861px) and (max-width: 1199px) {
+  .md-side-theme {
+    display: flex;
+    justify-content: center;
+    padding: 6px 4px 10px;
+  }
+  .md-side-theme :deep(.theme-toggle) {
+    width: 40px;
+    padding: 0;
+  }
+  .md-side-theme :deep(.theme-toggle-label) {
+    display: none;
+  }
+  .md-side-theme :deep(.theme-toggle-track) {
+    width: 28px;
+  }
+  .md-side-theme :deep(.theme-toggle-thumb) {
+    display: none;
+  }
+  .md-side-theme :deep(.theme-toggle-track i:first-child) {
+    display: none;
+  }
+  .md-side-theme :deep(.theme-toggle:not(.is-dark) .theme-toggle-track i:first-child) {
+    display: block;
+    grid-column: 1 / -1;
+  }
+  .md-side-theme :deep(.theme-toggle:not(.is-dark) .theme-toggle-track i:nth-child(2)) {
+    display: none;
+  }
+}
 </style>

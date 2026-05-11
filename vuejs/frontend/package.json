@@ -5,25 +5,57 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:legacy": "vite --config vite.config.legacy.mjs --port 5175",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:modern": "vite build --outDir dist/modern",
+    "build:legacy": "vite build --config vite.config.legacy.mjs --outDir dist/legacy",
+    "build:all": "npm run build:modern && npm run build:legacy",
+    "build:prod:modern": "vite build --base=/modern/ --outDir dist/modern",
+    "build:prod:legacy": "vite build --config vite.config.legacy.mjs --base=/legacy/ --outDir dist/legacy",
+    "build:prod": "npm run build:prod:modern && npm run build:prod:legacy && node scripts/generate-unified-index.cjs",
+    "preview": "vite preview",
+    "postinstall": "node scripts/patch-legacy-build.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
-    "@vitejs/plugin-legacy": "^6.1.1",
     "@vueuse/head": "^2.0.0",
     "@vueuse/motion": "^3.0.3",
+    "core-js": "^3.39.0",
+    "intersection-observer": "^0.12.2",
     "qrcode": "^1.5.4",
     "qs": "^6.15.1",
+    "regenerator-runtime": "^0.14.1",
     "terser": "^5.46.2",
+    "three": "^0.184.0",
+    "url-search-params-polyfill": "^8.2.5",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0",
-    "vuex": "^4.0.2"
+    "vuex": "^4.0.2",
+    "whatwg-fetch": "^3.6.20",
+    "yup": "^1.4.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-legacy": "^6.1.1",
     "@vitejs/plugin-vue": "^5.2.1",
     "playwright": "^1.59.1",
+    "unplugin-vue2-script-setup": "^0.11.4",
     "vite": "^6.2.1",
-    "vite-plugin-vue-devtools": "^7.7.2"
-  }
+    "vite-plugin-vue-devtools": "^7.7.2",
+    "vite-plugin-vue2": "^2.0.3",
+    "vue-router2": "npm:vue-router@^3.6.5",
+    "vue-template-compiler": "^2.7.16",
+    "vue2": "npm:vue@^2.7.16",
+    "vuex2": "npm:vuex@^3.6.2"
+  },
+  "browserslist": [
+    "chrome >= 37",
+    "android >= 4.4",
+    "ios_saf >= 8",
+    "safari >= 8",
+    "firefox >= 38",
+    "ie >= 11",
+    "edge >= 12",
+    "samsung >= 4",
+    "opera >= 24"
+  ]
 }

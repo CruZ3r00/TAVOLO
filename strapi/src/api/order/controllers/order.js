@@ -27,10 +27,25 @@ const statsService = require('../../../services/stats');
 const posBridge = require('../../../services/pos-bridge');
 const {
   STAFF_ROLES,
+  KITCHEN_LIKE_ROLES,
   resolveStaffContext,
   assertStaffRole,
   canTransitionItem,
 } = require('../../../utils/staff-access');
+const {
+  normalizeStation,
+  ensureCategoryRouting,
+  loadRoutingMap,
+} = require('../../../utils/category-routing');
+const {
+  sendTakeawayEmail,
+} = require('../../../utils/customer-email');
+const {
+  TAKEAWAY_STATUSES,
+  pickupDueForSend,
+  sendToDepartments,
+  refreshReadyState,
+} = require('../../../utils/takeaway-lifecycle');
 
 const { ApplicationError } = errors;
 
@@ -46,6 +61,8 @@ const ITEM_TRANSITIONS = {
 };
 
 const ITEM_STATUS_ENUM = ['taken', 'preparing', 'ready', 'served'];
+const ORDER_STATUS_ENUM = ['active', 'closed'];
+const SERVICE_TYPE_ENUM = ['table', 'takeaway'];
 
 /* ------------------------------------------------------------------ */
 /* Error helpers (allineati a reservation)                            */
@@ -56,6 +73,7 @@ const ERROR_STATUS = {
   INVALID_ITEM_TRANSITION: 400,
   PAYMENT_DECLINED: 402,
   NOT_OWNER: 403,
+  RESTAURANT_NOT_FOUND: 404,
   TABLE_NOT_FOUND: 404,
   ORDER_NOT_FOUND: 404,
   ITEM_NOT_FOUND: 404,
@@ -67,6 +85,7 @@ const ERROR_STATUS = {
   PAYMENT_UNAVAILABLE: 503,
   PAYMENT_TIMEOUT: 504,
   POS_DEVICE_NOT_FOUND: 409,
+  EMAIL_DELIVERY_FAILED: 503,
 };
 
 function appError(code, message, details) {
@@ -94,26 +113,39 @@ function sendError(ctx, err) {
 /* Serializers                                                        */
 /* ------------------------------------------------------------------ */
 
-function serializeItem(item) {
+function serializeItem(item, routingLookup) {
   if (!item) return null;
+  const category = item.category || (item.fk_element ? item.fk_element.category : null) || null;
   return {
     documentId: item.documentId,
     name: item.name,
     price: item.price,
     quantity: item.quantity,
+    category,
+    course: parseInt(item.course, 10) || 1,
     notes: item.notes || null,
     status: item.status,
+    station: routingLookup ? routingLookup(category) : null,
     fk_element: item.fk_element ? { documentId: item.fk_element.documentId } : null,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };
 }
 
-function serializeOrder(order, includeItems) {
+function serializeOrder(order, includeItems, routingLookup) {
   if (!order) return null;
   const result = {
     documentId: order.documentId,
     status: order.status,
+    service_type: order.service_type || 'table',
+    takeaway_status: order.takeaway_status || null,
+    customer_name: order.customer_name || null,
+    customer_phone: order.customer_phone || null,
+    customer_email: order.customer_email || null,
+    pickup_at: order.pickup_at || null,
+    sent_to_departments_at: order.sent_to_departments_at || null,
+    ready_at: order.ready_at || null,
+    picked_up_at: order.picked_up_at || null,
     opened_at: order.opened_at,
     closed_at: order.closed_at || null,
     total_amount: order.total_amount,
@@ -140,7 +172,7 @@ function serializeOrder(order, includeItems) {
     updatedAt: order.updatedAt,
   };
   if (includeItems) {
-    result.items = (order.fk_items || []).map(serializeItem);
+    result.items = (order.fk_items || []).map((item) => serializeItem(item, routingLookup));
   }
   return result;
 }
@@ -222,11 +254,198 @@ async function loadOwnedMenuElement(documentId, userId) {
   return element;
 }
 
+function validateEmail(value, { required = false } = {}) {
+  const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!email) {
+    if (required) throw appError('INVALID_PAYLOAD', 'customer_email obbligatoria.');
+    return null;
+  }
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    throw appError('INVALID_PAYLOAD', 'customer_email non valida.');
+  }
+  return email;
+}
+
+function validatePickupAt(body) {
+  const date = typeof body.date === 'string' ? body.date.trim() : '';
+  const time = typeof body.time === 'string' ? body.time.trim() : '';
+  const pickupAtRaw = typeof body.pickup_at === 'string' ? body.pickup_at.trim() : '';
+  let pickupAt;
+
+  if (pickupAtRaw) {
+    pickupAt = new Date(pickupAtRaw);
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{2}:\d{2}(:\d{2})?$/.test(time)) {
+    const normalizedTime = time.length === 5 ? `${time}:00` : time;
+    pickupAt = new Date(`${date}T${normalizedTime}`);
+  } else {
+    throw appError('INVALID_PAYLOAD', 'pickup_at oppure date/time obbligatori.');
+  }
+
+  if (!pickupAt || Number.isNaN(pickupAt.getTime())) {
+    throw appError('INVALID_PAYLOAD', 'Orario ritiro non valido.');
+  }
+  if (pickupAt.getTime() < Date.now()) {
+    throw appError('INVALID_PAYLOAD', 'Non puoi creare un asporto per un orario passato.');
+  }
+
+  return pickupAt.toISOString();
+}
+
+function validateTakeawayCustomer(body, { emailRequired = false } = {}) {
+  const customer_name = typeof body.customer_name === 'string' ? body.customer_name.trim() : '';
+  if (!customer_name) throw appError('INVALID_PAYLOAD', 'customer_name obbligatorio.');
+  if (customer_name.length > 120) throw appError('INVALID_PAYLOAD', 'customer_name troppo lungo.');
+
+  const customer_phone = typeof body.customer_phone === 'string'
+    ? body.customer_phone.trim()
+    : (typeof body.phone === 'string' ? body.phone.trim() : '');
+  if (!customer_phone) throw appError('INVALID_PAYLOAD', 'customer_phone obbligatorio.');
+  if (customer_phone.length > 32) throw appError('INVALID_PAYLOAD', 'customer_phone troppo lungo.');
+
+  const customer_email = validateEmail(
+    body.customer_email !== undefined ? body.customer_email : body.email,
+    { required: emailRequired }
+  );
+
+  return { customer_name, customer_phone, customer_email };
+}
+
+async function buildOrderItemDataFromPayload(payload, ownerId, orderId) {
+  let itemName, itemPrice, itemCategory, menuElement;
+
+  if (payload.element_id) {
+    menuElement = await loadOwnedMenuElement(payload.element_id, ownerId);
+    itemName = menuElement.name;
+    itemPrice = menuElement.price;
+    itemCategory = menuElement.category || null;
+  } else {
+    itemName = typeof payload.name === 'string' ? payload.name.trim() : '';
+    if (!itemName) throw appError('INVALID_PAYLOAD', 'name obbligatorio per item fuori menu.');
+    if (itemName.length > 200) throw appError('INVALID_PAYLOAD', 'name troppo lungo (max 200).');
+
+    itemPrice = parseFloat(payload.price);
+    if (!Number.isFinite(itemPrice) || itemPrice < 0) {
+      throw appError('INVALID_PAYLOAD', 'price obbligatorio e deve essere >= 0.');
+    }
+    itemCategory = typeof payload.category === 'string' ? payload.category.trim() : null;
+    if (itemCategory && itemCategory.length > 100) {
+      throw appError('INVALID_PAYLOAD', 'category troppo lunga (max 100).');
+    }
+  }
+
+  const quantity = parseInt(payload.quantity, 10);
+  if (!Number.isFinite(quantity) || quantity < 1) {
+    throw appError('INVALID_PAYLOAD', 'quantity obbligatoria (intero >= 1).');
+  }
+
+  const course = payload.course !== undefined ? parseInt(payload.course, 10) : 1;
+  if (!Number.isFinite(course) || course < 1 || course > 12) {
+    throw appError('INVALID_PAYLOAD', 'course deve essere un intero 1..12.');
+  }
+
+  const notes = typeof payload.notes === 'string' ? payload.notes.trim() : null;
+
+  const data = {
+    name: itemName,
+    price: itemPrice,
+    quantity,
+    category: itemCategory || null,
+    course,
+    notes: notes && notes.length > 0 ? notes : null,
+    status: 'taken',
+    fk_order: { connect: [{ id: orderId }] },
+  };
+  if (menuElement) {
+    data.fk_element = { connect: [{ id: menuElement.id }] };
+  }
+  if (data.category) {
+    await ensureCategoryRouting(strapi, ownerId, data.category);
+  }
+  return data;
+}
+
+async function restaurantNameForOwner(ownerId) {
+  const configs = await strapi.documents('api::website-config.website-config').findMany({
+    filters: { fk_user: { id: { $eq: ownerId } } },
+    limit: 1,
+  });
+  const wc = configs && configs.length > 0 ? configs[0] : null;
+  return wc && wc.restaurant_name ? wc.restaurant_name : 'Tavolo';
+}
+
+async function deleteOrderWithItems(order) {
+  if (!order || !order.documentId) return;
+  const items = Array.isArray(order.fk_items) ? order.fk_items : [];
+  for (const item of items) {
+    if (item && item.documentId) {
+      await strapi.documents('api::order-item.order-item').delete({ documentId: item.documentId });
+    }
+  }
+  await strapi.documents('api::order.order').delete({ documentId: order.documentId });
+}
+
+async function createTakeawayOrder({ ownerId, body, status, emailRequired }) {
+  const customer = validateTakeawayCustomer(body, { emailRequired });
+  const pickupAt = validatePickupAt(body);
+  const itemsPayload = Array.isArray(body.items) ? body.items : [];
+  if (itemsPayload.length === 0) {
+    throw appError('INVALID_PAYLOAD', 'Aggiungi almeno un piatto all\'ordine asporto.');
+  }
+  if (itemsPayload.length > 200) {
+    throw appError('INVALID_PAYLOAD', 'Troppi elementi asporto (max 200).');
+  }
+
+  let order;
+  try {
+    order = await strapi.documents('api::order.order').create({
+      data: {
+        status: 'active',
+        service_type: 'takeaway',
+        takeaway_status: status,
+        customer_name: customer.customer_name,
+        customer_phone: customer.customer_phone,
+        customer_email: customer.customer_email,
+        pickup_at: pickupAt,
+        opened_at: new Date().toISOString(),
+        total_amount: 0,
+        payment_status: 'unpaid',
+        lock_version: 0,
+        covers: null,
+        fk_user: { connect: [{ id: ownerId }] },
+      },
+    });
+
+    for (const payload of itemsPayload) {
+      const itemData = await buildOrderItemDataFromPayload(payload || {}, ownerId, order.id);
+      await strapi.documents('api::order-item.order-item').create({ data: itemData });
+    }
+
+    await recalculateTotal(strapi, order.documentId);
+  } catch (err) {
+    if (order) {
+      const partial = await loadOrder(order.documentId, ownerId).catch(() => ({ ...order, fk_items: [] }));
+      await deleteOrderWithItems(partial).catch((cleanupErr) => {
+        strapi.log.error(`cleanup asporto parziale fallito: ${cleanupErr.message}`);
+      });
+    }
+    throw err;
+  }
+
+  let full = await loadOrder(order.documentId, ownerId);
+  if (status === 'confirmed' && pickupDueForSend(full)) {
+    await sendToDepartments(strapi, full);
+    full = await loadOrder(order.documentId, ownerId);
+  }
+  return full;
+}
+
 function serializePosJobItem(item) {
   return {
     name: item.name,
     quantity: parseInt(item.quantity, 10) || 1,
     price: Number(item.price || 0),
+    category: item.category || (item.fk_element ? item.fk_element.category : null) || null,
+    course: parseInt(item.course, 10) || 1,
     notes: item.notes || null,
     element_document_id: item.fk_element ? item.fk_element.documentId : null,
   };
@@ -251,7 +470,135 @@ function assertLockVersion(order, clientVersion) {
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 25;
-const ORDER_STATUS_ENUM = ['active', 'closed'];
+function stationForActor(actor, query) {
+  if (!actor) return null;
+  if (actor.role === STAFF_ROLES.CUCINA) {
+    const requested = normalizeStation(query && query.station);
+    return requested === STAFF_ROLES.CUCINA_SG ? requested : STAFF_ROLES.CUCINA;
+  }
+  if (KITCHEN_LIKE_ROLES.has(actor.role)) return actor.role;
+  if (actor.role === STAFF_ROLES.OWNER || actor.role === STAFF_ROLES.GESTIONE) {
+    return normalizeStation(query && query.station);
+  }
+  return null;
+}
+
+function filterItemsForStation(order, routingLookup, station) {
+  if (!station || !order || !Array.isArray(order.fk_items)) return order;
+
+  const filtered = order.fk_items.filter((item) => {
+    const itemStation = routingLookup(item.category || (item.fk_element && item.fk_element.category));
+    return itemStation === station;
+  });
+  return { ...order, fk_items: filtered };
+}
+
+function filterOrdersForStation(orders, routingLookup, station) {
+  if (!station) return orders;
+  const filtered = [];
+  for (const order of orders || []) {
+    const stationOrder = filterItemsForStation(order, routingLookup, station);
+    if ((stationOrder.fk_items || []).some((item) => item.status !== 'served')) {
+      filtered.push(stationOrder);
+    }
+  }
+  return filtered;
+}
+
+/**
+ * Filtra a livello SQL gli ordini che hanno almeno un item non-servito
+ * routato verso `station` per l'owner. Restituisce IDs ordinati + total per
+ * paginazione corretta. Sostituisce il post-filter in JS che rompeva total/pageCount.
+ */
+async function listOrderIdsForStation(strapi, params) {
+  const {
+    ownerId,
+    station,
+    statusFilter,
+    serviceTypeFilter,
+    tableFilter,
+    from,
+    to,
+    pickupFrom,
+    pickupTo,
+    linkedFilter,
+    page,
+    pageSize,
+  } = params;
+  const conn = strapi.db.connection;
+
+  const applyFilters = (q) => {
+    let query = q
+      .innerJoin('orders_fk_user_lnk as ul', 'ul.order_id', 'o.id')
+      .innerJoin('order_items_fk_order_lnk as il', 'il.order_id', 'o.id')
+      .innerJoin('order_items as oi', 'oi.id', 'il.order_item_id')
+      .innerJoin('restaurant_category_routing as rcr', 'rcr.owner_id', 'ul.user_id')
+      .whereRaw('rcr.category_key = LOWER(TRIM(oi.category))')
+      .where('ul.user_id', ownerId)
+      .where('rcr.staff_role', station)
+      .where('oi.status', '<>', 'served')
+      .andWhere(function () {
+        this.where(function () {
+          this.where(function () {
+            this.whereNull('o.service_type').orWhere('o.service_type', 'table');
+          });
+        }).orWhere(function () {
+          this.where('o.service_type', 'takeaway')
+            .whereNotNull('o.sent_to_departments_at')
+            .whereIn('o.takeaway_status', ['sent_to_departments', 'ready']);
+        });
+      });
+
+    if (statusFilter && statusFilter.length) {
+      query = query.whereIn('o.status', statusFilter);
+    }
+    if (serviceTypeFilter) {
+      query = query.where('o.service_type', serviceTypeFilter);
+    }
+    if (tableFilter) {
+      query = query
+        .innerJoin('orders_fk_table_lnk as tl', 'tl.order_id', 'o.id')
+        .innerJoin('tables as t', 't.id', 'tl.table_id')
+        .where('t.document_id', tableFilter);
+    }
+    if (from) query = query.where('o.opened_at', '>=', from);
+    if (to) query = query.where('o.opened_at', '<', to);
+    if (pickupFrom) query = query.where('o.pickup_at', '>=', pickupFrom);
+    if (pickupTo) query = query.where('o.pickup_at', '<', pickupTo);
+
+    if (linkedFilter === true) {
+      query = query.whereExists(function () {
+        this.select('*')
+          .from('reservations_fk_order_lnk as rl')
+          .whereRaw('rl.order_id = o.id');
+      });
+    } else if (linkedFilter === false) {
+      query = query.whereNotExists(function () {
+        this.select('*')
+          .from('reservations_fk_order_lnk as rl')
+          .whereRaw('rl.order_id = o.id');
+      });
+    }
+    return query;
+  };
+
+  const idsQuery = applyFilters(conn('orders as o'))
+    .select('o.id')
+    .min('o.opened_at as opened_at_min')
+    .groupBy('o.id')
+    .orderBy('opened_at_min', 'desc')
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+
+  const countQuery = applyFilters(conn('orders as o'))
+    .countDistinct('o.id as cnt')
+    .first();
+
+  const [rows, countRow] = await Promise.all([idsQuery, countQuery]);
+  const ids = (rows || []).map((r) => r.id);
+  const total = parseInt(countRow && countRow.cnt, 10) || 0;
+  return { ids, total };
+}
 
 /* ================================================================== */
 /* CONTROLLER                                                         */
@@ -323,6 +670,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
           const orderDoc = await strapi.documents('api::order.order').create({
             data: {
               status: 'active',
+              service_type: 'table',
               opened_at: new Date().toISOString(),
               total_amount: 0,
               payment_status: 'unpaid',
@@ -357,6 +705,75 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
   },
 
   /**
+   * POST /api/takeaways
+   * Crea un ordine asporto dal gestionale. Nasce sempre confermato.
+   */
+  async createTakeawayAuthenticated(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const full = await createTakeawayOrder({
+        ownerId: actor.ownerId,
+        body: ctx.request.body || {},
+        status: 'confirmed',
+        emailRequired: false,
+      });
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+
+      ctx.status = 201;
+      ctx.body = { data: serializeOrder(full, true, routingLookup) };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  /**
+   * POST /api/takeaways/public/:userDocumentId
+   * Crea una richiesta asporto pubblica, in attesa di accettazione.
+   */
+  async createTakeawayPublic(ctx) {
+    try {
+      const { userDocumentId } = ctx.params;
+      if (!userDocumentId) throw appError('INVALID_PAYLOAD', 'userDocumentId mancante.');
+
+      const users = await strapi.db
+        .query('plugin::users-permissions.user')
+        .findMany({ where: { documentId: userDocumentId }, limit: 1 });
+      if (!users || users.length === 0) {
+        throw appError('RESTAURANT_NOT_FOUND', 'Ristorante non trovato.');
+      }
+      const targetUser = users[0];
+      const full = await createTakeawayOrder({
+        ownerId: targetUser.id,
+        body: ctx.request.body || {},
+        status: 'pending_acceptance',
+        emailRequired: true,
+      });
+
+      try {
+        await sendTakeawayEmail(strapi, {
+          order: full,
+          restaurantName: await restaurantNameForOwner(targetUser.id),
+          type: 'received',
+        });
+      } catch (emailErr) {
+        await deleteOrderWithItems(full).catch((cleanupErr) => {
+          strapi.log.error(`cleanup asporto pubblico fallito: ${cleanupErr.message}`);
+        });
+        throw emailErr;
+      }
+
+      ctx.status = 201;
+      ctx.body = { data: serializeOrder(full, true) };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  /**
    * GET /api/orders
    * Lista paginata degli ordini dell'utente.
    */
@@ -366,23 +783,46 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
+      assertStaffRole(actor, [
+        STAFF_ROLES.OWNER,
+        STAFF_ROLES.GESTIONE,
+        STAFF_ROLES.CAMERIERE,
+        STAFF_ROLES.CUCINA,
+        STAFF_ROLES.BAR,
+        STAFF_ROLES.PIZZERIA,
+        STAFF_ROLES.CUCINA_SG,
+      ]);
       const ownerId = actor.ownerId;
       const q = ctx.request.query || {};
+      const station = stationForActor(actor, q);
 
       const statusFilter = typeof q.status === 'string' && q.status.trim()
         ? q.status.split(',').map((s) => s.trim()).filter((s) => ORDER_STATUS_ENUM.includes(s))
+        : null;
+      const serviceTypeFilter = typeof q.service_type === 'string' && SERVICE_TYPE_ENUM.includes(q.service_type.trim())
+        ? q.service_type.trim()
+        : null;
+      const takeawayStatusFilter = typeof q.takeaway_status === 'string' && q.takeaway_status.trim()
+        ? q.takeaway_status.split(',').map((s) => s.trim()).filter((s) => TAKEAWAY_STATUSES.includes(s))
         : null;
 
       const tableFilter = typeof q.table === 'string' && q.table.trim() ? q.table.trim() : null;
 
       const from = typeof q.from === 'string' && q.from.trim() ? q.from.trim() : null;
       const to = typeof q.to === 'string' && q.to.trim() ? q.to.trim() : null;
+      const pickupFrom = typeof q.pickup_from === 'string' && q.pickup_from.trim() ? q.pickup_from.trim() : null;
+      const pickupTo = typeof q.pickup_to === 'string' && q.pickup_to.trim() ? q.pickup_to.trim() : null;
       if (from && Number.isNaN(new Date(from).getTime())) {
         throw appError('INVALID_PAYLOAD', 'from non valido.');
       }
       if (to && Number.isNaN(new Date(to).getTime())) {
         throw appError('INVALID_PAYLOAD', 'to non valido.');
+      }
+      if (pickupFrom && Number.isNaN(new Date(pickupFrom).getTime())) {
+        throw appError('INVALID_PAYLOAD', 'pickup_from non valido.');
+      }
+      if (pickupTo && Number.isNaN(new Date(pickupTo).getTime())) {
+        throw appError('INVALID_PAYLOAD', 'pickup_to non valido.');
       }
 
       const pageRaw = parseInt(q.page, 10);
@@ -397,6 +837,12 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (statusFilter && statusFilter.length) {
         filters.status = { $in: statusFilter };
       }
+      if (serviceTypeFilter) {
+        filters.service_type = { $eq: serviceTypeFilter };
+      }
+      if (takeawayStatusFilter && takeawayStatusFilter.length) {
+        filters.takeaway_status = { $in: takeawayStatusFilter };
+      }
       if (tableFilter) {
         filters.fk_table = { documentId: { $eq: tableFilter } };
       }
@@ -405,26 +851,83 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         if (from) filters.opened_at.$gte = from;
         if (to) filters.opened_at.$lt = to;
       }
+      if (pickupFrom || pickupTo) {
+        filters.pickup_at = {};
+        if (pickupFrom) filters.pickup_at.$gte = pickupFrom;
+        if (pickupTo) filters.pickup_at.$lt = pickupTo;
+      }
 
       const linkedRaw = typeof q.linked_reservation === 'string' ? q.linked_reservation.trim() : null;
+      let linkedFilter = null;
       if (linkedRaw === 'true' || linkedRaw === '1') {
+        linkedFilter = true;
         filters.fk_reservation = { id: { $notNull: true } };
       } else if (linkedRaw === 'false' || linkedRaw === '0') {
+        linkedFilter = false;
         filters.fk_reservation = { id: { $null: true } };
       }
 
-      const [results, total] = await Promise.all([
-        strapi.documents('api::order.order').findMany({
-          filters,
-          populate: ['fk_table', 'fk_items', 'fk_reservation'],
-          sort: ['opened_at:desc'],
-          pagination: { page, pageSize },
-        }),
-        strapi.documents('api::order.order').count({ filters }),
-      ]);
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+
+      let results;
+      let total;
+
+      if (station) {
+        // Filtro a livello SQL via JOIN su restaurant_category_routing.
+        // Necessario per paginazione/total corretti: il vecchio post-filter
+        // in JS contava il subset di una pagina invece del totale filtrato.
+        const { ids, total: filteredTotal } = await listOrderIdsForStation(strapi, {
+          ownerId,
+          station,
+          statusFilter,
+          serviceTypeFilter,
+          tableFilter,
+          from,
+          to,
+          pickupFrom,
+          pickupTo,
+          linkedFilter,
+          page,
+          pageSize,
+        });
+        total = filteredTotal;
+
+        if (ids.length === 0) {
+          results = [];
+        } else {
+          const populated = await strapi.documents('api::order.order').findMany({
+            filters: { id: { $in: ids } },
+            populate: {
+              fk_table: true,
+              fk_items: { populate: ['fk_element'] },
+              fk_reservation: true,
+            },
+            sort: ['opened_at:desc'],
+            pagination: { page: 1, pageSize: ids.length },
+          });
+          // Restringe gli item alla station richiesta (kanban di reparto).
+          results = (populated || []).map((o) => filterItemsForStation(o, routingLookup, station));
+        }
+      } else {
+        const [findResults, countTotal] = await Promise.all([
+          strapi.documents('api::order.order').findMany({
+            filters,
+            populate: {
+              fk_table: true,
+              fk_items: { populate: ['fk_element'] },
+              fk_reservation: true,
+            },
+            sort: ['opened_at:desc'],
+            pagination: { page, pageSize },
+          }),
+          strapi.documents('api::order.order').count({ filters }),
+        ]);
+        results = findResults || [];
+        total = countTotal;
+      }
 
       ctx.body = {
-        data: (results || []).map((o) => serializeOrder(o, true)),
+        data: results.map((o) => serializeOrder(o, true, routingLookup)),
         meta: {
           pagination: {
             page,
@@ -449,13 +952,24 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
+      assertStaffRole(actor, [
+        STAFF_ROLES.OWNER,
+        STAFF_ROLES.GESTIONE,
+        STAFF_ROLES.CAMERIERE,
+        STAFF_ROLES.CUCINA,
+        STAFF_ROLES.BAR,
+        STAFF_ROLES.PIZZERIA,
+        STAFF_ROLES.CUCINA_SG,
+      ]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
-      const order = await loadOrder(documentId, actor.ownerId);
+      const station = stationForActor(actor, ctx.request.query || {});
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      const loaded = await loadOrder(documentId, actor.ownerId);
+      const order = filterItemsForStation(loaded, routingLookup, station);
 
-      ctx.body = { data: serializeOrder(order, true) };
+      ctx.body = { data: serializeOrder(order, true, routingLookup) };
     } catch (err) {
       sendError(ctx, err);
     }
@@ -507,16 +1021,20 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
       }
+      if (order.service_type === 'takeaway' && order.sent_to_departments_at) {
+        throw appError('ITEM_NOT_EDITABLE', 'Asporto gia inviato ai reparti, non modificabile.');
+      }
 
       assertLockVersion(order, body.lock_version);
 
-      let itemName, itemPrice;
+      let itemName, itemPrice, itemCategory, menuElement;
 
       if (body.element_id) {
         // Da menu: carica l'Element solo se appartiene al menu dell'utente.
-        const el = await loadOwnedMenuElement(body.element_id, actor.ownerId);
-        itemName = el.name;
-        itemPrice = el.price;
+        menuElement = await loadOwnedMenuElement(body.element_id, actor.ownerId);
+        itemName = menuElement.name;
+        itemPrice = menuElement.price;
+        itemCategory = menuElement.category || null;
       } else {
         // Item libero
         itemName = typeof body.name === 'string' ? body.name.trim() : '';
@@ -527,11 +1045,20 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         if (!Number.isFinite(itemPrice) || itemPrice < 0) {
           throw appError('INVALID_PAYLOAD', 'price obbligatorio e deve essere >= 0.');
         }
+        itemCategory = typeof body.category === 'string' ? body.category.trim() : null;
+        if (itemCategory && itemCategory.length > 100) {
+          throw appError('INVALID_PAYLOAD', 'category troppo lunga (max 100).');
+        }
       }
 
       const quantity = parseInt(body.quantity, 10);
       if (!Number.isFinite(quantity) || quantity < 1) {
         throw appError('INVALID_PAYLOAD', 'quantity obbligatoria (intero >= 1).');
+      }
+
+      const course = body.course !== undefined ? parseInt(body.course, 10) : 1;
+      if (!Number.isFinite(course) || course < 1 || course > 12) {
+        throw appError('INVALID_PAYLOAD', 'course deve essere un intero 1..12.');
       }
 
       const notes = typeof body.notes === 'string' ? body.notes.trim() : null;
@@ -541,14 +1068,18 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         name: itemName,
         price: itemPrice,
         quantity,
+        category: itemCategory || null,
+        course,
         notes: notes && notes.length > 0 ? notes : null,
         status: 'taken',
         fk_order: { connect: [{ id: order.id }] },
       };
 
-      if (body.element_id) {
-        const el = await loadOwnedMenuElement(body.element_id, actor.ownerId);
-        itemData.fk_element = { connect: [{ id: el.id }] };
+      if (menuElement) {
+        itemData.fk_element = { connect: [{ id: menuElement.id }] };
+      }
+      if (itemData.category) {
+        await ensureCategoryRouting(strapi, actor.ownerId, itemData.category);
       }
 
       const createdItem = await strapi.documents('api::order-item.order-item').create({
@@ -558,10 +1089,12 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       // Ricalcola totale
       const totalResult = await recalculateTotal(strapi, documentId);
 
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+
       ctx.status = 201;
       ctx.body = {
         data: {
-          item: serializeItem(createdItem),
+          item: serializeItem(createdItem, routingLookup),
           order: {
             total_amount: totalResult.total,
             lock_version: totalResult.lock_version,
@@ -594,6 +1127,9 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
+      }
+      if (order.service_type === 'takeaway' && order.sent_to_departments_at) {
+        throw appError('ITEM_NOT_EDITABLE', 'Asporto gia inviato ai reparti, non modificabile.');
       }
 
       assertLockVersion(order, body.lock_version);
@@ -636,9 +1172,11 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         limit: 1,
       });
 
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+
       ctx.body = {
         data: {
-          item: serializeItem(updatedItems && updatedItems[0]),
+          item: serializeItem(updatedItems && updatedItems[0], routingLookup),
           order: {
             total_amount: totalResult.total,
             lock_version: totalResult.lock_version,
@@ -671,6 +1209,9 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
+      }
+      if (order.service_type === 'takeaway' && order.sent_to_departments_at) {
+        throw appError('ITEM_NOT_EDITABLE', 'Asporto gia inviato ai reparti, non modificabile.');
       }
 
       assertLockVersion(order, body.lock_version);
@@ -713,7 +1254,15 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA]);
+      assertStaffRole(actor, [
+        STAFF_ROLES.OWNER,
+        STAFF_ROLES.GESTIONE,
+        STAFF_ROLES.CAMERIERE,
+        STAFF_ROLES.CUCINA,
+        STAFF_ROLES.BAR,
+        STAFF_ROLES.PIZZERIA,
+        STAFF_ROLES.CUCINA_SG,
+      ]);
       const { documentId, itemDocumentId } = ctx.params;
       if (!documentId || !itemDocumentId) {
         throw appError('INVALID_PAYLOAD', 'documentId e itemDocumentId obbligatori.');
@@ -730,10 +1279,26 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
       }
+      if (order.service_type === 'takeaway' && !order.sent_to_departments_at) {
+        throw appError('ORDER_NOT_ACTIVE', 'Asporto non ancora inviato ai reparti.');
+      }
 
       const items = order.fk_items || [];
       const item = items.find((i) => i.documentId === itemDocumentId);
       if (!item) throw appError('ITEM_NOT_FOUND', 'Item non trovato.');
+      if (order.service_type === 'takeaway' && nextStatus === 'served') {
+        throw appError('INVALID_ITEM_TRANSITION', 'Usa "Preso dalla cucina" per ritirare un asporto pronto.');
+      }
+
+      const station = stationForActor(actor, ctx.request.query || {});
+      let routingLookup = null;
+      if (station) {
+        routingLookup = await loadRoutingMap(strapi, actor.owner);
+        const itemStation = routingLookup(item.category || (item.fk_element && item.fk_element.category));
+        if (itemStation !== station) {
+          throw appError('NOT_OWNER', 'Questo reparto non puo lavorare questa categoria.');
+        }
+      }
 
       // FSM check
       const allowed = ITEM_TRANSITIONS[item.status] || [];
@@ -752,8 +1317,203 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         documentId: itemDocumentId,
         data: { status: nextStatus },
       });
+      if (order.service_type === 'takeaway' && nextStatus === 'ready') {
+        await refreshReadyState(strapi, documentId);
+      }
 
-      ctx.body = { data: { item: serializeItem(updated) } };
+      ctx.body = { data: { item: serializeItem(updated, routingLookup) } };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  /**
+   * PATCH /api/takeaways/:documentId
+   * Modifica dati cliente/orario finche l'asporto non e' stato inviato.
+   */
+  async updateTakeaway(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const { documentId } = ctx.params;
+      if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
+
+      const order = await loadOrder(documentId, actor.ownerId);
+      if (order.service_type !== 'takeaway') throw appError('ORDER_NOT_FOUND', 'Asporto non trovato.');
+      if (order.status !== 'active') throw appError('ORDER_NOT_ACTIVE', 'Asporto gia chiuso.');
+      if (order.sent_to_departments_at) {
+        throw appError('ITEM_NOT_EDITABLE', 'Asporto gia inviato ai reparti, non modificabile.');
+      }
+
+      const body = ctx.request.body || {};
+      const data = {};
+      if (body.customer_name !== undefined || body.customer_phone !== undefined || body.phone !== undefined || body.customer_email !== undefined || body.email !== undefined) {
+        Object.assign(data, validateTakeawayCustomer({
+          customer_name: body.customer_name !== undefined ? body.customer_name : order.customer_name,
+          customer_phone: body.customer_phone !== undefined ? body.customer_phone : (body.phone !== undefined ? body.phone : order.customer_phone),
+          customer_email: body.customer_email !== undefined ? body.customer_email : (body.email !== undefined ? body.email : order.customer_email),
+        }, { emailRequired: order.takeaway_status === 'pending_acceptance' }));
+      }
+      if (body.pickup_at !== undefined || body.date !== undefined || body.time !== undefined) {
+        data.pickup_at = validatePickupAt({
+          pickup_at: body.pickup_at !== undefined ? body.pickup_at : undefined,
+          date: body.date,
+          time: body.time,
+        });
+      }
+      if (Object.keys(data).length === 0) {
+        throw appError('INVALID_PAYLOAD', 'Nessun campo da aggiornare.');
+      }
+
+      let updated = await strapi.documents('api::order.order').update({
+        documentId,
+        data: {
+          ...data,
+          lock_version: (order.lock_version || 0) + 1,
+        },
+      });
+      if (updated.takeaway_status === 'confirmed' && pickupDueForSend(updated)) {
+        await sendToDepartments(strapi, updated);
+        updated = await loadOrder(documentId, actor.ownerId);
+      }
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      ctx.body = { data: serializeOrder(updated, true, routingLookup) };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  async acceptTakeaway(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const { documentId } = ctx.params;
+      const order = await loadOrder(documentId, actor.ownerId);
+      if (order.service_type !== 'takeaway') throw appError('ORDER_NOT_FOUND', 'Asporto non trovato.');
+      if (order.takeaway_status !== 'pending_acceptance') {
+        throw appError('INVALID_PAYLOAD', 'Solo gli asporti in attesa possono essere accettati.');
+      }
+
+      await sendTakeawayEmail(strapi, {
+        order,
+        restaurantName: await restaurantNameForOwner(actor.ownerId),
+        type: 'confirmed',
+      });
+
+      let updated = await strapi.documents('api::order.order').update({
+        documentId,
+        data: {
+          takeaway_status: 'confirmed',
+          lock_version: (order.lock_version || 0) + 1,
+        },
+      });
+      if (pickupDueForSend(updated)) {
+        await sendToDepartments(strapi, updated);
+        updated = await loadOrder(documentId, actor.ownerId);
+      }
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      ctx.body = { data: serializeOrder(updated, true, routingLookup) };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  async rejectTakeaway(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const { documentId } = ctx.params;
+      const order = await loadOrder(documentId, actor.ownerId);
+      if (order.service_type !== 'takeaway') throw appError('ORDER_NOT_FOUND', 'Asporto non trovato.');
+      if (order.takeaway_status !== 'pending_acceptance') {
+        throw appError('INVALID_PAYLOAD', 'Solo una richiesta asporto in attesa puo essere rifiutata.');
+      }
+      if (order.sent_to_departments_at) {
+        throw appError('INVALID_PAYLOAD', 'Asporto gia inviato ai reparti, non rifiutabile.');
+      }
+
+      await sendTakeawayEmail(strapi, {
+        order,
+        restaurantName: await restaurantNameForOwner(actor.ownerId),
+        type: 'rejected',
+      });
+
+      await deleteOrderWithItems(order);
+      ctx.status = 204;
+      ctx.body = null;
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  async sendTakeawayToDepartments(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const { documentId } = ctx.params;
+      const order = await loadOrder(documentId, actor.ownerId);
+      if (order.service_type !== 'takeaway') throw appError('ORDER_NOT_FOUND', 'Asporto non trovato.');
+      if (order.takeaway_status !== 'confirmed') {
+        throw appError('INVALID_PAYLOAD', 'Solo un asporto confermato puo essere inviato ai reparti.');
+      }
+      const updated = await sendToDepartments(strapi, order);
+      const full = await loadOrder((updated || order).documentId, actor.ownerId);
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      ctx.body = { data: serializeOrder(full, true, routingLookup) };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  async pickupTakeaway(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const { documentId } = ctx.params;
+      const order = await loadOrder(documentId, actor.ownerId);
+      if (order.service_type !== 'takeaway') throw appError('ORDER_NOT_FOUND', 'Asporto non trovato.');
+      if (order.takeaway_status !== 'ready') {
+        throw appError('INVALID_PAYLOAD', 'L\'asporto non e ancora pronto.');
+      }
+      const items = order.fk_items || [];
+      if (!items.length || !items.every((item) => item.status === 'ready' || item.status === 'served')) {
+        throw appError('INVALID_PAYLOAD', 'Tutte le portate devono essere pronte.');
+      }
+
+      for (const item of items) {
+        if (item.status !== 'served') {
+          await strapi.documents('api::order-item.order-item').update({
+            documentId: item.documentId,
+            data: { status: 'served' },
+          });
+        }
+      }
+      const updated = await strapi.documents('api::order.order').update({
+        documentId,
+        data: {
+          takeaway_status: 'picked_up',
+          picked_up_at: new Date().toISOString(),
+          lock_version: (order.lock_version || 0) + 1,
+        },
+      });
+      const full = await loadOrder(updated.documentId, actor.ownerId);
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      ctx.body = { data: serializeOrder(full, true, routingLookup) };
     } catch (err) {
       sendError(ctx, err);
     }
@@ -769,7 +1529,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
@@ -780,6 +1540,12 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
+      }
+      if (actor.role === STAFF_ROLES.CAMERIERE && order.service_type !== 'takeaway') {
+        throw appError('NOT_OWNER', 'Il cameriere puo chiudere solo ordini asporto.');
+      }
+      if (order.service_type === 'takeaway' && order.takeaway_status !== 'picked_up') {
+        throw appError('ORDER_NOT_ACTIVE', 'Prima segnala che l\'asporto e stato preso dalla cucina.');
       }
 
       assertLockVersion(order, body.lock_version);
@@ -811,6 +1577,14 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             discount: totalResult.discount,
             currency: 'EUR',
             payment_method: paymentMethod,
+            service_type: order.service_type || 'table',
+            takeaway: order.service_type === 'takeaway'
+              ? {
+                  customer_name: order.customer_name,
+                  customer_phone: order.customer_phone,
+                  pickup_at: order.pickup_at,
+                }
+              : null,
             table: order.fk_table
               ? {
                   documentId: order.fk_table.documentId,
@@ -878,11 +1652,12 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
               status: 'closed',
               closed_at: closedAtISO,
               total_amount: totalResult.total,
-              payment_status: 'paid',
-              payment_reference: paymentResult.transactionId,
-              lock_version: (order.lock_version || 0) + 1,
-            },
-          });
+            payment_status: 'paid',
+            payment_reference: paymentResult.transactionId,
+            lock_version: (order.lock_version || 0) + 1,
+            ...(order.service_type === 'takeaway' ? { takeaway_status: 'closed' } : {}),
+          },
+        });
 
           if (order.fk_table) {
             await strapi.documents('api::table.table').update({
@@ -916,6 +1691,11 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
               closed_at: closedAtISO,
               total_amount: totalResult.total,
               covers: order.covers || null,
+              service_type: order.service_type || 'table',
+              customer_name: order.customer_name || null,
+              customer_phone: order.customer_phone || null,
+              customer_email: order.customer_email || null,
+              pickup_at: order.pickup_at || null,
             };
             const reservation = order.fk_reservation || null;
             const table = order.fk_table || null;
@@ -929,6 +1709,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
               paymentReference: paymentResult.transactionId,
               userId: actor.ownerId,
               isWalkin: reservation ? !!reservation.is_walkin : false,
+              isTakeaway: order.service_type === 'takeaway',
             });
 
             const dateKey = statsService.dateKeyUTC(closedAtISO);
@@ -947,6 +1728,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
               items: itemsCount,
               isWalkin: reservation ? !!reservation.is_walkin : false,
               hasReservation: !!reservation && !reservation.is_walkin,
+              isTakeaway: order.service_type === 'takeaway',
             });
 
             await statsService.updateElementStats(strapi, {

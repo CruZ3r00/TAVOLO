@@ -577,9 +577,14 @@ export interface ApiOrderArchiveOrderArchive
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    customer_email: Schema.Attribute.Email;
     customer_name: Schema.Attribute.String &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 120;
+      }>;
+    customer_phone: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 32;
       }>;
     duration_minutes: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
@@ -621,11 +626,15 @@ export interface ApiOrderArchiveOrderArchive
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 255;
       }>;
+    pickup_at: Schema.Attribute.DateTime;
     publishedAt: Schema.Attribute.DateTime;
     reservation_document_id: Schema.Attribute.String &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 64;
       }>;
+    service_type: Schema.Attribute.Enumeration<['table', 'takeaway']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'table'>;
     table_area: Schema.Attribute.String &
       Schema.Attribute.SetMinMaxLength<{
         maxLength: 32;
@@ -652,6 +661,19 @@ export interface ApiOrderItemOrderItem extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    category: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 100;
+      }>;
+    course: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 12;
+          min: 1;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<1>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -725,6 +747,26 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    customer_email: Schema.Attribute.Email;
+    customer_name: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    customer_phone: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 32;
+      }>;
+    fiscal_event_id: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 80;
+      }>;
+    fiscal_receipt_id: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 120;
+      }>;
+    fiscal_status: Schema.Attribute.Enumeration<
+      ['pending', 'completed', 'failed', 'not_required']
+    >;
     fk_items: Schema.Attribute.Relation<
       'oneToMany',
       'api::order-item.order-item'
@@ -752,10 +794,27 @@ export interface ApiOrderOrder extends Struct.CollectionTypeSchema {
     payment_status: Schema.Attribute.Enumeration<['unpaid', 'paid']> &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'unpaid'>;
+    picked_up_at: Schema.Attribute.DateTime;
+    pickup_at: Schema.Attribute.DateTime;
     publishedAt: Schema.Attribute.DateTime;
+    ready_at: Schema.Attribute.DateTime;
+    sent_to_departments_at: Schema.Attribute.DateTime;
+    service_type: Schema.Attribute.Enumeration<['table', 'takeaway']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'table'>;
     status: Schema.Attribute.Enumeration<['active', 'closed']> &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'active'>;
+    takeaway_status: Schema.Attribute.Enumeration<
+      [
+        'pending_acceptance',
+        'confirmed',
+        'sent_to_departments',
+        'ready',
+        'picked_up',
+        'closed',
+      ]
+    >;
     total_amount: Schema.Attribute.Decimal &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<0>;
@@ -942,65 +1001,6 @@ export interface ApiPosPairingTokenPosPairingToken
   };
 }
 
-export interface ApiPreferencePreference extends Struct.CollectionTypeSchema {
-  collectionName: 'preferences';
-  info: {
-    description: '';
-    displayName: 'Preferences';
-    pluralName: 'preferences';
-    singularName: 'preference';
-  };
-  options: {
-    draftAndPublish: true;
-  };
-  attributes: {
-    background: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMaxLength<{
-        maxLength: 7;
-        minLength: 7;
-      }> &
-      Schema.Attribute.DefaultTo<'#FFFFFF'>;
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    details: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMaxLength<{
-        maxLength: 7;
-        minLength: 7;
-      }> &
-      Schema.Attribute.DefaultTo<'#111111'>;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::preference.preference'
-    > &
-      Schema.Attribute.Private;
-    primary_color: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMaxLength<{
-        maxLength: 7;
-        minLength: 7;
-      }> &
-      Schema.Attribute.DefaultTo<'#1C1C1C'>;
-    publishedAt: Schema.Attribute.DateTime;
-    second_color: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMaxLength<{
-        maxLength: 7;
-        minLength: 7;
-      }> &
-      Schema.Attribute.DefaultTo<'#E0E0E0'>;
-    theme: Schema.Attribute.String &
-      Schema.Attribute.Required &
-      Schema.Attribute.DefaultTo<'classic'>;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-  };
-}
-
 export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
   collectionName: 'reservations';
   info: {
@@ -1016,6 +1016,7 @@ export interface ApiReservationReservation extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    customer_email: Schema.Attribute.Email;
     customer_name: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
@@ -1130,6 +1131,15 @@ export interface ApiRestaurantDailyStatRestaurantDailyStat
       Schema.Attribute.DefaultTo<0>;
     revenue: Schema.Attribute.Decimal &
       Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<0>;
+    takeaway_count: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
       Schema.Attribute.DefaultTo<0>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -1708,8 +1718,11 @@ export interface PluginUsersPermissionsUser
     draftAndPublish: false;
   };
   attributes: {
+    address: Schema.Attribute.String;
     birth_date: Schema.Attribute.Date;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    cap: Schema.Attribute.String;
+    city: Schema.Attribute.String;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     createdAt: Schema.Attribute.DateTime;
@@ -1725,10 +1738,6 @@ export interface PluginUsersPermissionsUser
       'manyToOne',
       'plugin::users-permissions.user'
     >;
-    fk_prefs: Schema.Attribute.Relation<
-      'oneToOne',
-      'api::preference.preference'
-    >;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1743,6 +1752,7 @@ export interface PluginUsersPermissionsUser
       }>;
     payment_method: Schema.Attribute.JSON;
     provider: Schema.Attribute.String;
+    province: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
     role: Schema.Attribute.Relation<
@@ -1754,7 +1764,15 @@ export interface PluginUsersPermissionsUser
       'plugin::users-permissions.user'
     >;
     staff_role: Schema.Attribute.Enumeration<
-      ['owner', 'gestione', 'cameriere', 'cucina']
+      [
+        'owner',
+        'gestione',
+        'cameriere',
+        'cucina',
+        'bar',
+        'pizzeria',
+        'cucina_sg',
+      ]
     > &
       Schema.Attribute.DefaultTo<'owner'>;
     stripe_customer_id: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1780,6 +1798,7 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 3;
       }>;
+    vat: Schema.Attribute.String;
   };
 }
 
@@ -1803,7 +1822,6 @@ declare module '@strapi/strapi' {
       'api::pos-device.pos-device': ApiPosDevicePosDevice;
       'api::pos-job.pos-job': ApiPosJobPosJob;
       'api::pos-pairing-token.pos-pairing-token': ApiPosPairingTokenPosPairingToken;
-      'api::preference.preference': ApiPreferencePreference;
       'api::reservation.reservation': ApiReservationReservation;
       'api::restaurant-daily-stat.restaurant-daily-stat': ApiRestaurantDailyStatRestaurantDailyStat;
       'api::table.table': ApiTableTable;

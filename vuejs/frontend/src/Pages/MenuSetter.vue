@@ -8,6 +8,7 @@ import MenuAdder from '@/components/MenuAdder.vue';
 import MenuList from '@/components/MenuList.vue';
 import MenuImporter from '@/components/MenuImporter.vue';
 import IngredientsManager from '@/components/IngredientsManager.vue';
+import TeleportCompat from '@/lib/compat/teleport.js';
 
 const store = useStore();
 const router = useRouter();
@@ -168,7 +169,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Overlay loading full-screen durante l'analisi OCR -->
-    <Teleport to="body">
+    <TeleportCompat to="body">
       <div v-if="isImporting" class="import-overlay" role="status" aria-live="polite">
         <div class="import-overlay-spinner" aria-hidden="true"></div>
         <h3 class="import-overlay-title">Stiamo analizzando il tuo menu…</h3>
@@ -181,9 +182,9 @@ onBeforeUnmount(() => {
           Operazione in corso. Non chiudere o ricaricare la pagina.
         </p>
       </div>
-    </Teleport>
+    </TeleportCompat>
 
-    <Teleport to="body">
+    <TeleportCompat to="body">
       <Transition name="toast">
         <div
           v-if="toast.show"
@@ -198,7 +199,7 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </Transition>
-    </Teleport>
+    </TeleportCompat>
   </AppLayout>
 </template>
 

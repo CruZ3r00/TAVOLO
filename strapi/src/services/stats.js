@@ -51,6 +51,7 @@ async function archiveClosedOrder(strapi, {
   paymentReference,
   userId,
   isWalkin,
+  isTakeaway,
 }) {
   const itemsSnapshot = (items || []).map((it) => ({
     name: it.name,
@@ -66,10 +67,14 @@ async function archiveClosedOrder(strapi, {
   const data = {
     order_document_id: order.documentId,
     reservation_document_id: reservation ? reservation.documentId : null,
+    service_type: isTakeaway || order.service_type === 'takeaway' ? 'takeaway' : 'table',
     opened_at: order.opened_at,
     closed_at: order.closed_at || new Date().toISOString(),
     duration_minutes: durationMinutes(order.opened_at, order.closed_at || new Date().toISOString()),
-    customer_name: reservation ? reservation.customer_name : null,
+    customer_name: order.customer_name || (reservation ? reservation.customer_name : null),
+    customer_phone: order.customer_phone || (reservation ? reservation.phone : null),
+    customer_email: order.customer_email || (reservation ? reservation.customer_email : null),
+    pickup_at: order.pickup_at || null,
     covers: order.covers || (reservation ? reservation.number_of_people : null),
     is_walkin: !!isWalkin,
     table_number: table ? table.number : null,
@@ -97,6 +102,7 @@ async function updateDailyStat(strapi, {
   items,
   isWalkin,
   hasReservation,
+  isTakeaway,
 }) {
   if (!dateKey) return null;
 
@@ -119,6 +125,7 @@ async function updateDailyStat(strapi, {
         items_sold: (row.items_sold || 0) + (items || 0),
         walkin_count: (row.walkin_count || 0) + (isWalkin ? 1 : 0),
         reservation_count: (row.reservation_count || 0) + (hasReservation ? 1 : 0),
+        takeaway_count: (row.takeaway_count || 0) + (isTakeaway ? 1 : 0),
       },
     });
   }
@@ -132,6 +139,7 @@ async function updateDailyStat(strapi, {
       items_sold: items || 0,
       walkin_count: isWalkin ? 1 : 0,
       reservation_count: hasReservation ? 1 : 0,
+      takeaway_count: isTakeaway ? 1 : 0,
       fk_user: { connect: [{ id: userId }] },
     },
   });

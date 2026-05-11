@@ -17,6 +17,54 @@
       "default": "active",
       "required": true
     },
+    "service_type": {
+      "type": "enumeration",
+      "enum": ["table", "takeaway"],
+      "default": "table",
+      "required": true
+    },
+    "takeaway_status": {
+      "type": "enumeration",
+      "enum": [
+        "pending_acceptance",
+        "confirmed",
+        "sent_to_departments",
+        "ready",
+        "picked_up",
+        "closed"
+      ],
+      "required": false
+    },
+    "customer_name": {
+      "type": "string",
+      "required": false,
+      "maxLength": 120
+    },
+    "customer_phone": {
+      "type": "string",
+      "required": false,
+      "maxLength": 32
+    },
+    "customer_email": {
+      "type": "email",
+      "required": false
+    },
+    "pickup_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "sent_to_departments_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "ready_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "picked_up_at": {
+      "type": "datetime",
+      "required": false
+    },
     "opened_at": {
       "type": "datetime",
       "required": true

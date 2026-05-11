@@ -8,6 +8,8 @@ import { canSeeNavItem, defaultRouteForUser, effectiveUserId } from '@/staffAcce
 import AppSidebar from '@/components/AppSidebar.vue';
 import MobileBottomNav from '@/components/MobileBottomNav.vue';
 import MobileTopBar from '@/components/MobileTopBar.vue';
+import ThemeToggle from '@/components/ThemeToggle.vue';
+import TeleportCompat from '@/lib/compat/teleport.js';
 
 const props = defineProps({
   // 'app' = sidebar + bottom nav, 'public' = top nav, 'auto' = decide da auth + path
@@ -16,7 +18,7 @@ const props = defineProps({
 });
 
 const username = ref('');
-const restaurantName = ref('Tavolo');
+const restaurantName = ref('ComforTables');
 const restaurantSub = ref('');
 const store = useStore();
 const route = useRoute();
@@ -40,7 +42,7 @@ const checkLog = async () => {
     if (response.ok) {
       const userData = await response.json();
       username.value = userData.username;
-      restaurantName.value = userData.restaurant_name || userData.username || 'Tavolo';
+      restaurantName.value = userData.restaurant_name || userData.username || 'ComforTables';
       const city = userData.city || userData.address || '';
       const tables = userData.coperti_invernali ? `${userData.coperti_invernali} coperti` : '';
       restaurantSub.value = [city, tables].filter(Boolean).join(' · ') || 'Gestionale';
@@ -58,7 +60,7 @@ const refreshCounts = async () => {
       canReadReservations
         ? fetchReservations({ status: 'pending', pageSize: 1 }, token)
         : Promise.resolve(null),
-      fetchOrders({ status: 'active', pageSize: 1 }, token),
+      fetchOrders({ status: 'active', service_type: 'table', pageSize: 1 }, token),
     ]);
     pendingCount.value = canReadReservations ? (r?.meta?.pagination?.total ?? 0) : 0;
     activeOrdersCount.value = o?.meta?.pagination?.total ?? 0;
@@ -80,7 +82,9 @@ const stopRealtimeCounts = async () => {
     realtimeRefreshHandle = null;
   }
   if (realtimeChannel && supabase) {
-    await supabase.removeChannel(realtimeChannel);
+    try {
+      await supabase.removeChannel(realtimeChannel);
+    } catch (_err) { /* realtime is optional */ }
     realtimeChannel = null;
   }
 };
@@ -89,28 +93,40 @@ const subscribeRealtimeCounts = async () => {
   await stopRealtimeCounts();
   const userId = effectiveUserId(store.getters.getUser);
   if (!isSupabaseRealtimeConfigured || !supabase || !userId) return;
-  realtimeChannel = supabase
-    .channel(`app-counts-${userId}`)
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'order_realtime_events',
-      filter: `user_id=eq.${userId}`,
-    }, scheduleRealtimeCountsRefresh)
-    .subscribe();
+  try {
+    realtimeChannel = supabase
+      .channel(`app-counts-${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'order_realtime_events',
+        filter: `user_id=eq.${userId}`,
+      }, scheduleRealtimeCountsRefresh);
+
+    realtimeChannel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        realtimeChannel = null;
+      }
+    });
+  } catch (_err) {
+    realtimeChannel = null;
+  }
 };
 
 const variantResolved = computed(() => {
   if (props.variant !== 'auto') return props.variant;
   return isLoggedIn.value ? 'app' : 'public';
 });
+// Computed esplicito: il compiler-sfc Vue 2.7 a volte ottimizza-out i nodi
+// con `v-if="isGuest"` adiacenti a `v-if="isLoggedIn"`, scartandoli dal
+// render output. Usare un nome diverso evita l'ottimizzazione errata.
+const isGuest = computed(() => !isLoggedIn.value);
 
 const userInitial = computed(() => (username.value || 'U').charAt(0).toUpperCase());
 const currentUser = computed(() => store.getters.getUser || null);
 const defaultAppRoute = computed(() => defaultRouteForUser(currentUser.value));
 const showNav = (id) => canSeeNavItem(currentUser.value, id);
 const showMobileProfile = computed(() => showNav('profilo'));
-const showMobileReservations = computed(() => showNav('prenotazioni'));
 
 const handleClickOutside = (e) => {
   const target = e.target;
@@ -149,12 +165,10 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
   <!-- ============== APP variant: sidebar + bottom nav ============== -->
   <div v-if="variantResolved === 'app'" class="app-shell-app">
     <MobileTopBar
-      :title="pageTitle || 'Tavolo'"
-      :has-notifications="pendingCount > 0"
+      :title="pageTitle || 'ComforTables'"
       :username="username"
       :restaurant-name="restaurantName"
       :show-menu-button="false"
-      :show-reservations="showMobileReservations"
       :show-profile="showMobileProfile"
       @menu="toggleMobileMenu"
     />
@@ -179,33 +193,33 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
       :user="currentUser"
     />
 
-    <Teleport to="body">
+    <TeleportCompat to="body">
       <Transition name="drawer">
         <div v-if="mobileMenuOpen" class="mobile-drawer-backdrop" @click="closeMobileMenu">
           <aside class="mobile-drawer" @click.stop>
             <header class="mobile-drawer-h">
-              <span class="tv-brand-mark">T</span>
+              <span class="tv-brand-mark">C</span>
               <div>
                 <div class="md-side-name">{{ restaurantName }}</div>
                 <div class="md-side-sub">{{ restaurantSub }}</div>
               </div>
-              <button class="fm-close" @click="closeMobileMenu" aria-label="Chiudi"><i class="bi bi-x-lg"/></button>
+              <button class="fm-close" @click="closeMobileMenu" aria-label="Chiudi"><i class="bi bi-x-lg"></i></button>
             </header>
             <nav class="mobile-drawer-nav">
-              <router-link v-if="showNav('manager')" to="/dashboard" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-speedometer2"/> Manager</router-link>
-              <router-link v-if="showNav('sala')" to="/orders" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-grid-3x3-gap"/> Sala</router-link>
-              <router-link v-if="showNav('cucina')" to="/kitchen" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-fire"/> Cucina</router-link>
-              <router-link v-if="showNav('prenotazioni')" to="/reservations" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-calendar-check"/> Prenotazioni</router-link>
-              <router-link v-if="showNav('menu')" to="/menu-handler" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-journal-text"/> Menu</router-link>
+              <router-link v-if="showNav('manager')" to="/dashboard" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-speedometer2"></i> Manager</router-link>
+              <router-link v-if="showNav('sala')" to="/orders" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-grid-3x3-gap"></i> Sala</router-link>
+              <router-link v-if="showNav('cucina')" to="/kitchen" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-fire"></i> Cucina</router-link>
+              <router-link v-if="showNav('prenotazioni')" to="/reservations" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-calendar-check"></i> Prenotazioni</router-link>
+              <router-link v-if="showNav('menu')" to="/menu-handler" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-journal-text"></i> Menu</router-link>
               <hr v-if="showNav('sito') || showNav('profilo')" class="mobile-drawer-sep">
-              <router-link v-if="showNav('sito')" to="/profile/show?section=sito" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-globe2"/> Sito pubblico</router-link>
-              <router-link v-if="showNav('profilo')" to="/profile/show" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-person"/> Profilo</router-link>
-              <router-link to="/logout" class="md-side-item md-side-item--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"/> Esci</router-link>
+              <router-link v-if="showNav('sito')" to="/profile/show?section=sito" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-globe2"></i> Sito pubblico</router-link>
+              <router-link v-if="showNav('profilo')" to="/profile/show" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-person"></i> Profilo</router-link>
+              <router-link to="/logout" class="md-side-item md-side-item--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"></i> Esci</router-link>
             </nav>
           </aside>
         </div>
       </Transition>
-    </Teleport>
+    </TeleportCompat>
   </div>
 
   <!-- ============== PUBLIC variant: landing/auth top nav ============== -->
@@ -213,8 +227,8 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
     <nav class="nav">
       <div class="nav-inner">
         <router-link :to="isLoggedIn ? defaultAppRoute : '/landing'" class="brand" @click="closeMobileMenu">
-          <span class="tv-brand-mark">T</span>
-          <span class="brand-text">Tavolo</span>
+          <span class="tv-brand-mark">C</span>
+          <span class="brand-text">ComforTables</span>
           <span class="brand-tag">beta</span>
         </router-link>
 
@@ -225,31 +239,33 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
         </div>
 
         <div class="nav-tools">
-          <template v-if="isLoggedIn">
-            <router-link :to="defaultAppRoute" class="btn btn-primary btn-sm nav-cta">
-              <i class="bi bi-speedometer2"/> Vai alla dashboard
-            </router-link>
-            <div class="user-menu">
-              <button class="avatar" @click.stop="toggleUserMenu" :aria-expanded="userMenuOpen">
-                <span>{{ userInitial }}</span>
-              </button>
-              <Transition name="fade">
-                <ul v-if="userMenuOpen" class="user-dropdown" role="menu">
-                  <li class="user-dropdown-header">
-                    <div class="user-dropdown-name">{{ username || 'Utente' }}</div>
-                    <div class="user-dropdown-role">Operatore</div>
-                  </li>
-                  <li><router-link to="/profile/show" class="user-dropdown-item" @click="closeUserMenu"><i class="bi bi-person"/><span>Profilo</span></router-link></li>
-                  <li><hr class="user-dropdown-sep"></li>
-                  <li><router-link to="/logout" class="user-dropdown-item user-dropdown-item--danger" @click="closeUserMenu"><i class="bi bi-box-arrow-right"/><span>Esci</span></router-link></li>
-                </ul>
-              </Transition>
-            </div>
-          </template>
-          <template v-else>
-            <router-link to="/login" class="btn btn-ghost btn-sm nav-cta">Accedi</router-link>
-            <router-link to="/register" class="btn btn-primary btn-sm nav-cta">Inizia ora</router-link>
-          </template>
+          <ThemeToggle class="nav-theme-toggle" />
+          <ThemeToggle compact class="nav-theme-toggle-mobile" />
+          <router-link
+            v-if="isLoggedIn"
+            :to="defaultAppRoute"
+            class="btn btn-primary btn-sm nav-cta"
+          >
+            <i class="bi bi-speedometer2"></i> Vai alla dashboard
+          </router-link>
+          <div v-if="isLoggedIn" class="user-menu">
+            <button class="avatar" @click.stop="toggleUserMenu" :aria-expanded="userMenuOpen">
+              <span>{{ userInitial }}</span>
+            </button>
+            <Transition name="fade">
+              <ul v-if="userMenuOpen" class="user-dropdown" role="menu">
+                <li class="user-dropdown-header">
+                  <div class="user-dropdown-name">{{ username || 'Utente' }}</div>
+                  <div class="user-dropdown-role">Operatore</div>
+                </li>
+                <li><router-link to="/profile/show" class="user-dropdown-item" @click="closeUserMenu"><i class="bi bi-person"></i><span>Profilo</span></router-link></li>
+                <li><hr class="user-dropdown-sep"></li>
+                <li><router-link to="/logout" class="user-dropdown-item user-dropdown-item--danger" @click="closeUserMenu"><i class="bi bi-box-arrow-right"></i><span>Esci</span></router-link></li>
+              </ul>
+            </Transition>
+          </div>
+          <router-link v-if="isGuest" to="/login" class="btn btn-ghost btn-sm nav-cta">Accedi</router-link>
+          <router-link v-if="isGuest" to="/register" class="btn btn-primary btn-sm nav-cta">Inizia ora</router-link>
 
           <button class="hamburger" :class="{ 'is-open': mobileMenuOpen }" @click="toggleMobileMenu" :aria-expanded="mobileMenuOpen" aria-label="Menu">
             <span></span><span></span><span></span>
@@ -259,19 +275,17 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 
       <Transition name="panel">
         <div v-if="mobileMenuOpen" class="mobile-nav-panel">
+          <ThemeToggle class="mobile-theme-toggle"></ThemeToggle>
+          <hr class="mobile-sep">
           <router-link to="/landing" class="mobile-link" @click="closeMobileMenu">Home</router-link>
           <router-link to="/who-are-us" class="mobile-link" @click="closeMobileMenu">Chi siamo</router-link>
           <router-link to="/contact-us" class="mobile-link" @click="closeMobileMenu">Contattaci</router-link>
           <hr class="mobile-sep">
-          <template v-if="isLoggedIn">
-            <router-link :to="defaultAppRoute" class="mobile-link" @click="closeMobileMenu"><i class="bi bi-speedometer2"/><span>Dashboard</span></router-link>
-            <router-link v-if="showNav('profilo')" to="/profile/show" class="mobile-link" @click="closeMobileMenu"><i class="bi bi-person"/><span>Profilo</span></router-link>
-            <router-link to="/logout" class="mobile-link mobile-link--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"/><span>Esci</span></router-link>
-          </template>
-          <template v-else>
-            <router-link to="/login" class="mobile-link" @click="closeMobileMenu">Accedi</router-link>
-            <router-link to="/register" class="mobile-link mobile-link--primary" @click="closeMobileMenu">Inizia ora</router-link>
-          </template>
+          <router-link v-if="isLoggedIn" :to="defaultAppRoute" class="mobile-link" @click="closeMobileMenu"><i class="bi bi-speedometer2"></i><span>Dashboard</span></router-link>
+          <router-link v-if="isLoggedIn && showNav('profilo')" to="/profile/show" class="mobile-link" @click="closeMobileMenu"><i class="bi bi-person"></i><span>Profilo</span></router-link>
+          <router-link v-if="isLoggedIn" to="/logout" class="mobile-link mobile-link--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"></i><span>Esci</span></router-link>
+          <router-link v-if="isGuest" to="/login" class="mobile-link" @click="closeMobileMenu">Accedi</router-link>
+          <router-link v-if="isGuest" to="/register" class="mobile-link mobile-link--primary" @click="closeMobileMenu">Inizia ora</router-link>
         </div>
       </Transition>
     </nav>
@@ -283,8 +297,8 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
     <footer class="app-footer">
       <div class="app-footer-inner">
         <div class="app-footer-brand">
-          <span class="tv-brand-mark sm">T</span>
-          <span>Tavolo</span>
+          <span class="tv-brand-mark sm">C</span>
+          <span>ComforTables</span>
           <span class="app-footer-tag">Il gestionale dei ristoranti moderni</span>
         </div>
         <nav class="app-footer-nav">
@@ -292,7 +306,7 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
           <router-link to="/privacy-policy">Privacy</router-link>
           <router-link to="/contact-us">Contatti</router-link>
         </nav>
-        <div class="app-footer-copy">&copy; {{ new Date().getFullYear() }} Tavolo</div>
+        <div class="app-footer-copy">&copy; {{ new Date().getFullYear() }} ComforTables</div>
       </div>
     </footer>
   </div>
@@ -412,6 +426,10 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 .public-link.is-active { color: var(--ink); font-weight: 500; }
 
 .nav-tools { margin-left: auto; display: flex; align-items: center; gap: var(--s-2); }
+.nav-theme-toggle-mobile { display: none; }
+.mobile-theme-toggle {
+  align-self: flex-start;
+}
 .user-menu { position: relative; }
 .avatar {
   width: 36px; height: 36px;
@@ -508,6 +526,8 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
   .public-links { display: none; }
   .hamburger { display: flex; }
   .nav-cta { display: none; }
+  .nav-theme-toggle { display: none; }
+  .nav-theme-toggle-mobile { display: inline-flex; }
   .brand-tag { display: none; }
   .nav-inner { padding: 0 var(--s-4); gap: var(--s-3); }
   .app-footer-inner { flex-direction: column; align-items: flex-start; gap: 12px; }

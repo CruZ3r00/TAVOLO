@@ -30,6 +30,10 @@ const lineTotal = computed(() => {
             <OrderStatusBadge :status="item.status" />
         </div>
 
+        <div v-if="item.category" class="oi-meta">
+            <span>{{ item.category }}</span>
+        </div>
+
         <div v-if="item.notes" class="oi-notes">
             <i class="bi bi-chat-text" aria-hidden="true"></i>
             <span>{{ item.notes }}</span>
@@ -134,6 +138,25 @@ const lineTotal = computed(() => {
     font-size: 12px;
     color: var(--ink-3);
     flex-shrink: 0;
+}
+
+.oi-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.oi-meta span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 8px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--bg-2);
+    color: var(--ink-3);
+    font-family: var(--f-sans, 'Geist', sans-serif);
+    font-size: 11px;
+    font-weight: 600;
 }
 
 .oi-notes {

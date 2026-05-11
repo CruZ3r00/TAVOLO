@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 const { validateProductionConfig } = require('./utils/production-checks');
+const { sweepDueTakeaways } = require('./utils/takeaway-lifecycle');
 console.log("STARTING STRAPI...");
 console.log("PORT:", process.env.PORT);
 function escapeHtml(value) {
@@ -111,6 +112,13 @@ module.exports = {
           where: { id: createdUser.id },
           data: { url: siteUrl },
         });
+        if (strapi.db.connection) {
+          try {
+            await strapi.db.connection.raw('select public.sync_owner_staff_accounts(?)', [createdUser.id]);
+          } catch (syncErr) {
+            strapi.log.warn(`register middleware: sync staff DB fallita per user ${createdUser.id}: ${syncErr.message}`);
+          }
+        }
         if (ctx.body && ctx.body.user) {
           ctx.body.user.url = siteUrl;
         }
@@ -255,8 +263,30 @@ module.exports = {
     // prenotazioni per il ruolo Public (usato dal sito vetrina esterno).
     await grantImportPermissions(strapi);
     await grantPublicReservationPermission(strapi);
+    startTakeawaySweep(strapi);
   },
 };
+
+function startTakeawaySweep(strapi) {
+  const run = async () => {
+    if (strapi.takeawaySweepRunning) return;
+    strapi.takeawaySweepRunning = true;
+    try {
+      const sent = await sweepDueTakeaways(strapi);
+      if (sent > 0) strapi.log.info(`Asporto: inviati ai reparti ${sent} ordini in scadenza.`);
+    } catch (err) {
+      strapi.log.warn(`Asporto: sweep invio reparti fallito: ${err.message}`);
+    } finally {
+      strapi.takeawaySweepRunning = false;
+    }
+  };
+  run();
+  if (strapi.takeawaySweepInterval) clearInterval(strapi.takeawaySweepInterval);
+  strapi.takeawaySweepInterval = setInterval(run, 60000);
+  if (typeof strapi.takeawaySweepInterval.unref === 'function') {
+    strapi.takeawaySweepInterval.unref();
+  }
+}
 
 async function configureUsersPermissionsEmail(strapi) {
   try {
@@ -351,6 +381,8 @@ async function grantImportPermissions(strapi) {
       'api::element.element.update',
       'api::element.element.remove',
       'api::account.account.updateProfile',
+      'api::account.account.listStaff',
+      'api::account.account.updateStaff',
       'api::account.account.getWebsiteConfig',
       'api::account.account.upsertWebsiteConfig',
       'api::account.account.updatePassword',
@@ -380,6 +412,12 @@ async function grantImportPermissions(strapi) {
       'api::order.order.deleteItem',
       'api::order.order.updateItemStatus',
       'api::order.order.close',
+      'api::order.order.createTakeawayAuthenticated',
+      'api::order.order.updateTakeaway',
+      'api::order.order.acceptTakeaway',
+      'api::order.order.rejectTakeaway',
+      'api::order.order.sendTakeawayToDepartments',
+      'api::order.order.pickupTakeaway',
       'api::pos-device.pos-device.register',
       'api::pos-device.pos-device.createPairingToken',
       'api::pos-device.pos-device.revoke',
@@ -409,15 +447,20 @@ async function grantPublicReservationPermission(strapi) {
     });
     if (!publicRole) return;
 
-    const action = 'api::reservation.reservation.createPublic';
-    const existing = await strapi.db.query('plugin::users-permissions.permission').findOne({
-      where: { action, role: publicRole.id },
-    });
-    if (!existing) {
-      await strapi.db.query('plugin::users-permissions.permission').create({
-        data: { action, role: publicRole.id },
+    const actions = [
+      'api::reservation.reservation.createPublic',
+      'api::order.order.createTakeawayPublic',
+    ];
+    for (const action of actions) {
+      const existing = await strapi.db.query('plugin::users-permissions.permission').findOne({
+        where: { action, role: publicRole.id },
       });
-      strapi.log.info(`Permission pubblica creata: ${action}`);
+      if (!existing) {
+        await strapi.db.query('plugin::users-permissions.permission').create({
+          data: { action, role: publicRole.id },
+        });
+        strapi.log.info(`Permission pubblica creata: ${action}`);
+      }
     }
   } catch (e) {
     strapi.log.warn('Impossibile concedere permission pubblica reservation: ' + e.message);

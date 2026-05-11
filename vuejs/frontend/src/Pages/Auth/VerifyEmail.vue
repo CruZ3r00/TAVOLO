@@ -1,8 +1,8 @@
 <script setup>
-import { computed } from 'vue';
-import { useHead } from '@vueuse/head';
-import { useForm } from 'vee-validate';
+import { computed, ref } from 'vue';
+import { useHead } from '@/lib/compat/head.js';
 import AuthenticationCard from '@/components/AuthenticationCard.vue';
+import { API_BASE } from '@/utils';
 
 useHead({
     title: 'Verifica Email',
@@ -11,16 +11,22 @@ useHead({
     ],
 });
 
-const form = useForm();
-
 const props = defineProps({
     status: String,
 });
 
+const processing = ref(false);
 const verificationLinkSent = computed(() => props.status === 'verification-link-sent');
 
-const submit = () => {
-    form.post(route('verification.send'));
+// Endpoint SMTP non ancora attivo (vedi CLAUDE.md tech debt). Per ora la submit
+// e' un placeholder che chiama l'endpoint quando sara' configurato.
+const submit = async () => {
+    if (processing.value) return;
+    processing.value = true;
+    try {
+        await fetch(`${API_BASE}/api/account/verify-email/send`, { method: 'POST' });
+    } catch (_e) { /* silent finche' SMTP non e' configurato */ }
+    finally { processing.value = false; }
 };
 </script>
 
@@ -46,8 +52,8 @@ const submit = () => {
 
     <form @submit.prevent="submit">
       <div class="verify-actions">
-        <button type="submit" class="ds-btn ds-btn-primary" :disabled="form.processing">
-          <span v-if="form.processing" class="ds-spinner"></span>
+        <button type="submit" class="ds-btn ds-btn-primary" :disabled="processing">
+          <span v-if="processing" class="ds-spinner"></span>
           <span v-else>Invia nuovamente</span>
         </button>
 

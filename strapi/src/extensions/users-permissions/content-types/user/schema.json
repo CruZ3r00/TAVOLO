@@ -98,11 +98,6 @@
       "type": "boolean",
       "default": false
     },
-    "fk_prefs": {
-      "type": "relation",
-      "relation": "oneToOne",
-      "target": "api::preference.preference"
-    },
     "end_subscription": {
       "type": "date"
     },
@@ -118,7 +113,10 @@
         "owner",
         "gestione",
         "cameriere",
-        "cucina"
+        "cucina",
+        "bar",
+        "pizzeria",
+        "cucina_sg"
       ],
       "default": "owner"
     },

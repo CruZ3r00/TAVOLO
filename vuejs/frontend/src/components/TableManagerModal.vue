@@ -12,7 +12,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated']);
 
-const form = ref({ number: '', seats: 2, area: 'interno' });
+const tableForm = ref({ number: '', seats: 2, area: 'interno' });
 const fieldErrors = ref({});
 const submitting = ref(false);
 const errorMessage = ref('');
@@ -31,7 +31,7 @@ watch(() => props.show, (v) => {
     if (props.editingTable) {
         isEditing.value = true;
         editDocId.value = props.editingTable.documentId;
-        form.value = {
+        tableForm.value = {
             number: props.editingTable.number,
             seats: props.editingTable.seats,
             area: props.editingTable.area || 'interno',
@@ -40,15 +40,15 @@ watch(() => props.show, (v) => {
         isEditing.value = false;
         editDocId.value = null;
         const maxNum = props.tables.reduce((max, t) => Math.max(max, t.number || 0), 0);
-        form.value = { number: maxNum + 1, seats: 2, area: 'interno' };
+        tableForm.value = { number: maxNum + 1, seats: 2, area: 'interno' };
     }
 });
 
 const validate = () => {
     const errs = {};
-    const n = parseInt(form.value.number, 10);
+    const n = parseInt(tableForm.value.number, 10);
     if (!Number.isFinite(n) || n < 1) errs.number = 'Numero tavolo obbligatorio (min 1).';
-    const s = parseInt(form.value.seats, 10);
+    const s = parseInt(tableForm.value.seats, 10);
     if (!Number.isFinite(s) || s < 1) errs.seats = 'Posti obbligatori (min 1).';
     if (s > 100) errs.seats = 'Massimo 100 posti.';
     fieldErrors.value = errs;
@@ -61,9 +61,9 @@ const submit = async () => {
     submitting.value = true;
     try {
         const payload = {
-            number: parseInt(form.value.number, 10),
-            seats: parseInt(form.value.seats, 10),
-            area: form.value.area,
+            number: parseInt(tableForm.value.number, 10),
+            seats: parseInt(tableForm.value.seats, 10),
+            area: tableForm.value.area,
         };
         if (isEditing.value) {
             await updateTable(editDocId.value, payload, props.token);
@@ -131,7 +131,7 @@ const onClose = () => {
                             <label class="ds-label" for="tmm-number">Numero *</label>
                             <input
                                 id="tmm-number"
-                                v-model.number="form.number"
+                                v-model.number="tableForm.number"
                                 type="number"
                                 min="1"
                                 class="ds-input"
@@ -143,7 +143,7 @@ const onClose = () => {
                             <label class="ds-label" for="tmm-seats">Posti *</label>
                             <input
                                 id="tmm-seats"
-                                v-model.number="form.seats"
+                                v-model.number="tableForm.seats"
                                 type="number"
                                 min="1"
                                 max="100"
@@ -154,7 +154,7 @@ const onClose = () => {
                         </div>
                         <div class="ds-field">
                             <label class="ds-label" for="tmm-area">Area</label>
-                            <select id="tmm-area" v-model="form.area" class="ds-input ds-select">
+                            <select id="tmm-area" v-model="tableForm.area" class="ds-input ds-select">
                                 <option value="interno">Interno</option>
                                 <option value="esterno">Esterno</option>
                             </select>

@@ -15,7 +15,7 @@ const pending = ref(false);
 const qrDataUrl = ref('');
 const setupKey = ref('');
 const recoveryCodes = ref([]);
-const code = ref('');
+const verificationCode = ref('');
 const errorMsg = ref('');
 const successMsg = ref('');
 
@@ -62,12 +62,12 @@ const enableTwoFactor = async () => {
 
 const confirmTwoFactor = async () => {
     resetMessages();
-    if (!/^\d{6}$/.test(code.value)) { errorMsg.value = 'Inserisci un codice di 6 cifre'; return; }
+    if (!/^\d{6}$/.test(verificationCode.value)) { errorMsg.value = 'Inserisci un codice di 6 cifre'; return; }
     loading.value = true;
     try {
         const r = await fetch(`${API_BASE}/api/account/2fa/confirm`, {
             method: 'POST', headers: authHeaders(),
-            body: JSON.stringify({ code: code.value }),
+            body: JSON.stringify({ code: verificationCode.value }),
         });
         const d = await r.json();
         if (!r.ok) { errorMsg.value = d?.error?.message || 'Codice non valido'; return; }
@@ -75,7 +75,7 @@ const confirmTwoFactor = async () => {
         pending.value = false;
         qrDataUrl.value = '';
         setupKey.value = '';
-        code.value = '';
+        verificationCode.value = '';
         successMsg.value = '2FA attivato con successo';
     } catch {
         errorMsg.value = 'Errore di rete';
@@ -174,7 +174,7 @@ onMounted(loadStatus);
                 <InputLabel for="code" value="Codice di verifica" />
                 <TextInput
                     id="code"
-                    v-model="code"
+                    v-model="verificationCode"
                     type="text"
                     inputmode="numeric"
                     autocomplete="one-time-code"

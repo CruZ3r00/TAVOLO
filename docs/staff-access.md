@@ -1,40 +1,66 @@
 # Accessi staff
 
-La gestione staff completa puo arrivare in una schermata dedicata. Intanto il
-backend crea automaticamente gli account operativi alla registrazione del
-ristorante.
+La gestione staff nasce dal database: la registrazione e gli aggiornamenti
+dell'abbonamento owner richiamano `public.sync_owner_staff_accounts(owner_id)`,
+mentre i trigger SQL mantengono utenti staff, link `fk_owner` e righe
+`public.restaurant_staff` idempotenti.
 
 ## Ruoli
 
-- `owner`: account ristorante esistente, accesso completo.
-- `gestione`: cassa/gestione, accesso a dashboard, sala, cucina, menu,
-  prenotazioni e profilo.
-- `cameriere`: solo sala.
-- `cucina`: solo cucina.
+- `owner`: account ristorante pagante, accesso completo e rinnovo Stripe.
+- `gestione`: cassa/gestione, accesso operativo completo ma non checkout.
+- `cameriere`: sala e prenotazioni.
+- `cucina`: board cucina e board senza glutine.
+- `bar`: board bar, solo piano Professionale.
+- `pizzeria`: board pizzeria, solo piano Professionale.
+- `cucina_sg`: board senza glutine, solo piano Professionale.
+
+## Piani
+
+- Essenziale (`starter`) attivo: owner, cameriere e cucina.
+- Professionale (`pro`) attivo: owner, cameriere, cucina, bar, pizzeria e
+  cucina sg.
+- Abbonamento non attivo: solo owner puo accedere al rinnovo; gli staff usano
+  sempre l'abbonamento dell'owner e non hanno dati Stripe propri.
 
 ## Creazione automatica
 
-Alla registrazione di un nuovo ristorante, se `REGISTER_AUTO_STAFF_ACCOUNTS`
-non e' `false`, vengono creati:
+Il database crea o aggiorna gli account staff con la stessa password hash
+dell'owner:
 
 - `<NomeRistorante>.cameriere`
 - `<NomeRistorante>.cucina`
+- `<NomeRistorante>.bar`
+- `<NomeRistorante>.pizzeria`
+- `<NomeRistorante>.cucinasg`
 
-La password iniziale e' la stessa scelta dal titolare in registrazione.
-Esempio per `Trattoria al grande`:
+Gli account sono `confirmed = true`. La riga `restaurant_staff.active`
+rappresenta la scelta dell'owner nel profilo. Il campo `blocked` viene calcolato
+da piano, scadenza e scelta owner.
 
-- `TrattoriaAlGrande.cameriere`
-- `TrattoriaAlGrande.cucina`
+## Gestione owner
 
-## Creazione manuale
+Dal profilo owner, sezione Reparti, si possono attivare o disattivare:
 
-1. Crea un utente con ruolo users-permissions `Authenticated`.
-2. Imposta `staff_role` a `cameriere`, `cucina` o `gestione`.
-3. Collega `fk_owner` all'utente ristorante titolare.
-4. Mantieni gli account staff con email uniche. Lo username puo seguire questo
-   formato:
-   - `TrattoriaAlGrande.cameriere`
-   - `TrattoriaAlGrande.cucina`
+- sala/cameriere
+- cucina
+- bar
+- pizzeria
+- cucina SG
 
-Gli ordini e i tavoli restano collegati al titolare: gli account staff usano
-automaticamente l'owner come ristorante effettivo.
+I reparti fuori piano restano visibili ma non attivabili finche non si passa al
+piano richiesto. Le preferenze restano salvate anche se il piano cambia.
+
+## Smistamento categorie
+
+`public.restaurant_category_routing` salva la prima classificazione di ogni
+categoria per owner:
+
+- categorie bevande/bar -> `bar`
+- categorie senza glutine -> `cucina_sg`
+- categorie pizze/pizzeria -> `pizzeria`
+- tutto il resto -> `cucina`
+
+La classificazione automatica avviene solo al primo inserimento della categoria;
+le righe possono essere rese gestibili dal profilo owner in una schermata
+successiva.

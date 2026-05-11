@@ -21,6 +21,12 @@
       "required": false,
       "maxLength": 64
     },
+    "service_type": {
+      "type": "enumeration",
+      "enum": ["table", "takeaway"],
+      "default": "table",
+      "required": true
+    },
     "opened_at": {
       "type": "datetime",
       "required": true
@@ -38,6 +44,19 @@
       "type": "string",
       "required": false,
       "maxLength": 120
+    },
+    "customer_phone": {
+      "type": "string",
+      "required": false,
+      "maxLength": 32
+    },
+    "customer_email": {
+      "type": "email",
+      "required": false
+    },
+    "pickup_at": {
+      "type": "datetime",
+      "required": false
     },
     "covers": {
       "type": "integer",

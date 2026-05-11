@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useStore } from 'vuex';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import OrdersTableGrid from '@/components/OrdersTableGrid.vue';
 import KitchenBoard from '@/components/KitchenBoard.vue';
@@ -11,16 +11,20 @@ import CheckoutModal from '@/components/CheckoutModal.vue';
 import Modal from '@/components/Modal.vue';
 import Skeleton from '@/components/Skeleton.vue';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
-import { effectiveUserId } from '@/staffAccess';
+import { STAFF_ROLES, effectiveUserId, staffRole } from '@/staffAccess';
 import {
   fetchTables, fetchOrders, closeOrder,
   addOrderItem, updateItemStatus, orderErrorMessage,
+  pickupTakeaway,
   createWalkin, reservationErrorMessage,
 } from '@/utils';
 
 const store = useStore();
 const route = useRoute();
+const router = useRouter();
 const token = computed(() => store.getters.getToken);
+const currentUser = computed(() => store.getters.getUser || null);
+const isOwnerView = computed(() => staffRole(currentUser.value) === STAFF_ROLES.OWNER);
 
 const tables = ref([]);
 const orders = ref([]);
@@ -29,7 +33,58 @@ const refreshing = ref(false);
 const errorMessage = ref('');
 const toast = ref(null);
 
-const mode = computed(() => (route.meta?.ordersMode === 'cucina' ? 'cucina' : 'cameriere'));
+const kitchenModes = {
+  cucina: { title: 'Cucina', overline: 'Cucina', station: 'cucina' },
+  bar: { title: 'Bar', overline: 'Bar', station: 'bar' },
+  pizzeria: { title: 'Pizzeria', overline: 'Pizzeria', station: 'pizzeria' },
+  cucina_sg: { title: 'Cucina SG', overline: 'Senza glutine', station: 'cucina_sg' },
+};
+const ownerOrderTabs = [
+  { mode: 'cucina', label: 'Cucina', icon: 'bi-fire', path: '/kitchen' },
+  { mode: 'bar', label: 'Bar', icon: 'bi-cup-straw', path: '/bar' },
+  { mode: 'pizzeria', label: 'Pizzeria', icon: 'bi-record-circle', path: '/pizzeria' },
+  { mode: 'cucina_sg', label: 'Cucina SG', icon: 'bi-shield-check', path: '/kitchen-sg' },
+];
+const mode = computed(() => (route.meta?.ordersMode && kitchenModes[route.meta.ordersMode] ? route.meta.ordersMode : 'cameriere'));
+const isKitchenMode = computed(() => mode.value !== 'cameriere');
+const modeInfo = computed(() => kitchenModes[mode.value] || { title: 'Sala', overline: 'Sala', station: null });
+const isOwnerProductionMode = computed(() => isOwnerView.value && isKitchenMode.value);
+const isPro = computed(() => currentUser.value?.subscription_plan === 'pro');
+
+// Owner monitor: department pill bar (Tutti/Cucina/Bar/Pizzeria/Cucina SG)
+const initialMonitorDept = (() => {
+  const m = route.meta?.ordersMode;
+  return m && ['cucina', 'bar', 'pizzeria', 'cucina_sg'].includes(m) ? m : 'all';
+})();
+const monitorDept = ref(initialMonitorDept);
+const COURSE_LABELS = { 1: 'Prima portata', 2: 'Seconda portata', 3: 'Terza portata', 4: 'Altro' };
+const ROLE_LABELS = { cucina: 'Cucina', bar: 'Bar', pizzeria: 'Pizzeria', cucina_sg: 'Cucina SG' };
+const ROLE_ICONS = { cucina: 'bi-fire', bar: 'bi-cup-straw', pizzeria: 'bi-record-circle', cucina_sg: 'bi-shield-check' };
+
+const departmentPills = computed(() => ([
+  { key: 'all',       label: 'Tutti',     icon: 'bi-grid-3x3-gap', allowed: true },
+  { key: 'cucina',    label: 'Cucina',    icon: 'bi-fire',          allowed: true },
+  { key: 'bar',       label: 'Bar',       icon: 'bi-cup-straw',     allowed: isPro.value },
+  { key: 'pizzeria',  label: 'Pizzeria',  icon: 'bi-record-circle', allowed: isPro.value },
+  { key: 'cucina_sg', label: 'Cucina SG', icon: 'bi-shield-check',  allowed: isPro.value },
+]));
+
+const stationFromMonitor = computed(() => (monitorDept.value === 'all' ? null : monitorDept.value));
+const effectiveStation = computed(() => (
+  isOwnerProductionMode.value ? stationFromMonitor.value : modeInfo.value.station
+));
+
+const pageTitle = computed(() => (isOwnerProductionMode.value ? 'Ordini' : modeInfo.value.title));
+const headerTitle = computed(() => {
+  if (isOwnerProductionMode.value) return 'Ordini in tempo reale';
+  return isKitchenMode.value ? 'Comande in corso' : 'Sala & tavoli';
+});
+const headerOverline = computed(() => {
+  if (isOwnerProductionMode.value) {
+    return `Monitoraggio operativo · live · ${now.value}`;
+  }
+  return `${modeInfo.value.overline} · ${now.value}`;
+});
 
 const showOrderDetail = ref(false);
 const currentOrderDocId = ref(null);
@@ -48,7 +103,8 @@ const walkinErrors = ref({});
 const orderDetailRef = ref(null);
 
 const stats = computed(() => {
-  const activeOrders = orders.value.filter(o => o.status === 'active');
+  const tableOrders = orders.value.filter(o => o.service_type !== 'takeaway');
+  const activeOrders = tableOrders.filter(o => o.status === 'active');
   const occupied = tables.value.filter(t => t.status === 'occupied').length;
   const free = tables.value.filter(t => t.status !== 'occupied' && t.status !== 'reserved').length;
   let readyTables = 0;
@@ -57,6 +113,9 @@ const stats = computed(() => {
   }
   return { occupied, free, total: tables.value.length, readyTables };
 });
+const readyTakeaways = computed(() => orders.value
+  .filter(o => o.service_type === 'takeaway' && o.status === 'active' && o.takeaway_status === 'ready')
+  .sort((a, b) => new Date(a.pickup_at || 0) - new Date(b.pickup_at || 0)));
 
 const kitchenStats = computed(() => {
   let total = 0;
@@ -72,16 +131,117 @@ const kitchenStats = computed(() => {
   return { total, ready };
 });
 
+// ===== Monitor view (owner) =====
+const itemStation = (item) => {
+  if (!item) return null;
+  return item.station || item.fk_element?.staff_role || null;
+};
+const itemCourse = (item) => {
+  const c = parseInt(item?.course, 10);
+  return Number.isFinite(c) && c >= 1 ? c : 1;
+};
+const formatElapsed = (ts) => {
+  if (!ts) return '0\'';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '0\'';
+  const m = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
+  return `${m}'`;
+};
+const orderTopStatus = (order) => {
+  const items = (order.items || []).filter(i => i.status !== 'served' && i.status !== 'cancelled');
+  if (items.length === 0) return 'consegnato';
+  if (items.every(i => i.status === 'ready')) return 'pronto';
+  if (items.some(i => i.status === 'preparing' || i.status === 'taken')) return 'lavorazione';
+  return 'lavorazione';
+};
+const filteredMonitorOrders = computed(() => {
+  const dept = monitorDept.value;
+  return orders.value
+    .filter(o => o.status === 'active' && Array.isArray(o.items))
+    .map(o => {
+      const items = dept === 'all' ? o.items : o.items.filter(i => itemStation(i) === dept);
+      return { ...o, items };
+    })
+    .filter(o => o.items.length > 0)
+    .map(o => ({
+      ...o,
+      _topStatus: orderTopStatus(o),
+      _grouped: o.items.reduce((acc, it) => {
+        const c = itemCourse(it);
+        (acc[c] = acc[c] || []).push(it);
+        return acc;
+      }, {}),
+    }))
+    .sort((a, b) => new Date(b.opened_at || b.createdAt || 0) - new Date(a.opened_at || a.createdAt || 0));
+});
+const monitorStats = computed(() => {
+  const list = filteredMonitorOrders.value;
+  let inLav = 0, pronti = 0, consegnati = 0;
+  list.forEach(o => {
+    if (o._topStatus === 'lavorazione') inLav += 1;
+    else if (o._topStatus === 'pronto') pronti += 1;
+    else if (o._topStatus === 'consegnato') consegnati += 1;
+  });
+  return { total: list.length, inLav, pronti, consegnati };
+});
+const monitorActiveTitle = computed(() => (
+  monitorDept.value === 'all' ? 'Tutti i reparti' : (ROLE_LABELS[monitorDept.value] || 'Reparto')
+));
+const monitorActiveIcon = computed(() => (
+  monitorDept.value === 'all' ? 'bi-grid-3x3-gap' : (ROLE_ICONS[monitorDept.value] || 'bi-grid-3x3-gap')
+));
+const tableNumber = (order) => order?.table?.number ?? order?.fk_table?.number ?? order?.table_number ?? '?';
+const takeawayDailyNumbers = computed(() => {
+  const map = new Map();
+  const sameDay = (iso) => {
+    if (!iso) return false;
+    const d = new Date(iso);
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear()
+      && d.getMonth() === now.getMonth()
+      && d.getDate() === now.getDate();
+  };
+  const list = (orders.value || [])
+    .filter(o => o?.service_type === 'takeaway' && sameDay(o.opened_at))
+    .sort((a, b) => new Date(a.opened_at || 0) - new Date(b.opened_at || 0));
+  list.forEach((o, i) => map.set(o.documentId, i + 1));
+  return map;
+});
+const takeawayDailyNumber = (order) => takeawayDailyNumbers.value.get(order?.documentId) ?? '?';
+const orderPill = (order) => order?.service_type === 'takeaway' ? `A${takeawayDailyNumber(order)}` : `T${tableNumber(order)}`;
+const orderTitle = (order) => order?.service_type === 'takeaway'
+  ? `Asporto · ${order.customer_name || 'Cliente'}`
+  : `Tavolo ${tableNumber(order)}`;
+const setMonitorDept = (key, allowed) => {
+  if (!allowed) return;
+  monitorDept.value = key;
+  loadData({ silent: true });
+};
+
+const filterOrdersForView = (rows) => {
+  const list = Array.isArray(rows) ? rows : [];
+  if (mode.value === 'cameriere') {
+    return list.filter(o => o.service_type !== 'takeaway' || o.takeaway_status === 'ready');
+  }
+  if (isOwnerProductionMode.value && !effectiveStation.value) {
+    return list.filter(o => (
+      o.service_type !== 'takeaway'
+      || ['sent_to_departments', 'ready'].includes(o.takeaway_status)
+    ));
+  }
+  return list;
+};
+
 const loadData = async ({ silent = false } = {}) => {
   if (!token.value) return;
   if (silent) refreshing.value = true; else loading.value = true;
   try {
     const [tablesResp, ordersResp] = await Promise.all([
-      fetchTables(token.value),
-      fetchOrders({ status: 'active', pageSize: 100 }, token.value),
+      isKitchenMode.value ? Promise.resolve({ data: [] }) : fetchTables(token.value),
+      fetchOrders({ status: 'active', pageSize: 100, station: effectiveStation.value }, token.value),
     ]);
     tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
-    orders.value = Array.isArray(ordersResp?.data) ? ordersResp.data : [];
+    orders.value = filterOrdersForView(ordersResp?.data);
     errorMessage.value = '';
   } catch (err) {
     errorMessage.value = orderErrorMessage(err);
@@ -220,7 +380,7 @@ const handleKitchenAdvance = async ({ item, next, orderDocumentId }) => {
     if (itemInOrder) { oldStatus = itemInOrder.status; itemInOrder.status = next; }
   }
   try {
-    await updateItemStatus(orderDocumentId, item.documentId, next, token.value);
+    await updateItemStatus(orderDocumentId, item.documentId, next, token.value, { station: modeInfo.value.station });
     showToast('success', `"${item.name}" → ${statusLabel(next)}`);
   } catch (err) {
     if (orderIdx !== -1) {
@@ -232,6 +392,17 @@ const handleKitchenAdvance = async ({ item, next, orderDocumentId }) => {
     const s2 = new Set(busyItemIds.value);
     s2.delete(item.documentId);
     busyItemIds.value = s2;
+  }
+};
+
+const handleTakeawayPickupFromSala = async (order) => {
+  if (!order?.documentId) return;
+  try {
+    await pickupTakeaway(order.documentId, token.value);
+    showToast('success', `Asporto ${order.customer_name || ''} ritirato dalla cucina.`);
+    await loadData({ silent: true });
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
   }
 };
 
@@ -262,7 +433,9 @@ const stopRealtime = async () => {
     realtimeRefreshHandle = null;
   }
   if (realtimeChannel && supabase) {
-    await supabase.removeChannel(realtimeChannel);
+    try {
+      await supabase.removeChannel(realtimeChannel);
+    } catch (_err) { /* realtime is optional */ }
     realtimeChannel = null;
   }
 };
@@ -271,15 +444,24 @@ const subscribeRealtime = async (userId) => {
   await stopRealtime();
   if (!isSupabaseRealtimeConfigured || !supabase || !userId) return;
 
-  realtimeChannel = supabase
-    .channel(`kitchen-orders-${userId}`)
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'order_realtime_events',
-      filter: `user_id=eq.${userId}`,
-    }, scheduleRealtimeRefresh)
-    .subscribe();
+  try {
+    realtimeChannel = supabase
+      .channel(`kitchen-orders-${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'order_realtime_events',
+        filter: `user_id=eq.${userId}`,
+      }, scheduleRealtimeRefresh);
+
+    realtimeChannel.subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        realtimeChannel = null;
+      }
+    });
+  } catch (_err) {
+    realtimeChannel = null;
+  }
 };
 const onVisibilityChange = () => {
   if (document.visibilityState === 'visible') loadData({ silent: true });
@@ -292,8 +474,17 @@ const openOrderFromQuery = () => {
   showOrderDetail.value = true;
 };
 
+const updateDocumentTitle = () => {
+  document.title = `${pageTitle.value} · ComforTables`;
+};
+
+const switchOwnerOrderMode = (tab) => {
+  if (!tab?.path || route.path === tab.path) return;
+  router.push(tab.path);
+};
+
 onMounted(async () => {
-  document.title = mode.value === 'cucina' ? 'Cucina · Tavolo' : 'Sala · Tavolo';
+  updateDocumentTitle();
   await loadData();
   await subscribeRealtime(effectiveUserId(store.getters.getUser));
   document.addEventListener('visibilitychange', onVisibilityChange);
@@ -309,17 +500,27 @@ const now = computed(() => {
   const d = new Date();
   return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 });
+
+watch(() => route.path, async () => {
+  updateDocumentTitle();
+  if (isOwnerProductionMode.value) {
+    const m = route.meta?.ordersMode;
+    if (m && ['cucina', 'bar', 'pizzeria', 'cucina_sg'].includes(m)) {
+      monitorDept.value = m;
+    }
+  }
+  await loadData();
+  openOrderFromQuery();
+});
 </script>
 
 <template>
-  <AppLayout :page-title="mode === 'cucina' ? 'Cucina' : 'Sala'">
-    <div class="md-main" :class="{ 'kt-main': mode === 'cucina' }">
+  <AppLayout :page-title="pageTitle">
+    <div class="md-main" :class="{ 'kt-main': isKitchenMode }">
       <header class="md-top">
         <div>
-          <div class="overline">
-            {{ mode === 'cucina' ? 'Cucina' : 'Sala' }} · {{ now }}
-          </div>
-          <h1>{{ mode === 'cucina' ? 'Comande in corso' : 'Sala & tavoli' }}</h1>
+          <div class="overline">{{ headerOverline }}</div>
+          <h1>{{ headerTitle }}</h1>
           <p v-if="mode === 'cameriere'">
             {{ stats.occupied }} occupati su {{ stats.total }} · {{ stats.free }} liberi
             <span v-if="stats.readyTables > 0"> · <strong style="color: var(--ok);">{{ stats.readyTables }} da chiudere</strong></span>
@@ -343,6 +544,28 @@ const now = computed(() => {
         </div>
       </header>
 
+      <!-- ===== OWNER · monitor toolbar ===== -->
+      <div v-if="isOwnerProductionMode" class="ct-dept-bar" aria-label="Reparto monitorato">
+        <button
+          v-for="pill in departmentPills"
+          :key="pill.key"
+          type="button"
+          class="ct-dept-pill"
+          :class="{ active: monitorDept === pill.key }"
+          :disabled="!pill.allowed"
+          :title="pill.allowed ? '' : 'Disponibile con il piano Professionale'"
+          @click="setMonitorDept(pill.key, pill.allowed)"
+        >
+          <i :class="['bi', pill.icon]" aria-hidden="true"></i>
+          <span>{{ pill.label }}</span>
+          <span v-if="!pill.allowed" class="lock-pill">PRO</span>
+        </button>
+        <span v-if="!isPro" class="ct-dept-bar__note">
+          <i class="bi bi-info-circle" style="color: var(--ac);"></i>
+          Piano Essenziale: solo Cucina
+        </span>
+      </div>
+
       <Transition name="fade">
         <div v-if="errorMessage" class="md-card" style="border-color: var(--danger); background: var(--danger-bg); padding: 12px 16px; color: var(--danger);">
           <i class="bi bi-exclamation-circle"></i>
@@ -359,7 +582,7 @@ const now = computed(() => {
 
       <!-- Skeleton loaders -->
       <div v-if="loading && tables.length === 0 && orders.length === 0">
-        <div v-if="mode === 'cameriere'" class="ord-skel-grid">
+          <div v-if="mode === 'cameriere'" class="ord-skel-grid">
           <div v-for="n in 8" :key="`sk-tbl-${n}`" class="ord-skel-card">
             <Skeleton width="40%" height="22px" />
             <Skeleton width="60%" height="11px" style="margin-top: 8px;" />
@@ -379,13 +602,151 @@ const now = computed(() => {
       </div>
 
       <template v-else>
-        <OrdersTableGrid
-          v-if="mode === 'cameriere'"
-          :tables="tables"
-          :orders="orders"
-          @view-order="handleViewOrder"
-          @open-table="handleOpenTable"
-        />
+        <!-- ===== KPI strip + Monitor (owner) ===== -->
+        <template v-if="isOwnerProductionMode">
+          <div class="ct-stat-grid ct-stagger">
+            <div class="ct-stat">
+              <span class="ct-stat__ico"><i class="bi bi-receipt"></i></span>
+              <div>
+                <div class="ct-stat__label">Ordini attivi</div>
+                <div class="ct-stat__value">{{ monitorStats.total }}</div>
+              </div>
+            </div>
+            <div class="ct-stat ct-stat--warn">
+              <span class="ct-stat__ico"><i class="bi bi-fire"></i></span>
+              <div>
+                <div class="ct-stat__label">In lavorazione</div>
+                <div class="ct-stat__value">{{ monitorStats.inLav }}</div>
+              </div>
+            </div>
+            <div class="ct-stat ct-stat--ok">
+              <span class="ct-stat__ico"><i class="bi bi-bell"></i></span>
+              <div>
+                <div class="ct-stat__label">Pronti</div>
+                <div class="ct-stat__value">{{ monitorStats.pronti }}</div>
+              </div>
+            </div>
+            <div class="ct-stat ct-stat--muted">
+              <span class="ct-stat__ico"><i class="bi bi-check2-circle"></i></span>
+              <div>
+                <div class="ct-stat__label">Consegnati</div>
+                <div class="ct-stat__value">{{ monitorStats.consegnati }}</div>
+              </div>
+            </div>
+          </div>
+
+          <section class="ct-orders-section">
+            <header class="ct-orders-section__head">
+              <h2 class="ct-orders-section__title">
+                <i :class="['bi', monitorActiveIcon]" aria-hidden="true"></i>
+                {{ monitorActiveTitle }}
+              </h2>
+              <div class="ct-orders-live">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span>Live · aggiornamento auto</span>
+              </div>
+            </header>
+
+            <div class="ct-orders-grid ct-stagger">
+              <article
+                v-for="o in filteredMonitorOrders"
+                :key="o.documentId || o.id"
+                class="ct-order-card"
+                @click="handleViewOrder(o)"
+                role="button"
+                tabindex="0"
+                @keydown.enter="handleViewOrder(o)"
+              >
+                <header class="ct-order-card__head">
+                  <span class="ct-order-card__pill" :class="{ takeaway: o.service_type === 'takeaway' }">{{ orderPill(o) }}</span>
+                  <div class="ct-order-card__heading">
+                    <div class="ct-order-card__title">{{ orderTitle(o) }}</div>
+                    <div class="ct-order-card__meta">
+                      <span><i class="bi bi-clock"></i> {{ formatElapsed(o.opened_at) }}</span>
+                      <span v-if="o.covers">·</span>
+                      <span v-if="o.covers">{{ o.covers }} cop.</span>
+                    </div>
+                  </div>
+                  <span
+                    class="chip"
+                    :class="{
+                      ok: o._topStatus === 'pronto',
+                      warn: o._topStatus === 'lavorazione',
+                    }"
+                  >
+                    <template v-if="o._topStatus === 'pronto'">Pronto</template>
+                    <template v-else-if="o._topStatus === 'lavorazione'">In lavorazione</template>
+                    <template v-else>Consegnato</template>
+                  </span>
+                </header>
+                <div class="ct-order-card__body">
+                  <div
+                    v-for="(group, courseKey) in o._grouped"
+                    :key="`c-${o.documentId || o.id}-${courseKey}`"
+                    class="ct-order-course"
+                  >
+                    <div class="ct-order-course__label">
+                      <span class="ct-order-course__label-dot"></span>
+                      {{ COURSE_LABELS[courseKey] || `Portata ${courseKey}` }}
+                    </div>
+                    <ul class="ct-order-course__list">
+                      <li
+                        v-for="(it, idx) in group"
+                        :key="`it-${o.documentId || o.id}-${courseKey}-${idx}`"
+                        class="ct-order-course__item"
+                      >
+                        <span class="ct-order-course__qty">×{{ it.quantity || 1 }}</span>
+                        <span class="ct-order-course__name">{{ it.name }}</span>
+                        <span
+                          v-if="monitorDept === 'all' && itemStation(it)"
+                          class="ct-order-course__station"
+                        >
+                          {{ ROLE_LABELS[itemStation(it)] || itemStation(it) }}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </article>
+
+              <div v-if="filteredMonitorOrders.length === 0" class="ct-orders-empty">
+                <i class="bi bi-inbox"></i>
+                Nessun ordine attivo per questo reparto.
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- ===== Cameriere (sala) ===== -->
+        <template v-else-if="mode === 'cameriere'">
+          <section v-if="readyTakeaways.length" class="takeaway-ready-alert">
+            <header>
+              <i class="bi bi-bag-check"></i>
+              <strong>Asporto pronto da ritirare</strong>
+              <span>{{ readyTakeaways.length }}</span>
+            </header>
+            <div class="takeaway-ready-list">
+              <article v-for="o in readyTakeaways" :key="o.documentId" class="takeaway-ready-row">
+                <div>
+                  <strong>{{ o.customer_name || 'Cliente' }}</strong>
+                  <span>{{ o.customer_phone || 'Telefono non disponibile' }}</span>
+                </div>
+                <button type="button" class="ds-btn ds-btn-primary ds-btn-sm" @click="handleTakeawayPickupFromSala(o)">
+                  <i class="bi bi-box-arrow-up"></i>
+                  <span>Preso dalla cucina</span>
+                </button>
+              </article>
+            </div>
+          </section>
+          <OrdersTableGrid
+            :tables="tables"
+            :orders="orders"
+            @view-order="handleViewOrder"
+            @open-table="handleOpenTable"
+          />
+        </template>
+
+        <!-- ===== Staff cucina/bar/etc. — kanban ===== -->
         <KitchenBoard
           v-else
           :orders="orders"
@@ -576,7 +937,76 @@ const now = computed(() => {
 .fade-enter-active, .fade-leave-active { transition: opacity 200ms, transform 200ms; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-6px); }
 
+.ord-tabs {
+  margin-top: -4px;
+}
+.ord-tabs .pf-tab {
+  text-decoration: none;
+}
+
+.ct-order-card { cursor: pointer; }
+.ct-order-card:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+:deep(.ct-order-card__pill.takeaway) {
+  background: color-mix(in oklab, var(--ac) 12%, var(--paper));
+  color: var(--ac);
+  border-color: color-mix(in oklab, var(--ac) 35%, var(--line));
+}
+.takeaway-ready-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--ok) 35%, var(--line));
+  border-radius: var(--r-md);
+  background: color-mix(in oklab, var(--ok) 9%, var(--paper));
+}
+.takeaway-ready-alert header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ok-ink, var(--ok));
+}
+.takeaway-ready-alert header span {
+  min-width: 24px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-weight: 800;
+}
+.takeaway-ready-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+.takeaway-ready-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+}
+.takeaway-ready-row strong,
+.takeaway-ready-row span {
+  display: block;
+}
+.takeaway-ready-row span {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
 @media (max-width: 860px) {
   .md-toast { left: 16px; right: 16px; bottom: 88px; max-width: none; }
+  .takeaway-ready-row { align-items: stretch; flex-direction: column; }
 }
 </style>

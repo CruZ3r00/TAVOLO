@@ -1,19 +1,18 @@
 <script setup>
 import { computed } from 'vue';
+import ThemeToggle from '@/components/ThemeToggle.vue';
 
 const props = defineProps({
-  title: { type: String, default: 'Tavolo' },
-  hasNotifications: { type: Boolean, default: false },
+  title: { type: String, default: 'ComforTables' },
   username: { type: String, default: '' },
   restaurantName: { type: String, default: '' },
   showMenuButton: { type: Boolean, default: false },
-  showReservations: { type: Boolean, default: false },
   showProfile: { type: Boolean, default: false },
 });
 const emit = defineEmits(['menu']);
 
 const avatarLetter = computed(() => {
-  const src = props.restaurantName || props.username || 'T';
+  const src = props.restaurantName || props.username || 'C';
   return src.charAt(0).toUpperCase();
 });
 </script>
@@ -25,14 +24,11 @@ const avatarLetter = computed(() => {
     </button>
     <span v-else class="tv-mobile-top-spacer" aria-hidden="true"></span>
     <div class="tv-mobile-top-title">
-      <span class="tv-brand-mark sm">T</span>
+      <span class="tv-brand-mark sm">C</span>
       <strong>{{ title }}</strong>
     </div>
     <div class="tv-mobile-top-right">
-      <router-link v-if="showReservations" to="/reservations" class="tv-mobile-top-btn" aria-label="Notifiche">
-        <i class="bi bi-bell" aria-hidden="true"></i>
-        <span v-if="hasNotifications" class="tv-mobile-top-dot" aria-hidden="true"></span>
-      </router-link>
+      <ThemeToggle compact />
       <router-link v-if="showProfile" to="/profile/show" class="tv-mobile-top-avatar" aria-label="Profilo">
         <span>{{ avatarLetter }}</span>
       </router-link>
