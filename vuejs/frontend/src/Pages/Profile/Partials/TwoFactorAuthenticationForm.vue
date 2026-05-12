@@ -12,6 +12,9 @@ const store = useStore();
 const loading = ref(false);
 const enabled = ref(false);
 const pending = ref(false);
+const method = ref('totp');
+const pendingMethod = ref('totp');
+const emailHint = ref('');
 const qrDataUrl = ref('');
 const setupKey = ref('');
 const recoveryCodes = ref([]);
@@ -35,6 +38,8 @@ const loadStatus = async () => {
             const d = await r.json();
             enabled.value = !!d.enabled;
             pending.value = !!d.pending;
+            method.value = d.method || 'totp';
+            pendingMethod.value = d.method || 'totp';
         }
     } catch {}
 };
@@ -54,7 +59,33 @@ const enableTwoFactor = async () => {
         recoveryCodes.value = d.recoveryCodes || [];
         await renderQr(d.otpauth);
         pending.value = true;
+        pendingMethod.value = 'totp';
+        method.value = 'totp';
         enabled.value = false;
+    } catch {
+        errorMsg.value = 'Errore di rete';
+    } finally {
+        loading.value = false;
+    }
+};
+
+const enableEmailTwoFactor = async () => {
+    resetMessages();
+    loading.value = true;
+    try {
+        const r = await fetch(`${API_BASE}/api/account/2fa/email/enable`, { method: 'POST', headers: authHeaders() });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { errorMsg.value = d?.error?.message || d.message || 'Errore'; return; }
+        qrDataUrl.value = '';
+        setupKey.value = '';
+        recoveryCodes.value = [];
+        verificationCode.value = '';
+        pending.value = true;
+        enabled.value = false;
+        method.value = 'email';
+        pendingMethod.value = 'email';
+        emailHint.value = d.emailHint || '';
+        successMsg.value = 'Codice inviato via email.';
     } catch {
         errorMsg.value = 'Errore di rete';
     } finally {
@@ -64,10 +95,17 @@ const enableTwoFactor = async () => {
 
 const confirmTwoFactor = async () => {
     resetMessages();
+    if (pending.value && sensitivePassword.value && !verificationCode.value) {
+        await disableTwoFactor();
+        return;
+    }
     if (!/^\d{6}$/.test(verificationCode.value)) { errorMsg.value = 'Inserisci un codice di 6 cifre'; return; }
     loading.value = true;
     try {
-        const r = await fetch(`${API_BASE}/api/account/2fa/confirm`, {
+        const endpoint = pendingMethod.value === 'email'
+            ? `${API_BASE}/api/account/2fa/email/confirm`
+            : `${API_BASE}/api/account/2fa/confirm`;
+        const r = await fetch(endpoint, {
             method: 'POST', headers: authHeaders(),
             body: JSON.stringify({ code: verificationCode.value }),
         });
@@ -75,6 +113,7 @@ const confirmTwoFactor = async () => {
         if (!r.ok) { errorMsg.value = d?.error?.message || 'Codice non valido'; return; }
         enabled.value = true;
         pending.value = false;
+        method.value = pendingMethod.value;
         qrDataUrl.value = '';
         setupKey.value = '';
         verificationCode.value = '';
@@ -88,22 +127,24 @@ const confirmTwoFactor = async () => {
 
 const disableTwoFactor = async () => {
     resetMessages();
-    if (enabled.value && !/^\d{6}$/.test(sensitiveCode.value)) {
-        errorMsg.value = 'Inserisci il codice 2FA per disabilitare la protezione';
+    if (enabled.value && method.value !== 'email' && !/^\d{6}$/.test(sensitiveCode.value) && !sensitivePassword.value) {
+        errorMsg.value = 'Inserisci il codice 2FA oppure la password per disabilitare la protezione';
         return;
     }
-    if (!enabled.value && pending.value && !sensitivePassword.value) {
+    if ((enabled.value && method.value === 'email') || (!enabled.value && pending.value)) {
+      if (!sensitivePassword.value) {
         errorMsg.value = 'Inserisci la password per annullare la configurazione';
         return;
+      }
     }
     if (!confirm('Sei sicuro di voler disabilitare l\'autenticazione a due fattori?')) return;
     loading.value = true;
     try {
         const r = await fetch(`${API_BASE}/api/account/2fa/disable`, {
-            method: 'DELETE',
+            method: 'POST',
             headers: authHeaders(),
-            body: JSON.stringify(enabled.value
-                ? { code: sensitiveCode.value }
+            body: JSON.stringify(enabled.value && method.value !== 'email'
+                ? { code: sensitiveCode.value, password: sensitivePassword.value }
                 : { password: sensitivePassword.value }),
         });
         const d = await r.json().catch(() => ({}));
@@ -115,6 +156,8 @@ const disableTwoFactor = async () => {
         recoveryCodes.value = [];
         sensitiveCode.value = '';
         sensitivePassword.value = '';
+        method.value = 'totp';
+        pendingMethod.value = 'totp';
         successMsg.value = '2FA disabilitato';
     } catch {
         errorMsg.value = 'Errore di rete';
@@ -125,6 +168,10 @@ const disableTwoFactor = async () => {
 
 const regenerateRecovery = async () => {
     resetMessages();
+    if (method.value === 'email') {
+        errorMsg.value = 'I codici di recupero sono disponibili solo per 2FA con app authenticator.';
+        return;
+    }
     if (!/^\d{6}$/.test(sensitiveCode.value)) {
         errorMsg.value = 'Inserisci il codice 2FA per rigenerare i codici';
         return;
@@ -175,7 +222,7 @@ onMounted(loadStatus);
             <div class="tfa-status">
                 <div v-if="enabled" class="ds-alert ds-alert-success">
                     <i class="bi bi-shield-check"></i>
-                    <span>Hai abilitato l'autenticazione a due fattori.</span>
+                    <span>Hai abilitato l'autenticazione a due fattori{{ method === 'email' ? ' via email' : ' con app authenticator' }}.</span>
                 </div>
                 <div v-else-if="pending" class="ds-alert ds-alert-warning">
                     <i class="bi bi-shield-exclamation"></i>
@@ -187,7 +234,12 @@ onMounted(loadStatus);
                 </div>
             </div>
 
-            <div v-if="pending && qrDataUrl" class="tfa-qr-section">
+            <div v-if="pending && pendingMethod === 'email'" class="ds-alert ds-alert-info">
+                <i class="bi bi-envelope-check"></i>
+                <span>Abbiamo inviato un codice a {{ emailHint || 'la tua email' }}. Inseriscilo qui sotto per completare l'attivazione.</span>
+            </div>
+
+            <div v-else-if="pending && qrDataUrl" class="tfa-qr-section">
                 <p class="tfa-instruction">Scansiona il QR con la tua app di autenticazione (Google Authenticator, Authy, 1Password...) oppure inserisci manualmente la setup key.</p>
                 <div class="tfa-qr-wrapper">
                     <img :src="qrDataUrl" alt="QR 2FA" style="max-width: 200px;" />
@@ -198,7 +250,7 @@ onMounted(loadStatus);
                 </div>
             </div>
 
-            <div v-else-if="pending && !qrDataUrl" class="ds-alert ds-alert-info">
+            <div v-else-if="pending && pendingMethod !== 'email' && !qrDataUrl" class="ds-alert ds-alert-info">
                 <i class="bi bi-qr-code"></i>
                 <span>Il setup 2FA e' iniziato, ma il QR non e' piu' visibile. Genera un nuovo QR e usa quello per completare la configurazione.</span>
             </div>
@@ -224,14 +276,34 @@ onMounted(loadStatus);
             </div>
 
             <div v-if="enabled" class="ds-field">
-                <InputLabel for="sensitive_code" value="Codice 2FA per modifiche sensibili" />
+                <InputLabel
+                    for="sensitive_code"
+                    :value="method === 'email' ? 'Password per modifiche sensibili' : 'Codice 2FA o password per modifiche sensibili'"
+                />
                 <TextInput
                     id="sensitive_code"
+                    v-if="method !== 'email'"
                     v-model="sensitiveCode"
                     type="text"
                     inputmode="numeric"
                     autocomplete="one-time-code"
                     placeholder="000000"
+                />
+                <TextInput
+                    v-if="method !== 'email'"
+                    id="sensitive_password_enabled"
+                    v-model="sensitivePassword"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="Oppure la tua password"
+                />
+                <TextInput
+                    v-else
+                    id="sensitive_password_enabled"
+                    v-model="sensitivePassword"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="La tua password"
                 />
                 <InputError :message="''" />
             </div>
@@ -244,25 +316,29 @@ onMounted(loadStatus);
                     type="password"
                     autocomplete="current-password"
                     placeholder="La tua password"
+                    @keyup.enter="disableTwoFactor"
                 />
                 <InputError :message="''" />
             </div>
 
             <div class="tfa-actions-row">
-                <button v-if="!enabled && !pending" class="ds-btn ds-btn-primary" :disabled="loading" @click="enableTwoFactor">
-                    <i class="bi bi-shield-lock"></i><span>Attiva</span>
+                <button v-if="!enabled && !pending" class="ds-btn ds-btn-primary" :disabled="loading" @click="enableEmailTwoFactor">
+                    <i class="bi bi-envelope-check"></i><span>Attiva via email</span>
                 </button>
-                <button v-if="pending && !qrDataUrl" class="ds-btn ds-btn-secondary" :disabled="loading" @click="enableTwoFactor">
+                <button v-if="!enabled && !pending" class="ds-btn ds-btn-secondary" :disabled="loading" @click="enableTwoFactor">
+                    <i class="bi bi-qr-code"></i><span>Attiva con app</span>
+                </button>
+                <button v-if="pending && pendingMethod !== 'email' && !qrDataUrl" class="ds-btn ds-btn-secondary" :disabled="loading" @click="enableTwoFactor">
                     <i class="bi bi-qr-code"></i><span>Genera nuovo QR</span>
                 </button>
                 <button v-if="pending" class="ds-btn ds-btn-primary" :disabled="loading" @click="confirmTwoFactor">
                     <span>Conferma</span>
                 </button>
-                <button v-if="enabled" class="ds-btn ds-btn-secondary" :disabled="loading" @click="regenerateRecovery">
+                <button v-if="enabled && method !== 'email'" class="ds-btn ds-btn-secondary" :disabled="loading" @click="regenerateRecovery">
                     <span>Rigenera codici</span>
                 </button>
                 <button v-if="enabled || pending" class="ds-btn ds-btn-danger" :disabled="loading" @click="disableTwoFactor">
-                    <span>Disabilita</span>
+                    <span>{{ pending ? 'Annulla configurazione' : 'Disabilita' }}</span>
                 </button>
             </div>
         </div>

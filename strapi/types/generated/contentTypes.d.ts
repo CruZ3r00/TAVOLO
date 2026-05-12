@@ -1783,8 +1783,16 @@ export interface PluginUsersPermissionsUser
     subscription_plan: Schema.Attribute.String;
     subscription_status: Schema.Attribute.String;
     surname: Schema.Attribute.String & Schema.Attribute.Required;
+    two_factor_email_code_expires_at: Schema.Attribute.DateTime &
+      Schema.Attribute.Private;
+    two_factor_email_code_hash: Schema.Attribute.String &
+      Schema.Attribute.Private;
+    two_factor_email_last_sent_at: Schema.Attribute.DateTime &
+      Schema.Attribute.Private;
     two_factor_enabled: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<false>;
+    two_factor_method: Schema.Attribute.Enumeration<['totp', 'email']> &
+      Schema.Attribute.DefaultTo<'totp'>;
     two_factor_recovery_codes: Schema.Attribute.JSON & Schema.Attribute.Private;
     two_factor_secret: Schema.Attribute.String & Schema.Attribute.Private;
     unavailable_ingredients: Schema.Attribute.JSON;

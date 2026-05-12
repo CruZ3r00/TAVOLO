@@ -16,7 +16,10 @@ const {
 const {
   consumeRecoveryCode,
   encodeRecoveryCodes,
+  generateEmailCode,
+  hashEmailCode,
   signTwoFactorChallenge,
+  verifyEmailCode,
   verifyTwoFactorChallenge,
 } = require('../src/utils/two-factor-auth');
 const publicTakeawayGuard = require('../src/api/order/middlewares/public-takeaway-guard');
@@ -227,6 +230,15 @@ test('two factor challenge token verifies purpose and tampering', () => {
   const token = signTwoFactorChallenge(testStrapi, 42);
   assert.equal(verifyTwoFactorChallenge(testStrapi, token).id, 42);
   assert.equal(verifyTwoFactorChallenge(testStrapi, `${token}x`), null);
+});
+
+test('two factor email codes are six digits and hashed', () => {
+  const code = generateEmailCode();
+  assert.match(code, /^\d{6}$/);
+  const hash = hashEmailCode(testStrapi, code);
+  assert.notEqual(hash, code);
+  assert.equal(verifyEmailCode(testStrapi, hash, code), true);
+  assert.equal(verifyEmailCode(testStrapi, hash, '000000'), false);
 });
 
 test('public takeaway guard replays matching idempotent requests', async () => {

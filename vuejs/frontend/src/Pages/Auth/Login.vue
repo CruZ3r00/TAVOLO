@@ -42,6 +42,8 @@ const submit = async () => {
       if (data.two_factor_required || data.twoFactorRequired) {
         sessionStorage.setItem('two_factor_challenge_token', data.challenge_token || '');
         sessionStorage.setItem('two_factor_pending_user', JSON.stringify(data.user || {}));
+        sessionStorage.setItem('two_factor_methods', JSON.stringify(data.methods || []));
+        sessionStorage.setItem('two_factor_email_hint', data.email_hint || '');
         if (route.query.plan) {
           sessionStorage.setItem('pending_plan_after_verification', route.query.plan);
         }

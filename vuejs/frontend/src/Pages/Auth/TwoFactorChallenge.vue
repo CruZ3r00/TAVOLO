@@ -23,8 +23,13 @@
     const recoveryCodeInput = ref(null);
     const codeInput = ref(null);
     const errorMessage = ref('');
+    const successMessage = ref('');
     const router = useRouter();
     const store = useStore();
+    const methods = ref(JSON.parse(sessionStorage.getItem('two_factor_methods') || '[]'));
+    const emailHint = ref(sessionStorage.getItem('two_factor_email_hint') || '');
+    const emailMode = ref(methods.value.includes('email') && !methods.value.includes('totp'));
+    const recoveryAvailable = ref(methods.value.includes('recovery'));
 
     // Schema dinamico: in modalita' "code" valida `code`, in modalita' "recovery"
     // valida `recovery_code`. Ricostruisco la useFormState ad ogni toggle non e'
@@ -55,10 +60,11 @@
         initialValues: { code: '', recovery_code: '' },
         onSubmit: async (vals) => {
             errorMessage.value = '';
+            successMessage.value = '';
             // Validazione manuale del campo attivo.
             if (!recovery.value) {
                 if (!vals.code) { setError('code', 'Codice obbligatorio.'); return; }
-                if (!/^[0-9]+$/.test(vals.code)) { setError('code', 'Il codice deve essere numerico.'); return; }
+                if (!/^[0-9]{6}$/.test(vals.code)) { setError('code', 'Il codice deve essere di 6 cifre.'); return; }
             } else if (!vals.recovery_code) {
                 setError('recovery_code', 'Codice di recupero obbligatorio.');
                 return;
@@ -90,6 +96,8 @@
                 localStorage.setItem('token', data.jwt);
                 sessionStorage.removeItem('two_factor_challenge_token');
                 sessionStorage.removeItem('two_factor_pending_user');
+                sessionStorage.removeItem('two_factor_methods');
+                sessionStorage.removeItem('two_factor_email_hint');
 
                 const pendingPlan = sessionStorage.getItem('pending_plan_after_verification');
                 if (['starter', 'pro'].includes(pendingPlan)) {
@@ -106,6 +114,7 @@
     });
 
     const toggleRecovery = async () => {
+        if (!recoveryAvailable.value) return;
         recovery.value = !recovery.value;
         await nextTick();
         if (recovery.value) {
@@ -114,6 +123,33 @@
         } else {
             codeInput.value?.focus?.();
             challengeForm.recovery_code = '';
+        }
+    };
+
+    const resendEmailCode = async () => {
+        errorMessage.value = '';
+        successMessage.value = '';
+        const challengeToken = sessionStorage.getItem('two_factor_challenge_token');
+        if (!challengeToken) {
+            router.push('/login');
+            return;
+        }
+        try {
+            const resp = await fetch(`${API_BASE}/api/auth/two-factor-challenge/email/resend`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ challenge_token: challengeToken }),
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                errorMessage.value = data?.error?.message || data.message || 'Impossibile inviare un nuovo codice.';
+                return;
+            }
+            emailHint.value = data.emailHint || emailHint.value;
+            successMessage.value = 'Nuovo codice inviato.';
+        } catch (err) {
+            console.error('2FA resend error:', err);
+            errorMessage.value = 'Errore di rete. Riprova.';
         }
     };
 
@@ -131,7 +167,8 @@
         <h1 class="auth-title">Verifica a due fattori</h1>
         <p class="auth-subtitle">
             <template v-if="!recovery">
-                Inserisci il codice di autenticazione dalla tua app.
+                <span v-if="emailMode">Inserisci il codice che abbiamo inviato a {{ emailHint || 'la tua email' }}.</span>
+                <span v-else>Inserisci il codice di autenticazione dalla tua app.</span>
             </template>
             <template v-else>
                 Inserisci uno dei codici di recupero di emergenza.
@@ -142,6 +179,12 @@
             <div v-if="errorMessage" class="ds-alert ds-alert-error">
                 <i class="bi bi-exclamation-circle"></i>
                 <span>{{ errorMessage }}</span>
+            </div>
+        </Transition>
+        <Transition name="fade">
+            <div v-if="successMessage" class="ds-alert ds-alert-success">
+                <i class="bi bi-check-circle"></i>
+                <span>{{ successMessage }}</span>
             </div>
         </Transition>
 
@@ -175,10 +218,14 @@
             </div>
 
             <div class="tfa-actions">
-                <button type="button" class="toggle-link" @click.prevent="toggleRecovery">
+                <button v-if="recoveryAvailable" type="button" class="toggle-link" @click.prevent="toggleRecovery">
                     <template v-if="!recovery">Usa un codice di recupero</template>
                     <template v-else>Usa il codice di autenticazione</template>
                 </button>
+                <button v-else-if="emailMode" type="button" class="toggle-link" @click.prevent="resendEmailCode">
+                    Invia nuovo codice
+                </button>
+                <span v-else></span>
 
                 <button type="submit" class="ds-btn ds-btn-primary" :disabled="isSubmitting">
                     <span v-if="isSubmitting" class="ds-spinner"></span>

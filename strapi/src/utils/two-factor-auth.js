@@ -15,11 +15,12 @@ function hmac(strapi, value, suffix = '') {
   return crypto.createHmac('sha256', `${secret}:${suffix}`).update(value).digest('base64url');
 }
 
-function signTwoFactorChallenge(strapi, userId) {
+function signTwoFactorChallenge(strapi, userId, extra = {}) {
   const payload = {
     id: userId,
     purpose: CHALLENGE_PURPOSE,
     exp: Date.now() + CHALLENGE_TTL_MS,
+    ...extra,
   };
   const data = base64Url(JSON.stringify(payload));
   return `${data}.${hmac(strapi, data, CHALLENGE_PURPOSE)}`;
@@ -49,6 +50,32 @@ function verifyTwoFactorChallenge(strapi, token) {
 
 function normalizeRecoveryCode(code) {
   return String(code || '').trim().replace(/\s+/g, '').toLowerCase();
+}
+
+function generateEmailCode() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+function normalizeEmailCode(code) {
+  return String(code || '').trim().replace(/\s+/g, '');
+}
+
+function hashEmailCode(strapi, code) {
+  const normalized = normalizeEmailCode(code);
+  return crypto
+    .createHash('sha256')
+    .update(`${hmac(strapi, 'email-code', '2fa-email')}:${normalized}`)
+    .digest('hex');
+}
+
+function verifyEmailCode(strapi, storedHash, code) {
+  const normalized = normalizeEmailCode(code);
+  if (!/^\d{6}$/.test(normalized) || !storedHash) return false;
+  if (!/^[a-f0-9]{64}$/i.test(String(storedHash))) return false;
+  return crypto.timingSafeEqual(
+    Buffer.from(String(storedHash)),
+    Buffer.from(hashEmailCode(strapi, normalized))
+  );
 }
 
 function isHashedRecoveryCode(value) {
@@ -92,6 +119,9 @@ function consumeRecoveryCode(strapi, storedCodes = [], candidate) {
 module.exports = {
   signTwoFactorChallenge,
   verifyTwoFactorChallenge,
+  generateEmailCode,
+  hashEmailCode,
+  verifyEmailCode,
   normalizeRecoveryCode,
   hashRecoveryCode,
   encodeRecoveryCodes,
