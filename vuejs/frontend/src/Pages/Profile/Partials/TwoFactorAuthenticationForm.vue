@@ -21,6 +21,7 @@ const recoveryCodes = ref([]);
 const verificationCode = ref('');
 const sensitiveCode = ref('');
 const sensitivePassword = ref('');
+const sensitiveEmailCodeSent = ref(false);
 const errorMsg = ref('');
 const successMsg = ref('');
 
@@ -127,11 +128,15 @@ const confirmTwoFactor = async () => {
 
 const disableTwoFactor = async () => {
     resetMessages();
+    if (enabled.value && method.value === 'email' && !/^\d{6}$/.test(sensitiveCode.value)) {
+        errorMsg.value = 'Invia e inserisci il codice email per disabilitare la protezione';
+        return;
+    }
     if (enabled.value && method.value !== 'email' && !/^\d{6}$/.test(sensitiveCode.value) && !sensitivePassword.value) {
         errorMsg.value = 'Inserisci il codice 2FA oppure la password per disabilitare la protezione';
         return;
     }
-    if ((enabled.value && method.value === 'email') || (!enabled.value && pending.value)) {
+    if (!enabled.value && pending.value) {
       if (!sensitivePassword.value) {
         errorMsg.value = 'Inserisci la password per annullare la configurazione';
         return;
@@ -145,7 +150,9 @@ const disableTwoFactor = async () => {
             headers: authHeaders(),
             body: JSON.stringify(enabled.value && method.value !== 'email'
                 ? { code: sensitiveCode.value, password: sensitivePassword.value }
-                : { password: sensitivePassword.value }),
+                : (enabled.value && method.value === 'email'
+                    ? { code: sensitiveCode.value }
+                    : { password: sensitivePassword.value })),
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) { errorMsg.value = d?.error?.message || d.message || 'Errore durante la disabilitazione'; return; }
@@ -156,9 +163,30 @@ const disableTwoFactor = async () => {
         recoveryCodes.value = [];
         sensitiveCode.value = '';
         sensitivePassword.value = '';
+        sensitiveEmailCodeSent.value = false;
         method.value = 'totp';
         pendingMethod.value = 'totp';
         successMsg.value = '2FA disabilitato';
+    } catch {
+        errorMsg.value = 'Errore di rete';
+    } finally {
+        loading.value = false;
+    }
+};
+
+const sendSensitiveEmailCode = async () => {
+    resetMessages();
+    loading.value = true;
+    try {
+        const r = await fetch(`${API_BASE}/api/account/2fa/email/code`, {
+            method: 'POST',
+            headers: authHeaders(),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { errorMsg.value = d?.error?.message || d.message || 'Impossibile inviare il codice'; return; }
+        emailHint.value = d.emailHint || emailHint.value;
+        sensitiveEmailCodeSent.value = true;
+        successMsg.value = 'Codice inviato via email.';
     } catch {
         errorMsg.value = 'Errore di rete';
     } finally {
@@ -278,8 +306,12 @@ onMounted(loadStatus);
             <div v-if="enabled" class="ds-field">
                 <InputLabel
                     for="sensitive_code"
-                    :value="method === 'email' ? 'Password per modifiche sensibili' : 'Codice 2FA o password per modifiche sensibili'"
+                    :value="method === 'email' ? 'Codice email per disabilitare' : 'Codice 2FA o password per modifiche sensibili'"
                 />
+                <div v-if="method === 'email'" class="ds-alert ds-alert-info">
+                    <i class="bi bi-envelope-check"></i>
+                    <span>Invia un codice a {{ emailHint || 'la tua email' }}, poi inseriscilo qui per disabilitare la 2FA.</span>
+                </div>
                 <TextInput
                     id="sensitive_code"
                     v-if="method !== 'email'"
@@ -290,20 +322,22 @@ onMounted(loadStatus);
                     placeholder="000000"
                 />
                 <TextInput
+                    v-else
+                    id="sensitive_email_code"
+                    v-model="sensitiveCode"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    placeholder="000000"
+                    @keyup.enter="disableTwoFactor"
+                />
+                <TextInput
                     v-if="method !== 'email'"
                     id="sensitive_password_enabled"
                     v-model="sensitivePassword"
                     type="password"
                     autocomplete="current-password"
                     placeholder="Oppure la tua password"
-                />
-                <TextInput
-                    v-else
-                    id="sensitive_password_enabled"
-                    v-model="sensitivePassword"
-                    type="password"
-                    autocomplete="current-password"
-                    placeholder="La tua password"
                 />
                 <InputError :message="''" />
             </div>
@@ -333,6 +367,9 @@ onMounted(loadStatus);
                 </button>
                 <button v-if="pending" class="ds-btn ds-btn-primary" :disabled="loading" @click="confirmTwoFactor">
                     <span>Conferma</span>
+                </button>
+                <button v-if="enabled && method === 'email'" class="ds-btn ds-btn-secondary" :disabled="loading" @click="sendSensitiveEmailCode">
+                    <i class="bi bi-envelope-check"></i><span>{{ sensitiveEmailCodeSent ? 'Invia nuovo codice' : 'Invia codice email' }}</span>
                 </button>
                 <button v-if="enabled && method !== 'email'" class="ds-btn ds-btn-secondary" :disabled="loading" @click="regenerateRecovery">
                     <span>Rigenera codici</span>

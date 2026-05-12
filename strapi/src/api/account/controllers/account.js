@@ -119,20 +119,38 @@ async function verifyUserPassword(strapi, user, password) {
 async function verifySensitiveAccountChange(strapi, user, body = {}) {
   const fresh = await strapi.db.query('plugin::users-permissions.user').findOne({
     where: { id: user.id },
-    select: ['id', 'password', 'two_factor_enabled', 'two_factor_secret', 'two_factor_method'],
+    select: [
+      'id',
+      'password',
+      'two_factor_enabled',
+      'two_factor_secret',
+      'two_factor_method',
+      'two_factor_email_code_hash',
+      'two_factor_email_code_expires_at',
+    ],
   });
   if (!fresh) return { ok: false, message: 'Utente non trovato' };
 
-  const passwordOk = await verifyUserPassword(strapi, user, body.password);
-  if (passwordOk) return { ok: true };
+  if (fresh.two_factor_enabled && fresh.two_factor_method === 'email') {
+    if (!fresh.two_factor_email_code_expires_at || new Date(fresh.two_factor_email_code_expires_at).getTime() < Date.now()) {
+      return { ok: false, message: 'Codice email scaduto. Richiedi un nuovo codice.' };
+    }
+    if (!verifyEmailCode(strapi, fresh.two_factor_email_code_hash, body.code)) {
+      return { ok: false, message: 'Codice email non valido.' };
+    }
+    return { ok: true };
+  }
 
   if (fresh.two_factor_enabled && fresh.two_factor_method !== 'email') {
+    const passwordOk = await verifyUserPassword(strapi, user, body.password);
+    if (passwordOk) return { ok: true };
     if (!verifyTotp(fresh.two_factor_secret, body.code)) {
       return { ok: false, message: 'Inserisci un codice 2FA valido oppure la password.' };
     }
     return { ok: true };
   }
 
+  const passwordOk = await verifyUserPassword(strapi, user, body.password);
   if (!passwordOk) return { ok: false, message: 'Password errata' };
   return { ok: true };
 }
@@ -744,6 +762,30 @@ module.exports = {
     return ctx.send({ success: true });
   },
 
+  async twoFactorEmailSendCode(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+    const fresh = await strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: user.id },
+      select: ['id', 'email', 'two_factor_enabled', 'two_factor_method', 'two_factor_email_last_sent_at'],
+    });
+    if (!fresh?.two_factor_enabled || fresh.two_factor_method !== 'email') {
+      return ctx.badRequest('2FA email non attiva');
+    }
+    try {
+      const sent = await sendTwoFactorEmailCode(strapi, fresh);
+      if (!sent.ok) {
+        ctx.status = 429;
+        ctx.body = { error: { code: 'RATE_LIMITED', message: sent.message } };
+        return;
+      }
+      return ctx.send({ success: true, emailHint: maskEmail(sent.email) });
+    } catch (err) {
+      strapi.log.error(`2FA email code fallita: ${err.message}`);
+      return ctx.internalServerError('Impossibile inviare il codice via email.');
+    }
+  },
+
   async twoFactorDisable(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.unauthorized();
@@ -758,6 +800,7 @@ module.exports = {
         two_factor_recovery_codes: null,
         two_factor_email_code_hash: null,
         two_factor_email_code_expires_at: null,
+        two_factor_email_last_sent_at: null,
       },
     });
     return ctx.send({ success: true });

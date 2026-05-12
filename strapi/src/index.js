@@ -419,6 +419,7 @@ async function grantImportPermissions(strapi) {
       'api::account.account.twoFactorConfirm',
       'api::account.account.twoFactorEmailEnable',
       'api::account.account.twoFactorEmailConfirm',
+      'api::account.account.twoFactorEmailSendCode',
       'api::account.account.twoFactorDisable',
       'api::account.account.twoFactorRegenerateRecovery',
       'api::ingredient.ingredient.list',
