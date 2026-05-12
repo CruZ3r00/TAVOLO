@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     ENABLE_DOCUMENT_CROP: bool = False
     NOISY_IMAGE_THRESHOLD: float = 0.42
     LAYOUT_COLUMN_DETECTION: bool = True
+    MAX_INPUT_FILE_BYTES: int = 20 * 1024 * 1024
+    MAX_PDF_PAGES: int = 8
+    MAX_IMAGE_PIXELS: int = 25_000_000
+    OCR_MAX_CONCURRENT_REQUESTS: int = 1
+    OCR_QUEUE_TIMEOUT_SECONDS: float = 2.0
 
     ALLOWED_INPUT_DIR: str = Field(..., min_length=1)
     INTERNAL_API_TOKEN: str = ""

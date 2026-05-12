@@ -10,7 +10,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def extract_pdf_text_layout(pdf_path: str) -> list[dict]:
+def extract_pdf_text_layout(pdf_path: str, max_pages: int | None = None) -> list[dict]:
     """Estrae testo selezionabile da PDF con coordinate, senza OCR.
 
     Ritorna una pagina per elemento con ``blocks`` e ``lines`` gia' ordinati
@@ -21,6 +21,8 @@ def extract_pdf_text_layout(pdf_path: str) -> list[dict]:
     pages: list[dict] = []
     doc = fitz.open(pdf_path)
     try:
+        if max_pages is not None and max_pages > 0 and doc.page_count > max_pages:
+            raise ValueError(f"PDF con troppe pagine: {doc.page_count} > {max_pages}")
         for page_idx, page in enumerate(doc):
             page_dict = page.get_text("dict")
             blocks: list[dict] = []
@@ -72,7 +74,12 @@ def extract_pdf_text_layout(pdf_path: str) -> list[dict]:
     return pages
 
 
-def pdf_to_images(pdf_path: str, dpi: int = 300) -> list[np.ndarray]:
+def pdf_to_images(
+    pdf_path: str,
+    dpi: int = 300,
+    max_pages: int | None = None,
+    max_pixels: int | None = None,
+) -> list[np.ndarray]:
     """Apre ``pdf_path`` e ritorna una lista di immagini BGR uint8, una per pagina.
 
     Usa PyMuPDF con una trasformazione ``dpi/72`` (72 dpi e' il default PDF).
@@ -88,8 +95,14 @@ def pdf_to_images(pdf_path: str, dpi: int = 300) -> list[np.ndarray]:
 
     doc = fitz.open(pdf_path)
     try:
+        if max_pages is not None and max_pages > 0 and doc.page_count > max_pages:
+            raise ValueError(f"PDF con troppe pagine: {doc.page_count} > {max_pages}")
         for page_idx, page in enumerate(doc):
             pix = page.get_pixmap(matrix=matrix, alpha=False)
+            if max_pixels is not None and max_pixels > 0 and pix.width * pix.height > max_pixels:
+                raise ValueError(
+                    f"pagina PDF troppo grande: {pix.width * pix.height} pixel > {max_pixels}"
+                )
             # pix.samples: bytes RGB (n=3) o RGBA (n=4) se alpha=True.
             channels = pix.n
             buffer = np.frombuffer(pix.samples, dtype=np.uint8)

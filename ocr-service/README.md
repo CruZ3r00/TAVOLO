@@ -130,6 +130,11 @@ Vedi `.env.example`. Le principali:
 | `LOG_LEVEL` | `INFO` | livello logging JSON |
 | `PADDLE_USE_GPU` | `false` | abilita GPU |
 | `PDF_RENDER_DPI` | `300` | DPI rasterizzazione |
+| `MAX_INPUT_FILE_BYTES` | `20971520` | dimensione massima file input |
+| `MAX_PDF_PAGES` | `8` | numero massimo pagine PDF |
+| `MAX_IMAGE_PIXELS` | `25000000` | pixel massimi per immagine/pagina rasterizzata |
+| `OCR_MAX_CONCURRENT_REQUESTS` | `1` | richieste `/process` eseguibili in parallelo |
+| `OCR_QUEUE_TIMEOUT_SECONDS` | `2.0` | attesa massima prima di rispondere `429` se OCR e' occupato |
 
 ## Troubleshooting
 

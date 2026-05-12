@@ -12,7 +12,7 @@ from typing import Any
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import ValidationError
 
 from app.config import get_settings
@@ -44,6 +44,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _SUPPORTED_EXT: frozenset[str] = frozenset({".pdf", ".png", ".jpg", ".jpeg", ".webp"})
+_PROCESS_SEMAPHORE: asyncio.Semaphore | None = None
+_PROCESS_SEMAPHORE_LIMIT: int | None = None
 
 
 def _verify_internal_token(header_token: str | None) -> None:
@@ -66,10 +68,73 @@ def _verify_internal_token(header_token: str | None) -> None:
         )
 
 
-def _load_pages(file_path: str, ext: str, dpi: int) -> list[np.ndarray]:
+def _get_process_semaphore(settings: Any) -> asyncio.Semaphore:
+    global _PROCESS_SEMAPHORE, _PROCESS_SEMAPHORE_LIMIT
+    limit = max(1, int(settings.OCR_MAX_CONCURRENT_REQUESTS or 1))
+    if _PROCESS_SEMAPHORE is None or _PROCESS_SEMAPHORE_LIMIT != limit:
+        _PROCESS_SEMAPHORE = asyncio.Semaphore(limit)
+        _PROCESS_SEMAPHORE_LIMIT = limit
+    return _PROCESS_SEMAPHORE
+
+
+async def _process_slot() -> None:
+    settings = get_settings()
+    semaphore = _get_process_semaphore(settings)
+    timeout = max(0.001, float(settings.OCR_QUEUE_TIMEOUT_SECONDS or 0))
+    try:
+        await asyncio.wait_for(semaphore.acquire(), timeout=timeout)
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="OCR occupato. Riprova tra poco.",
+        ) from exc
+    try:
+        yield
+    finally:
+        semaphore.release()
+
+
+def _max_input_file_bytes(settings: Any) -> int:
+    return max(1, int(settings.MAX_INPUT_FILE_BYTES or 1))
+
+
+def _max_pdf_pages(settings: Any) -> int:
+    return max(1, int(settings.MAX_PDF_PAGES or 1))
+
+
+def _max_image_pixels(settings: Any) -> int:
+    return max(1, int(settings.MAX_IMAGE_PIXELS or 1))
+
+
+def _enforce_file_size(file_path: str, settings: Any) -> None:
+    max_bytes = _max_input_file_bytes(settings)
+    size = os.path.getsize(file_path)
+    if size > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File troppo grande: {size} byte > {max_bytes} byte.",
+        )
+
+
+def _enforce_image_pixels(img: np.ndarray, settings: Any) -> None:
+    max_pixels = _max_image_pixels(settings)
+    pixels = int(img.shape[0]) * int(img.shape[1])
+    if pixels > max_pixels:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Immagine troppo grande: {pixels} pixel > {max_pixels} pixel.",
+        )
+
+
+def _load_pages(file_path: str, ext: str, settings: Any) -> list[np.ndarray]:
     """Carica il file in una lista di np.ndarray BGR."""
     if ext == ".pdf":
-        pages = pdf_to_images(file_path, dpi=dpi)
+        pages = pdf_to_images(
+            file_path,
+            dpi=settings.PDF_RENDER_DPI,
+            max_pages=_max_pdf_pages(settings),
+            max_pixels=_max_image_pixels(settings),
+        )
         if not pages:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -83,6 +148,7 @@ def _load_pages(file_path: str, ext: str, dpi: int) -> list[np.ndarray]:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Impossibile decodificare l'immagine.",
         )
+    _enforce_image_pixels(img, settings)
     return [img]
 
 
@@ -857,6 +923,7 @@ def _extract_structured_text_from_page(
 async def process_file(
     payload: ProcessRequest,
     x_internal_token: str | None = Header(default=None, alias="X-Internal-Token"),
+    _slot: None = Depends(_process_slot),
 ) -> dict[str, Any]:
     """Esegue la pipeline completa su un file e restituisce gli elementi strutturati."""
     _verify_internal_token(x_internal_token)
@@ -879,6 +946,7 @@ async def process_file(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"File non trovato: {payload.file_path}",
         )
+    _enforce_file_size(real_path, settings)
 
     # 3. Estensione supportata.
     ext = os.path.splitext(real_path)[1].lower()
@@ -905,7 +973,7 @@ async def process_file(
     pdf_text_layout: list[dict[str, Any]] = []
     if ext == ".pdf" and settings.ENABLE_PDF_TEXT_EXTRACTION:
         try:
-            pdf_text_layout = extract_pdf_text_layout(real_path)
+            pdf_text_layout = extract_pdf_text_layout(real_path, max_pages=_max_pdf_pages(settings))
             if _has_useful_pdf_text(pdf_text_layout):
                 method = "pdf_text"
                 layout["method"] = method
@@ -999,7 +1067,7 @@ async def process_file(
 
     # 4b. Carica pagine per OCR.
     try:
-        pages = _load_pages(real_path, ext, settings.PDF_RENDER_DPI)
+        pages = _load_pages(real_path, ext, settings)
     except HTTPException:
         raise
     except Exception as exc:

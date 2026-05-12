@@ -1,9 +1,10 @@
 'use strict';
 
 /**
- * website-config router
+ * Core Content API disabled.
+ *
+ * Website config is managed through /account/website-config so ownership,
+ * logo validation, and sensitive-change confirmation are always enforced.
  */
 
-const { createCoreRouter } = require('@strapi/strapi').factories;
-
-module.exports = createCoreRouter('api::website-config.website-config');
+module.exports = { routes: [] };

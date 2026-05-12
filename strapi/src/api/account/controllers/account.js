@@ -138,6 +138,13 @@ async function verifySensitiveAccountChange(strapi, user, body = {}) {
     if (!verifyEmailCode(strapi, fresh.two_factor_email_code_hash, body.code)) {
       return { ok: false, message: 'Codice email non valido.' };
     }
+    await strapi.db.query('plugin::users-permissions.user').update({
+      where: { id: fresh.id },
+      data: {
+        two_factor_email_code_hash: null,
+        two_factor_email_code_expires_at: null,
+      },
+    });
     return { ok: true };
   }
 
@@ -423,6 +430,9 @@ module.exports = {
     if (email && email !== user.email) data.email = String(email).trim().toLowerCase();
     if (Object.keys(data).length === 0) return ctx.send({ success: true, user });
 
+    const confirmation = await verifySensitiveAccountChange(strapi, user, ctx.request.body || {});
+    if (!confirmation.ok) return ctx.badRequest(confirmation.message);
+
     if (data.email) {
       const exists = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { email: data.email, id: { $ne: user.id } },
@@ -567,6 +577,9 @@ module.exports = {
     if (!user) return ctx.unauthorized();
 
     const body = ctx.request.body || {};
+    const confirmation = await verifySensitiveAccountChange(strapi, user, body);
+    if (!confirmation.ok) return ctx.badRequest(confirmation.message);
+
     const cInv = parseCapacity(body.coperti_invernali);
     if (!isValidCapacity(cInv)) {
       return ctx.badRequest('coperti_invernali obbligatorio (intero 1..10000).');

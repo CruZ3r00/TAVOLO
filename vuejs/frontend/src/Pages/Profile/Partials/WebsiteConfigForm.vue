@@ -22,8 +22,19 @@ const apiEndpoint = ref('');
 const apiCopied = ref(false);
 const copertiInvernali = ref('');
 const copertiEstivi = ref('');
+const twoFactorEnabled = ref(false);
+const twoFactorMethod = ref('totp');
+const confirmationCode = ref('');
+const confirmationPassword = ref('');
+const emailHint = ref('');
+const emailCodeSent = ref(false);
 const logoAllowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const logoMaxBytes = 2 * 1024 * 1024;
+
+const authHeaders = () => ({
+  'Authorization': `Bearer ${tkn}`,
+  'Content-Type': 'application/json',
+});
 
 const applyConfig = (config) => {
   configId.value = config?.documentId || '';
@@ -39,10 +50,7 @@ const fetchConfig = async () => {
   try {
     const userRes = await fetch(`${API_BASE}/api/users/me?populate=*`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${tkn}`,
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(),
     });
     if (userRes.ok) {
       const userData = await userRes.json();
@@ -51,10 +59,7 @@ const fetchConfig = async () => {
 
       const wcRes = await fetch(`${API_BASE}/api/account/website-config`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${tkn}`,
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders(),
       });
       if (wcRes.ok) {
         const wcData = await wcRes.json();
@@ -66,6 +71,64 @@ const fetchConfig = async () => {
     }
   } catch (error) {
     console.error('Errore nel caricamento configurazione:', error);
+  }
+};
+
+const fetchTwoFactorStatus = async () => {
+  try {
+    const response = await fetch(`${API_BASE}/api/account/2fa/status`, { headers: authHeaders() });
+    if (!response.ok) return;
+    const data = await response.json();
+    twoFactorEnabled.value = !!data.enabled;
+    twoFactorMethod.value = data.method || 'totp';
+  } catch {
+    // Backend still enforces confirmation if the status request fails.
+  }
+};
+
+const validateConfirmation = () => {
+  if (twoFactorEnabled.value && twoFactorMethod.value === 'email') {
+    if (!/^\d{6}$/.test(confirmationCode.value)) {
+      saveError.value = 'Invia e inserisci il codice email per salvare la configurazione.';
+      return false;
+    }
+    return true;
+  }
+  if (twoFactorEnabled.value) {
+    if (!confirmationPassword.value && !/^\d{6}$/.test(confirmationCode.value)) {
+      saveError.value = 'Inserisci il codice 2FA oppure la password.';
+      return false;
+    }
+    return true;
+  }
+  if (!confirmationPassword.value) {
+    saveError.value = 'Inserisci la password per salvare la configurazione.';
+    return false;
+  }
+  return true;
+};
+
+const sendEmailCode = async () => {
+  saveSuccess.value = false;
+  saveError.value = '';
+  isSaving.value = true;
+  try {
+    const response = await fetch(`${API_BASE}/api/account/2fa/email/code`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      saveError.value = data?.error?.message || data?.message || 'Impossibile inviare il codice email.';
+      return;
+    }
+    emailHint.value = data.emailHint || emailHint.value;
+    emailCodeSent.value = true;
+    saveSuccess.value = true;
+  } catch {
+    saveError.value = 'Errore di rete durante invio codice.';
+  } finally {
+    isSaving.value = false;
   }
 };
 
@@ -126,8 +189,7 @@ const saveConfig = async () => {
   saveError.value = '';
 
   try {
-    await uploadLogo();
-    if (saveError.value) {
+    if (!validateConfirmation()) {
       isSaving.value = false;
       return;
     }
@@ -159,12 +221,21 @@ const saveConfig = async () => {
       bodyData.logo = uploadedLogoId.value;
     }
 
+    bodyData.code = confirmationCode.value;
+    bodyData.password = confirmationPassword.value;
+
+    await uploadLogo();
+    if (saveError.value) {
+      isSaving.value = false;
+      return;
+    }
+    if (uploadedLogoId.value) {
+      bodyData.logo = uploadedLogoId.value;
+    }
+
     const response = await fetch(`${API_BASE}/api/account/website-config`, {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${tkn}`,
-        'Content-Type': 'application/json',
-      },
+      headers: authHeaders(),
       body: JSON.stringify(bodyData),
     });
 
@@ -172,6 +243,9 @@ const saveConfig = async () => {
       const data = await response.json();
       applyConfig(data.data);
       saveSuccess.value = true;
+      confirmationCode.value = '';
+      confirmationPassword.value = '';
+      emailCodeSent.value = false;
     } else {
       const errorData = await response.json().catch(() => ({}));
       saveError.value = errorData?.error?.message || 'Errore nel salvataggio della configurazione.';
@@ -194,7 +268,7 @@ const copyApiEndpoint = () => {
 };
 
 onMounted(async () => {
-  await fetchConfig();
+  await Promise.all([fetchConfig(), fetchTwoFactorStatus()]);
 });
 </script>
 
@@ -246,10 +320,51 @@ onMounted(async () => {
             </label>
           </div>
 
+          <div class="ds-field">
+            <label class="ds-label">
+              {{ twoFactorEnabled && twoFactorMethod === 'email' ? 'Codice email di conferma' : 'Conferma modifica sensibile' }}
+            </label>
+            <div v-if="twoFactorEnabled && twoFactorMethod === 'email'" class="confirm-row">
+              <input
+                v-model="confirmationCode"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                class="ds-input"
+                placeholder="000000"
+              >
+              <button type="button" class="ds-btn ds-btn-secondary" :disabled="isSaving" @click="sendEmailCode">
+                <i class="bi bi-envelope-check"></i>
+                <span>{{ emailCodeSent ? 'Invia nuovo codice' : 'Invia codice email' }}</span>
+              </button>
+            </div>
+            <template v-else>
+              <input
+                v-if="twoFactorEnabled"
+                v-model="confirmationCode"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                class="ds-input"
+                placeholder="Codice 2FA"
+              >
+              <input
+                v-model="confirmationPassword"
+                type="password"
+                autocomplete="current-password"
+                class="ds-input"
+                :placeholder="twoFactorEnabled ? 'Oppure la tua password' : 'La tua password'"
+              >
+            </template>
+            <p v-if="twoFactorEnabled && twoFactorMethod === 'email'" class="ds-helper">
+              Il codice viene inviato a {{ emailHint || 'la tua email' }}.
+            </p>
+          </div>
+
           <Transition name="fade">
             <div v-if="saveSuccess" class="ds-alert ds-alert-success">
               <i class="bi bi-check-circle"></i>
-              <span>Configurazione salvata con successo!</span>
+              <span>{{ emailCodeSent ? 'Codice email inviato.' : 'Configurazione salvata con successo!' }}</span>
             </div>
           </Transition>
           <Transition name="fade">
@@ -377,6 +492,15 @@ onMounted(async () => {
   max-height: 96px;
   background: var(--paper);
 }
+.confirm-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.confirm-row .ds-btn {
+  white-space: nowrap;
+}
 
 /* API block */
 .api-description {
@@ -434,4 +558,9 @@ onMounted(async () => {
 
 .fade-enter-active, .fade-leave-active { transition: opacity 200ms, transform 200ms; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(4px); }
+@media (max-width: 640px) {
+  .confirm-row {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

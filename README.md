@@ -416,6 +416,11 @@ Poi apri `ocr-service/.env` e allinea almeno:
 - `OLLAMA_MODEL=qwen2.5:7b`
 - `OCR_LANG=it`
 - `ALLOWED_INPUT_DIR=D:\percorso\assoluto\cms_restaurant\strapi\.menu-upload`
+- `MAX_INPUT_FILE_BYTES=20971520`
+- `MAX_PDF_PAGES=8`
+- `MAX_IMAGE_PIXELS=25000000`
+- `OCR_MAX_CONCURRENT_REQUESTS=1`
+- `OCR_QUEUE_TIMEOUT_SECONDS=2.0`
 
 Regola chiave:
 
