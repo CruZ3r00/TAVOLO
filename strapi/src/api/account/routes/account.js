@@ -30,5 +30,11 @@ module.exports = {
     { method: 'POST',   path: '/account/2fa/confirm',     handler: 'account.twoFactorConfirm' },
     { method: 'DELETE', path: '/account/2fa/disable',     handler: 'account.twoFactorDisable' },
     { method: 'POST',   path: '/account/2fa/recovery',    handler: 'account.twoFactorRegenerateRecovery' },
+    {
+      method: 'POST',
+      path: '/auth/two-factor-challenge',
+      handler: 'account.twoFactorLogin',
+      config: { auth: false, policies: [], middlewares: [] },
+    },
   ],
 };

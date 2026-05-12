@@ -47,7 +47,7 @@ class Settings(BaseSettings):
 
     ALLOWED_INPUT_DIR: str = Field(..., min_length=1)
     INTERNAL_API_TOKEN: str = ""
-    REQUIRE_INTERNAL_API_TOKEN: bool = False
+    REQUIRE_INTERNAL_API_TOKEN: bool = True
 
     LOG_LEVEL: str = "INFO"
 

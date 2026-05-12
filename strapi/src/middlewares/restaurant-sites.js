@@ -29,11 +29,11 @@ module.exports = (config, { strapi }) => {
 
     const username = match[1];
     const safeUsername = escapeHtml(username);
-    const filePath = path.join(sitesDir, `${username}.html`);
+    const filePath = path.resolve(sitesDir, `${username}.html`);
 
     // Previeni path traversal
-    if (!filePath.startsWith(sitesDir)) {
-      ctx.status = 400;
+    if (!filePath.startsWith(`${sitesDir}${path.sep}`)) {
+      ctx.status = 403;
       ctx.body = 'Richiesta non valida';
       return;
     }

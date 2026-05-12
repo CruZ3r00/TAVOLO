@@ -39,6 +39,16 @@ const submit = async () => {
     });
     if (response.ok) {
       const data = await response.json();
+      if (data.two_factor_required || data.twoFactorRequired) {
+        sessionStorage.setItem('two_factor_challenge_token', data.challenge_token || '');
+        sessionStorage.setItem('two_factor_pending_user', JSON.stringify(data.user || {}));
+        if (route.query.plan) {
+          sessionStorage.setItem('pending_plan_after_verification', route.query.plan);
+        }
+        router.push('/two-factor-challenge');
+        return;
+      }
+
       let user = data.user;
       try {
         const meResponse = await fetch(`${API_BASE}/api/users/me`, {

@@ -1,7 +1,19 @@
 'use strict';
 
 const crypto = require('crypto');
-const { STAFF_ROLES, applyStaffActiveState } = require('../../../utils/staff-access');
+const {
+  STAFF_ROLES,
+  applyStaffActiveState,
+  publicSiteSlug,
+  resolveStaffContext,
+  staffUserPayload,
+  validatePublicUsername,
+} = require('../../../utils/staff-access');
+const {
+  consumeRecoveryCode,
+  encodeRecoveryCodes,
+  verifyTwoFactorChallenge,
+} = require('../../../utils/two-factor-auth');
 const {
   ROUTABLE_STAFF_ROLE_SET,
   listCategoryRouting,
@@ -11,6 +23,8 @@ const {
 } = require('../../../utils/category-routing');
 const CAPACITY_MIN = 1;
 const CAPACITY_MAX = 10000;
+const LOGO_MAX_KB_DEFAULT = 2048;
+const LOGO_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MANAGED_STAFF_ROLES = [
   STAFF_ROLES.CAMERIERE,
   STAFF_ROLES.CUCINA,
@@ -97,6 +111,42 @@ async function verifyUserPassword(strapi, user, password) {
   return strapi.plugin('users-permissions').service('user').validatePassword(password, fresh.password);
 }
 
+async function verifySensitiveAccountChange(strapi, user, body = {}) {
+  const fresh = await strapi.db.query('plugin::users-permissions.user').findOne({
+    where: { id: user.id },
+    select: ['id', 'password', 'two_factor_enabled', 'two_factor_secret'],
+  });
+  if (!fresh) return { ok: false, message: 'Utente non trovato' };
+
+  if (fresh.two_factor_enabled) {
+    if (!verifyTotp(fresh.two_factor_secret, body.code)) {
+      return { ok: false, message: 'Codice 2FA non valido' };
+    }
+    return { ok: true };
+  }
+
+  const passwordOk = await verifyUserPassword(strapi, user, body.password);
+  if (!passwordOk) return { ok: false, message: 'Password errata' };
+  return { ok: true };
+}
+
+function stripPrivateUserFields(user) {
+  const safe = { ...(user || {}) };
+  delete safe.password;
+  delete safe.resetPasswordToken;
+  delete safe.confirmationToken;
+  delete safe.two_factor_secret;
+  delete safe.two_factor_recovery_codes;
+  return safe;
+}
+
+async function authUserPayload(strapi, user) {
+  const safe = stripPrivateUserFields(user);
+  const actor = await resolveStaffContext(strapi, safe);
+  if (actor) Object.assign(safe, staffUserPayload(actor.actor, actor.owner));
+  return safe;
+}
+
 function parseCapacity(value) {
   if (value === undefined || value === null || value === '') return null;
   const parsed = parseInt(value, 10);
@@ -108,12 +158,51 @@ function isValidCapacity(value) {
   return Number.isFinite(value) && value >= CAPACITY_MIN && value <= CAPACITY_MAX;
 }
 
+function logoMaxKb() {
+  const raw = parseInt(process.env.LOGO_MAX_KB || '', 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : LOGO_MAX_KB_DEFAULT;
+}
+
+function sameEntity(a, b) {
+  if (!a || !b) return false;
+  return (a.documentId && b.documentId && a.documentId === b.documentId) || (a.id && b.id && a.id === b.id);
+}
+
 async function findUserWebsiteConfig(userId, populate = []) {
   const configs = await strapi.documents('api::website-config.website-config').findMany({
     filters: { fk_user: { id: { $eq: userId } } },
     populate,
   });
   return configs && configs.length > 0 ? configs[0] : null;
+}
+
+async function validateLogoFile(strapi, user, logoId, existingConfig = null) {
+  const id = Number(logoId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return { ok: false, message: 'Logo non valido.' };
+  }
+
+  const file = await strapi.db.query('plugin::upload.file').findOne({
+    where: { id },
+    populate: ['related'],
+  });
+  if (!file) return { ok: false, message: 'Logo non trovato.' };
+  if (!LOGO_ALLOWED_MIME.has(file.mime)) {
+    return { ok: false, message: 'Formato logo non supportato. Usa PNG, JPEG, WEBP o GIF.' };
+  }
+  if (Number(file.size || 0) > logoMaxKb()) {
+    return { ok: false, message: `Logo troppo grande. Limite: ${logoMaxKb()} KB.` };
+  }
+
+  const related = Array.isArray(file.related) ? file.related : [];
+  if (related.length > 0) {
+    const allowed = existingConfig && related.some((entity) => sameEntity(entity, existingConfig));
+    if (!allowed) {
+      return { ok: false, message: 'Logo già associato a un altro contenuto.' };
+    }
+  }
+
+  return { ok: true, id };
 }
 
 async function requireAccountUser(ctx) {
@@ -274,6 +363,10 @@ module.exports = {
       if (exists) return ctx.badRequest('Email già in uso');
     }
     if (data.username) {
+      const usernameValidation = validatePublicUsername(data.username);
+      if (!usernameValidation.ok) return ctx.badRequest(usernameValidation.message);
+      data.username = usernameValidation.value;
+
       const exists = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { username: data.username, id: { $ne: user.id } },
       });
@@ -420,14 +513,9 @@ module.exports = {
       }
     }
 
-  	 const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
-       	const siteSlug = String(user.username || '')
-  		 .trim()
- 		 .replace(/\s+/g, '_');
-	const siteUrl = `${siteBaseUrl.replace(/\/+$/, '')}/sites/${siteSlug}`;
-
-  
-      `${siteBaseUrl}/sites/${user.username}`;
+    const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+    const siteSlug = publicSiteSlug(user.username);
+    const siteUrl = `${siteBaseUrl.replace(/\/+$/, '')}/sites/${siteSlug}`;
     const restaurantName =
       (typeof body.restaurant_name === 'string' && body.restaurant_name.trim()) ||
       user.username ||
@@ -441,11 +529,13 @@ module.exports = {
       fk_user: { connect: [{ id: user.id }] },
     };
 
+    const existing = await findUserWebsiteConfig(user.id);
     if (body.logo !== undefined && body.logo !== null && body.logo !== '') {
-      data.logo = body.logo;
+      const logo = await validateLogoFile(strapi, user, body.logo, existing);
+      if (!logo.ok) return ctx.badRequest(logo.message);
+      data.logo = logo.id;
     }
 
-    const existing = await findUserWebsiteConfig(user.id);
     if (existing) {
       await strapi.documents('api::website-config.website-config').update({
         documentId: existing.documentId,
@@ -508,11 +598,21 @@ module.exports = {
   async twoFactorEnable(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.unauthorized();
+    const current = await strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: user.id },
+      select: ['id', 'two_factor_enabled'],
+    });
+    if (current?.two_factor_enabled) return ctx.badRequest('2FA già attiva');
+
     const secret = generateSecret();
     const recovery = generateRecoveryCodes();
     await strapi.db.query('plugin::users-permissions.user').update({
       where: { id: user.id },
-      data: { two_factor_secret: secret, two_factor_enabled: false, two_factor_recovery_codes: recovery },
+      data: {
+        two_factor_secret: secret,
+        two_factor_enabled: false,
+        two_factor_recovery_codes: encodeRecoveryCodes(strapi, recovery),
+      },
     });
     const issuer = encodeURIComponent('CMS Restaurant');
     const label = encodeURIComponent(`${user.email}`);
@@ -540,6 +640,8 @@ module.exports = {
   async twoFactorDisable(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.unauthorized();
+    const confirmation = await verifySensitiveAccountChange(strapi, user, ctx.request.body || {});
+    if (!confirmation.ok) return ctx.badRequest(confirmation.message);
     await strapi.db.query('plugin::users-permissions.user').update({
       where: { id: user.id },
       data: { two_factor_secret: null, two_factor_enabled: false, two_factor_recovery_codes: null },
@@ -550,11 +652,45 @@ module.exports = {
   async twoFactorRegenerateRecovery(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.unauthorized();
+    const confirmation = await verifySensitiveAccountChange(strapi, user, ctx.request.body || {});
+    if (!confirmation.ok) return ctx.badRequest(confirmation.message);
     const recovery = generateRecoveryCodes();
     await strapi.db.query('plugin::users-permissions.user').update({
       where: { id: user.id },
-      data: { two_factor_recovery_codes: recovery },
+      data: { two_factor_recovery_codes: encodeRecoveryCodes(strapi, recovery) },
     });
     return ctx.send({ recoveryCodes: recovery });
+  },
+
+  async twoFactorLogin(ctx) {
+    const { challenge_token: challengeToken, code, recovery_code: recoveryCode } = ctx.request.body || {};
+    const challenge = verifyTwoFactorChallenge(strapi, challengeToken);
+    if (!challenge) return ctx.forbidden('Challenge 2FA non valida o scaduta');
+
+    const user = await strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: challenge.id },
+      populate: ['role', 'fk_owner'],
+    });
+    if (!user || user.blocked) return ctx.forbidden('Account non disponibile');
+    if (!user.two_factor_enabled || !user.two_factor_secret) {
+      return ctx.badRequest('2FA non attiva');
+    }
+
+    if (recoveryCode) {
+      const result = consumeRecoveryCode(strapi, user.two_factor_recovery_codes || [], recoveryCode);
+      if (!result.ok) return ctx.badRequest('Codice di recupero non valido');
+      await strapi.db.query('plugin::users-permissions.user').update({
+        where: { id: user.id },
+        data: { two_factor_recovery_codes: result.nextCodes },
+      });
+    } else if (!verifyTotp(user.two_factor_secret, code)) {
+      return ctx.badRequest('Codice non valido');
+    }
+
+    const jwt = await strapi.plugin('users-permissions').service('jwt').issue({ id: user.id });
+    return ctx.send({
+      jwt,
+      user: await authUserPayload(strapi, user),
+    });
   },
 };

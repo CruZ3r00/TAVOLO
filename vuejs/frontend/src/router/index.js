@@ -95,6 +95,11 @@ const routes = [
         name: 'login',
         component: () => import('../Pages/Auth/Login.vue'),
     },
+    {
+        path: '/two-factor-challenge',
+        name: 'two-factor-challenge',
+        component: () => import('../Pages/Auth/TwoFactorChallenge.vue'),
+    },
     { //non protetta - step 2 della registrazione (scelta piano + redirect Stripe)
         path: '/choose-plan',
         name: 'choose-plan',

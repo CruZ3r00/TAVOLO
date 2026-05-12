@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { validateProductionConfig } = require('./utils/production-checks');
 const { sweepDueTakeaways } = require('./utils/takeaway-lifecycle');
+const { isReservedStaffUsername, publicSiteSlug } = require('./utils/staff-access');
 console.log("STARTING STRAPI...");
 console.log("PORT:", process.env.PORT);
 function escapeHtml(value) {
@@ -58,6 +59,23 @@ module.exports = {
       const rawInv = body.coperti_invernali;
       const rawEst = body.coperti_estivi;
       const rawName = body.restaurant_name;
+      const username = String(createdUser.username || '').trim();
+
+      if (isReservedStaffUsername(username)) {
+        try {
+          await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+        } catch (_) { /* best effort */ }
+        ctx.status = 400;
+        ctx.body = {
+          data: null,
+          error: {
+            status: 400,
+            name: 'ValidationError',
+            message: 'Username riservato agli account staff gestiti dal sistema.',
+          },
+        };
+        return;
+      }
 
       // Parse & validate capacity
       const cInv = Number.isFinite(Number(rawInv)) ? parseInt(rawInv, 10) : null;
@@ -98,7 +116,8 @@ module.exports = {
 
       try {
         const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
-        const siteUrl = `${siteBaseUrl}/sites/${createdUser.username}`;
+        const siteSlug = publicSiteSlug(createdUser.username);
+        const siteUrl = `${siteBaseUrl.replace(/\/+$/, '')}/sites/${siteSlug}`;
         await strapi.documents('api::website-config.website-config').create({
           data: {
             restaurant_name: restaurantName,
@@ -152,6 +171,10 @@ module.exports = {
           strapi.log.info(`Staff user creato (${result.staff_role}), skip sito/email: ${result.username}`);
           return;
         }
+        if (isReservedStaffUsername(result && result.username)) {
+          strapi.log.warn(`Username riservato rilevato, skip sito/email: ${result.username}`);
+          return;
+        }
 
         // Genera il file HTML del sito in restaurant-sites/
         try {
@@ -159,8 +182,12 @@ module.exports = {
           if (!fs.existsSync(sitesDir)) {
             fs.mkdirSync(sitesDir, { recursive: true });
           }
+          const siteSlug = publicSiteSlug(result.username);
           const safeUsername = escapeHtml(result.username);
-          const filePath = path.join(sitesDir, `${result.username}.html`);
+          const filePath = path.resolve(sitesDir, `${siteSlug}.html`);
+          if (!filePath.startsWith(`${sitesDir}${path.sep}`)) {
+            throw new Error('Percorso sito fuori dalla directory consentita.');
+          }
           const htmlContent = `<!DOCTYPE html>
 <html lang="it">
 <head>
@@ -522,10 +549,11 @@ async function seedDemoData(strapi) {
 
     // 3. Crea il website-config per l'utente demo con site_url auto-generato
     const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+    const demoSiteSlug = publicSiteSlug(demoUser.username);
     const websiteConfig = await strapi.documents('api::website-config.website-config').create({
       data: {
         restaurant_name: 'Ristorante Demo',
-        site_url: `${siteBaseUrl}/sites/${demoUser.username}`,
+        site_url: `${siteBaseUrl.replace(/\/+$/, '')}/sites/${demoSiteSlug}`,
         coperti_invernali: 30,
         coperti_estivi: 60,
         fk_user: { connect: [{ id: demoUser.id }] },
@@ -535,7 +563,7 @@ async function seedDemoData(strapi) {
     // Aggiorna l'URL dell'utente demo
     await strapi.db.query('plugin::users-permissions.user').update({
       where: { id: demoUser.id },
-      data: { url: `${siteBaseUrl}/sites/${demoUser.username}` },
+      data: { url: `${siteBaseUrl.replace(/\/+$/, '')}/sites/${demoSiteSlug}` },
     });
 
     strapi.log.info(`Seed: website-config creato (id: ${websiteConfig.id})`);

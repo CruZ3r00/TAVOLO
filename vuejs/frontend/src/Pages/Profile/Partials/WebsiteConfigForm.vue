@@ -22,6 +22,8 @@ const apiEndpoint = ref('');
 const apiCopied = ref(false);
 const copertiInvernali = ref('');
 const copertiEstivi = ref('');
+const logoAllowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+const logoMaxBytes = 2 * 1024 * 1024;
 
 const applyConfig = (config) => {
   configId.value = config?.documentId || '';
@@ -70,6 +72,21 @@ const fetchConfig = async () => {
 const handleLogoFile = (event) => {
   const file = event.target.files[0];
   if (file) {
+    saveError.value = '';
+    if (!logoAllowedTypes.has(file.type)) {
+      logoFile.value = null;
+      logoPreview.value = null;
+      event.target.value = '';
+      saveError.value = 'Formato logo non supportato. Usa PNG, JPEG, WEBP o GIF.';
+      return;
+    }
+    if (file.size > logoMaxBytes) {
+      logoFile.value = null;
+      logoPreview.value = null;
+      event.target.value = '';
+      saveError.value = 'Logo troppo grande. Limite: 2 MB.';
+      return;
+    }
     logoFile.value = file;
     const reader = new FileReader();
     reader.onload = () => {
@@ -92,9 +109,14 @@ const uploadLogo = async () => {
     if (response.ok) {
       const result = await response.json();
       uploadedLogoId.value = result[0].id;
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData?.error?.message || 'Upload logo non riuscito.');
     }
   } catch (error) {
     console.error('Errore upload logo:', error);
+    saveError.value = error.message || 'Upload logo non riuscito.';
+    throw error;
   }
 };
 
@@ -105,6 +127,10 @@ const saveConfig = async () => {
 
   try {
     await uploadLogo();
+    if (saveError.value) {
+      isSaving.value = false;
+      return;
+    }
 
     const cInv = parseInt(copertiInvernali.value, 10);
     if (!Number.isFinite(cInv) || cInv < 1 || cInv > 10000) {
@@ -208,7 +234,7 @@ onMounted(async () => {
           <div class="ds-field">
             <label class="ds-label">Logo del ristorante</label>
             <label class="file-upload-area" tabindex="0">
-              <input type="file" accept="image/*" @change="handleLogoFile" class="file-upload-hidden">
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" @change="handleLogoFile" class="file-upload-hidden">
               <div v-if="!logoPreview && !currentLogoUrl" class="file-upload-content">
                 <i class="bi bi-cloud-arrow-up file-upload-icon"></i>
                 <span class="file-upload-text">Clicca per caricare il logo</span>

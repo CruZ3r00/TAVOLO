@@ -1,5 +1,7 @@
 <script setup>
     import { ref, nextTick } from 'vue';
+    import { useRouter } from 'vue-router';
+    import { useStore } from 'vuex';
     import * as yup from 'yup';
     import { useHead } from '@/lib/compat/head.js';
     import { useFormState } from '@/lib/validation/form.js';
@@ -8,6 +10,7 @@
     import InputLabel from '@/components/InputLabel.vue';
     import TextInput from '@/components/TextInput.vue';
     import { API_BASE } from '@/utils';
+    import { defaultRouteForUser } from '@/staffAccess';
 
     useHead({
         title: 'Verifica a due fattori',
@@ -20,6 +23,8 @@
     const recoveryCodeInput = ref(null);
     const codeInput = ref(null);
     const errorMessage = ref('');
+    const router = useRouter();
+    const store = useStore();
 
     // Schema dinamico: in modalita' "code" valida `code`, in modalita' "recovery"
     // valida `recovery_code`. Ricostruisco la useFormState ad ogni toggle non e'
@@ -60,17 +65,39 @@
             }
 
             try {
+                const challengeToken = sessionStorage.getItem('two_factor_challenge_token');
+                if (!challengeToken) {
+                    router.push('/login');
+                    return;
+                }
+
                 const resp = await fetch(`${API_BASE}/api/auth/two-factor-challenge`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(recovery.value
-                        ? { recovery_code: vals.recovery_code }
-                        : { code: vals.code }),
+                        ? { challenge_token: challengeToken, recovery_code: vals.recovery_code }
+                        : { challenge_token: challengeToken, code: vals.code }),
                 });
                 if (!resp.ok) {
                     const data = await resp.json().catch(() => ({}));
                     errorMessage.value = data?.error?.message || data.message || 'Codice non valido.';
+                    return;
                 }
+
+                const data = await resp.json();
+                store.dispatch('login', { user: data.user, token: data.jwt });
+                localStorage.setItem('user', JSON.stringify(data.user));
+                localStorage.setItem('token', data.jwt);
+                sessionStorage.removeItem('two_factor_challenge_token');
+                sessionStorage.removeItem('two_factor_pending_user');
+
+                const pendingPlan = sessionStorage.getItem('pending_plan_after_verification');
+                if (['starter', 'pro'].includes(pendingPlan)) {
+                    sessionStorage.removeItem('pending_plan_after_verification');
+                    router.push({ path: '/renew-sub', query: { checkout: 'retry', plan: pendingPlan } });
+                    return;
+                }
+                router.push(defaultRouteForUser(data.user));
             } catch (err) {
                 console.error('2FA error:', err);
                 errorMessage.value = 'Errore di rete. Riprova.';

@@ -13,6 +13,9 @@ const {
   resolveStaffContext,
   staffUserPayload,
 } = require('../../utils/staff-access');
+const {
+  signTwoFactorChallenge,
+} = require('../../utils/two-factor-auth');
 
 module.exports = (plugin) => {
   const originalCallback = plugin.controllers.auth.callback;
@@ -33,6 +36,28 @@ module.exports = (plugin) => {
 
   plugin.controllers.auth.callback = async (ctx) => {
     await originalCallback(ctx);
+    const bodyUser = ctx.body && ctx.body.user ? ctx.body.user : null;
+    if (bodyUser?.id && ctx.body?.jwt) {
+      const fresh = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: bodyUser.id },
+        select: ['id', 'email', 'username', 'two_factor_enabled'],
+      });
+
+      if (fresh?.two_factor_enabled) {
+        ctx.body = {
+          two_factor_required: true,
+          twoFactorRequired: true,
+          challenge_token: signTwoFactorChallenge(strapi, fresh.id),
+          user: {
+            id: fresh.id,
+            email: fresh.email,
+            username: fresh.username,
+          },
+        };
+        return;
+      }
+    }
+
     await enrichAuthUser(ctx);
   };
 

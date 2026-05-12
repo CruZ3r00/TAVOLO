@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { useHead } from '@/lib/compat/head.js';
+import { useStore } from 'vuex';
 import AuthenticationCard from '@/components/AuthenticationCard.vue';
 import { API_BASE } from '@/utils';
 
@@ -15,17 +16,37 @@ const props = defineProps({
     status: String,
 });
 
+const store = useStore();
 const processing = ref(false);
+const errorMessage = ref('');
+const successMessage = ref('');
 const verificationLinkSent = computed(() => props.status === 'verification-link-sent');
+const userEmail = computed(() => String(store.getters.getUser?.email || '').trim().toLowerCase());
 
-// Endpoint SMTP non ancora attivo (vedi CLAUDE.md tech debt). Per ora la submit
-// e' un placeholder che chiama l'endpoint quando sara' configurato.
 const submit = async () => {
     if (processing.value) return;
+    errorMessage.value = '';
+    successMessage.value = '';
+    if (!userEmail.value) {
+        errorMessage.value = 'Email account non disponibile. Rientra e riprova.';
+        return;
+    }
+
     processing.value = true;
     try {
-        await fetch(`${API_BASE}/api/account/verify-email/send`, { method: 'POST' });
-    } catch (_e) { /* silent finche' SMTP non e' configurato */ }
+        const response = await fetch(`${API_BASE}/api/auth/send-email-confirmation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: userEmail.value }),
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data?.error?.message || data?.message || 'Invio email non riuscito.');
+        }
+        successMessage.value = 'Un nuovo link di verifica è stato inviato al tuo indirizzo email.';
+    } catch (e) {
+        errorMessage.value = e.message || 'Invio email non riuscito.';
+    }
     finally { processing.value = false; }
 };
 </script>
@@ -44,9 +65,15 @@ const submit = async () => {
     </p>
 
     <Transition name="fade">
-      <div v-if="verificationLinkSent" class="ds-alert ds-alert-success">
+      <div v-if="verificationLinkSent || successMessage" class="ds-alert ds-alert-success">
         <i class="bi bi-check-circle"></i>
-        <span>Un nuovo link di verifica è stato inviato al tuo indirizzo email.</span>
+        <span>{{ successMessage || 'Un nuovo link di verifica è stato inviato al tuo indirizzo email.' }}</span>
+      </div>
+    </Transition>
+    <Transition name="fade">
+      <div v-if="errorMessage" class="ds-alert ds-alert-error">
+        <i class="bi bi-exclamation-circle"></i>
+        <span>{{ errorMessage }}</span>
       </div>
     </Transition>
 

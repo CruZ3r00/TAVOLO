@@ -16,6 +16,8 @@ const qrDataUrl = ref('');
 const setupKey = ref('');
 const recoveryCodes = ref([]);
 const verificationCode = ref('');
+const sensitiveCode = ref('');
+const sensitivePassword = ref('');
 const errorMsg = ref('');
 const successMsg = ref('');
 
@@ -86,16 +88,33 @@ const confirmTwoFactor = async () => {
 
 const disableTwoFactor = async () => {
     resetMessages();
+    if (enabled.value && !/^\d{6}$/.test(sensitiveCode.value)) {
+        errorMsg.value = 'Inserisci il codice 2FA per disabilitare la protezione';
+        return;
+    }
+    if (!enabled.value && pending.value && !sensitivePassword.value) {
+        errorMsg.value = 'Inserisci la password per annullare la configurazione';
+        return;
+    }
     if (!confirm('Sei sicuro di voler disabilitare l\'autenticazione a due fattori?')) return;
     loading.value = true;
     try {
-        const r = await fetch(`${API_BASE}/api/account/2fa/disable`, { method: 'DELETE', headers: authHeaders() });
-        if (!r.ok) { errorMsg.value = 'Errore durante la disabilitazione'; return; }
+        const r = await fetch(`${API_BASE}/api/account/2fa/disable`, {
+            method: 'DELETE',
+            headers: authHeaders(),
+            body: JSON.stringify(enabled.value
+                ? { code: sensitiveCode.value }
+                : { password: sensitivePassword.value }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { errorMsg.value = d?.error?.message || d.message || 'Errore durante la disabilitazione'; return; }
         enabled.value = false;
         pending.value = false;
         qrDataUrl.value = '';
         setupKey.value = '';
         recoveryCodes.value = [];
+        sensitiveCode.value = '';
+        sensitivePassword.value = '';
         successMsg.value = '2FA disabilitato';
     } catch {
         errorMsg.value = 'Errore di rete';
@@ -106,12 +125,21 @@ const disableTwoFactor = async () => {
 
 const regenerateRecovery = async () => {
     resetMessages();
+    if (!/^\d{6}$/.test(sensitiveCode.value)) {
+        errorMsg.value = 'Inserisci il codice 2FA per rigenerare i codici';
+        return;
+    }
     loading.value = true;
     try {
-        const r = await fetch(`${API_BASE}/api/account/2fa/recovery`, { method: 'POST', headers: authHeaders() });
+        const r = await fetch(`${API_BASE}/api/account/2fa/recovery`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ code: sensitiveCode.value }),
+        });
         const d = await r.json();
-        if (!r.ok) { errorMsg.value = 'Errore'; return; }
+        if (!r.ok) { errorMsg.value = d?.error?.message || d.message || 'Errore'; return; }
         recoveryCodes.value = d.recoveryCodes || [];
+        sensitiveCode.value = '';
         successMsg.value = 'Codici di recupero rigenerati';
     } catch {
         errorMsg.value = 'Errore di rete';
@@ -170,6 +198,11 @@ onMounted(loadStatus);
                 </div>
             </div>
 
+            <div v-else-if="pending && !qrDataUrl" class="ds-alert ds-alert-info">
+                <i class="bi bi-qr-code"></i>
+                <span>Il setup 2FA e' iniziato, ma il QR non e' piu' visibile. Genera un nuovo QR e usa quello per completare la configurazione.</span>
+            </div>
+
             <div v-if="pending" class="ds-field">
                 <InputLabel for="code" value="Codice di verifica" />
                 <TextInput
@@ -190,9 +223,37 @@ onMounted(loadStatus);
                 </ul>
             </div>
 
+            <div v-if="enabled" class="ds-field">
+                <InputLabel for="sensitive_code" value="Codice 2FA per modifiche sensibili" />
+                <TextInput
+                    id="sensitive_code"
+                    v-model="sensitiveCode"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    placeholder="000000"
+                />
+                <InputError :message="''" />
+            </div>
+
+            <div v-else-if="pending" class="ds-field">
+                <InputLabel for="sensitive_password" value="Password per annullare la configurazione" />
+                <TextInput
+                    id="sensitive_password"
+                    v-model="sensitivePassword"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="La tua password"
+                />
+                <InputError :message="''" />
+            </div>
+
             <div class="tfa-actions-row">
                 <button v-if="!enabled && !pending" class="ds-btn ds-btn-primary" :disabled="loading" @click="enableTwoFactor">
                     <i class="bi bi-shield-lock"></i><span>Attiva</span>
+                </button>
+                <button v-if="pending && !qrDataUrl" class="ds-btn ds-btn-secondary" :disabled="loading" @click="enableTwoFactor">
+                    <i class="bi bi-qr-code"></i><span>Genera nuovo QR</span>
                 </button>
                 <button v-if="pending" class="ds-btn ds-btn-primary" :disabled="loading" @click="confirmTwoFactor">
                     <span>Conferma</span>

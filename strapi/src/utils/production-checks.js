@@ -40,6 +40,16 @@ function isHttpsUrl(value) {
   }
 }
 
+function isEmailLike(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function parseEmailAddress(value) {
+    const raw = String(value || '').trim();
+    const match = raw.match(/^\s*.*?<([^>]+)>\s*$/);
+    return match ? match[1].trim() : raw;
+}
+
 function parseCsv(value) {
   return String(value || '')
     .split(',')
@@ -99,6 +109,20 @@ function validateProductionConfig(strapi) {
             errors.push("Environment variable 'OCR_SERVICE_INTERNAL_TOKEN_REQUIRED' must be 'true' in production when OCR_SERVICE_URL is set.");
         }
         requireEnv('OCR_SERVICE_INTERNAL_TOKEN', errors);
+    }
+
+    ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'SMTP_DEFAULT_FROM'].forEach((name) => requireEnv(name, errors));
+    const smtpPort = Number(envValue('SMTP_PORT') || '587');
+    if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
+        errors.push("Environment variable 'SMTP_PORT' must be a valid TCP port.");
+    }
+    const defaultFrom = parseEmailAddress(envValue('SMTP_DEFAULT_FROM'));
+    if (defaultFrom && !isEmailLike(defaultFrom)) {
+        errors.push("Environment variable 'SMTP_DEFAULT_FROM' must be an email address or 'Name <email@example.com>'.");
+    }
+    const defaultReplyTo = parseEmailAddress(envValue('SMTP_DEFAULT_REPLY_TO'));
+    if (defaultReplyTo && !isEmailLike(defaultReplyTo)) {
+        errors.push("Environment variable 'SMTP_DEFAULT_REPLY_TO' must be an email address or 'Name <email@example.com>'.");
     }
 
     const dbClient = envValue('DATABASE_CLIENT');
