@@ -64,6 +64,7 @@ const addItemOrderDocId = ref(null);
 const addItemLockVersion = ref(0);
 const showCheckout = ref(false);
 const checkoutOrder = ref(null);
+const checkoutBusy = ref(false);
 const orderDetailRef = ref(null);
 
 const activeTab = ref('pending'); // mobile single-column view
@@ -253,7 +254,21 @@ const transitionToast = (next) => {
 const handleSeatIntent = (r) => { seatTargetReservation.value = r; showSeatModal.value = true; };
 const onSeated = async () => { showToast('success', 'Cliente accomodato.'); await loadData({ silent: true }); };
 const onWalkinCreated = async () => { showToast('success', 'Walk-in registrato.'); await loadData({ silent: true }); };
-const onTableManagerUpdated = async () => { await loadData({ silent: true }); };
+const onTableManagerUpdated = async (payload = null) => {
+  if (payload?.table?.documentId) {
+    if (payload.action === 'created') {
+      tables.value = [...tables.value, payload.table].sort((a, b) => (a.number || 0) - (b.number || 0));
+    } else if (payload.action === 'updated') {
+      tables.value = tables.value.map((t) => (
+        t.documentId === payload.table.documentId ? { ...t, ...payload.table } : t
+      ));
+    } else if (payload.action === 'deleted') {
+      tables.value = tables.value.filter((t) => t.documentId !== payload.table.documentId);
+    }
+    return;
+  }
+  await loadData({ silent: true });
+};
 const handleOpenOrder = (order) => {
   if (!order?.documentId) return;
   currentOrderDocId.value = order.documentId;
@@ -283,7 +298,8 @@ const onAddItem = async (payload) => {
   }
 };
 const onConfirmCheckout = async (payload) => {
-  if (!checkoutOrder.value) return;
+  if (!checkoutOrder.value || checkoutBusy.value) return;
+  checkoutBusy.value = true;
   try {
     const result = await closeOrder(checkoutOrder.value.documentId, payload, token.value);
     showCheckout.value = false;
@@ -303,6 +319,9 @@ const onConfirmCheckout = async (payload) => {
     } else {
       showToast('error', orderErrorMessage(err));
     }
+  }
+  finally {
+    checkoutBusy.value = false;
   }
 };
 const onCreated = (created) => {
@@ -776,7 +795,7 @@ const switchSection = (section) => {
     <TableManagerModal :show="showTableManager" :token="token" :tables="tables" :editing-table="null" @close="showTableManager = false" @updated="onTableManagerUpdated" />
     <OrderDetailModal ref="orderDetailRef" :show="showOrderDetail" :order-document-id="currentOrderDocId" :token="token" @close="showOrderDetail = false" @order-updated="onOrderUpdated" @open-add-item="onOpenAddItem" @open-checkout="(o) => { checkoutOrder = o; showCheckout = true; }" />
     <AddItemModal :show="showAddItem" :order-document-id="addItemOrderDocId" :lock-version="addItemLockVersion" @close="showAddItem = false" @add="onAddItem" />
-    <CheckoutModal :show="showCheckout" :order="checkoutOrder" @close="showCheckout = false" @confirm="onConfirmCheckout" />
+    <CheckoutModal :show="showCheckout" :order="checkoutOrder" :busy="checkoutBusy" @close="showCheckout = false" @confirm="onConfirmCheckout" />
   </AppLayout>
 </template>
 

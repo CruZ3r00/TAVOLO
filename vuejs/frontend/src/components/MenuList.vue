@@ -23,6 +23,7 @@
     const uploadedImageId = ref(null);
     const searchQuery = ref('');
     const filterCategory = ref('');
+    const deletingIds = ref(new Set());
 
     //lista degli elementi
     const list = ref([]);
@@ -41,6 +42,11 @@
             result = result.filter(el => el.name.toLowerCase().includes(q));
         }
         return result;
+    };
+
+    const syncListMeta = () => {
+        categories.value = [...new Set(list.value.map(el => el.category))];
+        emit('count-changed', list.value.length);
     };
 
     const readErrorMessage = async (response, fallback) => {
@@ -95,12 +101,12 @@
                 // flag `is_beverage`, allineato al routing staff "bar".
                 const allElements = data.data[0].fk_elements || [];
                 list.value = allElements.filter(el => el.is_beverage !== true);
-                categories.value = [...new Set(list.value.map(el => el.category))];
+                syncListMeta();
             } else {
                 list.value = [];
                 categories.value = [];
+                emit('count-changed', 0);
             }
-            emit('count-changed', list.value.length);
         } catch (error) {
             console.error(error);
         } finally {
@@ -152,6 +158,13 @@
 
     //function che cancella dal database e dalla lista l'elemento cliccato
     const handleDelete = async (id) => {
+        if (deletingIds.value.has(id)) return;
+        const previous = [...list.value];
+        const nextDeleting = new Set(deletingIds.value);
+        nextDeleting.add(id);
+        deletingIds.value = nextDeleting;
+        list.value = list.value.filter((el) => el.documentId !== id);
+        syncListMeta();
         try {
             const del = await fetch(`${API_BASE}/api/elements/${id}`,{
                 method: "DELETE",
@@ -163,10 +176,14 @@
             if (!del.ok && del.status !== 204) {
                 throw new Error(await readErrorMessage(del, 'Errore durante l\'eliminazione dell\'elemento.'));
             }
-
-            await fetchList();
         } catch (error) {
+            list.value = previous;
+            syncListMeta();
             console.error(error);
+        } finally {
+            const doneDeleting = new Set(deletingIds.value);
+            doneDeleting.delete(id);
+            deletingIds.value = doneDeleting;
         }
     }
 
@@ -317,9 +334,14 @@
                                 <i class="bi bi-pencil"></i>
                                 <span>Modifica</span>
                             </button>
-                            <button @click="handleDelete(element.documentId)" class="ds-btn ds-btn-danger ds-btn-sm element-action-btn">
-                                <i class="bi bi-trash"></i>
-                                <span>Elimina</span>
+                            <button
+                                @click="handleDelete(element.documentId)"
+                                class="ds-btn ds-btn-danger ds-btn-sm element-action-btn"
+                                :disabled="deletingIds.has(element.documentId)"
+                            >
+                                <span v-if="deletingIds.has(element.documentId)" class="ds-spinner ds-spinner-sm" aria-hidden="true"></span>
+                                <i v-else class="bi bi-trash"></i>
+                                <span>{{ deletingIds.has(element.documentId) ? 'Elimino...' : 'Elimina' }}</span>
                             </button>
                         </div>
                     </Transition>

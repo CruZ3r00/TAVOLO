@@ -5,6 +5,7 @@ import Modal from '@/components/Modal.vue';
 const props = defineProps({
     show: { type: Boolean, default: false },
     order: { type: Object, default: null },
+    busy: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['close', 'confirm']);
@@ -13,6 +14,7 @@ const paymentMethod = ref('simulator');
 const submitting = ref(false);
 const errorMessage = ref('');
 const paymentResult = ref(null);
+const isSubmitting = computed(() => props.busy);
 
 watch(() => props.show, (v) => {
     if (v) {
@@ -40,6 +42,7 @@ const confirmLabel = computed(() => (
 ));
 
 const doCheckout = () => {
+    if (isSubmitting.value) return;
     errorMessage.value = '';
     emit('confirm', {
         payment_method: paymentMethod.value,
@@ -48,7 +51,7 @@ const doCheckout = () => {
 };
 
 const onClose = () => {
-    if (submitting.value) return;
+    if (isSubmitting.value) return;
     emit('close');
 };
 </script>
@@ -119,11 +122,11 @@ const onClose = () => {
 
                 <!-- Azioni -->
                 <div class="form-actions">
-                    <button type="button" class="ds-btn ds-btn-ghost" @click="onClose" :disabled="submitting">
+                    <button type="button" class="ds-btn ds-btn-ghost" @click="onClose" :disabled="isSubmitting">
                         Annulla
                     </button>
-                    <button type="button" class="ds-btn ds-btn-primary" @click="doCheckout" :disabled="submitting">
-                        <span v-if="submitting" class="ds-spinner" aria-hidden="true"></span>
+                    <button type="button" class="ds-btn ds-btn-primary" @click="doCheckout" :disabled="isSubmitting">
+                        <span v-if="isSubmitting" class="ds-spinner" aria-hidden="true"></span>
                         <template v-else>
                             <i class="bi bi-lock" aria-hidden="true"></i>
                             <span>{{ confirmLabel }}</span>

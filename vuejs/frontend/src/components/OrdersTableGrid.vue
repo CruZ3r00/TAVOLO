@@ -7,9 +7,10 @@ import SalaAreaSummary from '@/components/SalaAreaSummary.vue';
 const props = defineProps({
   tables: { type: Array, default: () => [] },
   orders: { type: Array, default: () => [] },
+  canRemoveTables: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['view-order', 'open-table']);
+const emit = defineEmits(['view-order', 'open-table', 'remove-table']);
 
 const filter = ref('all');
 const search = ref('');
@@ -75,8 +76,10 @@ const filtered = computed(() => {
         :key="t.documentId"
         :table="t"
         :active-order="activeOrderForTable(t)"
+        :can-remove="canRemoveTables"
         @view-order="(ord) => emit('view-order', ord)"
         @open-table="(table) => emit('open-table', table)"
+        @remove-table="(table) => emit('remove-table', table)"
       />
     </div>
     <div v-else class="kt-empty" style="padding: 40px 16px;">

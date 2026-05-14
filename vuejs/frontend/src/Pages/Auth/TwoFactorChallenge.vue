@@ -79,6 +79,7 @@
 
                 const resp = await fetch(`${API_BASE}/api/auth/two-factor-challenge`, {
                     method: 'POST',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(recovery.value
                         ? { challenge_token: challengeToken, recovery_code: vals.recovery_code }
@@ -91,7 +92,7 @@
                 }
 
                 const data = await resp.json();
-                store.dispatch('login', { user: data.user, token: data.jwt || null });
+                store.dispatch('login', { user: data.user, token: data.jwt || null, remember: true });
                 sessionStorage.removeItem('two_factor_challenge_token');
                 sessionStorage.removeItem('two_factor_pending_user');
                 sessionStorage.removeItem('two_factor_methods');

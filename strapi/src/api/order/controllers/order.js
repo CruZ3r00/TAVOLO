@@ -239,23 +239,102 @@ async function loadOrder(documentId, userId, { populate } = {}) {
 }
 
 /**
- * Carica un elemento menu solo se appartiene al menu pubblicato dell'utente.
- * Element non ha fk_user diretto, quindi l'ownership passa dalla relazione Menu.
+ * Carica un elemento menu solo se appartiene all'utente.
+ * Element ha fk_user diretto: evitiamo di caricare tutto il menu per una sola riga.
  */
 async function loadOwnedMenuElement(documentId, userId) {
-  const menus = await strapi.documents('api::menu.menu').findMany({
+  const elements = await strapi.documents('api::element.element').findMany({
     filters: {
       fk_user: { id: { $eq: userId } },
+      documentId: { $eq: documentId },
+      is_archived: { $ne: true },
     },
-    populate: { fk_elements: true },
+    fields: ['id', 'documentId', 'name', 'price', 'category'],
     status: 'published',
     limit: 1,
   });
-  const menu = menus && menus.length > 0 ? menus[0] : null;
-  const element = (menu && Array.isArray(menu.fk_elements) ? menu.fk_elements : [])
-    .find((item) => item && item.documentId === documentId);
+  const element = elements && elements.length > 0 ? elements[0] : null;
   if (!element) throw appError('INVALID_PAYLOAD', 'Elemento menu non trovato.');
   return element;
+}
+
+async function updateOrderTotalFromItems(order, items) {
+  const result = computeTotal({ items });
+  const lockVersion = (order.lock_version || 0) + 1;
+  await strapi.documents('api::order.order').update({
+    documentId: order.documentId,
+    data: {
+      total_amount: result.total,
+      lock_version: lockVersion,
+    },
+    status: 'published',
+  });
+  return { ...result, lock_version: lockVersion };
+}
+
+function archiveClosedOrderBestEffort({ order, items, totalResult, paymentMethod, paymentReference, userId, closedAtISO }) {
+  setImmediate(async () => {
+    try {
+      const reservation = order.fk_reservation || null;
+      const table = order.fk_table || null;
+      const closedOrder = {
+        documentId: order.documentId,
+        opened_at: order.opened_at,
+        closed_at: closedAtISO,
+        total_amount: totalResult.total,
+        covers: order.covers || null,
+        service_type: order.service_type || 'table',
+        customer_name: order.customer_name || null,
+        customer_phone: order.customer_phone || null,
+        customer_email: order.customer_email || null,
+        pickup_at: order.pickup_at || null,
+      };
+
+      await statsService.archiveClosedOrder(strapi, {
+        order: closedOrder,
+        items,
+        reservation,
+        table,
+        paymentMethod,
+        paymentReference,
+        userId,
+        isWalkin: reservation ? !!reservation.is_walkin : false,
+        isTakeaway: order.service_type === 'takeaway',
+      });
+
+      const dateKey = statsService.dateKeyUTC(closedAtISO);
+      const customersCount = (
+        order.covers
+          ? parseInt(order.covers, 10)
+          : reservation
+            ? parseInt(reservation.number_of_people, 10)
+            : 0
+      ) || 0;
+      const itemsCount = (items || []).reduce(
+        (s, it) => (it && it.voided ? s : s + (parseInt(it.quantity, 10) || 0)),
+        0,
+      );
+
+      await statsService.updateDailyStat(strapi, {
+        userId,
+        dateKey,
+        revenue: totalResult.total,
+        customers: customersCount,
+        items: itemsCount,
+        isWalkin: reservation ? !!reservation.is_walkin : false,
+        hasReservation: !!reservation && !reservation.is_walkin,
+        isTakeaway: order.service_type === 'takeaway',
+      });
+
+      await statsService.updateElementStats(strapi, {
+        userId,
+        items,
+        timestamp: closedAtISO,
+      });
+    } catch (err) {
+      strapi.log.warn(`close order stats/archive best-effort fallito: ${err.message}`);
+    }
+  });
 }
 
 function validateEmail(value, { required = false } = {}) {
@@ -691,18 +770,22 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             data: { status: 'occupied' },
           });
 
-          return orderDoc;
+          return {
+            ...orderDoc,
+            fk_table: {
+              documentId: tableDocId,
+              status: 'occupied',
+            },
+            fk_items: [],
+          };
         });
       }, { maxAttempts: 3 }).catch((err) => {
         if (err && err._resCode) throw err;
         throw appError('ORDER_CONTENTION', 'Contesa DB, riprova.');
       });
 
-      // Ricarica con populate per response completa
-      const full = await loadOrder(created.documentId, ownerId);
-
       ctx.status = 201;
-      ctx.body = { data: serializeOrder(full, true) };
+      ctx.body = { data: serializeOrder(created, true) };
     } catch (err) {
       sendError(ctx, err);
     }
@@ -1090,8 +1173,10 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         data: itemData,
       });
 
-      // Ricalcola totale
-      const totalResult = await recalculateTotal(strapi, documentId);
+      const totalResult = await updateOrderTotalFromItems(order, [
+        ...(order.fk_items || []),
+        createdItem,
+      ]);
 
       const routingLookup = await loadRoutingMap(strapi, actor.owner);
 
@@ -1162,25 +1247,21 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         throw appError('INVALID_PAYLOAD', 'Nessun campo da aggiornare.');
       }
 
-      await strapi.documents('api::order-item.order-item').update({
+      const updatedItem = await strapi.documents('api::order-item.order-item').update({
         documentId: itemDocumentId,
         data,
       });
 
-      // Ricalcola totale
-      const totalResult = await recalculateTotal(strapi, documentId);
-
-      // Ricarica item aggiornato
-      const updatedItems = await strapi.documents('api::order-item.order-item').findMany({
-        filters: { documentId: { $eq: itemDocumentId } },
-        limit: 1,
-      });
+      const nextItems = items.map((current) => (
+        current.documentId === itemDocumentId ? { ...current, ...updatedItem } : current
+      ));
+      const totalResult = await updateOrderTotalFromItems(order, nextItems);
 
       const routingLookup = await loadRoutingMap(strapi, actor.owner);
 
       ctx.body = {
         data: {
-          item: serializeItem(updatedItems && updatedItems[0], routingLookup),
+          item: serializeItem(updatedItem, routingLookup),
           order: {
             total_amount: totalResult.total,
             lock_version: totalResult.lock_version,
@@ -1232,8 +1313,10 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         documentId: itemDocumentId,
       });
 
-      // Ricalcola totale
-      const totalResult = await recalculateTotal(strapi, documentId);
+      const totalResult = await updateOrderTotalFromItems(
+        order,
+        items.filter((current) => current.documentId !== itemDocumentId)
+      );
 
       ctx.body = {
         data: {
@@ -1332,11 +1415,13 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       // Hook inventory: scarico magazzino al passaggio served (dine-in).
       // Fail-soft: errori loggati ma non rilanciati (NON deve bloccare la FSM).
       if (nextStatus === 'served') {
-        try {
-          await inventoryService.applyOnServe(strapi, updated);
-        } catch (invErr) {
-          strapi.log.warn(`order.updateItemStatus: inventory.applyOnServe fallito per item ${itemDocumentId}: ${invErr.message}`);
-        }
+        setImmediate(async () => {
+          try {
+            await inventoryService.applyOnServe(strapi, updated);
+          } catch (invErr) {
+            strapi.log.warn(`order.updateItemStatus: inventory.applyOnServe fallito per item ${itemDocumentId}: ${invErr.message}`);
+          }
+        });
       }
 
       ctx.body = { data: { item: serializeItem(updated, routingLookup) } };
@@ -1766,8 +1851,10 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       }
 
       const dialect = getDialect(strapi);
+      let closedAtISO = null;
 
-      // Chiusura atomica: ordine + tavolo + reservation + archive + stats
+      // Chiusura atomica: solo source of truth operativa (ordine + tavolo + reservation).
+      // Stats/archive vengono calcolate best-effort fuori dal percorso critico.
       await withRetry(async () => {
         return strapi.db.transaction(async ({ trx }) => {
           await beginImmediate(trx, dialect);
@@ -1781,7 +1868,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
           }
 
-          const closedAtISO = new Date().toISOString();
+          closedAtISO = new Date().toISOString();
 
           await strapi.documents('api::order.order').update({
             documentId,
@@ -1789,12 +1876,12 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
               status: 'closed',
               closed_at: closedAtISO,
               total_amount: totalResult.total,
-            payment_status: 'paid',
-            payment_reference: paymentResult.transactionId,
-            lock_version: (order.lock_version || 0) + 1,
-            ...(order.service_type === 'takeaway' ? { takeaway_status: 'closed' } : {}),
-          },
-        });
+              payment_status: 'paid',
+              payment_reference: paymentResult.transactionId,
+              lock_version: (order.lock_version || 0) + 1,
+              ...(order.service_type === 'takeaway' ? { takeaway_status: 'closed' } : {}),
+            },
+          });
 
           if (order.fk_table) {
             await strapi.documents('api::table.table').update({
@@ -1815,83 +1902,34 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
               });
             }
           }
-
-          // Archive + stats: fail-soft (log ma non rollback ordine chiuso).
-          // NB: essendo nella stessa tx, un fail qui rolla TUTTO. Per questo
-          // catturiamo sotto (fuori della tx) e reinvochiamo best-effort se
-          // serve. Qui dentro vogliamo consistency forte: se fallisce,
-          // abbiamo fatto rollback e possiamo ritentare.
-          try {
-            const closedOrder = {
-              documentId,
-              opened_at: order.opened_at,
-              closed_at: closedAtISO,
-              total_amount: totalResult.total,
-              covers: order.covers || null,
-              service_type: order.service_type || 'table',
-              customer_name: order.customer_name || null,
-              customer_phone: order.customer_phone || null,
-              customer_email: order.customer_email || null,
-              pickup_at: order.pickup_at || null,
-            };
-            const reservation = order.fk_reservation || null;
-            const table = order.fk_table || null;
-
-            await statsService.archiveClosedOrder(strapi, {
-              order: closedOrder,
-              items,
-              reservation,
-              table,
-              paymentMethod,
-              paymentReference: paymentResult.transactionId,
-              userId: actor.ownerId,
-              isWalkin: reservation ? !!reservation.is_walkin : false,
-              isTakeaway: order.service_type === 'takeaway',
-            });
-
-            const dateKey = statsService.dateKeyUTC(closedAtISO);
-            const customersCount = (order.covers
-              ? parseInt(order.covers, 10)
-              : (reservation ? parseInt(reservation.number_of_people, 10) : 0)) || 0;
-            const itemsCount = (items || []).reduce(
-              (s, it) => (it && it.voided ? s : s + (parseInt(it.quantity, 10) || 0)), 0
-            );
-
-            await statsService.updateDailyStat(strapi, {
-              userId: actor.ownerId,
-              dateKey,
-              revenue: totalResult.total,
-              customers: customersCount,
-              items: itemsCount,
-              isWalkin: reservation ? !!reservation.is_walkin : false,
-              hasReservation: !!reservation && !reservation.is_walkin,
-              isTakeaway: order.service_type === 'takeaway',
-            });
-
-            await statsService.updateElementStats(strapi, {
-              userId: actor.ownerId,
-              items,
-              timestamp: closedAtISO,
-            });
-          } catch (statsErr) {
-            // Se le stats falliscono, rolliamo l'intera tx. La source of
-            // truth (orders + items) resta in DB quando la tx si apre di
-            // nuovo su retry. Se persiste, loggamo e rilanciamo.
-            strapi.log.error('stats/archive failure durante close order', statsErr);
-            throw statsErr;
-          }
         });
       }, { maxAttempts: 3 }).catch((err) => {
         if (err && err._resCode) throw err;
         throw appError('ORDER_CONTENTION', 'Contesa DB, riprova.');
       });
 
-      // Ricarica ordine chiuso
-      const closed = await loadOrder(documentId, actor.ownerId);
+      archiveClosedOrderBestEffort({
+        order,
+        items,
+        totalResult,
+        paymentMethod,
+        paymentReference: paymentResult.transactionId,
+        userId: actor.ownerId,
+        closedAtISO: closedAtISO || new Date().toISOString(),
+      });
 
       ctx.body = {
         data: {
-          order: serializeOrder(closed, true),
+          order: {
+            ...serializeOrder(order, true),
+            status: 'closed',
+            closed_at: closedAtISO,
+            total_amount: totalResult.total,
+            payment_status: 'paid',
+            payment_reference: paymentResult.transactionId,
+            lock_version: (order.lock_version || 0) + 1,
+            ...(order.service_type === 'takeaway' ? { takeaway_status: 'closed' } : {}),
+          },
           payment: {
             transactionId: paymentResult.transactionId,
             timestamp: paymentResult.timestamp,

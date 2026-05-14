@@ -25,7 +25,7 @@ export const store = createStore({
   state() {
     return {
       user: JSON.parse(localStorage.getItem('user')) || null,
-      token: null,
+      token: localStorage.getItem('token') || null,
       sessionChecked: false,
     };
   },
@@ -45,11 +45,12 @@ export const store = createStore({
     },
   },
   actions: {
-    login({ commit }, { user, token }) {
+    login({ commit }, { user, token, remember = true }) {
       commit('setUser', user);
       commit('setToken', token || null);
       if (user) localStorage.setItem('user', JSON.stringify(user));
-      localStorage.removeItem('token');
+      if (remember && token) localStorage.setItem('token', token);
+      else localStorage.removeItem('token');
     },
     logout({ commit }) {
       commit('logout');
@@ -58,7 +59,11 @@ export const store = createStore({
     },
     async refreshSession({ commit, state }) {
       try {
-        const resp = await fetch(`${API_BASE}/api/users/me`, { credentials: 'include' });
+        const headers = state.token ? { Authorization: `Bearer ${state.token}` } : {};
+        const resp = await fetch(`${API_BASE}/api/users/me`, {
+          credentials: 'include',
+          headers,
+        });
         if (!resp.ok) {
           commit('logout');
           localStorage.removeItem('user');
@@ -69,7 +74,6 @@ export const store = createStore({
         commit('setUser', user);
         commit('setToken', state.token || null);
         localStorage.setItem('user', JSON.stringify(user));
-        localStorage.removeItem('token');
         return true;
       } catch (_err) {
         commit('logout');

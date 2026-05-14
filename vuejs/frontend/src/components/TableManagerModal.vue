@@ -65,12 +65,16 @@ const submit = async () => {
             seats: parseInt(tableForm.value.seats, 10),
             area: tableForm.value.area,
         };
+        let savedTable = null;
         if (isEditing.value) {
-            await updateTable(editDocId.value, payload, props.token);
+            savedTable = await updateTable(editDocId.value, payload, props.token);
         } else {
-            await createTable(payload, props.token);
+            savedTable = await createTable(payload, props.token);
         }
-        emit('updated');
+        emit('updated', {
+            action: isEditing.value ? 'updated' : 'created',
+            table: savedTable,
+        });
         emit('close');
     } catch (err) {
         errorMessage.value = orderErrorMessage(err);
@@ -89,7 +93,7 @@ const handleDelete = async (table) => {
     try {
         await deleteTable(table.documentId, props.token);
         deleteConfirm.value = null;
-        emit('updated');
+        emit('updated', { action: 'deleted', table });
     } catch (err) {
         errorMessage.value = orderErrorMessage(err);
     } finally {

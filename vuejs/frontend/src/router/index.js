@@ -275,7 +275,6 @@ router.beforeEach(async (to, from, next) => {
                 const user = { ...(store.getters.getUser || {}), ...billing };
                 store.commit('setUser', user);
                 localStorage.setItem('user', JSON.stringify(user));
-                localStorage.removeItem('token');
             }
 
             if (billing && !ACTIVE_SUBSCRIPTION_STATUSES.has(billing.subscription_status)) {
@@ -293,9 +292,15 @@ router.beforeEach(async (to, from, next) => {
                 return;
             }
         } catch (err) {
-            if (err?.status === 401 || err?.status === 403) {
+            if (err?.status === 401) {
                 store.dispatch('logout');
                 next({ name: 'landing' });
+                return;
+            }
+
+            if (err?.status === 403) {
+                console.warn('Subscription check forbidden:', err);
+                next();
                 return;
             }
 

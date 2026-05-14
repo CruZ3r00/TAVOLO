@@ -142,6 +142,19 @@ async function ensureUserMenu(strapi, userId) {
   });
 }
 
+async function userOwnsElement(strapi, userId, documentId) {
+  if (!userId || !documentId) return false;
+  const rows = await strapi.documents('api::element.element').findMany({
+    filters: {
+      documentId: { $eq: documentId },
+      fk_user: { id: { $eq: userId } },
+    },
+    fields: ['documentId'],
+    limit: 1,
+  });
+  return Array.isArray(rows) && rows.length > 0;
+}
+
 module.exports = createCoreController('api::element.element', ({ strapi }) => ({
   async create(ctx) {
     const user = ctx.state.user;
@@ -220,13 +233,9 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
     if (!parsed.ok) return ctx.badRequest(parsed.message);
 
     try {
-      const menu = await loadUserMenu(strapi, user.id);
-      if (!menu) return ctx.notFound('Menu non trovato.');
-
-      const ownsElement = Array.isArray(menu.fk_elements)
-        && menu.fk_elements.some((item) => item.documentId === documentId);
-
-      if (!ownsElement) return ctx.notFound('Elemento non trovato.');
+      if (!(await userOwnsElement(strapi, user.id, documentId))) {
+        return ctx.notFound('Elemento non trovato.');
+      }
 
       // Se cambia categoria e `is_beverage` non e' stato fornito esplicito,
       // riallinea il flag al routing staff "bar" (override pro o regex).
@@ -275,11 +284,9 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
     const { documentId } = ctx.params;
     if (!documentId) return ctx.badRequest('documentId mancante.');
     try {
-      const menu = await loadUserMenu(strapi, user.id);
-      if (!menu) return ctx.notFound('Menu non trovato.');
-      const ownsElement = Array.isArray(menu.fk_elements)
-        && menu.fk_elements.some((item) => item && item.documentId === documentId);
-      if (!ownsElement) return ctx.notFound('Elemento non trovato.');
+      if (!(await userOwnsElement(strapi, user.id, documentId))) {
+        return ctx.notFound('Elemento non trovato.');
+      }
 
       const recipe = await ingredientsService.listElementRecipe(strapi, documentId);
       ctx.body = { data: { recipe } };
@@ -300,11 +307,9 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
     const { documentId } = ctx.params;
     if (!documentId) return ctx.badRequest('documentId mancante.');
     try {
-      const menu = await loadUserMenu(strapi, user.id);
-      if (!menu) return ctx.notFound('Menu non trovato.');
-      const ownsElement = Array.isArray(menu.fk_elements)
-        && menu.fk_elements.some((item) => item && item.documentId === documentId);
-      if (!ownsElement) return ctx.notFound('Elemento non trovato.');
+      if (!(await userOwnsElement(strapi, user.id, documentId))) {
+        return ctx.notFound('Elemento non trovato.');
+      }
 
       const body = ctx.request.body?.data || ctx.request.body || {};
       const recipe = Array.isArray(body.recipe) ? body.recipe : null;
@@ -339,12 +344,9 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
     if (!documentId) return ctx.badRequest('documentId mancante.');
 
     try {
-      const menu = await loadUserMenu(strapi, user.id);
-      if (!menu) return ctx.notFound('Menu non trovato.');
-
-      const ownsElement = Array.isArray(menu.fk_elements)
-        && menu.fk_elements.some((item) => item && item.documentId === documentId);
-      if (!ownsElement) return ctx.notFound('Elemento non trovato.');
+      if (!(await userOwnsElement(strapi, user.id, documentId))) {
+        return ctx.notFound('Elemento non trovato.');
+      }
 
       // Soft delete: flaggato come archiviato. Resta in DB con il link a menu.fk_elements
       // perche gli OrderItem.fk_element vecchi potrebbero ancora puntarci.

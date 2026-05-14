@@ -505,6 +505,7 @@
 }
 .sl-card {
   appearance: none;
+  position: relative;
   font-family: inherit;
   text-align: left;
   background: var(--paper);
@@ -524,6 +525,34 @@
 .sl-card.res { background: color-mix(in oklab, var(--info) 5%, var(--paper)); border-color: color-mix(in oklab, var(--info) 25%, var(--paper)); }
 .sl-card.free { background: var(--bg-sunk, var(--bg-2)); border-style: dashed; }
 .sl-card.alert { box-shadow: 0 0 0 2px color-mix(in oklab, var(--warn) 35%, transparent); border-color: var(--warn); }
+.sl-card-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in oklab, var(--dan) 24%, var(--line));
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--paper) 90%, transparent);
+  color: var(--dan);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.sl-card:hover .sl-card-remove,
+.sl-card:focus-within .sl-card-remove {
+  opacity: 1;
+  transform: scale(1);
+}
+.sl-card-remove:hover {
+  background: color-mix(in oklab, var(--dan) 12%, var(--paper));
+}
 
 .sl-card-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 16px 8px; }
 .sl-card-n { font-family: var(--f-mono); font-size: 24px; font-weight: 700; letter-spacing: 0.02em; line-height: 1; }

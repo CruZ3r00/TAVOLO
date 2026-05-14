@@ -17,6 +17,7 @@ import {
   addOrderItem, updateItemStatus, orderErrorMessage,
   pickupTakeaway,
   createWalkin, reservationErrorMessage,
+  deleteTable,
 } from '@/utils';
 
 const store = useStore();
@@ -25,6 +26,7 @@ const router = useRouter();
 const token = computed(() => store.getters.getToken);
 const currentUser = computed(() => store.getters.getUser || null);
 const isOwnerView = computed(() => staffRole(currentUser.value) === STAFF_ROLES.OWNER);
+const canManageTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE].includes(staffRole(currentUser.value)));
 
 const tables = ref([]);
 const orders = ref([]);
@@ -93,6 +95,7 @@ const addItemOrderDocId = ref(null);
 const addItemLockVersion = ref(0);
 const showCheckout = ref(false);
 const checkoutOrder = ref(null);
+const checkoutBusy = ref(false);
 const busyItemIds = ref(new Set());
 const showWalkin = ref(false);
 const walkinTable = ref(null);
@@ -275,6 +278,20 @@ const handleOpenTable = async (table) => {
   showWalkin.value = true;
 };
 
+const handleRemoveTable = async (table) => {
+  if (!canManageTables.value || !table?.documentId) return;
+  const ok = window.confirm(`Rimuovere il tavolo ${table.number}?`);
+  if (!ok) return;
+  try {
+    await deleteTable(table.documentId, token.value);
+    showToast('success', `Tavolo ${table.number} rimosso.`);
+    await loadData({ silent: true });
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
+    await loadData({ silent: true });
+  }
+};
+
 const validateWalkin = () => {
   const errors = {};
   const people = parseInt(walkinForm.value.number_of_people, 10);
@@ -345,7 +362,8 @@ const onOpenCheckout = (order) => {
 };
 
 const onConfirmCheckout = async (payload) => {
-  if (!checkoutOrder.value) return;
+  if (!checkoutOrder.value || checkoutBusy.value) return;
+  checkoutBusy.value = true;
   try {
     const result = await closeOrder(checkoutOrder.value.documentId, payload, token.value);
     showCheckout.value = false;
@@ -365,6 +383,9 @@ const onConfirmCheckout = async (payload) => {
     } else {
       showToast('error', orderErrorMessage(err));
     }
+  }
+  finally {
+    checkoutBusy.value = false;
   }
 };
 
@@ -421,9 +442,12 @@ let realtimeRefreshHandle = null;
 const scheduleRealtimeRefresh = () => {
   if (document.visibilityState !== 'visible') return;
   if (realtimeRefreshHandle) clearTimeout(realtimeRefreshHandle);
-  realtimeRefreshHandle = setTimeout(() => {
+  realtimeRefreshHandle = setTimeout(async () => {
     realtimeRefreshHandle = null;
-    loadData({ silent: true });
+    await loadData({ silent: true });
+    if (showOrderDetail.value && currentOrderDocId.value && orderDetailRef.value) {
+      await orderDetailRef.value.silentReload();
+    }
   }, 250);
 };
 
@@ -464,7 +488,12 @@ const subscribeRealtime = async (userId) => {
   }
 };
 const onVisibilityChange = () => {
-  if (document.visibilityState === 'visible') loadData({ silent: true });
+  if (document.visibilityState === 'visible') {
+    loadData({ silent: true });
+    if (showOrderDetail.value && currentOrderDocId.value && orderDetailRef.value) {
+      orderDetailRef.value.silentReload();
+    }
+  }
 };
 
 const openOrderFromQuery = () => {
@@ -741,8 +770,10 @@ watch(() => route.path, async () => {
           <OrdersTableGrid
             :tables="tables"
             :orders="orders"
+            :can-remove-tables="canManageTables"
             @view-order="handleViewOrder"
             @open-table="handleOpenTable"
+            @remove-table="handleRemoveTable"
           />
         </template>
 
@@ -778,6 +809,7 @@ watch(() => route.path, async () => {
     <CheckoutModal
       :show="showCheckout"
       :order="checkoutOrder"
+      :busy="checkoutBusy"
       @close="showCheckout = false"
       @confirm="onConfirmCheckout"
     />
