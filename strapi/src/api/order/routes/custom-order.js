@@ -18,7 +18,7 @@ module.exports = {
       method: 'POST',
       path: '/takeaways/public/:userDocumentId',
       handler: 'order.createTakeawayPublic',
-      config: { auth: false, policies: [], middlewares: [] },
+      config: { auth: false, policies: [], middlewares: ['api::order.public-takeaway-guard'] },
     },
     {
       method: 'PATCH',
@@ -90,6 +90,12 @@ module.exports = {
       method: 'PATCH',
       path: '/orders/:documentId/items/:itemDocumentId/status',
       handler: 'order.updateItemStatus',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'PATCH',
+      path: '/orders/:documentId/items/:itemDocumentId/void',
+      handler: 'order.voidItem',
       config: { policies: [], middlewares: [] },
     },
     {

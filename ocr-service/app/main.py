@@ -23,6 +23,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     settings = get_settings()
     configure_logging(settings.LOG_LEVEL)
+    if settings.REQUIRE_INTERNAL_API_TOKEN and not settings.INTERNAL_API_TOKEN.strip():
+        raise RuntimeError("INTERNAL_API_TOKEN obbligatorio quando REQUIRE_INTERNAL_API_TOKEN=true")
     logger.info(
         "ocr-service boot",
         extra={

@@ -234,7 +234,7 @@ Queste API **devono essere aggiunte a Strapi** nella Fase 13 del piano. Il contr
 
 ### 4.3 WebSocket
 
-- `WS /ws/pos` con header `Authorization: Bearer <device_token>` (o query `?token=` per client che non supportano header in upgrade)
+- `WS /ws/pos` con header `Authorization: Bearer <device_token>`
 
 - **Server→client:**
   - `{ type: "job.new", id, event_id, kind, payload }` — nuovo job disponibile (il client può pullarlo o già consumarlo dal payload)

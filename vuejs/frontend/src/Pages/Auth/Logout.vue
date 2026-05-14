@@ -3,6 +3,7 @@ import { useHead } from '@/lib/compat/head.js';
 import { useRouter } from 'vue-router';
 import { ref } from 'vue';
 import { useStore } from 'vuex';
+import { API_BASE } from '@/lib/api/_base';
 
 useHead({
   title: 'Logout',
@@ -13,11 +14,13 @@ const store = useStore();
 const router = useRouter();
 const errorMessage = ref('');
 
-const logout = () => {
+const logout = async () => {
+  try {
+    await fetch(`${API_BASE}/api/account/logout`, { method: 'POST' });
+  } catch (_err) {
+    // Logout locale comunque: non lasciamo dati in memoria se il server non risponde.
+  }
   store.dispatch('logout');
-  localStorage.removeItem('user');
-  localStorage.removeItem('token');
-  console.log('Logout effettuato');
   router.push('/login');
 };
 

@@ -6,12 +6,22 @@ const props = defineProps({
     item: { type: Object, required: true },
     orderActive: { type: Boolean, default: true },
     busy: { type: Boolean, default: false },
+    canVoid: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['increment', 'decrement', 'delete', 'serve', 'edit-notes']);
+const emit = defineEmits(['increment', 'decrement', 'delete', 'serve', 'void', 'edit-notes']);
 
-const isEditable = computed(() => props.item.status === 'taken' && props.orderActive);
-const isReady = computed(() => props.item.status === 'ready' && props.orderActive);
+const isVoided = computed(() => !!props.item.voided);
+const isEditable = computed(() => !isVoided.value && props.item.status === 'taken' && props.orderActive);
+const isReady = computed(() => !isVoided.value && props.item.status === 'ready' && props.orderActive);
+// Annullamento: item gia in lavorazione (preparing/ready/served), ordine attivo, non gia voided,
+// e caller ha permesso (cameriere+).
+const showVoid = computed(() => (
+    !isVoided.value
+    && props.orderActive
+    && props.canVoid
+    && props.item.status !== 'taken'
+));
 
 const lineTotal = computed(() => {
     const p = parseFloat(props.item.price) || 0;
@@ -21,13 +31,22 @@ const lineTotal = computed(() => {
 </script>
 
 <template>
-    <div class="oi-row" :class="{ 'oi-row-busy': busy }">
+    <div class="oi-row" :class="{ 'oi-row-busy': busy, 'oi-row-voided': isVoided }">
         <div class="oi-main">
             <div class="oi-info">
                 <span class="oi-name">{{ item.name }}</span>
                 <span class="oi-price">&euro; {{ parseFloat(item.price).toFixed(2) }}</span>
             </div>
-            <OrderStatusBadge :status="item.status" />
+            <span v-if="isVoided" class="oi-voided-badge" title="Annullato">
+                <i class="bi bi-x-circle" aria-hidden="true"></i>
+                <span>Annullato</span>
+            </span>
+            <OrderStatusBadge v-else :status="item.status" />
+        </div>
+
+        <div v-if="isVoided && item.voided_reason" class="oi-voided-reason">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            <span>{{ item.voided_reason }}</span>
         </div>
 
         <div v-if="item.category" class="oi-meta">
@@ -76,6 +95,18 @@ const lineTotal = computed(() => {
                     aria-label="Elimina elemento"
                 >
                     <i class="bi bi-trash" aria-hidden="true"></i>
+                </button>
+                <button
+                    v-if="showVoid"
+                    type="button"
+                    class="ds-btn ds-btn-ghost ds-btn-sm oi-action-btn oi-action-void"
+                    :disabled="busy"
+                    @click="emit('void', item)"
+                    aria-label="Annulla elemento"
+                    title="Annulla elemento"
+                >
+                    <i class="bi bi-x-circle" aria-hidden="true"></i>
+                    <span>Annulla</span>
                 </button>
                 <button
                     v-if="isReady"
@@ -242,5 +273,50 @@ const lineTotal = computed(() => {
 }
 .oi-action-btn {
     padding: 6px 10px;
+}
+.oi-action-void {
+    color: var(--ds-color-warning, #d97706);
+}
+.oi-action-void:hover:not(:disabled) {
+    background: color-mix(in oklab, #d97706 12%, var(--paper));
+}
+
+/* Voided state: striked-through, faded, separator badge */
+.oi-row-voided { opacity: 0.6; background: var(--bg-2); }
+.oi-row-voided .oi-name,
+.oi-row-voided .oi-price,
+.oi-row-voided .oi-line-total {
+    text-decoration: line-through;
+    color: var(--ink-3);
+}
+
+.oi-voided-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: color-mix(in oklab, #d97706 14%, var(--paper));
+    color: #b45309;
+    border: 1px solid color-mix(in oklab, #d97706 30%, var(--paper));
+    border-radius: var(--r-sm);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+.oi-voided-reason {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 10px;
+    background: color-mix(in oklab, #d97706 10%, var(--paper));
+    color: #92400e;
+    border: 1px solid color-mix(in oklab, #d97706 25%, var(--paper));
+    border-radius: var(--r-sm);
+    font-size: 12px;
+    line-height: 1.4;
+}
+.oi-voided-reason i {
+    margin-top: 2px;
+    flex-shrink: 0;
 }
 </style>

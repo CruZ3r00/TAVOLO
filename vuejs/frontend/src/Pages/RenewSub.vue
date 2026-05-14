@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import {
+    API_BASE,
     createBillingCheckoutSession,
     createBillingPortalSession,
     fetchBillingStatus,
@@ -93,6 +94,8 @@ const syncIfReturningFromCheckout = async () => {
             const user = { ...(store.getters.getUser || {}), ...synced };
             store.commit('setUser', user);
             localStorage.setItem('user', JSON.stringify(user));
+            // Riallinea con /users/me autoritativo (subscription_plan, staff payload, ecc).
+            await store.dispatch('refreshUser');
         }
         noticeMessage.value = 'Pagamento confermato. Puoi accedere all\'app.';
         // Pulizia query string e ridirezione alla dashboard se attivo.
@@ -136,10 +139,13 @@ const openPortal = async () => {
     }
 };
 
-const logout = () => {
+const logout = async () => {
+    try {
+        await fetch(`${API_BASE}/api/account/logout`, { method: 'POST' });
+    } catch (_err) {
+        // Logout locale comunque.
+    }
     store.dispatch('logout');
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
     router.push('/login');
 };
 

@@ -225,6 +225,41 @@ async function updateCategoryRouting(strapi, owner, category, role) {
   return true;
 }
 
+/**
+ * Determina se una categoria deve essere considerata "bevande" per un owner.
+ * Logica:
+ *   - Se l'owner ha pro routing e ha gia un override su quella categoria → usa
+ *     `staff_role === BAR` dall'override.
+ *   - Altrimenti → fallback regex `classifyCategory(category) === BAR`.
+ *
+ * In pratica: lo slot "bevande" del menu rispecchia esattamente lo slot dello
+ * staff "bar" — finche l'owner non riassegna manualmente le categorie.
+ */
+async function isBarRoutedCategory(strapi, owner, category) {
+  const clean = cleanCategory(category);
+  if (!clean) return false;
+
+  if (ownerHasProfessionalRouting(owner) && owner && owner.id && strapi.db.connection) {
+    try {
+      const row = await findRoutingRow(strapi, owner.id, clean);
+      if (row && row.staff_role) {
+        return normalizeStation(row.staff_role) === STAFF_ROLES.BAR;
+      }
+    } catch (_err) { /* fall back to regex */ }
+  }
+  return classifyCategory(clean) === STAFF_ROLES.BAR;
+}
+
+/**
+ * Versione sincrona — solo regex. Da usare in path dove non possiamo fare
+ * await sul DB (es. validazione payload semplice).
+ */
+function isBarRoutedCategorySync(category) {
+  const clean = cleanCategory(category);
+  if (!clean) return false;
+  return classifyCategory(clean) === STAFF_ROLES.BAR;
+}
+
 module.exports = {
   ROUTABLE_STAFF_ROLES,
   ROUTABLE_STAFF_ROLE_SET,
@@ -237,4 +272,6 @@ module.exports = {
   loadRoutingMap,
   listCategoryRouting,
   updateCategoryRouting,
+  isBarRoutedCategory,
+  isBarRoutedCategorySync,
 };

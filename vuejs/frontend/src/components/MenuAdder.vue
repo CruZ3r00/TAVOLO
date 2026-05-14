@@ -1,11 +1,17 @@
 <script setup>
     import { useStore } from 'vuex';
-    import { ref, onMounted, nextTick } from 'vue';
+    import { ref, onMounted, nextTick, computed } from 'vue';
     import { API_BASE } from '@/utils';
 
     //recupero del jwt della sessione in corso con store e reindirizzo il sito con il router
     const store = useStore();
     const tkn = store.getters.getToken;
+
+    const props = defineProps({
+      // 'dish' (default) | 'beverage' — controlla titolo, category preselezionata e flag is_beverage
+      mode: { type: String, default: 'dish' },
+    });
+    const isBeverageMode = computed(() => props.mode === 'beverage');
 
     const emit = defineEmits(['ViewList']);
 
@@ -17,13 +23,23 @@
 
     //variabili utilizzate nel form da inviare per la richiesta API per creare nuovi record
     const name = ref('');
+    // Ingredienti: array di stringhe (nomi). Il backend crea le entita
+    // Ingredient mancanti via `syncElementRecipe`. Il typeahead suggerisce
+    // ingredienti gia presenti nel magazzino dell'owner.
     const ingredients = ref([]);
+    const existingIngredients = ref([]); // [{ key, name, ... }]
+    const focusedRowIdx = ref(-1);
     const allergens = ref([]);
     const image = ref(null);
     const price = ref(null);
     const category = ref('');
     const customCategory = ref('');
     const useCustomCategory = ref(false);
+    // Toggle "questa e' una bevanda": precompilato in base alla mode con cui
+    // si entra in MenuAdder (beverage tab → true). L'utente puo cambiarlo
+    // a mano. Lasciato a undefined il backend applica l'auto-classificazione
+    // sulla categoria; settandolo esplicitamente overrida quella logica.
+    const isBeverage = ref(isBeverageMode.value);
 
     const readErrorMessage = async (response, fallback) => {
         const payload = await response.json().catch(() => null);
@@ -59,22 +75,22 @@
     //Creazione di un nuovo record di elemento tramite API strapi
     const CreateElement = async () => {
         const finalCategory = useCustomCategory.value ? customCategory.value : category.value;
+        const payload = {
+            name: name.value,
+            ingredients: ingredients.value,
+            allergens: allergens.value,
+            image: uploadedImageId.value,
+            price: price.value,
+            category: finalCategory,
+            is_beverage: !!isBeverage.value,
+        };
         const response = await fetch(`${API_BASE}/api/elements`,{
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${tkn}`,
             },
-            body: JSON.stringify({
-                data: {
-                    name: name.value,
-                    ingredients: ingredients.value,
-                    allergens: allergens.value,
-                    image: uploadedImageId.value,
-                    price: price.value,
-                    category: finalCategory,
-                }
-            })
+            body: JSON.stringify({ data: payload })
         });
 
         if (!response.ok) {
@@ -120,6 +136,70 @@
     const addIngredient = () => ingredients.value.push('');
     const removeIngredient = (index) => ingredients.value.splice(index, 1);
 
+    // Tipeahead: filtra `existingIngredients` in base al testo della riga,
+    // escludendo quelli gia selezionati nelle altre righe.
+    const ingredientSuggestions = (index) => {
+      const query = String(ingredients.value[index] || '').trim().toLowerCase();
+      const selected = new Set(
+        ingredients.value
+          .map((v, i) => (i !== index ? String(v || '').trim().toLowerCase() : null))
+          .filter(Boolean),
+      );
+      const filtered = (existingIngredients.value || [])
+        .filter((ing) => !selected.has(String(ing.name || '').toLowerCase()))
+        .filter((ing) => !query || String(ing.name || '').toLowerCase().includes(query));
+      return filtered.slice(0, 6);
+    };
+
+    // True se il testo digitato non corrisponde esattamente a nessun
+    // ingrediente esistente — mostra il pulsante "Aggiungi nuovo".
+    const isNewIngredient = (index) => {
+      const value = String(ingredients.value[index] || '').trim();
+      if (!value) return false;
+      return !(existingIngredients.value || []).some(
+        (ing) => String(ing.name || '').toLowerCase() === value.toLowerCase(),
+      );
+    };
+
+    const pickIngredient = (index, name) => {
+      ingredients.value[index] = name;
+      focusedRowIdx.value = -1;
+    };
+
+    const onIngredientFocus = (index) => { focusedRowIdx.value = index; };
+    const onIngredientBlur = (index) => {
+      // Delay per permettere il click sul suggerimento (mousedown).
+      setTimeout(() => {
+        if (focusedRowIdx.value === index) focusedRowIdx.value = -1;
+      }, 180);
+    };
+
+    /** Carica gli ingredienti gia presenti nel magazzino dell'owner */
+    const loadExistingIngredients = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/ingredients`, {
+          headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const raw = Array.isArray(data?.data?.ingredients) ? data.data.ingredients : [];
+        // Dedup per nome (case-insensitive) in caso il backend abbia ancora
+        // duplicati storici. Mantieni l'entry con count piu' alto.
+        const byName = new Map();
+        for (const ing of raw) {
+          const k = String(ing.name || '').trim().toLowerCase();
+          if (!k) continue;
+          const existing = byName.get(k);
+          if (!existing || Number(ing.count || 0) > Number(existing.count || 0)) {
+            byName.set(k, ing);
+          }
+        }
+        existingIngredients.value = [...byName.values()].sort((a, b) =>
+          String(a.name || '').localeCompare(String(b.name || ''), 'it'),
+        );
+      } catch (_e) { /* silenzio: il typeahead diventa solo "free text" */ }
+    };
+
     // funzioni per aumentare e dimunire le dimensioni della lista degli allergeni
     const addAllergen = () => allergens.value.push('');
     const removeAllergen = (index) => allergens.value.splice(index, 1);
@@ -136,6 +216,7 @@
         category.value = '';
         customCategory.value = '';
         useCustomCategory.value = false;
+        isBeverage.value = isBeverageMode.value;
     }
 
     //funzione per gestire il file e la preview dell'immagine
@@ -151,11 +232,15 @@
         }
     };
 
-    //impostazione del titolo della scheda
+    //impostazione del titolo della scheda + precompilazione modalita
     onMounted(async () => {
         nextTick(() => {
-            document.title = 'Aggiungi elemento al menu';
+            document.title = isBeverageMode.value ? 'Aggiungi bevanda' : 'Aggiungi elemento al menu';
         });
+        if (isBeverageMode.value && !category.value) {
+            category.value = 'Bevande';
+        }
+        await loadExistingIngredients();
     });
 </script>
 
@@ -165,8 +250,12 @@
             <!-- Header -->
             <div class="adder-header">
                 <div>
-                    <h2 class="adder-title">Nuovo elemento</h2>
-                    <p class="adder-subtitle">Aggiungi un nuovo piatto o bevanda al tuo menu</p>
+                    <h2 class="adder-title">{{ isBeverageMode ? 'Nuova bevanda' : 'Nuovo elemento' }}</h2>
+                    <p class="adder-subtitle">
+                        {{ isBeverageMode
+                            ? 'Aggiungi una bevanda al bar (acqua, vino, lattine, cocktail, ecc.)'
+                            : 'Aggiungi un nuovo piatto al tuo menu' }}
+                    </p>
                 </div>
                 <div class="adder-header-actions">
                     <button @click="emit('ViewList')" class="ds-btn ds-btn-secondary">
@@ -255,11 +344,62 @@
                             </div>
                         </div>
 
-                        <!-- Ingredients -->
+                        <!-- Toggle "Questa e' una bevanda" -->
+                        <div class="ds-field bev-toggle-field">
+                            <label class="bev-toggle-row">
+                                <input type="checkbox" v-model="isBeverage" class="bev-toggle-input">
+                                <span class="bev-toggle-track">
+                                    <span class="bev-toggle-thumb"></span>
+                                </span>
+                                <span class="bev-toggle-label">
+                                    <strong>Questa e' una bevanda</strong>
+                                    <span class="bev-toggle-hint">Compare nella tab Bevande e contribuisce al turno bar.</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <!-- Ingredients (typeahead: seleziona esistente o crea nuovo) -->
                         <div class="ds-field">
                             <label class="ds-label">Ingredienti</label>
-                            <div v-for="(ingredient, index) in ingredients" :key="index" class="list-input-row">
-                                <input v-model="ingredients[index]" class="ds-input" placeholder="Ingrediente..." required />
+                            <div v-for="(ingredient, index) in ingredients" :key="index" class="list-input-row ingredient-row">
+                                <div class="ingredient-combo">
+                                    <input
+                                        v-model="ingredients[index]"
+                                        class="ds-input"
+                                        placeholder="Cerca o digita nuovo..."
+                                        required
+                                        autocomplete="off"
+                                        @focus="onIngredientFocus(index)"
+                                        @blur="onIngredientBlur(index)"
+                                    />
+                                    <div
+                                        v-if="focusedRowIdx === index && (ingredientSuggestions(index).length > 0 || isNewIngredient(index))"
+                                        class="ingredient-dropdown"
+                                    >
+                                        <button
+                                            v-for="sugg in ingredientSuggestions(index)"
+                                            :key="sugg.key || sugg.name"
+                                            type="button"
+                                            class="ingredient-dropdown-item"
+                                            @mousedown.prevent="pickIngredient(index, sugg.name)"
+                                        >
+                                            <i class="bi bi-check2 ingredient-dropdown-icon"></i>
+                                            <span>{{ sugg.name }}</span>
+                                            <span v-if="sugg.count" class="ingredient-dropdown-meta">
+                                                in {{ sugg.count }} {{ sugg.count === 1 ? 'piatto' : 'piatti' }}
+                                            </span>
+                                        </button>
+                                        <button
+                                            v-if="isNewIngredient(index)"
+                                            type="button"
+                                            class="ingredient-dropdown-item ingredient-dropdown-create"
+                                            @mousedown.prevent="pickIngredient(index, ingredients[index].trim())"
+                                        >
+                                            <i class="bi bi-plus-lg ingredient-dropdown-icon"></i>
+                                            <span>Aggiungi nuovo ingrediente: <strong>{{ ingredients[index].trim() }}</strong></span>
+                                        </button>
+                                    </div>
+                                </div>
                                 <button type="button" class="ds-btn ds-btn-ghost ds-btn-icon" @click="removeIngredient(index)">
                                     <i class="bi bi-x-lg"></i>
                                 </button>
@@ -452,6 +592,84 @@
     border: 1px solid var(--color-border);
     max-height: 100px;
 }
+
+.bev-toggle-field { margin: var(--space-2) 0; }
+.bev-toggle-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-subtle);
+    cursor: pointer;
+    transition: border-color 160ms;
+}
+.bev-toggle-row:hover { border-color: var(--color-primary); }
+.bev-toggle-input { position: absolute; opacity: 0; pointer-events: none; }
+.bev-toggle-track {
+    position: relative;
+    width: 38px; height: 22px; flex-shrink: 0;
+    background: var(--color-border);
+    border-radius: 999px;
+    transition: background 160ms;
+    margin-top: 2px;
+}
+.bev-toggle-thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 160ms;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+}
+.bev-toggle-input:checked + .bev-toggle-track { background: var(--color-primary); }
+.bev-toggle-input:checked + .bev-toggle-track .bev-toggle-thumb { transform: translateX(16px); }
+.bev-toggle-label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.bev-toggle-label strong { color: var(--color-text); font-weight: 600; }
+.bev-toggle-hint { color: var(--color-text-muted); font-size: 12.5px; line-height: 1.4; }
+
+/* Ingredient combobox (typeahead) */
+.ingredient-row { align-items: stretch; }
+.ingredient-combo { flex: 1; position: relative; }
+.ingredient-combo .ds-input { width: 100%; }
+.ingredient-dropdown {
+    position: absolute;
+    left: 0; right: 0; top: 100%;
+    background: var(--color-bg, #fff);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 6px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    margin-top: 2px;
+    z-index: 30;
+    max-height: 240px;
+    overflow-y: auto;
+}
+.ingredient-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-text);
+    font-family: var(--font-family);
+}
+.ingredient-dropdown-item:hover { background: var(--color-bg-subtle); }
+.ingredient-dropdown-icon { color: var(--color-text-muted); flex-shrink: 0; }
+.ingredient-dropdown-meta {
+    margin-left: auto;
+    color: var(--color-text-muted);
+    font-size: 11px;
+}
+.ingredient-dropdown-create {
+    border-top: 1px solid var(--color-border);
+    color: var(--color-primary);
+    font-weight: 500;
+}
+.ingredient-dropdown-create .ingredient-dropdown-icon { color: var(--color-primary); }
 
 @media (max-width: 640px) {
     .form-row-2 {

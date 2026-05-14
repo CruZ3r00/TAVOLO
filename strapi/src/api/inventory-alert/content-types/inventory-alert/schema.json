@@ -1,0 +1,59 @@
+{
+  "kind": "collectionType",
+  "collectionName": "inventory_alerts",
+  "info": {
+    "singularName": "inventory-alert",
+    "pluralName": "inventory-alerts",
+    "displayName": "InventoryAlert",
+    "description": "Alert raggruppato per tipo (predictive | threshold) con N ingredienti. Marcare 'ordinato' o acknowledged li chiude."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "alert_type": {
+      "type": "enumeration",
+      "enum": ["predictive", "threshold"],
+      "required": true
+    },
+    "level": {
+      "type": "enumeration",
+      "enum": ["info", "warning", "critical"],
+      "default": "warning",
+      "required": true
+    },
+    "ingredients_payload": {
+      "type": "json",
+      "required": true
+    },
+    "sent_email": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "sent_inapp": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "acknowledged_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "dismissed_by_restock": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "acknowledged_by": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

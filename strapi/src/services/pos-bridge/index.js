@@ -86,7 +86,7 @@ class WsHub {
 
 /**
  * Inizializza server WebSocket su strapi.server.httpServer.
- * Route: /ws/pos  (auth: device_token via header Authorization: Bearer oppure query ?token=)
+ * Route: /ws/pos  (auth: device_token via header Authorization: Bearer)
  */
 function setupWebSocketServer(strapi) {
   if (strapi.__posWsHub) return strapi.__posWsHub;
@@ -116,8 +116,6 @@ function setupWebSocketServer(strapi) {
       let token = null;
       if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
         token = authHeader.slice(7).trim();
-      } else if (parsed.query && parsed.query.token) {
-        token = String(parsed.query.token);
       }
 
       if (!token) {

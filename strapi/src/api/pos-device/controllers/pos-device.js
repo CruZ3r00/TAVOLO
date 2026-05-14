@@ -638,6 +638,25 @@ module.exports = {
       }
 
       const userId = tokenRow.fk_user.id;
+      const consumedAt = new Date();
+      let consumedRows = 0;
+      if (strapi.db.connection) {
+        consumedRows = await strapi.db.connection('pos_pairing_tokens')
+          .where({ id: tokenRow.id })
+          .whereNull('consumed_at')
+          .update({ consumed_at: consumedAt });
+      } else {
+        const consumed = await strapi.db.query('api::pos-pairing-token.pos-pairing-token').update({
+          where: { id: tokenRow.id, consumed_at: null },
+          data: { consumed_at: consumedAt },
+        });
+        consumedRows = consumed ? 1 : 0;
+      }
+      if (consumedRows !== 1) {
+        const err = appError('ALREADY_EXISTS', 'Token già utilizzato');
+        err._resCode = 'ALREADY_EXISTS';
+        throw err;
+      }
 
       // Reuse logica di register: revoca eventuale device pre-esistente con
       // stesso fingerprint per re-pairing dopo reinstall.
@@ -664,12 +683,6 @@ module.exports = {
           platform,
           fk_user: { connect: [{ id: userId }] },
         },
-      });
-
-      // Marca token consumato (single-use)
-      await strapi.db.query('api::pos-pairing-token.pos-pairing-token').update({
-        where: { id: tokenRow.id },
-        data: { consumed_at: new Date() },
       });
 
       strapi.log.info(

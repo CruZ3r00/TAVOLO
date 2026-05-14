@@ -4,12 +4,15 @@ import router from './router'
 import { createHead } from '@vueuse/head';
 import { store } from './store';
 import { MotionPlugin } from '@vueuse/motion';
+import { installCredentialedFetch } from './lib/api/fetch-credentials';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
 import './assets/design-system.css';
 import './assets/tavolo-screens.css';
 import './assets/comfortables.css';
+
+installCredentialedFetch();
 
 const app = createApp(App)
 app.use(store)

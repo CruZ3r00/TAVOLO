@@ -95,6 +95,11 @@ const routes = [
         name: 'login',
         component: () => import('../Pages/Auth/Login.vue'),
     },
+    {
+        path: '/two-factor-challenge',
+        name: 'two-factor-challenge',
+        component: () => import('../Pages/Auth/TwoFactorChallenge.vue'),
+    },
     { //non protetta - step 2 della registrazione (scelta piano + redirect Stripe)
         path: '/choose-plan',
         name: 'choose-plan',
@@ -193,6 +198,20 @@ const routes = [
         component: () => import('../Pages/Orders.vue'),
         meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina_sg', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CUCINA, STAFF_ROLES.CUCINA_SG] },
     },
+    { //protetta - Carico bar (solo staff bar pro / cucina starter)
+        path: '/bar-management',
+        name: 'Carico bar',
+        component: () => import('../Pages/BarManagement.vue'),
+        // Owner e gestione accedono al pannello via il bottone "Turno bar"
+        // dentro la tab Bevande del MenuSetter. Il gating piano (BAR pro /
+        // CUCINA starter) e' applicato dal middleware backend
+        // `subscription-gate.js` e dal nav-helper `canSeeNavItem`.
+        meta: {
+            requiresAuth: true,
+            requiresSubscription: true,
+            staffRoles: [STAFF_ROLES.BAR, STAFF_ROLES.CUCINA],
+        },
+    },
     { //non protetta
         path: '/who-are-us',
         name: 'Chi siamo',
@@ -228,10 +247,16 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, from, next) => {
-    const isAuthenticated = store.getters.isAuthenticated;
+    const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
+    let isAuthenticated = store.getters.isAuthenticated;
+
+    if (requiresAuth && !store.getters.sessionChecked) {
+        const restored = await store.dispatch('refreshSession');
+        isAuthenticated = restored && store.getters.isAuthenticated;
+    }
 
     // Guest che cerca di entrare in route protetta -> rimanda alla landing
-    if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
+    if (requiresAuth && !isAuthenticated) {
         next({ name: 'landing' });
         return;
     }
@@ -250,6 +275,7 @@ router.beforeEach(async (to, from, next) => {
                 const user = { ...(store.getters.getUser || {}), ...billing };
                 store.commit('setUser', user);
                 localStorage.setItem('user', JSON.stringify(user));
+                localStorage.removeItem('token');
             }
 
             if (billing && !ACTIVE_SUBSCRIPTION_STATUSES.has(billing.subscription_status)) {
@@ -269,8 +295,6 @@ router.beforeEach(async (to, from, next) => {
         } catch (err) {
             if (err?.status === 401 || err?.status === 403) {
                 store.dispatch('logout');
-                localStorage.removeItem('user');
-                localStorage.removeItem('token');
                 next({ name: 'landing' });
                 return;
             }

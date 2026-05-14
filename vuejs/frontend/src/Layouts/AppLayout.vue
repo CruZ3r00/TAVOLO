@@ -2,12 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useStore } from 'vuex';
-import { API_BASE, fetchReservations, fetchOrders } from '@/utils';
+import { fetchReservations, fetchOrders } from '@/utils';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
 import { canSeeNavItem, defaultRouteForUser, effectiveUserId } from '@/staffAccess';
 import AppSidebar from '@/components/AppSidebar.vue';
 import MobileBottomNav from '@/components/MobileBottomNav.vue';
 import MobileTopBar from '@/components/MobileTopBar.vue';
+import AlertHeaderBar from '@/components/AlertHeaderBar.vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 import TeleportCompat from '@/lib/compat/teleport.js';
 
@@ -31,23 +32,22 @@ let pollId = null;
 let realtimeChannel = null;
 let realtimeRefreshHandle = null;
 
+const applyUserToDisplay = (userData) => {
+  if (!userData) return;
+  username.value = userData.username || '';
+  restaurantName.value = userData.restaurant_name || userData.username || 'ComforTables';
+  const city = userData.city || userData.address || '';
+  const tables = userData.coperti_invernali ? `${userData.coperti_invernali} coperti` : '';
+  restaurantSub.value = [city, tables].filter(Boolean).join(' · ') || 'Gestionale';
+};
+
 const checkLog = async () => {
   if (!isLoggedIn.value) return;
-  const token = store.getters.getToken;
-  try {
-    const response = await fetch(`${API_BASE}/api/users/me`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (response.ok) {
-      const userData = await response.json();
-      username.value = userData.username;
-      restaurantName.value = userData.restaurant_name || userData.username || 'ComforTables';
-      const city = userData.city || userData.address || '';
-      const tables = userData.coperti_invernali ? `${userData.coperti_invernali} coperti` : '';
-      restaurantSub.value = [city, tables].filter(Boolean).join(' · ') || 'Gestionale';
-    }
-  } catch (_err) { /* silent */ }
+  // refreshUser fa fetch /api/users/me e committa al store cosi' campi come
+  // subscription_plan restano allineati al backend (fix: pro che vedeva il
+  // Magazzino bloccato perche' lo user in localStorage era pre-upgrade).
+  await store.dispatch('refreshUser');
+  applyUserToDisplay(store.getters.getUser);
 };
 
 const refreshCounts = async () => {
@@ -184,6 +184,7 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
     />
 
     <main class="app-shell-main">
+      <AlertHeaderBar />
       <slot />
     </main>
 

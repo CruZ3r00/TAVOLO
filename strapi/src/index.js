@@ -5,6 +5,10 @@ const path = require('path');
 const fs = require('fs');
 const { validateProductionConfig } = require('./utils/production-checks');
 const { sweepDueTakeaways } = require('./utils/takeaway-lifecycle');
+const { isReservedStaffUsername, publicSiteSlug } = require('./utils/staff-access');
+const { setAuthCookies, stripJwtFromBodyIfCookieOnly } = require('./utils/auth-cookies');
+const posBridge = require('./services/pos-bridge');
+const inventoryAlerts = require('./services/inventory-alerts');
 console.log("STARTING STRAPI...");
 console.log("PORT:", process.env.PORT);
 function escapeHtml(value) {
@@ -58,6 +62,23 @@ module.exports = {
       const rawInv = body.coperti_invernali;
       const rawEst = body.coperti_estivi;
       const rawName = body.restaurant_name;
+      const username = String(createdUser.username || '').trim();
+
+      if (isReservedStaffUsername(username)) {
+        try {
+          await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+        } catch (_) { /* best effort */ }
+        ctx.status = 400;
+        ctx.body = {
+          data: null,
+          error: {
+            status: 400,
+            name: 'ValidationError',
+            message: 'Username riservato agli account staff gestiti dal sistema.',
+          },
+        };
+        return;
+      }
 
       // Parse & validate capacity
       const cInv = Number.isFinite(Number(rawInv)) ? parseInt(rawInv, 10) : null;
@@ -98,7 +119,8 @@ module.exports = {
 
       try {
         const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
-        const siteUrl = `${siteBaseUrl}/sites/${createdUser.username}`;
+        const siteSlug = publicSiteSlug(createdUser.username);
+        const siteUrl = `${siteBaseUrl.replace(/\/+$/, '')}/sites/${siteSlug}`;
         await strapi.documents('api::website-config.website-config').create({
           data: {
             restaurant_name: restaurantName,
@@ -121,6 +143,10 @@ module.exports = {
         }
         if (ctx.body && ctx.body.user) {
           ctx.body.user.url = siteUrl;
+        }
+        if (ctx.body && ctx.body.jwt) {
+          setAuthCookies(ctx, ctx.body.jwt);
+          stripJwtFromBodyIfCookieOnly(ctx);
         }
       } catch (error) {
         strapi.log.error(
@@ -152,6 +178,10 @@ module.exports = {
           strapi.log.info(`Staff user creato (${result.staff_role}), skip sito/email: ${result.username}`);
           return;
         }
+        if (isReservedStaffUsername(result && result.username)) {
+          strapi.log.warn(`Username riservato rilevato, skip sito/email: ${result.username}`);
+          return;
+        }
 
         // Genera il file HTML del sito in restaurant-sites/
         try {
@@ -159,8 +189,12 @@ module.exports = {
           if (!fs.existsSync(sitesDir)) {
             fs.mkdirSync(sitesDir, { recursive: true });
           }
+          const siteSlug = publicSiteSlug(result.username);
           const safeUsername = escapeHtml(result.username);
-          const filePath = path.join(sitesDir, `${result.username}.html`);
+          const filePath = path.resolve(sitesDir, `${siteSlug}.html`);
+          if (!filePath.startsWith(`${sitesDir}${path.sep}`)) {
+            throw new Error('Percorso sito fuori dalla directory consentita.');
+          }
           const htmlContent = `<!DOCTYPE html>
 <html lang="it">
 <head>
@@ -253,6 +287,7 @@ module.exports = {
   async bootstrap({ strapi }) {
     validateProductionConfig(strapi);
     await configureUsersPermissionsEmail(strapi);
+    posBridge.setupWebSocketServer(strapi);
 
     // Seed data: crea utente demo e dati di test se non esistono
     if (process.env.SEED_DEMO_DATA === 'true') {
@@ -264,8 +299,40 @@ module.exports = {
     await grantImportPermissions(strapi);
     await grantPublicReservationPermission(strapi);
     startTakeawaySweep(strapi);
+    startInventoryAlertsScan(strapi);
   },
 };
+
+function startInventoryAlertsScan(strapi) {
+  // Scan periodico magazzino (cron 4h). Skip se feature flag disabilitata.
+  const enabled = String(process.env.INVENTORY_ALERTS_ENABLED || 'true').toLowerCase() !== 'false';
+  if (!enabled) {
+    strapi.log.info('Inventory alerts scan disabilitato via INVENTORY_ALERTS_ENABLED=false.');
+    return;
+  }
+  const intervalMs = parseInt(process.env.INVENTORY_ALERTS_INTERVAL_MS || '14400000', 10); // 4h default
+
+  const run = async () => {
+    if (strapi.inventoryAlertsScanRunning) return;
+    strapi.inventoryAlertsScanRunning = true;
+    try {
+      await inventoryAlerts.runAlertScan(strapi);
+    } catch (err) {
+      strapi.log.warn(`inventory-alerts scan fallito: ${err.message}`);
+    } finally {
+      strapi.inventoryAlertsScanRunning = false;
+    }
+  };
+
+  // Primo run differito di 2 minuti per non interferire col boot.
+  setTimeout(run, 2 * 60 * 1000);
+  if (strapi.inventoryAlertsInterval) clearInterval(strapi.inventoryAlertsInterval);
+  strapi.inventoryAlertsInterval = setInterval(run, intervalMs);
+  if (typeof strapi.inventoryAlertsInterval.unref === 'function') {
+    strapi.inventoryAlertsInterval.unref();
+  }
+  strapi.log.info(`Inventory alerts scan attivo (interval ${Math.round(intervalMs / 60000)}min).`);
+}
 
 function startTakeawaySweep(strapi) {
   const run = async () => {
@@ -380,6 +447,8 @@ async function grantImportPermissions(strapi) {
       'api::element.element.create',
       'api::element.element.update',
       'api::element.element.remove',
+      'api::element.element.getRecipe',
+      'api::element.element.setRecipe',
       'api::account.account.updateProfile',
       'api::account.account.listStaff',
       'api::account.account.updateStaff',
@@ -390,10 +459,36 @@ async function grantImportPermissions(strapi) {
       'api::account.account.twoFactorStatus',
       'api::account.account.twoFactorEnable',
       'api::account.account.twoFactorConfirm',
+      'api::account.account.twoFactorEmailEnable',
+      'api::account.account.twoFactorEmailConfirm',
+      'api::account.account.twoFactorEmailSendCode',
       'api::account.account.twoFactorDisable',
       'api::account.account.twoFactorRegenerateRecovery',
+      'api::billing.billing.status',
+      'api::billing.billing.createCheckoutSession',
+      'api::billing.billing.syncCheckoutSession',
+      'api::billing.billing.createPortalSession',
+      'api::billing.billing.changePlan',
+      'api::billing.billing.cancelSubscription',
+      'api::billing.billing.reactivateSubscription',
       'api::ingredient.ingredient.list',
       'api::ingredient.ingredient.toggle',
+      'api::ingredient.ingredient.listAdvanced',
+      'api::ingredient.ingredient.createAdvanced',
+      'api::ingredient.ingredient.restockBatch',
+      'api::ingredient.ingredient.updateAdvanced',
+      'api::ingredient.ingredient.removeAdvanced',
+      'api::ingredient.ingredient.restock',
+      'api::ingredient.ingredient.waste',
+      'api::ingredient.ingredient.confirmDepleted',
+      'api::ingredient.ingredient.listMovements',
+      'api::restock-order.restock-order.create',
+      'api::restock-order.restock-order.list',
+      'api::restock-order.restock-order.findOne',
+      'api::restock-order.restock-order.receive',
+      'api::restock-order.restock-order.cancel',
+      'api::inventory-alert.inventory-alert.list',
+      'api::inventory-alert.inventory-alert.acknowledge',
       'api::reservation.reservation.createAuthenticated',
       'api::reservation.reservation.list',
       'api::reservation.reservation.updateStatus',
@@ -522,10 +617,11 @@ async function seedDemoData(strapi) {
 
     // 3. Crea il website-config per l'utente demo con site_url auto-generato
     const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+    const demoSiteSlug = publicSiteSlug(demoUser.username);
     const websiteConfig = await strapi.documents('api::website-config.website-config').create({
       data: {
         restaurant_name: 'Ristorante Demo',
-        site_url: `${siteBaseUrl}/sites/${demoUser.username}`,
+        site_url: `${siteBaseUrl.replace(/\/+$/, '')}/sites/${demoSiteSlug}`,
         coperti_invernali: 30,
         coperti_estivi: 60,
         fk_user: { connect: [{ id: demoUser.id }] },
@@ -535,7 +631,7 @@ async function seedDemoData(strapi) {
     // Aggiorna l'URL dell'utente demo
     await strapi.db.query('plugin::users-permissions.user').update({
       where: { id: demoUser.id },
-      data: { url: `${siteBaseUrl}/sites/${demoUser.username}` },
+      data: { url: `${siteBaseUrl.replace(/\/+$/, '')}/sites/${demoSiteSlug}` },
     });
 
     strapi.log.info(`Seed: website-config creato (id: ${websiteConfig.id})`);

@@ -104,26 +104,24 @@ const registerThenCheckout = async (planKey) => {
             return;
         }
         const data = await response.json();
-        if (data?.user && !data?.jwt) {
+        if (data?.user && !data?.jwt && !data?.cookie_auth) {
             sessionStorage.removeItem('pending_registration');
             sessionStorage.setItem('pending_plan_after_verification', planKey);
             router.push({ path: '/login', query: { registered: 'verify', plan: planKey } });
             return;
         }
-        if (!data?.jwt || !data?.user) {
+        if (!data?.user) {
             errorMessage.value = 'Risposta di registrazione non valida.';
             return;
         }
 
         // 2) Login locale (token + user nello store/localStorage).
-        store.dispatch('login', { user: data.user, token: data.jwt });
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('token', data.jwt);
+        store.dispatch('login', { user: data.user, token: data.jwt || null });
         sessionStorage.removeItem('pending_registration');
 
         // 3) Stripe Checkout — il backend redirige a success_url (/renew-sub?checkout=success).
         try {
-            const session = await createBillingCheckoutSession(planKey, data.jwt);
+            const session = await createBillingCheckoutSession(planKey, data.jwt || null);
             if (session?.url) {
                 window.location.href = session.url;
                 return;

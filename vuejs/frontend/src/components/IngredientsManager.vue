@@ -110,6 +110,17 @@ onMounted(fetchIngredients);
                 </p>
             </div>
 
+            <!-- Pro upsell banner — non invasivo, una sola riga + link -->
+            <router-link to="/renew-sub" class="ing-pro-banner" role="link">
+                <i class="bi bi-stars ing-pro-icon"></i>
+                <span class="ing-pro-text">
+                    <strong>Vuoi una gestione automatica?</strong>
+                    Con il piano <strong>Professional</strong> ogni ingrediente ha stock, scarico
+                    automatico al servito, alert e fornitori.
+                </span>
+                <span class="ing-pro-cta">Scopri Magazzino <i class="bi bi-arrow-right"></i></span>
+            </router-link>
+
             <!-- Error -->
             <div v-if="error" class="ds-card ing-error">
                 <i class="bi bi-exclamation-triangle"></i>
@@ -295,6 +306,49 @@ onMounted(fetchIngredients);
     color: var(--color-text-secondary);
     margin: 0;
     line-height: 1.5;
+}
+
+/* Pro upsell banner — non invasivo */
+.ing-pro-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: color-mix(in oklab, var(--color-primary, var(--ac)) 6%, var(--color-bg, var(--paper)));
+    border: 1px dashed color-mix(in oklab, var(--color-primary, var(--ac)) 35%, transparent);
+    border-radius: var(--radius-md, var(--r-md));
+    text-decoration: none;
+    color: var(--color-text, var(--ink));
+    transition: background 160ms, border-color 160ms;
+}
+.ing-pro-banner:hover {
+    background: color-mix(in oklab, var(--color-primary, var(--ac)) 10%, var(--color-bg, var(--paper)));
+    border-color: var(--color-primary, var(--ac));
+}
+.ing-pro-icon {
+    color: var(--color-primary, var(--ac));
+    font-size: var(--text-lg);
+    flex-shrink: 0;
+}
+.ing-pro-text {
+    flex: 1;
+    font-size: var(--text-sm);
+    line-height: 1.45;
+    color: var(--color-text-secondary, var(--ink-2));
+}
+.ing-pro-text strong { color: var(--color-text, var(--ink)); }
+.ing-pro-cta {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-primary, var(--ac));
+    white-space: nowrap;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+@media (max-width: 640px) {
+    .ing-pro-banner { flex-direction: column; align-items: flex-start; }
 }
 
 /* Error */

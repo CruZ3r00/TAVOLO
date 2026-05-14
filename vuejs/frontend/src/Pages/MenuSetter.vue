@@ -1,14 +1,18 @@
 <script setup>
-import { onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue';
+import { onMounted, onBeforeUnmount, ref, nextTick, watch, computed } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useStore } from 'vuex';
 import { useRouter, useRoute } from 'vue-router';
-import { API_BASE } from '@/utils';
+import { API_BASE, fetchBillingStatus } from '@/utils';
 import MenuAdder from '@/components/MenuAdder.vue';
 import MenuList from '@/components/MenuList.vue';
 import MenuImporter from '@/components/MenuImporter.vue';
 import IngredientsManager from '@/components/IngredientsManager.vue';
+import BeverageList from '@/components/BeverageList.vue';
+import PantryView from '@/components/PantryView.vue';
+import BarShiftPanel from '@/components/BarShiftPanel.vue';
 import TeleportCompat from '@/lib/compat/teleport.js';
+import { STAFF_ROLES, staffRole } from '@/staffAccess';
 
 const store = useStore();
 const router = useRouter();
@@ -16,9 +20,24 @@ const route = useRoute();
 const tkn = store.getters.getToken;
 
 const activeTab = ref('list');
+// 'dish' (default) per piatti | 'beverage' per bevande — controlla MenuAdder
+const adderMode = ref('dish');
+const showBarShiftModal = ref(false);
+
+const currentUser = computed(() => store.getters.getUser || null);
+const isOwner = computed(() => staffRole(currentUser.value) === STAFF_ROLES.OWNER);
+// Fonte autoritativa del piano: /api/billing/status. Lo store puo' avere user
+// stale se il backend non ha mai popolato `subscription_plan` su /users/me
+// (capita su upgrade Stripe gia avvenuto in DB ma non riflesso al login).
+const billingPlan = ref(null);
+const isPro = computed(() => {
+  if (billingPlan.value) return billingPlan.value === 'pro';
+  return String(currentUser.value?.subscription_plan || '').toLowerCase() === 'pro';
+});
 
 const importerRef = ref(null);
 const menuListRef = ref(null);
+const beverageListRef = ref(null);
 
 const isImporting = ref(false);
 const menuElementsCount = ref(0);
@@ -64,9 +83,18 @@ const verifyPayment = async () => {
   } catch (_e) { /* silent */ }
 };
 
-const handleAdder = () => { activeTab.value = 'adder'; };
+const handleAdder = () => {
+  adderMode.value = activeTab.value === 'beverages' ? 'beverage' : 'dish';
+  activeTab.value = 'adder';
+};
+const handleAdderFromBeverage = () => {
+  adderMode.value = 'beverage';
+  activeTab.value = 'adder';
+};
 const handleList = () => { activeTab.value = 'list'; };
+const handleBeverages = () => { activeTab.value = 'beverages'; };
 const handleIngredients = () => { activeTab.value = 'ingredients'; };
+const handlePantry = () => { activeTab.value = 'pantry'; };
 
 const onRequestImport = () => { importerRef.value?.trigger(); };
 
@@ -86,20 +114,79 @@ const onImported = async (payload) => {
   showToast('success', `Menu ${modeLabel}: ${n} element${n === 1 ? 'o' : 'i'} importat${n === 1 ? 'o' : 'i'}.`);
   await nextTick();
   await menuListRef.value?.refresh?.();
+  await beverageListRef.value?.refresh?.();
 };
 
 const onImportError = (msg) => { showToast('error', msg || "Errore durante l'import."); };
 
 const onCountChanged = (n) => { menuElementsCount.value = Number(n) || 0; };
 
+// Quando un piatto viene modificato (in particolare il flag is_beverage),
+// aggiorniamo anche BeverageList cosi' eventuali spostamenti sono riflessi subito.
+const onElementUpdated = async () => {
+  await nextTick();
+  await beverageListRef.value?.refresh?.();
+};
+
+// Tab disponibili in base al piano:
+//   starter: Piatti | Bevande | Ingredienti
+//   pro:     Piatti | Bevande | Magazzino
+// Su starter la tab "pantry" non esiste; su pro la tab "ingredients" e' sostituita da "pantry".
+const isValidTab = (tab) => {
+  if (tab === 'list' || tab === 'adder' || tab === 'beverages') return true;
+  if (tab === 'pantry') return isOwner.value && isPro.value;
+  if (tab === 'ingredients') return !isPro.value;
+  return false;
+};
+
+const resolveTabFromQuery = (tabParam) => {
+  if (isValidTab(tabParam)) return tabParam;
+  return 'list';
+};
+
 watch(() => route.fullPath, () => {
-  if (route.path === '/menu-handler') activeTab.value = 'list';
+  if (route.path === '/menu-handler') {
+    const tabParam = route.query?.tab;
+    if (tabParam && isValidTab(tabParam)) {
+      activeTab.value = tabParam;
+    } else if (!isValidTab(activeTab.value)) {
+      activeTab.value = 'list';
+    }
+  }
 });
 
 onMounted(async () => {
   nextTick(() => { document.title = 'Menu · Tavolo'; });
   await verifyPayment();
-  activeTab.value = 'list';
+  // Riallinea user da /users/me + billing/status PRIMA di scegliere la tab.
+  // billing/status e' la fonte autoritativa del piano: se la sub e' attiva
+  // sul DB di Stripe (gestito dal backend), arriva anche se il campo user
+  // e' rimasto vuoto su una vecchia sessione.
+  try { await store.dispatch('refreshUser'); } catch (_e) { /* fail-soft */ }
+  try {
+    const billing = await fetchBillingStatus(tkn);
+    const plan = String(billing?.subscription_plan || '').toLowerCase();
+    if (plan === 'pro' || plan === 'starter') {
+      billingPlan.value = plan;
+      // Allinea anche lo store cosi' altri componenti vedono il piano giusto
+      // (es. canSeeBarManagement per cucina starter).
+      const u = store.getters.getUser || {};
+      if (String(u.subscription_plan || '').toLowerCase() !== plan) {
+        const merged = { ...u, subscription_plan: plan };
+        store.commit('setUser', merged);
+        try { localStorage.setItem('user', JSON.stringify(merged)); } catch (_e) {}
+      }
+    }
+  } catch (_e) { /* fail-soft: lascio il fallback su currentUser */ }
+  activeTab.value = resolveTabFromQuery(route.query?.tab);
+});
+
+// Se il piano cambia in sessione (es. dopo upgrade Stripe) la tab attiva
+// potrebbe diventare non piu' valida — fallback a 'list'.
+watch(isPro, () => {
+  if (!isValidTab(activeTab.value)) {
+    activeTab.value = 'list';
+  }
 });
 
 onBeforeUnmount(() => {
@@ -118,11 +205,19 @@ onBeforeUnmount(() => {
           <p>Aggiungi piatti, ingredienti e categorie. Ogni modifica si propaga subito al QR pubblico.</p>
         </div>
         <div class="md-top-tools">
-          <button type="button" class="btn btn-sm" @click="onRequestImport">
+          <button
+            v-if="activeTab === 'beverages'"
+            type="button"
+            class="btn btn-sm"
+            @click="showBarShiftModal = true"
+          >
+            <i class="bi bi-cup-hot"></i><span>Turno bar</span>
+          </button>
+          <button v-if="activeTab === 'list'" type="button" class="btn btn-sm" @click="onRequestImport">
             <i class="bi bi-upload"></i><span>Importa</span>
           </button>
           <button type="button" class="btn btn-sm btn-primary" @click="handleAdder">
-            <i class="bi bi-plus-lg"></i><span>Nuovo piatto</span>
+            <i class="bi bi-plus-lg"></i><span>{{ activeTab === 'beverages' ? 'Nuova bevanda' : 'Nuovo piatto' }}</span>
           </button>
         </div>
       </header>
@@ -139,23 +234,48 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="pf-tab"
+          :class="{ active: activeTab === 'beverages' }"
+          @click="handleBeverages"
+        >
+          <i class="bi bi-cup-straw"></i> Bevande
+        </button>
+        <button
+          v-if="!isPro"
+          type="button"
+          class="pf-tab"
           :class="{ active: activeTab === 'ingredients' }"
           @click="handleIngredients"
         >
           <i class="bi bi-basket"></i> Ingredienti
         </button>
+        <button
+          v-if="isPro && isOwner"
+          type="button"
+          class="pf-tab"
+          :class="{ active: activeTab === 'pantry' }"
+          @click="handlePantry"
+        >
+          <i class="bi bi-box-seam"></i> Magazzino
+        </button>
       </div>
 
       <div class="menu-content">
-        <MenuAdder v-if="activeTab === 'adder'" @ViewList="handleList" />
+        <MenuAdder v-if="activeTab === 'adder'" :mode="adderMode" @ViewList="adderMode === 'beverage' ? handleBeverages() : handleList()" />
         <MenuList
           v-else-if="activeTab === 'list'"
           ref="menuListRef"
           @AddElement="handleAdder"
           @RequestImport="onRequestImport"
           @count-changed="onCountChanged"
+          @element-updated="onElementUpdated"
         />
-        <IngredientsManager v-else-if="activeTab === 'ingredients'" />
+        <BeverageList
+          v-else-if="activeTab === 'beverages'"
+          ref="beverageListRef"
+          @AddBeverage="handleAdderFromBeverage"
+        />
+        <IngredientsManager v-else-if="activeTab === 'ingredients' && !isPro" />
+        <PantryView v-else-if="activeTab === 'pantry' && isPro" />
       </div>
 
       <MenuImporter
@@ -167,6 +287,24 @@ onBeforeUnmount(() => {
         @error="onImportError"
       />
     </div>
+
+    <!-- Modal Turno bar — accessibile dalla tab Bevande per owner/gestione -->
+    <TeleportCompat to="body">
+      <Transition name="bar-modal">
+        <div
+          v-if="showBarShiftModal"
+          class="bar-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Turno bar"
+          @click.self="showBarShiftModal = false"
+        >
+          <div class="bar-modal-card">
+            <BarShiftPanel mode="modal" @close="showBarShiftModal = false" />
+          </div>
+        </div>
+      </Transition>
+    </TeleportCompat>
 
     <!-- Overlay loading full-screen durante l'analisi OCR -->
     <TeleportCompat to="body">
@@ -205,6 +343,35 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .menu-content { display: flex; flex-direction: column; gap: 16px; }
+
+.bar-modal-overlay {
+  position: fixed; inset: 0;
+  background: color-mix(in oklab, black 50%, transparent);
+  backdrop-filter: blur(6px);
+  z-index: 450;
+  display: flex; align-items: stretch; justify-content: center;
+  padding: 24px;
+}
+.bar-modal-card {
+  background: var(--paper);
+  border-radius: var(--r-lg);
+  max-width: 1240px;
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  box-shadow: var(--shadow-lg);
+}
+.bar-modal-enter-active, .bar-modal-leave-active { transition: opacity 220ms; }
+.bar-modal-enter-active .bar-modal-card, .bar-modal-leave-active .bar-modal-card {
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bar-modal-enter-from, .bar-modal-leave-to { opacity: 0; }
+.bar-modal-enter-from .bar-modal-card, .bar-modal-leave-to .bar-modal-card { transform: translateY(16px); }
+
+@media (max-width: 860px) {
+  .bar-modal-overlay { padding: 0; }
+  .bar-modal-card { max-height: 100vh; border-radius: 0; }
+}
 
 .import-overlay {
   position: fixed; inset: 0;

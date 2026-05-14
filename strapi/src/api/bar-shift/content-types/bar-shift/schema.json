@@ -1,0 +1,53 @@
+{
+  "kind": "collectionType",
+  "collectionName": "bar_shifts",
+  "info": {
+    "singularName": "bar-shift",
+    "pluralName": "bar-shifts",
+    "displayName": "BarShift",
+    "description": "Turno bar (1 open per owner alla volta). Snapshot del report congelato a 'Carico fatto'."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "status": {
+      "type": "enumeration",
+      "enum": ["open", "closed"],
+      "default": "open",
+      "required": true
+    },
+    "opened_at": {
+      "type": "datetime",
+      "required": true
+    },
+    "closed_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "note": {
+      "type": "text",
+      "required": false,
+      "maxLength": 1000
+    },
+    "snapshot": {
+      "type": "json",
+      "required": false
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "opened_by": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "closed_by": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}
