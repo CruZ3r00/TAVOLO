@@ -24,6 +24,11 @@ const {
   ownerHasProfessionalRouting,
   updateCategoryRouting: saveCategoryRouting,
 } = require('../../../utils/category-routing');
+const {
+  clearAuthCookies,
+  setAuthCookies,
+  stripJwtFromBodyIfCookieOnly,
+} = require('../../../utils/auth-cookies');
 const CAPACITY_MIN = 1;
 const CAPACITY_MAX = 10000;
 const LOGO_MAX_KB_DEFAULT = 2048;
@@ -545,6 +550,29 @@ module.exports = {
     try {
       const saved = await saveCategoryRouting(strapi, owner, category, role);
       if (!saved) return ctx.internalServerError('Routing categorie non disponibile.');
+
+      // Propaga l'assegnazione al flag `is_beverage` degli element nella stessa
+      // categoria: lo slot bevande deve continuare a coincidere con lo slot
+      // staff "bar" anche dopo riassegnazioni manuali del routing.
+      try {
+        const knex = strapi.db.connection;
+        if (knex) {
+          const targetIsBeverage = role === STAFF_ROLES.BAR;
+          const elementIds = await knex('elements as e')
+            .join('elements_fk_user_lnk as l', 'l.element_id', 'e.id')
+            .where('l.user_id', owner.id)
+            .andWhereRaw('lower(e.category) = lower(?)', [category])
+            .pluck('e.id');
+          if (elementIds.length > 0) {
+            await knex('elements')
+              .whereIn('id', elementIds)
+              .update({ is_beverage: targetIsBeverage, updated_at: new Date() });
+          }
+        }
+      } catch (propErr) {
+        strapi.log.warn(`updateCategoryRouting: propagazione is_beverage fallita: ${propErr.message}`);
+      }
+
       return ctx.send({ data: await staffSettingsPayload(strapi, owner) });
     } catch (err) {
       strapi.log.error('updateCategoryRouting:', err);
@@ -659,6 +687,7 @@ module.exports = {
     }
 
     await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: user.id } });
+    clearAuthCookies(ctx);
     return ctx.send({ success: true, message: 'Account eliminato' });
   },
 
@@ -832,6 +861,11 @@ module.exports = {
     return ctx.send({ recoveryCodes: recovery });
   },
 
+  async logout(ctx) {
+    clearAuthCookies(ctx);
+    return ctx.send({ success: true });
+  },
+
   async twoFactorLogin(ctx) {
     const { challenge_token: challengeToken, code, recovery_code: recoveryCode } = ctx.request.body || {};
     const challenge = verifyTwoFactorChallenge(strapi, challengeToken);
@@ -872,10 +906,14 @@ module.exports = {
     }
 
     const jwt = await strapi.plugin('users-permissions').service('jwt').issue({ id: user.id });
-    return ctx.send({
+    const body = {
       jwt,
       user: await authUserPayload(strapi, user),
-    });
+    };
+    setAuthCookies(ctx, jwt);
+    ctx.body = body;
+    stripJwtFromBodyIfCookieOnly(ctx);
+    return;
   },
 
   async twoFactorEmailChallengeResend(ctx) {

@@ -93,6 +93,12 @@ module.exports = {
       config: { policies: [], middlewares: [] },
     },
     {
+      method: 'PATCH',
+      path: '/orders/:documentId/items/:itemDocumentId/void',
+      handler: 'order.voidItem',
+      config: { policies: [], middlewares: [] },
+    },
+    {
       method: 'POST',
       path: '/orders/:documentId/close',
       handler: 'order.close',

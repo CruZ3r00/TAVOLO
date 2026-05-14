@@ -25,6 +25,7 @@ const {
 const paymentService = require('../../../services/payment');
 const statsService = require('../../../services/stats');
 const posBridge = require('../../../services/pos-bridge');
+const inventoryService = require('../../../services/inventory');
 const {
   STAFF_ROLES,
   KITCHEN_LIKE_ROLES,
@@ -125,6 +126,9 @@ function serializeItem(item, routingLookup) {
     course: parseInt(item.course, 10) || 1,
     notes: item.notes || null,
     status: item.status,
+    voided: !!item.voided,
+    voided_reason: item.voided_reason || null,
+    voided_at: item.voided_at || null,
     station: routingLookup ? routingLookup(category) : null,
     fk_element: item.fk_element ? { documentId: item.fk_element.documentId } : null,
     createdAt: item.createdAt,
@@ -1313,15 +1317,136 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         throw appError('NOT_OWNER', 'Questo reparto non puo eseguire questa transizione.');
       }
 
+      const updateData = { status: nextStatus };
+      if (nextStatus === 'served') {
+        updateData.served_at = new Date();
+      }
       const updated = await strapi.documents('api::order-item.order-item').update({
         documentId: itemDocumentId,
-        data: { status: nextStatus },
+        data: updateData,
       });
       if (order.service_type === 'takeaway' && nextStatus === 'ready') {
         await refreshReadyState(strapi, documentId);
       }
 
+      // Hook inventory: scarico magazzino al passaggio served (dine-in).
+      // Fail-soft: errori loggati ma non rilanciati (NON deve bloccare la FSM).
+      if (nextStatus === 'served') {
+        try {
+          await inventoryService.applyOnServe(strapi, updated);
+        } catch (invErr) {
+          strapi.log.warn(`order.updateItemStatus: inventory.applyOnServe fallito per item ${itemDocumentId}: ${invErr.message}`);
+        }
+      }
+
       ctx.body = { data: { item: serializeItem(updated, routingLookup) } };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  /**
+   * PATCH /api/orders/:documentId/items/:itemDocumentId/void
+   * Annullamento item gia' in lavorazione/servito (cameriere+).
+   * - Marca voided=true, voided_reason, voided_at.
+   * - Se item era served: invoca inventory.applyOnVoid (compensativo).
+   * - Incrementa RestaurantDailyStat.voided_count / voided_revenue_lost.
+   * - Ricalcola order.total_amount (computeTotal esclude voided).
+   *
+   * Differisce da deleteItem: il record viene preservato in DB con flag,
+   * sia per audit che per ripristino della stock via movimenti compensativi.
+   */
+  async voidItem(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const { documentId, itemDocumentId } = ctx.params;
+      if (!documentId || !itemDocumentId) {
+        throw appError('INVALID_PAYLOAD', 'documentId e itemDocumentId obbligatori.');
+      }
+
+      const raw = ctx.request.body || {};
+      const body = raw.data && typeof raw.data === 'object' ? raw.data : raw;
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      if (!reason || reason.length < 2) {
+        throw appError('INVALID_PAYLOAD', 'reason obbligatoria (min 2 caratteri).');
+      }
+      if (reason.length > 500) {
+        throw appError('INVALID_PAYLOAD', 'reason troppo lunga (max 500).');
+      }
+
+      const order = await loadOrder(documentId, actor.ownerId);
+      if (order.status !== 'active') {
+        throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
+      }
+
+      assertLockVersion(order, body.lock_version);
+
+      const items = order.fk_items || [];
+      const item = items.find((i) => i.documentId === itemDocumentId);
+      if (!item) throw appError('ITEM_NOT_FOUND', 'Item non trovato.');
+      if (item.voided) {
+        throw appError('ITEM_NOT_EDITABLE', 'Item gia annullato.');
+      }
+
+      const wasServed = item.status === 'served';
+      const voidedAt = new Date();
+      const price = parseFloat(item.price) || 0;
+      const qty = parseInt(item.quantity, 10) || 0;
+      const lostRevenue = Math.round(price * qty * 100) / 100;
+
+      const updated = await strapi.documents('api::order-item.order-item').update({
+        documentId: itemDocumentId,
+        data: {
+          voided: true,
+          voided_reason: reason,
+          voided_at: voidedAt,
+        },
+      });
+
+      // Hook inventory compensativo: solo se l'item era gia served
+      // (ovvero applyOnServe era stato chiamato e ci sono movimenti).
+      // Fail-soft: non bloccare il flusso utente per errori magazzino.
+      if (wasServed) {
+        try {
+          await inventoryService.applyOnVoid(strapi, updated);
+        } catch (invErr) {
+          strapi.log.warn(`order.voidItem: inventory.applyOnVoid fallito item ${itemDocumentId}: ${invErr.message}`);
+        }
+      }
+
+      // Aggiorna RestaurantDailyStat (data del void in UTC). Fail-soft.
+      try {
+        const dateKey = statsService.dateKeyUTC(voidedAt.toISOString());
+        await statsService.bumpVoided(strapi, {
+          userId: actor.ownerId,
+          dateKey,
+          count: 1,
+          revenueLost: lostRevenue,
+        });
+      } catch (statErr) {
+        strapi.log.warn(`order.voidItem: bumpVoided fallito: ${statErr.message}`);
+      }
+
+      // Ricalcola totale ordine (computeTotal esclude items voided).
+      const totalResult = await recalculateTotal(strapi, documentId);
+
+      let routingLookup = null;
+      try { routingLookup = await loadRoutingMap(strapi, actor.owner); }
+      catch (_e) { routingLookup = () => null; }
+
+      ctx.body = {
+        data: {
+          item: serializeItem(updated, routingLookup),
+          order: {
+            total_amount: totalResult.total,
+            lock_version: totalResult.lock_version,
+          },
+        },
+      };
     } catch (err) {
       sendError(ctx, err);
     }
@@ -1495,12 +1620,24 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         throw appError('INVALID_PAYLOAD', 'Tutte le portate devono essere pronte.');
       }
 
+      const pickupTime = new Date();
+      const itemsServedNow = [];
       for (const item of items) {
         if (item.status !== 'served') {
-          await strapi.documents('api::order-item.order-item').update({
+          const upd = await strapi.documents('api::order-item.order-item').update({
             documentId: item.documentId,
-            data: { status: 'served' },
+            data: { status: 'served', served_at: pickupTime },
           });
+          itemsServedNow.push(upd);
+        }
+      }
+      // Hook inventory: scarica gli item appena passati a served (takeaway pickup).
+      // Fail-soft: errori loggati ma non rilanciati.
+      for (const oi of itemsServedNow) {
+        try {
+          await inventoryService.applyOnServe(strapi, oi);
+        } catch (invErr) {
+          strapi.log.warn(`pickupTakeaway: inventory.applyOnServe fallito item ${oi.documentId}: ${invErr.message}`);
         }
       }
       const updated = await strapi.documents('api::order.order').update({
@@ -1717,7 +1854,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
               ? parseInt(order.covers, 10)
               : (reservation ? parseInt(reservation.number_of_people, 10) : 0)) || 0;
             const itemsCount = (items || []).reduce(
-              (s, it) => s + (parseInt(it.quantity, 10) || 0), 0
+              (s, it) => (it && it.voided ? s : s + (parseInt(it.quantity, 10) || 0)), 0
             );
 
             await statsService.updateDailyStat(strapi, {

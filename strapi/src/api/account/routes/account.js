@@ -22,6 +22,7 @@ module.exports = {
     },
     { method: 'PUT',    path: '/account/password',        handler: 'account.updatePassword' },
     { method: 'POST',   path: '/account/destroy',         handler: 'account.destroy' },
+    { method: 'POST',   path: '/account/logout',          handler: 'account.logout', config: { auth: false, policies: [], middlewares: [] } },
     { method: 'GET',    path: '/account/2fa/status',      handler: 'account.twoFactorStatus' },
     { method: 'POST',   path: '/account/2fa/enable',      handler: 'account.twoFactorEnable' },
     { method: 'POST',   path: '/account/2fa/confirm',     handler: 'account.twoFactorConfirm' },

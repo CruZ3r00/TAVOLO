@@ -18,6 +18,10 @@ const {
   hashEmailCode,
   signTwoFactorChallenge,
 } = require('../../utils/two-factor-auth');
+const {
+  setAuthCookies,
+  stripJwtFromBodyIfCookieOnly,
+} = require('../../utils/auth-cookies');
 
 const TWO_FACTOR_EMAIL_TTL_MS = 10 * 60 * 1000;
 
@@ -102,6 +106,10 @@ module.exports = (plugin) => {
     }
 
     await enrichAuthUser(ctx);
+    if (ctx.body?.jwt) {
+      setAuthCookies(ctx, ctx.body.jwt);
+      stripJwtFromBodyIfCookieOnly(ctx);
+    }
   };
 
   plugin.controllers.user.me = async (ctx) => {

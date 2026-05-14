@@ -109,6 +109,21 @@ export const updateItemStatus = async (orderDocumentId, itemDocumentId, status, 
 };
 
 /**
+ * Annulla un item gia in lavorazione/servito. Marca voided=true e ricalcola.
+ * body: { reason, lock_version? }
+ */
+export const voidOrderItem = async (orderDocumentId, itemDocumentId, body, token) => {
+  const resp = await fetch(`${API_BASE}/api/orders/${orderDocumentId}/items/${itemDocumentId}/void`, {
+    method: 'PATCH',
+    headers: jsonHeaders(token),
+    body: JSON.stringify(body || {}),
+  });
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw buildApiError(resp, payload);
+  return payload.data;
+};
+
+/**
  * Chiude ordine + pagamento. body: { payment_method?, lock_version? }
  */
 export const closeOrder = async (documentId, body, token) => {

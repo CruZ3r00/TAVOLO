@@ -44,6 +44,12 @@ Important production requirements enforced at boot:
 - `PUBLIC_URL`, `FRONTEND_URL`, and every `CORS_ORIGIN` entry must use HTTPS.
 - `CORS_ORIGIN` must be only the public frontend origin, never `*`, localhost,
   or LAN addresses.
+- Auth cookies are used in production: keep `AUTH_COOKIE_ONLY=true`,
+  `AUTH_COOKIE_SECURE=true`, `AUTH_COOKIE_SAMESITE=lax`, and set
+  `AUTH_COOKIE_DOMAIN` to the shared parent domain when API and frontend live
+  on different subdomains.
+- `JWT_EXPIRES_IN` and `AUTH_COOKIE_MAX_AGE_SECONDS` must be 7 days or less.
+- Keep `CSP_ALLOW_UNSAFE_INLINE_SCRIPT=false` in production.
 - Database SSL must be enabled.
 - If `OCR_SERVICE_URL` is set, `OCR_SERVICE_INTERNAL_TOKEN_REQUIRED=true` and
   `OCR_SERVICE_INTERNAL_TOKEN` must be set.

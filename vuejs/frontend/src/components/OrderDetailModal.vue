@@ -3,9 +3,10 @@ import { computed, ref, watch } from 'vue';
 import Modal from '@/components/Modal.vue';
 import OrderItemRow from '@/components/OrderItemRow.vue';
 import OrderStatusBadge from '@/components/OrderStatusBadge.vue';
+import VoidItemModal from '@/components/VoidItemModal.vue';
 import {
     fetchOrder, addOrderItem, updateOrderItem, deleteOrderItem,
-    updateItemStatus, orderErrorMessage,
+    updateItemStatus, voidOrderItem, orderErrorMessage,
 } from '@/utils';
 
 const props = defineProps({
@@ -21,6 +22,11 @@ const loading = ref(false);
 const errorMessage = ref('');
 const toast = ref(null);
 const busyItemIds = ref(new Set());
+
+// Void item modal state
+const voidModalShow = ref(false);
+const voidTargetItem = ref(null);
+const voidSubmitting = ref(false);
 
 watch(() => props.show, async (v) => {
     if (v && props.orderDocumentId) {
@@ -201,6 +207,54 @@ const handleServe = async (item) => {
     }
 };
 
+const handleOpenVoid = (item) => {
+    if (!item || item.voided) return;
+    if (!isActive.value) return;
+    voidTargetItem.value = item;
+    voidModalShow.value = true;
+};
+
+const handleVoidCancel = () => {
+    if (voidSubmitting.value) return;
+    voidModalShow.value = false;
+    voidTargetItem.value = null;
+};
+
+const handleVoidConfirm = async (reason) => {
+    const item = voidTargetItem.value;
+    if (!item) return;
+    voidSubmitting.value = true;
+    setBusy(item.documentId, true);
+    try {
+        const result = await voidOrderItem(
+            props.orderDocumentId,
+            item.documentId,
+            { reason, lock_version: order.value.lock_version },
+            props.token,
+        );
+        // Aggiorna localmente l'item voided + il totale.
+        const idx = order.value.items.findIndex((i) => i.documentId === item.documentId);
+        if (idx !== -1 && result.item) {
+            order.value.items.splice(idx, 1, { ...order.value.items[idx], ...result.item });
+        }
+        if (result.order) {
+            order.value.total_amount = result.order.total_amount;
+            order.value.lock_version = result.order.lock_version;
+        }
+        showToast('success', 'Elemento annullato.');
+        emit('order-updated');
+        voidModalShow.value = false;
+        voidTargetItem.value = null;
+    } catch (err) {
+        if (!(await handleStaleError(err))) {
+            showToast('error', orderErrorMessage(err));
+        }
+    } finally {
+        voidSubmitting.value = false;
+        setBusy(item.documentId, false);
+    }
+};
+
 const openAddItem = () => {
     if (!canEditItems.value) return;
     emit('open-add-item', {
@@ -231,7 +285,15 @@ defineExpose({ onItemAdded, silentReload });
 </script>
 
 <template>
-    <Modal :show="show" @close="onClose">
+    <div class="odm-host">
+        <VoidItemModal
+            :show="voidModalShow"
+            :item="voidTargetItem"
+            :busy="voidSubmitting"
+            @confirm="handleVoidConfirm"
+            @cancel="handleVoidCancel"
+        />
+        <Modal :show="show" @close="onClose">
         <template #title>
             <div class="modal-title-wrap">
                 <i class="bi bi-receipt" aria-hidden="true"></i>
@@ -320,11 +382,13 @@ defineExpose({ onItemAdded, silentReload });
                                 :key="item.documentId"
                                 :item="item"
                                 :order-active="canEditItems"
+                                :can-void="isActive"
                                 :busy="busyItemIds.has(item.documentId)"
                                 @increment="handleIncrement"
                                 @decrement="handleDecrement"
                                 @delete="handleDelete"
                                 @serve="handleServe"
+                                @void="handleOpenVoid"
                             />
                         </section>
                     </div>
@@ -374,10 +438,14 @@ defineExpose({ onItemAdded, silentReload });
                 </template>
             </div>
         </template>
-    </Modal>
+        </Modal>
+    </div>
 </template>
 
 <style scoped>
+/* Wrapper invisibile: i due modali (Modal + VoidItemModal) sono teleport-to-body */
+.odm-host { display: contents; }
+
 .modal-title-wrap {
     display: flex;
     align-items: center;

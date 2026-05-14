@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "element_ingredients",
+  "info": {
+    "singularName": "element-ingredient",
+    "pluralName": "element-ingredients",
+    "displayName": "ElementIngredient",
+    "description": "Riga ricetta: quanto ingrediente usa un Element per ogni porzione."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "qty_per_serving": {
+      "type": "decimal",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "unit_override": {
+      "type": "enumeration",
+      "enum": ["g", "kg", "ml", "l", "pz", "mazzo"],
+      "required": false
+    },
+    "fk_element": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::element.element",
+      "inversedBy": "fk_element_ingredients"
+    },
+    "fk_ingredient": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ingredient.ingredient",
+      "inversedBy": "fk_element_ingredients"
+    }
+  }
+}

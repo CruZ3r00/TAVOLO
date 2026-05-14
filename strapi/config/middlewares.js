@@ -28,6 +28,23 @@ const parseCorsOrigins = () => {
 
 const frontendOrigins = parseCorsOrigins();
 const poweredByMiddleware = process.env.NODE_ENV === 'production' ? null : 'strapi::poweredBy';
+const scriptSrc = ["'self'", 'cdn.jsdelivr.net'];
+const corsAllowedHeaders = [
+  'Content-Type',
+  'Authorization',
+  'Origin',
+  'Accept',
+  'X-Requested-With',
+  'X-CSRF-Token',
+  'X-XSRF-Token',
+  'Idempotency-Key',
+  'Cache-Control',
+  'Pragma',
+];
+
+if (process.env.NODE_ENV !== 'production' || process.env.CSP_ALLOW_UNSAFE_INLINE_SCRIPT === 'true') {
+  scriptSrc.splice(1, 0, "'unsafe-inline'");
+}
 
 const parseFrameAncestors = () => {
   const raw = process.env.FRAME_ANCESTORS;
@@ -49,12 +66,14 @@ module.exports = [
       contentSecurityPolicy: {
         useDefaults: true,
         directives: {
-          'script-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
+          'script-src': scriptSrc,
           'style-src': ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
           'img-src': ["'self'", 'data:', 'blob:', 'cdn.jsdelivr.net'],
           'font-src': ["'self'", 'cdn.jsdelivr.net'],
           'connect-src': ["'self'"],
           'frame-ancestors': parseFrameAncestors(),
+          'base-uri': ["'self'"],
+          'object-src': ["'none'"],
         },
       },
     },
@@ -63,7 +82,8 @@ module.exports = [
     name: 'strapi::cors',
     config: {
       origin: frontendOrigins,
-      headers: '*',
+      headers: corsAllowedHeaders,
+      credentials: true,
     },
   },
   poweredByMiddleware,
@@ -81,6 +101,7 @@ module.exports = [
     },
   },
   'strapi::session',
+  'global::auth-cookie',
   'global::subscription-gate',
   'strapi::favicon',
   'strapi::public',

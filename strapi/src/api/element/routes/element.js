@@ -29,5 +29,23 @@ module.exports = {
         middlewares: [],
       },
     },
+    {
+      method: 'GET',
+      path: '/elements/:documentId/recipe',
+      handler: 'element.getRecipe',
+      config: {
+        policies: [],
+        middlewares: [],
+      },
+    },
+    {
+      method: 'PUT',
+      path: '/elements/:documentId/recipe',
+      handler: 'element.setRecipe',
+      config: {
+        policies: [],
+        middlewares: [],
+      },
+    },
   ],
 };

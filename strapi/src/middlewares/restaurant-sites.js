@@ -45,7 +45,7 @@ module.exports = (config, { strapi }) => {
       const siteCsp = [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
-        "script-src-attr 'unsafe-inline'",
+        "script-src-attr 'none'",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
         "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net",

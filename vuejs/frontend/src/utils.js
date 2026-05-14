@@ -58,6 +58,7 @@ export {
   updateOrderItem,
   deleteOrderItem,
   updateItemStatus,
+  voidOrderItem,
   closeOrder,
   orderErrorMessage,
 } from './lib/api/orders.js';
@@ -67,3 +68,34 @@ export {
   revokePosDevice,
   fetchPosInstallers,
 } from './lib/api/pos.js';
+export {
+  fetchBarShiftCurrent,
+  fetchBarShiftCurrentReport,
+  openBarShift,
+  closeBarShift,
+  caricoFatto,
+  fetchBarShiftHistory,
+  fetchBarShiftById,
+  fetchBarShiftReport,
+  barShiftErrorMessage,
+} from './lib/api/bar-shift.js';
+export {
+  fetchIngredientsAdvanced,
+  createIngredient,
+  updateIngredient,
+  deleteIngredient,
+  restockIngredient,
+  restockBatch,
+  wasteIngredient,
+  confirmDepletedIngredient,
+  fetchIngredientMovements,
+  createRestockOrders,
+  fetchRestockOrders,
+  receiveRestock,
+  cancelRestock,
+  fetchInventoryAlerts,
+  acknowledgeAlert,
+  fetchElementRecipe,
+  setElementRecipe,
+  inventoryErrorMessage,
+} from './lib/api/inventory.js';

@@ -50,6 +50,24 @@
       "default": "taken",
       "required": true
     },
+    "voided": {
+      "type": "boolean",
+      "default": false,
+      "required": false
+    },
+    "voided_reason": {
+      "type": "text",
+      "required": false,
+      "maxLength": 500
+    },
+    "voided_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "served_at": {
+      "type": "datetime",
+      "required": false
+    },
     "fk_order": {
       "type": "relation",
       "relation": "manyToOne",

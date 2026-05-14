@@ -54,15 +54,13 @@ const submit = async () => {
       let user = data.user;
       try {
         const meResponse = await fetch(`${API_BASE}/api/users/me`, {
-          headers: { Authorization: `Bearer ${data.jwt}` },
+          headers: data.jwt ? { Authorization: `Bearer ${data.jwt}` } : {},
         });
         if (meResponse.ok) {
           user = await meResponse.json();
         }
       } catch (_err) { /* login resta valido anche se /me non risponde */ }
-      store.dispatch('login', { user, token: data.jwt });
-      localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('token', data.jwt);
+      store.dispatch('login', { user, token: data.jwt || null });
       const pendingPlan = route.query.plan || sessionStorage.getItem('pending_plan_after_verification');
       if (['starter', 'pro'].includes(pendingPlan)) {
         sessionStorage.removeItem('pending_plan_after_verification');

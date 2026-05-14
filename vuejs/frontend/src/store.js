@@ -7,6 +7,7 @@
 // e store viene istanziato al top-level prima delle istruzioni nello main.
 import * as VueNS from 'vue';
 import * as VuexNS from 'vuex';
+import { API_BASE } from './lib/api/_base';
 
 const VueDefault = VueNS.default || VueNS;
 const VuexDefault = VuexNS.default || VuexNS;
@@ -24,7 +25,8 @@ export const store = createStore({
   state() {
     return {
       user: JSON.parse(localStorage.getItem('user')) || null,
-      token: localStorage.getItem('token') || null,
+      token: null,
+      sessionChecked: false,
     };
   },
   mutations: {
@@ -38,25 +40,78 @@ export const store = createStore({
       state.user = null;
       state.token = null;
     },
+    setSessionChecked(state, checked) {
+      state.sessionChecked = checked;
+    },
   },
   actions: {
     login({ commit }, { user, token }) {
       commit('setUser', user);
-      commit('setToken', token);
+      commit('setToken', token || null);
+      if (user) localStorage.setItem('user', JSON.stringify(user));
+      localStorage.removeItem('token');
     },
     logout({ commit }) {
       commit('logout');
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+    },
+    async refreshSession({ commit, state }) {
+      try {
+        const resp = await fetch(`${API_BASE}/api/users/me`, { credentials: 'include' });
+        if (!resp.ok) {
+          commit('logout');
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+          return false;
+        }
+        const user = await resp.json();
+        commit('setUser', user);
+        commit('setToken', state.token || null);
+        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.removeItem('token');
+        return true;
+      } catch (_err) {
+        commit('logout');
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        return false;
+      } finally {
+        commit('setSessionChecked', true);
+      }
+    },
+    // Refresh user payload (es. dopo cambio piano Stripe o mount AppLayout) senza
+    // toccare sessionChecked ne forzare logout su errore — fail-soft.
+    async refreshUser({ commit, state }) {
+      if (!state.user && !state.token) return false;
+      try {
+        const headers = state.token ? { Authorization: `Bearer ${state.token}` } : {};
+        const resp = await fetch(`${API_BASE}/api/users/me`, {
+          credentials: 'include',
+          headers,
+        });
+        if (!resp.ok) return false;
+        const user = await resp.json();
+        commit('setUser', user);
+        localStorage.setItem('user', JSON.stringify(user));
+        return true;
+      } catch (_err) {
+        return false;
+      }
     },
   },
   getters: {
     isAuthenticated(state) {
-      return state.token !== null;
+      return state.token !== null || state.user !== null;
     },
     getUser(state) {
       return state.user;
     },
     getToken(state){
       return state.token;
+    },
+    sessionChecked(state) {
+      return state.sessionChecked;
     }
   },
 });

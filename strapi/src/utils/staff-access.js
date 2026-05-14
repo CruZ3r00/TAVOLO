@@ -216,6 +216,8 @@ function staffUserPayload(user, owner) {
     effective_user_id: effectiveOwner ? effectiveOwner.id : user.id,
     effective_user_documentId: effectiveOwner ? effectiveOwner.documentId : user.documentId,
     restaurant_name: effectiveOwner ? (effectiveOwner.restaurant_name || effectiveOwner.username) : user.username,
+    subscription_plan: effectiveOwner ? (effectiveOwner.subscription_plan || null) : (user && user.subscription_plan) || null,
+    subscription_status: effectiveOwner ? (effectiveOwner.subscription_status || null) : (user && user.subscription_status) || null,
   };
 }
 

@@ -59,10 +59,13 @@ async function archiveClosedOrder(strapi, {
     quantity: parseInt(it.quantity, 10) || 0,
     notes: it.notes || null,
     status: it.status || null,
+    voided: !!it.voided,
+    voided_reason: it.voided_reason || null,
+    voided_at: it.voided_at || null,
     element_document_id: it.fk_element && it.fk_element.documentId ? it.fk_element.documentId : null,
   }));
 
-  const itemsCount = itemsSnapshot.reduce((s, it) => s + it.quantity, 0);
+  const itemsCount = itemsSnapshot.reduce((s, it) => (it.voided ? s : s + it.quantity), 0);
 
   const data = {
     order_document_id: order.documentId,
@@ -153,6 +156,7 @@ async function updateElementStats(strapi, { userId, items, timestamp }) {
   if (!Array.isArray(items) || items.length === 0) return;
 
   for (const item of items) {
+    if (item && item.voided) continue;
     const el = item.fk_element;
     if (!el || !el.id) continue;
 
@@ -195,10 +199,58 @@ async function updateElementStats(strapi, { userId, items, timestamp }) {
   }
 }
 
+/**
+ * Incrementa voided_count e voided_revenue_lost per (userId, dateKey).
+ * Usato dall'endpoint void item: rappresenta items annullati post-served
+ * (loss accounting separato da revenue effettivo dell'ordine).
+ *
+ * Crea la row se mancante per la data (es. annullamento prima della chiusura
+ * dell'ordine).
+ */
+async function bumpVoided(strapi, { userId, dateKey, count, revenueLost }) {
+  if (!userId || !dateKey) return null;
+  const inc = parseInt(count, 10) || 0;
+  const lost = parseFloat(revenueLost) || 0;
+  if (inc <= 0 && lost <= 0) return null;
+
+  const existing = await strapi.db.query('api::restaurant-daily-stat.restaurant-daily-stat').findMany({
+    where: { date: dateKey, fk_user: { id: userId } },
+    limit: 1,
+  });
+
+  if (existing && existing.length > 0) {
+    const row = existing[0];
+    return strapi.documents('api::restaurant-daily-stat.restaurant-daily-stat').update({
+      documentId: row.documentId,
+      data: {
+        voided_count: (row.voided_count || 0) + inc,
+        voided_revenue_lost: (parseFloat(row.voided_revenue_lost) || 0) + lost,
+      },
+    });
+  }
+
+  return strapi.documents('api::restaurant-daily-stat.restaurant-daily-stat').create({
+    data: {
+      date: dateKey,
+      orders_count: 0,
+      customers_count: 0,
+      revenue: 0,
+      items_sold: 0,
+      walkin_count: 0,
+      reservation_count: 0,
+      takeaway_count: 0,
+      voided_count: inc,
+      voided_revenue_lost: lost,
+      fk_user: { connect: [{ id: userId }] },
+    },
+  });
+}
+
 module.exports = {
   dateKeyUTC,
   durationMinutes,
   archiveClosedOrder,
   updateDailyStat,
   updateElementStats,
+  bumpVoided,
 };

@@ -6,6 +6,9 @@ const fs = require('fs');
 const { validateProductionConfig } = require('./utils/production-checks');
 const { sweepDueTakeaways } = require('./utils/takeaway-lifecycle');
 const { isReservedStaffUsername, publicSiteSlug } = require('./utils/staff-access');
+const { setAuthCookies, stripJwtFromBodyIfCookieOnly } = require('./utils/auth-cookies');
+const posBridge = require('./services/pos-bridge');
+const inventoryAlerts = require('./services/inventory-alerts');
 console.log("STARTING STRAPI...");
 console.log("PORT:", process.env.PORT);
 function escapeHtml(value) {
@@ -140,6 +143,10 @@ module.exports = {
         }
         if (ctx.body && ctx.body.user) {
           ctx.body.user.url = siteUrl;
+        }
+        if (ctx.body && ctx.body.jwt) {
+          setAuthCookies(ctx, ctx.body.jwt);
+          stripJwtFromBodyIfCookieOnly(ctx);
         }
       } catch (error) {
         strapi.log.error(
@@ -280,6 +287,7 @@ module.exports = {
   async bootstrap({ strapi }) {
     validateProductionConfig(strapi);
     await configureUsersPermissionsEmail(strapi);
+    posBridge.setupWebSocketServer(strapi);
 
     // Seed data: crea utente demo e dati di test se non esistono
     if (process.env.SEED_DEMO_DATA === 'true') {
@@ -291,8 +299,40 @@ module.exports = {
     await grantImportPermissions(strapi);
     await grantPublicReservationPermission(strapi);
     startTakeawaySweep(strapi);
+    startInventoryAlertsScan(strapi);
   },
 };
+
+function startInventoryAlertsScan(strapi) {
+  // Scan periodico magazzino (cron 4h). Skip se feature flag disabilitata.
+  const enabled = String(process.env.INVENTORY_ALERTS_ENABLED || 'true').toLowerCase() !== 'false';
+  if (!enabled) {
+    strapi.log.info('Inventory alerts scan disabilitato via INVENTORY_ALERTS_ENABLED=false.');
+    return;
+  }
+  const intervalMs = parseInt(process.env.INVENTORY_ALERTS_INTERVAL_MS || '14400000', 10); // 4h default
+
+  const run = async () => {
+    if (strapi.inventoryAlertsScanRunning) return;
+    strapi.inventoryAlertsScanRunning = true;
+    try {
+      await inventoryAlerts.runAlertScan(strapi);
+    } catch (err) {
+      strapi.log.warn(`inventory-alerts scan fallito: ${err.message}`);
+    } finally {
+      strapi.inventoryAlertsScanRunning = false;
+    }
+  };
+
+  // Primo run differito di 2 minuti per non interferire col boot.
+  setTimeout(run, 2 * 60 * 1000);
+  if (strapi.inventoryAlertsInterval) clearInterval(strapi.inventoryAlertsInterval);
+  strapi.inventoryAlertsInterval = setInterval(run, intervalMs);
+  if (typeof strapi.inventoryAlertsInterval.unref === 'function') {
+    strapi.inventoryAlertsInterval.unref();
+  }
+  strapi.log.info(`Inventory alerts scan attivo (interval ${Math.round(intervalMs / 60000)}min).`);
+}
 
 function startTakeawaySweep(strapi) {
   const run = async () => {
@@ -407,6 +447,8 @@ async function grantImportPermissions(strapi) {
       'api::element.element.create',
       'api::element.element.update',
       'api::element.element.remove',
+      'api::element.element.getRecipe',
+      'api::element.element.setRecipe',
       'api::account.account.updateProfile',
       'api::account.account.listStaff',
       'api::account.account.updateStaff',
@@ -431,6 +473,22 @@ async function grantImportPermissions(strapi) {
       'api::billing.billing.reactivateSubscription',
       'api::ingredient.ingredient.list',
       'api::ingredient.ingredient.toggle',
+      'api::ingredient.ingredient.listAdvanced',
+      'api::ingredient.ingredient.createAdvanced',
+      'api::ingredient.ingredient.restockBatch',
+      'api::ingredient.ingredient.updateAdvanced',
+      'api::ingredient.ingredient.removeAdvanced',
+      'api::ingredient.ingredient.restock',
+      'api::ingredient.ingredient.waste',
+      'api::ingredient.ingredient.confirmDepleted',
+      'api::ingredient.ingredient.listMovements',
+      'api::restock-order.restock-order.create',
+      'api::restock-order.restock-order.list',
+      'api::restock-order.restock-order.findOne',
+      'api::restock-order.restock-order.receive',
+      'api::restock-order.restock-order.cancel',
+      'api::inventory-alert.inventory-alert.list',
+      'api::inventory-alert.inventory-alert.acknowledge',
       'api::reservation.reservation.createAuthenticated',
       'api::reservation.reservation.list',
       'api::reservation.reservation.updateStatus',

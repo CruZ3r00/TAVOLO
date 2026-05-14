@@ -91,9 +91,7 @@
                 }
 
                 const data = await resp.json();
-                store.dispatch('login', { user: data.user, token: data.jwt });
-                localStorage.setItem('user', JSON.stringify(data.user));
-                localStorage.setItem('token', data.jwt);
+                store.dispatch('login', { user: data.user, token: data.jwt || null });
                 sessionStorage.removeItem('two_factor_challenge_token');
                 sessionStorage.removeItem('two_factor_pending_user');
                 sessionStorage.removeItem('two_factor_methods');

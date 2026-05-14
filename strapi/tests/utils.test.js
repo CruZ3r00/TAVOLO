@@ -22,6 +22,8 @@ const {
   verifyEmailCode,
   verifyTwoFactorChallenge,
 } = require('../src/utils/two-factor-auth');
+const { setAuthCookies, stripJwtFromBodyIfCookieOnly } = require('../src/utils/auth-cookies');
+const authCookieMiddleware = require('../src/middlewares/auth-cookie');
 const publicTakeawayGuard = require('../src/api/order/middlewares/public-takeaway-guard');
 
 const testStrapi = {
@@ -55,6 +57,29 @@ test('computeTotal rounds subtotal and total', () => {
   assert.equal(result.tax, 0);
   assert.equal(result.discount, 0);
   assert.equal(result.total, 23);
+});
+
+test('computeTotal esclude items voided dal subtotal', () => {
+  const result = computeTotal({
+    items: [
+      { price: '10', quantity: 2 },                       // 20
+      { price: '5', quantity: 1, voided: true },          // escluso
+      { price: '7.50', quantity: 2, voided: false },      // 15
+    ],
+  });
+  assert.equal(result.subtotal, 35);
+  assert.equal(result.total, 35);
+});
+
+test('computeTotal con tutti gli items voided = 0', () => {
+  const result = computeTotal({
+    items: [
+      { price: 10, quantity: 1, voided: true },
+      { price: 5, quantity: 3, voided: true },
+    ],
+  });
+  assert.equal(result.subtotal, 0);
+  assert.equal(result.total, 0);
 });
 
 test('season capacity uses configured summer months', () => {
@@ -99,6 +124,10 @@ test('production config allows safe minimal settings', () => {
     ADMIN_JWT_SECRET: 'admin-secret',
     TRANSFER_TOKEN_SALT: 'transfer-salt',
     JWT_SECRET: 'jwt-secret',
+    JWT_EXPIRES_IN: '7d',
+    AUTH_COOKIE_SECURE: 'true',
+    AUTH_COOKIE_ONLY: 'true',
+    AUTH_COOKIE_MAX_AGE_SECONDS: '604800',
     PUBLIC_URL: 'https://api.example.com',
     FRONTEND_URL: 'https://app.example.com',
     CORS_ORIGIN: 'https://app.example.com',
@@ -118,6 +147,39 @@ test('production config allows safe minimal settings', () => {
     SEED_DEMO_DATA: 'false',
   }, () => {
     assert.doesNotThrow(() => validateProductionConfig({ log: { error() {} } }));
+  });
+});
+
+test('production config rejects insecure auth cookie settings', () => {
+  withEnv({
+    NODE_ENV: 'production',
+    APP_KEYS: 'a,b,c,d',
+    API_TOKEN_SALT: 'salt',
+    ADMIN_JWT_SECRET: 'admin-secret',
+    TRANSFER_TOKEN_SALT: 'transfer-salt',
+    JWT_SECRET: 'jwt-secret',
+    JWT_EXPIRES_IN: '30d',
+    AUTH_COOKIE_SECURE: 'false',
+    AUTH_COOKIE_ONLY: 'false',
+    AUTH_COOKIE_MAX_AGE_SECONDS: '9999999',
+    PUBLIC_URL: 'https://api.example.com',
+    FRONTEND_URL: 'https://app.example.com',
+    CORS_ORIGIN: 'https://app.example.com',
+    DATABASE_CLIENT: 'mysql',
+    DATABASE_PASSWORD: 'not-a-placeholder',
+    DATABASE_SSL: 'true',
+    DATABASE_SSL_REJECT_UNAUTHORIZED: 'true',
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_PORT: '587',
+    SMTP_USER: 'smtp-user',
+    SMTP_PASS: 'smtp-pass',
+    SMTP_DEFAULT_FROM: 'Tavolo <no-reply@example.com>',
+    SEED_DEMO_DATA: 'false',
+  }, () => {
+    assert.throws(
+      () => validateProductionConfig({ log: { error() {} } }),
+      /AUTH_COOKIE_SECURE[\s\S]*AUTH_COOKIE_ONLY[\s\S]*JWT_EXPIRES_IN/
+    );
   });
 });
 
@@ -239,6 +301,80 @@ test('two factor email codes are six digits and hashed', () => {
   assert.notEqual(hash, code);
   assert.equal(verifyEmailCode(testStrapi, hash, code), true);
   assert.equal(verifyEmailCode(testStrapi, hash, '000000'), false);
+});
+
+test('auth cookies are httpOnly and strip jwt in production cookie-only mode', () => {
+  withEnv({
+    NODE_ENV: 'production',
+    AUTH_COOKIE_ONLY: 'true',
+    AUTH_COOKIE_SECURE: 'true',
+  }, () => {
+    const cookies = [];
+    const ctx = {
+      body: { jwt: 'jwt-token', user: { id: 1 } },
+      cookies: {
+        set(name, value, options) {
+          cookies.push({ name, value, options });
+        },
+      },
+      set(name, value) {
+        this.headers = { ...(this.headers || {}), [name]: value };
+      },
+    };
+
+    setAuthCookies(ctx, ctx.body.jwt);
+    stripJwtFromBodyIfCookieOnly(ctx);
+
+    const authCookie = cookies.find((cookie) => cookie.name === 'ct_auth');
+    const csrfCookie = cookies.find((cookie) => cookie.name === 'ct_csrf');
+    assert.equal(authCookie.value, 'jwt-token');
+    assert.equal(authCookie.options.httpOnly, true);
+    assert.equal(authCookie.options.secure, true);
+    assert.equal(csrfCookie.options.httpOnly, false);
+    assert.equal(typeof ctx.headers['X-CSRF-Token'], 'string');
+    assert.equal(ctx.body.jwt, undefined);
+    assert.equal(ctx.body.cookie_auth, true);
+  });
+});
+
+test('auth cookie middleware requires csrf on unsafe cookie-auth requests', async () => {
+  const middleware = authCookieMiddleware({}, {});
+  let nextCalls = 0;
+  const makeCtx = ({ csrfHeader } = {}) => ({
+    method: 'POST',
+    path: '/api/account/profile',
+    state: {},
+    request: {
+      headers: {},
+      header: {},
+    },
+    get(name) {
+      return name.toLowerCase() === 'x-csrf-token' ? csrfHeader || '' : '';
+    },
+    cookies: {
+      get(name) {
+        if (name === 'ct_auth') return 'jwt-token';
+        if (name === 'ct_csrf') return 'csrf-token';
+        return '';
+      },
+    },
+  });
+
+  const blocked = makeCtx();
+  await middleware(blocked, async () => {
+    nextCalls += 1;
+  });
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.body.error.code, 'CSRF_TOKEN_INVALID');
+  assert.equal(nextCalls, 0);
+
+  const allowed = makeCtx({ csrfHeader: 'csrf-token' });
+  await middleware(allowed, async () => {
+    nextCalls += 1;
+  });
+  assert.equal(nextCalls, 1);
+  assert.equal(allowed.request.headers.authorization, 'Bearer jwt-token');
+  assert.equal(allowed.state.authFromCookie, true);
 });
 
 test('public takeaway guard replays matching idempotent requests', async () => {

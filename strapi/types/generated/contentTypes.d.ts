@@ -26,6 +26,11 @@ export interface AdminApiToken extends Struct.CollectionTypeSchema {
       Schema.Attribute.SetMinMaxLength<{
         minLength: 1;
       }>;
+    adminPermissions: Schema.Attribute.Relation<
+      'oneToMany',
+      'admin::permission'
+    >;
+    adminUserOwner: Schema.Attribute.Relation<'manyToOne', 'admin::user'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -39,6 +44,9 @@ export interface AdminApiToken extends Struct.CollectionTypeSchema {
         minLength: 1;
       }>;
     expiresAt: Schema.Attribute.DateTime;
+    kind: Schema.Attribute.Enumeration<['content-api', 'admin']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'content-api'>;
     lastUsedAt: Schema.Attribute.DateTime;
     lifespan: Schema.Attribute.BigInteger;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -56,7 +64,6 @@ export interface AdminApiToken extends Struct.CollectionTypeSchema {
     >;
     publishedAt: Schema.Attribute.DateTime;
     type: Schema.Attribute.Enumeration<['read-only', 'full-access', 'custom']> &
-      Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'read-only'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -134,6 +141,7 @@ export interface AdminPermission extends Struct.CollectionTypeSchema {
         minLength: 1;
       }>;
     actionParameters: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<{}>;
+    apiToken: Schema.Attribute.Relation<'manyToOne', 'admin::api-token'>;
     conditions: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<[]>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -385,6 +393,8 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
     };
   };
   attributes: {
+    apiTokens: Schema.Attribute.Relation<'oneToMany', 'admin::api-token'> &
+      Schema.Attribute.Private;
     blocked: Schema.Attribute.Boolean &
       Schema.Attribute.Private &
       Schema.Attribute.DefaultTo<false>;
@@ -430,6 +440,102 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiBarShiftBarShift extends Struct.CollectionTypeSchema {
+  collectionName: 'bar_shifts';
+  info: {
+    description: "Turno bar (1 open per owner alla volta). Snapshot del report congelato a 'Carico fatto'.";
+    displayName: 'BarShift';
+    pluralName: 'bar-shifts';
+    singularName: 'bar-shift';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    closed_at: Schema.Attribute.DateTime;
+    closed_by: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::bar-shift.bar-shift'
+    > &
+      Schema.Attribute.Private;
+    note: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 1000;
+      }>;
+    opened_at: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    opened_by: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    snapshot: Schema.Attribute.JSON;
+    status: Schema.Attribute.Enumeration<['open', 'closed']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'open'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiElementIngredientElementIngredient
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'element_ingredients';
+  info: {
+    description: 'Riga ricetta: quanto ingrediente usa un Element per ogni porzione.';
+    displayName: 'ElementIngredient';
+    pluralName: 'element-ingredients';
+    singularName: 'element-ingredient';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    fk_element: Schema.Attribute.Relation<'manyToOne', 'api::element.element'>;
+    fk_ingredient: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::ingredient.ingredient'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::element-ingredient.element-ingredient'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    qty_per_serving: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    unit_override: Schema.Attribute.Enumeration<
+      ['g', 'kg', 'ml', 'l', 'pz', 'mazzo']
+    >;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiElementElement extends Struct.CollectionTypeSchema {
   collectionName: 'elements';
   info: {
@@ -448,12 +554,20 @@ export interface ApiElementElement extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    fk_element_ingredients: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::element-ingredient.element-ingredient'
+    >;
     fk_user: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.user'
     >;
     image: Schema.Attribute.Media<'images' | 'files'>;
     ingredients: Schema.Attribute.JSON & Schema.Attribute.Required;
+    is_archived: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    is_beverage: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    is_beverage_advanced: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -463,6 +577,237 @@ export interface ApiElementElement extends Struct.CollectionTypeSchema {
     name: Schema.Attribute.String & Schema.Attribute.Required;
     price: Schema.Attribute.Decimal & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiIngredientIngredient extends Struct.CollectionTypeSchema {
+  collectionName: 'ingredients';
+  info: {
+    description: 'Ingrediente nominale (starter) o tracciato a magazzino (pro). Univoco per (fk_user, name_normalized).';
+    displayName: 'Ingredient';
+    pluralName: 'ingredients';
+    singularName: 'ingredient';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    allergens: Schema.Attribute.JSON;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    fk_element_ingredients: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::element-ingredient.element-ingredient'
+    >;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    is_active: Schema.Attribute.Boolean &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<true>;
+    is_unavailable: Schema.Attribute.Boolean &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<false>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::ingredient.ingredient'
+    > &
+      Schema.Attribute.Private;
+    low_stock_threshold: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    name_normalized: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    notes: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 1000;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    reorder_lead_days: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<3>;
+    stock_qty: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    supplier_email: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    supplier_name: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    unit: Schema.Attribute.Enumeration<['g', 'kg', 'ml', 'l', 'pz', 'mazzo']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pz'>;
+    unit_size: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiInventoryAlertInventoryAlert
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'inventory_alerts';
+  info: {
+    description: "Alert raggruppato per tipo (predictive | threshold) con N ingredienti. Marcare 'ordinato' o acknowledged li chiude.";
+    displayName: 'InventoryAlert';
+    pluralName: 'inventory-alerts';
+    singularName: 'inventory-alert';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    acknowledged_at: Schema.Attribute.DateTime;
+    acknowledged_by: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    alert_type: Schema.Attribute.Enumeration<['predictive', 'threshold']> &
+      Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    dismissed_by_restock: Schema.Attribute.Boolean &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<false>;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    ingredients_payload: Schema.Attribute.JSON & Schema.Attribute.Required;
+    level: Schema.Attribute.Enumeration<['info', 'warning', 'critical']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'warning'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::inventory-alert.inventory-alert'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    sent_email: Schema.Attribute.Boolean &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<false>;
+    sent_inapp: Schema.Attribute.Boolean &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<false>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiInventoryMovementInventoryMovement
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'inventory_movements';
+  info: {
+    description: 'Audit trail append-only: ogni variazione di stock di un Ingredient (carico, scarico, scarto, adjustment, initial).';
+    displayName: 'InventoryMovement';
+    pluralName: 'inventory-movements';
+    singularName: 'inventory-movement';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    cost: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    fk_bar_shift: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::bar-shift.bar-shift'
+    >;
+    fk_ingredient: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::ingredient.ingredient'
+    >;
+    fk_order: Schema.Attribute.Relation<'manyToOne', 'api::order.order'>;
+    fk_order_item: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::order-item.order-item'
+    >;
+    fk_restock_order: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::restock-order.restock-order'
+    >;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    kind: Schema.Attribute.Enumeration<
+      ['initial', 'restock', 'consumption', 'waste', 'adjustment']
+    > &
+      Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::inventory-movement.inventory-movement'
+    > &
+      Schema.Attribute.Private;
+    note: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 1000;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    qty_after: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    qty_delta: Schema.Attribute.Decimal & Schema.Attribute.Required;
+    reason: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 100;
+      }>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -712,6 +1057,7 @@ export interface ApiOrderItemOrderItem extends Struct.CollectionTypeSchema {
         number
       > &
       Schema.Attribute.DefaultTo<1>;
+    served_at: Schema.Attribute.DateTime;
     status: Schema.Attribute.Enumeration<
       ['taken', 'preparing', 'ready', 'served']
     > &
@@ -720,6 +1066,12 @@ export interface ApiOrderItemOrderItem extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    voided: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    voided_at: Schema.Attribute.DateTime;
+    voided_reason: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
   };
 }
 
@@ -1144,6 +1496,18 @@ export interface ApiRestaurantDailyStatRestaurantDailyStat
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    voided_count: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<0>;
+    voided_revenue_lost: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<0>;
     walkin_count: Schema.Attribute.Integer &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<
@@ -1153,6 +1517,75 @@ export interface ApiRestaurantDailyStatRestaurantDailyStat
         number
       > &
       Schema.Attribute.DefaultTo<0>;
+  };
+}
+
+export interface ApiRestockOrderRestockOrder
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'restock_orders';
+  info: {
+    description: 'Ordine di rifornimento (ciclo ordinato \u2192 ricevuto) per il calcolo del lead time medio e il tracking spese.';
+    displayName: 'RestockOrder';
+    pluralName: 'restock-orders';
+    singularName: 'restock-order';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    cancelled_at: Schema.Attribute.DateTime;
+    cost: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    expected_qty: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    fk_ingredient: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::ingredient.ingredient'
+    >;
+    fk_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::restock-order.restock-order'
+    > &
+      Schema.Attribute.Private;
+    note: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 1000;
+      }>;
+    ordered_at: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    received_at: Schema.Attribute.DateTime;
+    received_qty: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    status: Schema.Attribute.Enumeration<['ordered', 'received', 'cancelled']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'ordered'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
   };
 }
 
@@ -1821,7 +2254,12 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
+      'api::bar-shift.bar-shift': ApiBarShiftBarShift;
+      'api::element-ingredient.element-ingredient': ApiElementIngredientElementIngredient;
       'api::element.element': ApiElementElement;
+      'api::ingredient.ingredient': ApiIngredientIngredient;
+      'api::inventory-alert.inventory-alert': ApiInventoryAlertInventoryAlert;
+      'api::inventory-movement.inventory-movement': ApiInventoryMovementInventoryMovement;
       'api::menu-element-stat.menu-element-stat': ApiMenuElementStatMenuElementStat;
       'api::menu.menu': ApiMenuMenu;
       'api::order-archive.order-archive': ApiOrderArchiveOrderArchive;
@@ -1832,6 +2270,7 @@ declare module '@strapi/strapi' {
       'api::pos-pairing-token.pos-pairing-token': ApiPosPairingTokenPosPairingToken;
       'api::reservation.reservation': ApiReservationReservation;
       'api::restaurant-daily-stat.restaurant-daily-stat': ApiRestaurantDailyStatRestaurantDailyStat;
+      'api::restock-order.restock-order': ApiRestockOrderRestockOrder;
       'api::table.table': ApiTableTable;
       'api::website-config.website-config': ApiWebsiteConfigWebsiteConfig;
       'plugin::content-releases.release': PluginContentReleasesRelease;

@@ -17,6 +17,9 @@ module.exports = () => {
   return {
     'users-permissions': {
       config: {
+        jwt: {
+          expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+        },
         register: {
           allowedFields: [
             'name',

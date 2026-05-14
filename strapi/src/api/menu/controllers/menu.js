@@ -12,7 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { createCoreController } = require('@strapi/strapi').factories;
-const { ensureCategoryRouting } = require('../../../utils/category-routing');
+const { ensureCategoryRouting, isBarRoutedCategory } = require('../../../utils/category-routing');
+const ingredientsService = require('../../../services/ingredients');
 
 const ALLOWED_MIME = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
 
@@ -238,10 +239,18 @@ function sanitizeElement(raw) {
   };
 }
 
-function serializeElement(el) {
+function serializeElement(el, recipeMap) {
   if (!el) return null;
 
   const parsedPrice = Number(el.price);
+  // Compone la lista di nomi ingredienti. Ordine di preferenza:
+  // 1) recipeMap (passato dal caller, batch lookup ElementIngredient → Ingredient.name)
+  // 2) Element.ingredients JSON legacy (durante migrazione)
+  let ingredients = Array.isArray(el.ingredients) ? el.ingredients : [];
+  if (recipeMap && recipeMap.has(el.id)) {
+    const fromRel = recipeMap.get(el.id);
+    if (Array.isArray(fromRel) && fromRel.length > 0) ingredients = fromRel;
+  }
 
   return {
     id: el.id,
@@ -249,24 +258,30 @@ function serializeElement(el) {
     name: el.name,
     price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
     category: el.category || '',
-    ingredients: Array.isArray(el.ingredients) ? el.ingredients : [],
+    ingredients,
     allergens: Array.isArray(el.allergens) ? el.allergens : [],
     image: el.image || null,
     available: el.available !== false,
+    is_beverage: el.is_beverage === true,
+    is_beverage_advanced: el.is_beverage_advanced === true,
+    is_archived: el.is_archived === true,
     createdAt: el.createdAt,
     updatedAt: el.updatedAt,
   };
 }
 
-function serializeMenu(menu) {
+function serializeMenu(menu, recipeMap) {
   if (!menu) return null;
+
+  const elements = Array.isArray(menu.fk_elements) ? menu.fk_elements : [];
+  // Filtra Element archiviati: restano in DB per FK integrity ma non devono
+  // comparire ne' nel menu gestionale ne' nelle liste pubbliche.
+  const visibleElements = elements.filter((el) => el && el.is_archived !== true);
 
   return {
     id: menu.id,
     documentId: menu.documentId,
-    fk_elements: Array.isArray(menu.fk_elements)
-      ? menu.fk_elements.map(serializeElement)
-      : [],
+    fk_elements: visibleElements.map((el) => serializeElement(el, recipeMap)),
     createdAt: menu.createdAt,
     updatedAt: menu.updatedAt,
   };
@@ -304,8 +319,20 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
     try {
       const menu = await loadPublishedMenuByUserId(strapi, user.id);
 
+      // Batch: per ogni Element del menu, recupera la lista nomi ingredienti
+      // dalla relazione ElementIngredient → Ingredient.name (con fallback JSON).
+      let recipeMap = new Map();
+      if (menu && Array.isArray(menu.fk_elements) && menu.fk_elements.length > 0) {
+        const elementIds = menu.fk_elements.map((el) => el && el.id).filter(Boolean);
+        try {
+          recipeMap = await ingredientsService.batchListElementIngredientNames(strapi, elementIds);
+        } catch (e) {
+          strapi.log.warn(`menu.list: batchListElementIngredientNames fallita: ${e.message}`);
+        }
+      }
+
       ctx.body = {
-        data: menu ? [serializeMenu(menu)] : [],
+        data: menu ? [serializeMenu(menu, recipeMap)] : [],
         meta: { total: menu ? 1 : 0 },
       };
     } catch (error) {
@@ -362,23 +389,44 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
         });
       }
 
-      const elements = (menu.fk_elements || []).filter((el) => el.available !== false);
+      // Filtra Element archiviati (soft delete) + non disponibili. Gli archiviati
+      // restano in DB per FK integrity ma non devono apparire nel menu pubblico.
+      const elements = (menu.fk_elements || []).filter(
+        (el) => el.available !== false && el.is_archived !== true
+      );
       const categories = [...new Set(elements.map((el) => el.category))];
-      const formattedElements = elements.map((el) => ({
-        documentId: el.documentId,
-        name: el.name,
-        price: el.price,
-        category: el.category,
-        ingredients: el.ingredients || [],
-        allergens: el.allergens || [],
-        available: el.available !== false,
-        image_url: el.image
-          ? el.image.formats && el.image.formats.thumbnail
-            ? el.image.formats.thumbnail.url
-            : el.image.url
-          : null,
-        image_full_url: el.image ? el.image.url : null,
-      }));
+
+      // Batch lookup ingredienti per ogni Element (ElementIngredient → Ingredient.name).
+      // Fallback al JSON legacy se nessuna relazione popolata.
+      let recipeMap = new Map();
+      try {
+        const ids = elements.map((el) => el.id).filter(Boolean);
+        recipeMap = await ingredientsService.batchListElementIngredientNames(strapi, ids);
+      } catch (e) {
+        strapi.log.warn(`publicMenu: batchListElementIngredientNames fallita: ${e.message}`);
+      }
+
+      const formattedElements = elements.map((el) => {
+        const fromRel = recipeMap.get(el.id);
+        const ingredients = Array.isArray(fromRel) && fromRel.length > 0
+          ? fromRel
+          : (Array.isArray(el.ingredients) ? el.ingredients : []);
+        return {
+          documentId: el.documentId,
+          name: el.name,
+          price: el.price,
+          category: el.category,
+          ingredients,
+          allergens: el.allergens || [],
+          available: el.available !== false,
+          image_url: el.image
+            ? el.image.formats && el.image.formats.thumbnail
+              ? el.image.formats.thumbnail.url
+              : el.image.url
+            : null,
+          image_full_url: el.image ? el.image.url : null,
+        };
+      });
 
       return ctx.send({
         data: {
@@ -568,6 +616,11 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
     }
 
     try {
+      const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: user.id },
+        select: ['id', 'subscription_status', 'subscription_plan', 'subscription_current_period_end', 'end_subscription'],
+      });
+
       const txResult = await strapi.db.transaction(async () => {
         const existingMenus = await strapi.documents('api::menu.menu').findMany({
           filters: { fk_user: { id: { $eq: user.id } } },
@@ -577,6 +630,7 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
 
         const createdDocs = [];
         for (const el of cleaned) {
+          const isBeverage = await isBarRoutedCategory(strapi, owner, el.category);
           const doc = await strapi.documents('api::element.element').create({
             data: {
               name: el.name,
@@ -584,11 +638,20 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
               category: el.category,
               ingredients: el.ingredients,
               allergens: el.allergens,
+              is_beverage: isBeverage,
               fk_user: { connect: [{ id: user.id }] },
             },
             status: 'published',
           });
           await ensureCategoryRouting(strapi, user.id, el.category);
+
+          // Sincronizza la ricetta strutturata via service (dual-write).
+          // Fail-soft: errore qui non rompe il bulk import.
+          try {
+            await ingredientsService.syncElementRecipe(strapi, user.id, doc.id, el.ingredients);
+          } catch (recipeErr) {
+            strapi.log.warn(`bulkImport: syncElementRecipe fallita per ${doc.documentId}: ${recipeErr.message}`);
+          }
           createdDocs.push(doc);
         }
 

@@ -24,6 +24,7 @@
  */
 function computeTotal({ items, taxRate, discounts }) {
   const subtotal = (items || []).reduce((sum, item) => {
+    if (item && item.voided) return sum;
     const p = parseFloat(item.price) || 0;
     const q = parseInt(item.quantity, 10) || 0;
     return sum + p * q;

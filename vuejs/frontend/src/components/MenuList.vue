@@ -9,8 +9,9 @@
     const store = useStore();
     const tkn = store.getters.getToken;
 
-    //segnale al padre per visualizzare adder, notificare il conteggio elementi e richiedere l'import
-    const emit = defineEmits(['AddElement', 'count-changed', 'RequestImport']);
+    //segnale al padre per visualizzare adder, notificare il conteggio elementi, richiedere l'import
+    //e segnalare che un elemento e' stato modificato (es. spostato in tab Bevande con il toggle)
+    const emit = defineEmits(['AddElement', 'count-changed', 'RequestImport', 'element-updated']);
 
     //variabili per il supporto delle richieste fetch
     const initialLoading = ref(true);
@@ -89,7 +90,11 @@
 
             const data = await response.json();
             if (data.data && data.data.length > 0) {
-                list.value = [...data.data[0].fk_elements];
+                // Piatti tab: mostra solo i non-bevande. Le bevande hanno la
+                // loro tab dedicata (BeverageList) — split netto basato sul
+                // flag `is_beverage`, allineato al routing staff "bar".
+                const allElements = data.data[0].fk_elements || [];
+                list.value = allElements.filter(el => el.is_beverage !== true);
                 categories.value = [...new Set(list.value.map(el => el.category))];
             } else {
                 list.value = [];
@@ -127,6 +132,7 @@
                         image: toModify.value.image?.id ?? null,
                         price: toModify.value.price,
                         category: toModify.value.category,
+                        is_beverage: !!toModify.value.is_beverage,
                     }
                 })
             });
@@ -137,6 +143,8 @@
             modalShow.value = false;
             imagePreview.value = null;
             await fetchList();
+            // Notifica il parent: se il flag bevanda e' cambiato, anche la BeverageList va aggiornata.
+            emit('element-updated');
         } catch (error) {
             console.error(error);
         }
@@ -384,6 +392,19 @@
                         <option>Secondi di pesce</option>
                         <option>Contorni</option>
                     </select>
+                </div>
+
+                <div class="ds-field bev-toggle-field">
+                    <label class="bev-toggle-row">
+                        <input type="checkbox" v-model="toModify.is_beverage" class="bev-toggle-input">
+                        <span class="bev-toggle-track">
+                            <span class="bev-toggle-thumb"></span>
+                        </span>
+                        <span class="bev-toggle-label">
+                            <strong>Questa e' una bevanda</strong>
+                            <span class="bev-toggle-hint">Se attivo, l'elemento appare nella tab Bevande e contribuisce al turno bar.</span>
+                        </span>
+                    </label>
                 </div>
 
                 <div class="ds-field">
@@ -706,6 +727,40 @@
     border: 1px solid var(--color-border);
     max-height: 100px;
 }
+
+.bev-toggle-field { margin: 4px 0 2px; }
+.bev-toggle-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border, var(--line));
+    border-radius: var(--radius-md, var(--r-md));
+    background: var(--color-bg-subtle, var(--bg-2));
+    cursor: pointer;
+    transition: border-color 160ms;
+}
+.bev-toggle-row:hover { border-color: var(--color-primary, var(--ac)); }
+.bev-toggle-input { position: absolute; opacity: 0; pointer-events: none; }
+.bev-toggle-track {
+    position: relative;
+    width: 38px; height: 22px; flex-shrink: 0;
+    background: var(--color-border, var(--line));
+    border-radius: 999px;
+    transition: background 160ms;
+    margin-top: 2px;
+}
+.bev-toggle-thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 160ms;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+}
+.bev-toggle-input:checked + .bev-toggle-track { background: var(--color-primary, var(--ac)); }
+.bev-toggle-input:checked + .bev-toggle-track .bev-toggle-thumb { transform: translateX(16px); }
+.bev-toggle-label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.bev-toggle-label strong { color: var(--color-text, var(--ink)); font-weight: 600; }
+.bev-toggle-hint { color: var(--color-text-muted, var(--ink-3)); font-size: 12.5px; line-height: 1.4; }
 
 /* Responsive */
 @media (max-width: 1024px) {

@@ -379,6 +379,13 @@ Poi apri `strapi/.env` e imposta almeno:
   - `ADMIN_JWT_SECRET`
   - `TRANSFER_TOKEN_SALT`
   - `JWT_SECRET`
+  - `JWT_EXPIRES_IN=7d`
+- cookie auth:
+  - `AUTH_COOKIE_ONLY=true` in produzione
+  - `AUTH_COOKIE_SECURE=true` in produzione
+  - `AUTH_COOKIE_SAMESITE=lax`
+  - `AUTH_COOKIE_DOMAIN=.tuodominio.it` se frontend e API sono su sottodomini diversi
+  - `AUTH_COOKIE_MAX_AGE_SECONDS=604800`
 - database:
   - `DATABASE_CLIENT=mysql`
   - `DATABASE_NAME=cms-restaurants`

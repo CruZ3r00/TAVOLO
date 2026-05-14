@@ -1,0 +1,63 @@
+{
+  "kind": "collectionType",
+  "collectionName": "restock_orders",
+  "info": {
+    "singularName": "restock-order",
+    "pluralName": "restock-orders",
+    "displayName": "RestockOrder",
+    "description": "Ordine di rifornimento (ciclo ordinato → ricevuto) per il calcolo del lead time medio e il tracking spese."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "status": {
+      "type": "enumeration",
+      "enum": ["ordered", "received", "cancelled"],
+      "default": "ordered",
+      "required": true
+    },
+    "ordered_at": {
+      "type": "datetime",
+      "required": true
+    },
+    "received_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "cancelled_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "expected_qty": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
+    },
+    "received_qty": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "cost": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "note": {
+      "type": "text",
+      "required": false,
+      "maxLength": 1000
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "fk_ingredient": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ingredient.ingredient"
+    }
+  }
+}

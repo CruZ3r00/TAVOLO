@@ -147,7 +147,7 @@ async function finalize({
                 ? parseInt(reservation.number_of_people, 10)
                 : 0) || 0;
           const itemsCount = (items || []).reduce(
-            (s, it) => s + (parseInt(it.quantity, 10) || 0),
+            (s, it) => (it && it.voided ? s : s + (parseInt(it.quantity, 10) || 0)),
             0,
           );
 
