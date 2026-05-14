@@ -1272,7 +1272,13 @@ export interface ApiPosJobPosJob extends Struct.CollectionTypeSchema {
       'plugin::users-permissions.user'
     >;
     kind: Schema.Attribute.Enumeration<
-      ['order.close', 'print.receipt', 'payment.charge', 'payment.refund']
+      [
+        'order.close',
+        'print.receipt',
+        'print.kitchen_ticket',
+        'payment.charge',
+        'payment.refund',
+      ]
     > &
       Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;

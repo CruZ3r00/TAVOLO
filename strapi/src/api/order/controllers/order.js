@@ -534,6 +534,62 @@ function serializePosJobItem(item) {
   };
 }
 
+function buildKitchenTicketPayload({ order, item, station, action }) {
+  const serviceType = order.service_type || 'table';
+  return {
+    action,
+    station: station || null,
+    title: action === 'cancel'
+      ? 'ANNULLA COMANDA'
+      : action === 'update'
+        ? 'MODIFICA COMANDA'
+        : 'COMANDA',
+    printed_at: new Date().toISOString(),
+    order: {
+      documentId: order.documentId,
+      service_type: serviceType,
+      opened_at: order.opened_at || null,
+    },
+    table: order.fk_table
+      ? {
+          documentId: order.fk_table.documentId,
+          number: order.fk_table.number,
+          area: order.fk_table.area || null,
+        }
+      : null,
+    takeaway: serviceType === 'takeaway'
+      ? {
+          customer_name: order.customer_name || null,
+          pickup_at: order.pickup_at || null,
+        }
+      : null,
+    items: [serializePosJobItem(item)],
+  };
+}
+
+function queueKitchenTicketPrint({ actor, order, item, station, action }) {
+  setImmediate(async () => {
+    try {
+      if (!actor || !actor.ownerId || !order || !item) return;
+      const device = await posBridge.findActiveDeviceForUser(strapi, actor.ownerId);
+      if (!device) {
+        strapi.log.info(`print.kitchen_ticket: nessun device POS/RT attivo per user ${actor.ownerId}`);
+        return;
+      }
+      await posBridge.dispatchJob(strapi, {
+        device,
+        user: { id: actor.ownerId },
+        kind: 'print.kitchen_ticket',
+        orderId: order.documentId,
+        priority: 20,
+        payload: buildKitchenTicketPayload({ order, item, station, action }),
+      });
+    } catch (err) {
+      strapi.log.warn(`print.kitchen_ticket: enqueue fallito per ordine ${order && order.documentId}: ${err.message}`);
+    }
+  });
+}
+
 /** Verifica lock_version (optimistic locking). */
 function assertLockVersion(order, clientVersion) {
   if (clientVersion === undefined || clientVersion === null) return; // Non fornito = skip
@@ -1179,6 +1235,14 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       ]);
 
       const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      const station = routingLookup(itemCategory);
+      queueKitchenTicketPrint({
+        actor,
+        order,
+        item: { ...createdItem, category: itemCategory, fk_element: menuElement || null },
+        station,
+        action: 'add',
+      });
 
       ctx.status = 201;
       ctx.body = {
@@ -1258,6 +1322,14 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       const totalResult = await updateOrderTotalFromItems(order, nextItems);
 
       const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      const station = routingLookup(updatedItem.category || item.category);
+      queueKitchenTicketPrint({
+        actor,
+        order,
+        item: { ...item, ...updatedItem, category: updatedItem.category || item.category },
+        station,
+        action: 'update',
+      });
 
       ctx.body = {
         data: {
@@ -1317,6 +1389,15 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         order,
         items.filter((current) => current.documentId !== itemDocumentId)
       );
+
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      queueKitchenTicketPrint({
+        actor,
+        order,
+        item,
+        station: routingLookup(item.category || (item.fk_element && item.fk_element.category)),
+        action: 'cancel',
+      });
 
       ctx.body = {
         data: {

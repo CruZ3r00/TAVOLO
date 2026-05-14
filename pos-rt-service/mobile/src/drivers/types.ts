@@ -57,6 +57,35 @@ export interface ReceiptInput {
   payment_description?: string;
 }
 
+export interface KitchenTicketItem {
+  name?: string;
+  quantity?: number;
+  category?: string | null;
+  course?: number;
+  notes?: string | null;
+}
+
+export interface KitchenTicketInput {
+  action?: 'add' | 'update' | 'cancel' | 'reprint' | string;
+  station?: string | null;
+  title?: string;
+  table?: {
+    number?: string | number | null;
+    area?: string | null;
+  } | null;
+  takeaway?: {
+    customer_name?: string | null;
+    pickup_at?: string | null;
+  } | null;
+  order?: {
+    documentId?: string;
+    service_type?: string;
+    opened_at?: string;
+  } | null;
+  items: KitchenTicketItem[];
+  printed_at?: string;
+}
+
 export interface PrintOutcome {
   success: boolean;
   receipt_no: string;
@@ -100,6 +129,7 @@ export interface PrinterDriver {
   init(): Promise<void>;
   printReceipt(data: ReceiptInput): Promise<PrintOutcome>;
   printFiscalReceipt(data: ReceiptInput): Promise<PrintOutcome>;
+  printKitchenTicket?(data: KitchenTicketInput): Promise<PrintOutcome>;
   getStatus(): Promise<DriverStatus>;
   dispose(): Promise<void>;
 }

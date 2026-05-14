@@ -13,6 +13,7 @@ type PaymentFactory = (opts: any) => Promise<PaymentDriver>;
 
 const PRINTERS: Record<string, PrinterFactory> = {
   stub: async (opts) => new (await import('./stubPrinter')).StubPrinterDriver(opts),
+  'escpos-network': async (opts) => new (await import('./escposNetwork')).EscposNetworkDriverMobile(opts),
   'epson-fpmate': async (opts) => new (await import('./epsonFpmate')).EpsonFpMateDriverMobile(opts),
   'custom-xon': async (opts) => new (await import('./customXon')).CustomXonDriverMobile(opts),
   'escpos-fiscal': async (opts) => new (await import('./escposFiscal')).EscposFiscalDriverMobile(opts),
