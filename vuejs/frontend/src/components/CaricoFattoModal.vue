@@ -21,25 +21,67 @@ const emit = defineEmits(['cancel', 'confirm']);
 
 const note = ref('');
 
-const aggregated = computed(() => {
-  const units = props.report?.units || [];
-  // Riassunto per stampa: nome + unita (escludendo righe a 0 unita).
-  return units
-    .map((u) => ({
-      name: u.name,
-      category: u.category || null,
-      served_count: u.served_count,
-      units_consumed: Number.isFinite(u.units_consumed) ? u.units_consumed : null,
-      is_advanced: !!u.is_beverage_advanced,
+// Bottiglie da prelevare dal magazzino, divise in due gruppi:
+//
+// 1) Ingredienti dosati (cocktail composti): vengono da
+//    `report.ingredients_consumption[]`. Mostriamo il nome ingrediente
+//    (campari, gin, vermouth…) con il numero di bottiglie aperte
+//    (ceil(qty_totale_usata / formato_bottiglia)). Sorgente: ricetta strutturata
+//    Element ↔ Ingredient ↔ ElementIngredient.qty_per_serving.
+//
+// 2) Bottiglie/lattine pre-confezionate: Element del menu con
+//    `is_beverage_advanced=false` (es. acqua minerale, coca-cola, birra in
+//    bottiglia). Per questi 1 servita = 1 unita' intera. Sorgente:
+//    `report.units[]` filtrato per `!is_beverage_advanced`.
+const ingredientsConsumption = computed(() => {
+  const list = props.report?.ingredients_consumption || [];
+  return list
+    .map((c) => ({
+      key: 'ing-' + (c.ingredient_documentId || c.name),
+      name: c.name,
+      unit: c.unit || '',
+      unit_size: c.unit_size || null,
+      total_qty_used: Number(c.total_qty_used || 0),
+      units_consumed: Number.isFinite(c.units_consumed) ? c.units_consumed : null,
     }))
     .sort((a, b) => String(a.name).localeCompare(String(b.name), 'it'));
 });
 
-const totalUnits = computed(() => aggregated.value.reduce(
-  (s, u) => s + (Number.isFinite(u.units_consumed) ? u.units_consumed : 0),
-  0
+const prePackagedUnits = computed(() => {
+  const units = props.report?.units || [];
+  return units
+    .filter((u) => !u.is_beverage_advanced)
+    .map((u) => ({
+      key: 'pre-' + (u.element_documentId || u.name),
+      name: u.name,
+      category: u.category || null,
+      served_count: u.served_count,
+      units_consumed: Number.isFinite(u.units_consumed) ? u.units_consumed : null,
+    }))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'it'));
+});
+
+const totalUnits = computed(() => {
+  const a = ingredientsConsumption.value.reduce(
+    (s, c) => s + (Number.isFinite(c.units_consumed) ? c.units_consumed : 0),
+    0
+  );
+  const b = prePackagedUnits.value.reduce(
+    (s, u) => s + (Number.isFinite(u.units_consumed) ? u.units_consumed : 0),
+    0
+  );
+  return a + b;
+});
+const totalServed = computed(() => {
+  const fromUnits = (props.report?.units || []).reduce((s, u) => s + (u.served_count || 0), 0);
+  return fromUnits;
+});
+
+const hasAnything = computed(() => (
+  ingredientsConsumption.value.length > 0
+    || prePackagedUnits.value.length > 0
+    || (props.report?.freeform || []).length > 0
 ));
-const totalServed = computed(() => aggregated.value.reduce((s, u) => s + (u.served_count || 0), 0));
 
 const freeform = computed(() => props.report?.freeform || []);
 
@@ -115,17 +157,48 @@ onBeforeUnmount(() => {
             <p>{{ formatDateTime(openedAt) }} → {{ formatDateTime(new Date().toISOString()) }}</p>
           </div>
 
-          <div v-if="aggregated.length === 0 && freeform.length === 0" class="cf-empty">
+          <div v-if="!hasAnything" class="cf-empty">
             <i class="bi bi-inbox"></i>
             <span>Nessuna vendita registrata in questo turno.</span>
           </div>
 
           <div v-else class="cf-sections">
-            <!-- Unita bottiglie -->
-            <div v-if="aggregated.length > 0" class="cf-section">
-              <h4>Da contare per il rifornimento</h4>
+            <!-- Bottiglie aperte dai cocktail dosati -->
+            <div v-if="ingredientsConsumption.length > 0" class="cf-section">
+              <h4>Bottiglie da prelevare</h4>
+              <p class="cf-section-note">
+                Bottiglie aperte durante il turno per preparare cocktail dosati.
+                Conta queste unita' per riempire il frigo del bar.
+              </p>
               <ul class="cf-list">
-                <li v-for="u in aggregated" :key="`u-${u.name}`" class="cf-row">
+                <li v-for="c in ingredientsConsumption" :key="c.key" class="cf-row">
+                  <div class="cf-row-name">
+                    <span>{{ c.name }}</span>
+                    <span class="cf-row-cat">
+                      <template v-if="c.unit_size">{{ Number(c.unit_size).toFixed(0) }} {{ c.unit }} a bottiglia</template>
+                      <template v-else>formato bottiglia non impostato</template>
+                    </span>
+                  </div>
+                  <div class="cf-row-vals">
+                    <span class="cf-row-served">{{ Number(c.total_qty_used).toFixed(0) }} {{ c.unit }} usati</span>
+                    <strong class="cf-row-units">
+                      <template v-if="c.units_consumed !== null">{{ c.units_consumed }} btg</template>
+                      <template v-else>— btg</template>
+                    </strong>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Bottiglie/lattine pre-confezionate (Element non-advanced) -->
+            <div v-if="prePackagedUnits.length > 0" class="cf-section">
+              <h4>Bottiglie/lattine pre-confezionate</h4>
+              <p class="cf-section-note">
+                Bevande servite intere (acqua, lattine, vino in bottiglia, ecc.):
+                1 servita = 1 unita' da rimpiazzare.
+              </p>
+              <ul class="cf-list">
+                <li v-for="u in prePackagedUnits" :key="u.key" class="cf-row">
                   <div class="cf-row-name">
                     <span>{{ u.name }}</span>
                     <span v-if="u.category" class="cf-row-cat">{{ u.category }}</span>
@@ -139,10 +212,12 @@ onBeforeUnmount(() => {
                   </div>
                 </li>
               </ul>
-              <div class="cf-row cf-row-total">
-                <div class="cf-row-name"><strong>TOTALE UNITA</strong></div>
-                <div class="cf-row-vals"><strong>{{ totalUnits }}</strong></div>
-              </div>
+            </div>
+
+            <!-- Totale generale -->
+            <div v-if="ingredientsConsumption.length > 0 || prePackagedUnits.length > 0" class="cf-row cf-row-total">
+              <div class="cf-row-name"><strong>TOTALE UNITA DA PRELEVARE</strong></div>
+              <div class="cf-row-vals"><strong>{{ totalUnits }}</strong></div>
             </div>
 
             <!-- Free-form -->
@@ -267,6 +342,7 @@ onBeforeUnmount(() => {
 .cf-section h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.05em; }
 .cf-section-warn h4 i { color: var(--color-warning, #d97706); margin-right: 6px; }
 .cf-warn-note { margin: 0 0 8px; font-size: 12px; color: var(--color-text-muted); }
+.cf-section-note { margin: 0 0 8px; font-size: 12px; color: var(--color-text-muted); }
 
 .cf-list { list-style: none; padding: 0; margin: 0; }
 .cf-row {

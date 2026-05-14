@@ -119,6 +119,15 @@ function serializeShift(shift) {
 async function aggregateServedItems(strapi, ownerId, fromISO, toISO) {
   const knex = strapi.db.connection;
 
+  // TZ NOTE: `served_at`/`picked_up_at` sono `timestamp without time zone` (default
+  // Strapi v5 su PG). Il driver `pg` di Node serializza i Date JS convertendo
+  // al fuso locale del server; al contrario, una stringa ISO con `Z` viene letta
+  // letteralmente da PG senza conversione, causando un mismatch del confronto.
+  // Soluzione: passare Date object al whereBetween cosi' il driver gestisce
+  // la conversione di fuso allo stesso modo dell'INSERT.
+  const fromDt = new Date(fromISO);
+  const toDt = new Date(toISO);
+
   // Query dine-in: OrderItem status=served, served_at ∈ [from, to), fk_user=owner.
   const dineRows = await knex({ oi: 'order_items' })
     .leftJoin('order_items_fk_order_lnk as oilnk', 'oilnk.order_item_id', 'oi.id')
@@ -130,7 +139,7 @@ async function aggregateServedItems(strapi, ownerId, fromISO, toISO) {
     .where('oi.status', 'served')
     .where('oi.voided', false)
     .where('o.service_type', 'table')
-    .whereBetween('oi.served_at', [fromISO, toISO])
+    .whereBetween('oi.served_at', [fromDt, toDt])
     .select(
       'oi.id as oi_id',
       'oi.name as oi_name',
@@ -156,7 +165,7 @@ async function aggregateServedItems(strapi, ownerId, fromISO, toISO) {
     .where('oi.voided', false)
     .where('o.service_type', 'takeaway')
     .where('o.takeaway_status', 'picked_up')
-    .whereBetween('o.picked_up_at', [fromISO, toISO])
+    .whereBetween('o.picked_up_at', [fromDt, toDt])
     .select(
       'oi.id as oi_id',
       'oi.name as oi_name',
@@ -227,12 +236,13 @@ async function aggregateServedItems(strapi, ownerId, fromISO, toISO) {
     // else: piatto non-bar → ignora nel report bar
   }
 
-  // Costruisce sezione "units" del report.
+  // Costruisce sezione "units" per Element (piatti/bevande serviti).
+  // - is_beverage_advanced=false: 1 servita = 1 unita' (es. bottiglia chiusa, lattina).
+  // - is_beverage_advanced=true:  units_consumed=null (il calcolo bottiglie
+  //   bottiglie aperte avviene in ingredients_consumption[] sotto).
   const units = [];
   for (const e of byElement.values()) {
-    const units_consumed = e.is_beverage_advanced
-      ? null // calcolato in FASE 4 con ElementIngredient + Ingredient
-      : e.served_count;
+    const units_consumed = e.is_beverage_advanced ? null : e.served_count;
     units.push({
       element_documentId: e.element_documentId,
       name: e.name,
@@ -244,6 +254,14 @@ async function aggregateServedItems(strapi, ownerId, fromISO, toISO) {
     });
   }
   units.sort((a, b) => a.name.localeCompare(b.name, 'it'));
+
+  // Sezione `ingredients_consumption[]`: per ogni Element con
+  // `is_beverage_advanced=true`, recupera la ricetta strutturata e accumula
+  // per Ingredient il `total_qty_used = servings × qty_per_serving`. Calcola
+  // poi `units_consumed = ceil(total_qty_used / unit_size)`: ogni bottiglia
+  // aperta vale 1, anche se non interamente consumata.
+  const advancedElements = [...byElement.values()].filter((e) => e.is_beverage_advanced);
+  const ingredientsConsumption = await aggregateIngredientsConsumption(strapi, advancedElements);
 
   const freeform = [];
   for (const e of freeformByName.values()) {
@@ -263,6 +281,7 @@ async function aggregateServedItems(strapi, ownerId, fromISO, toISO) {
       revenue: Number(revenueAll.toFixed(2)),
       items_count: itemsAll,
     },
+    ingredients_consumption: ingredientsConsumption,
     units,
     freeform,
   };
@@ -290,8 +309,105 @@ async function buildReport(strapi, ownerId, shift) {
     note: shift.note || null,
     totals: inner.totals,
     units: inner.units,
+    ingredients_consumption: inner.ingredients_consumption,
     freeform: inner.freeform,
   };
+}
+
+/**
+ * Aggrega il consumo per ingrediente dato un insieme di Element advanced.
+ *
+ * Input: `advancedElements` = [{ element_id, name, served_count, ... }]
+ * Output: [{ ingredient_documentId, name, unit, unit_size, qty_per_serving_avg,
+ *            total_qty_used, units_consumed }]
+ *
+ * Logica:
+ *   1) Carica le ElementIngredient con qty_per_serving>0 collegate agli element_id.
+ *   2) Per ciascuna riga: `contribution = ei.qty_per_serving × element.served_count`.
+ *   3) Aggrega per ingredient_id sommando i contributi.
+ *   4) `units_consumed = ceil(total_qty_used / unit_size)` se unit_size>0, altrimenti null.
+ *
+ * Una ElementIngredient puo' avere link a piu' rows draft/published dello stesso
+ * Element: la query usa una clausola IN sugli `element_id` che derivano dagli
+ * OrderItem realmente serviti, quindi non si conteggia mai due volte.
+ */
+async function aggregateIngredientsConsumption(strapi, advancedElements) {
+  if (!Array.isArray(advancedElements) || advancedElements.length === 0) return [];
+  const knex = strapi.db.connection;
+  if (!knex) return [];
+
+  const elementIds = advancedElements.map((e) => e.element_id).filter(Boolean);
+  if (elementIds.length === 0) return [];
+
+  const servingsByEl = new Map();
+  for (const e of advancedElements) {
+    servingsByEl.set(e.element_id, Number(e.served_count) || 0);
+  }
+
+  const rows = await knex({ ei: 'element_ingredients' })
+    .innerJoin('element_ingredients_fk_element_lnk as ellnk', 'ellnk.element_ingredient_id', 'ei.id')
+    .innerJoin('element_ingredients_fk_ingredient_lnk as ilnk', 'ilnk.element_ingredient_id', 'ei.id')
+    .innerJoin('ingredients as i', 'i.id', 'ilnk.ingredient_id')
+    .whereIn('ellnk.element_id', elementIds)
+    .where('ei.qty_per_serving', '>', 0)
+    .select(
+      'ellnk.element_id as element_id',
+      'i.id as ing_id',
+      'i.document_id as ing_documentId',
+      'i.name as ing_name',
+      'i.unit as ing_unit',
+      'i.unit_size as ing_unit_size',
+      'ei.qty_per_serving as qty_per_serving',
+    );
+
+  // Dedup per (ingredient_id, element_id): se ci sono due ElementIngredient
+  // identici (cioe' stessa coppia ingrediente↔element) tieni il MAX qty_per_serving.
+  const dedup = new Map();
+  for (const r of rows) {
+    const key = `${r.ing_id}|${r.element_id}`;
+    const qty = Number(r.qty_per_serving) || 0;
+    const existing = dedup.get(key);
+    if (!existing || qty > existing.qty_per_serving) {
+      dedup.set(key, { ...r, qty_per_serving: qty });
+    }
+  }
+
+  const byIng = new Map();
+  for (const r of dedup.values()) {
+    const servings = servingsByEl.get(r.element_id) || 0;
+    const contribution = servings * r.qty_per_serving;
+    if (contribution <= 0) continue;
+
+    if (!byIng.has(r.ing_id)) {
+      byIng.set(r.ing_id, {
+        ingredient_documentId: r.ing_documentId,
+        name: r.ing_name,
+        unit: r.ing_unit || null,
+        unit_size: r.ing_unit_size !== null && r.ing_unit_size !== undefined
+          ? Number(r.ing_unit_size) : null,
+        total_qty_used: 0,
+      });
+    }
+    byIng.get(r.ing_id).total_qty_used += contribution;
+  }
+
+  const out = [];
+  for (const e of byIng.values()) {
+    const total = Number(e.total_qty_used.toFixed(3));
+    const unitsConsumed = (e.unit_size && e.unit_size > 0)
+      ? Math.ceil(total / e.unit_size)
+      : null;
+    out.push({
+      ingredient_documentId: e.ingredient_documentId,
+      name: e.name,
+      unit: e.unit,
+      unit_size: e.unit_size,
+      total_qty_used: total,
+      units_consumed: unitsConsumed,
+    });
+  }
+  out.sort((a, b) => String(a.name).localeCompare(String(b.name), 'it'));
+  return out;
 }
 
 /* ------------------------------------------------------------------ */

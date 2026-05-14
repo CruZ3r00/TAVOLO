@@ -79,6 +79,7 @@ export {
   fetchBarShiftReport,
   barShiftErrorMessage,
 } from './lib/api/bar-shift.js';
+export { fetchOrdersHistory } from './lib/api/orders-history.js';
 export {
   fetchIngredientsAdvanced,
   createIngredient,

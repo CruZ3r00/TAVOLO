@@ -20,7 +20,7 @@ import BeverageAdvancedEditor from '@/components/BeverageAdvancedEditor.vue';
 const store = useStore();
 const tkn = store.getters.getToken;
 
-const emit = defineEmits(['AddBeverage', 'count-changed']);
+const emit = defineEmits(['AddBeverage', 'count-changed', 'open-bar-shift']);
 
 const list = ref([]);
 const initialLoading = ref(true);
@@ -161,9 +161,9 @@ defineExpose({ refresh: fetchList });
           </span>
         </div>
         <div class="bev-header-actions">
-          <button class="ds-btn ds-btn-secondary" :disabled="initialLoading" @click="fetchList">
-            <i class="bi" :class="initialLoading ? 'bi-arrow-repeat bev-spin' : 'bi-arrow-clockwise'"></i>
-            <span>Aggiorna</span>
+          <button class="ds-btn ds-btn-secondary" @click="emit('open-bar-shift')">
+            <i class="bi bi-cup-hot"></i>
+            <span>Turno bar</span>
           </button>
           <button class="ds-btn ds-btn-primary" @click="emit('AddBeverage')">
             <i class="bi bi-plus-lg"></i>

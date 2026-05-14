@@ -3,7 +3,9 @@
 // modal dentro la tab Bevande del MenuSetter (mode="modal").
 //
 // Funzionalita: stato turno corrente, KPI, tabella unita bottiglie, free-form,
-// storico turni chiusi paginato, modale "Carico fatto".
+// modale "Carico fatto". Lo storico turni e' in un componente separato
+// (BarShiftHistory) accessibile dal bottone "Storico ordini" nell'header del
+// MenuSetter, per tenere il modale operativo del turno focalizzato.
 // Polling 20s sospeso quando la pagina e' nascosta o il modale carico e' aperto.
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -13,8 +15,6 @@ import {
   fetchBarShiftCurrent,
   fetchBarShiftCurrentReport,
   openBarShift,
-  fetchBarShiftHistory,
-  fetchBarShiftReport,
   caricoFatto as apiCaricoFatto,
   barShiftErrorMessage,
 } from '@/utils';
@@ -27,7 +27,6 @@ const emit = defineEmits(['close']);
 const store = useStore();
 const token = computed(() => store.getters.getToken);
 
-const view = ref('current'); // 'current' | 'history'
 const loading = ref(true);
 const refreshing = ref(false);
 const error = ref('');
@@ -40,14 +39,6 @@ const openingShift = ref(false);
 const showCarico = ref(false);
 const submittingCarico = ref(false);
 
-const history = ref([]);
-const historyPage = ref(1);
-const historyPageSize = ref(20);
-const historyTotal = ref(0);
-const historyLoading = ref(false);
-const historyDetailReport = ref(null);
-const historyDetailLoading = ref(false);
-
 let pollTimer = null;
 let elapsedTimer = null;
 
@@ -57,7 +48,15 @@ const totals = computed(() => {
   const r = currentReport.value;
   if (!r) return { revenue: 0, items_count: 0, units_total: 0, lines_count: 0 };
   const linesCount = (r.units?.length || 0) + (r.freeform?.length || 0);
-  const unitsTotal = (r.units || []).reduce((s, u) => s + (Number(u.units_consumed) || 0), 0);
+  // Bottiglie aperte = somma di:
+  //  - units_consumed degli Element non-advanced (bottiglie/lattine pre-confezionate)
+  //  - units_consumed di ingredients_consumption[] (bottiglie aperte da cocktail dosati)
+  const simpleUnits = (r.units || [])
+    .filter((u) => !u.is_beverage_advanced)
+    .reduce((s, u) => s + (Number(u.units_consumed) || 0), 0);
+  const advancedUnits = (r.ingredients_consumption || [])
+    .reduce((s, c) => s + (Number(c.units_consumed) || 0), 0);
+  const unitsTotal = simpleUnits + advancedUnits;
   return {
     revenue: r.totals?.revenue || 0,
     items_count: r.totals?.items_count || 0,
@@ -77,17 +76,6 @@ const formatDuration = (seconds) => {
   const m = Math.floor((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
   return `${m} min`;
-};
-
-const formatDateTime = (iso) => {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
-  } catch (_e) {
-    return iso;
-  }
 };
 
 const formatTime = (iso) => {
@@ -136,33 +124,6 @@ const loadCurrent = async () => {
   }
 };
 
-const loadHistory = async (page = 1) => {
-  historyLoading.value = true;
-  try {
-    const resp = await fetchBarShiftHistory(token.value, { page, pageSize: historyPageSize.value });
-    history.value = resp?.data || [];
-    historyTotal.value = resp?.meta?.total || 0;
-    historyPage.value = resp?.meta?.page || page;
-  } catch (e) {
-    showToast('error', barShiftErrorMessage(e));
-  } finally {
-    historyLoading.value = false;
-  }
-};
-
-const loadHistoryDetail = async (shift) => {
-  historyDetailLoading.value = true;
-  historyDetailReport.value = null;
-  try {
-    const idOrDoc = shift.documentId || shift.id;
-    historyDetailReport.value = await fetchBarShiftReport(token.value, idOrDoc);
-  } catch (e) {
-    showToast('error', barShiftErrorMessage(e));
-  } finally {
-    historyDetailLoading.value = false;
-  }
-};
-
 const handleOpenShift = async () => {
   openingShift.value = true;
   try {
@@ -195,23 +156,16 @@ const handleConfirmCarico = async (payload) => {
 const handleRefresh = async () => {
   refreshing.value = true;
   try {
-    if (view.value === 'current') await loadCurrent();
-    else await loadHistory(historyPage.value);
+    await loadCurrent();
   } finally {
     refreshing.value = false;
   }
-};
-
-const switchView = async (v) => {
-  view.value = v;
-  if (v === 'history' && history.value.length === 0) await loadHistory(1);
 };
 
 const startPolling = () => {
   stopPolling();
   pollTimer = setInterval(() => {
     if (document.visibilityState !== 'visible') return;
-    if (view.value !== 'current') return;
     if (showCarico.value) return;
     loadCurrent();
   }, 20000);
@@ -286,25 +240,6 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <div class="bar-tabs">
-      <button
-        type="button"
-        class="bar-tab"
-        :class="{ active: view === 'current' }"
-        @click="switchView('current')"
-      >
-        <i class="bi bi-cup-straw"></i> Turno corrente
-      </button>
-      <button
-        type="button"
-        class="bar-tab"
-        :class="{ active: view === 'history' }"
-        @click="switchView('history')"
-      >
-        <i class="bi bi-clock-history"></i> Storico
-      </button>
-    </div>
-
     <div
       v-if="toast"
       class="bar-toast"
@@ -320,8 +255,7 @@ onBeforeUnmount(() => {
       <span>{{ error }}</span>
     </div>
 
-    <template v-if="view === 'current'">
-      <div v-if="loading" class="ds-card bar-empty">
+    <div v-if="loading" class="ds-card bar-empty">
         <i class="bi bi-arrow-repeat bar-spin"></i> Caricamento…
       </div>
 
@@ -413,6 +347,52 @@ onBeforeUnmount(() => {
         </div>
 
         <div
+          v-if="currentReport && currentReport.ingredients_consumption && currentReport.ingredients_consumption.length > 0"
+          class="ds-card bar-table-card"
+        >
+          <div class="bar-table-head">
+            <h3><i class="bi bi-bottle"></i> Bottiglie utilizzate</h3>
+            <p>
+              Consumo per ingrediente calcolato dalla ricetta strutturata.
+              "Bottiglie aperte" = ceil(quantita totale / formato bottiglia):
+              ogni bottiglia aperta conta 1, anche se non e' stata svuotata.
+            </p>
+          </div>
+          <div class="bar-table-wrap">
+            <table class="bar-table">
+              <thead>
+                <tr>
+                  <th>Ingrediente</th>
+                  <th class="t-right">Quantita usata</th>
+                  <th class="t-right">Formato bottiglia</th>
+                  <th class="t-right">Bottiglie aperte</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in currentReport.ingredients_consumption" :key="c.ingredient_documentId">
+                  <td><span class="bar-row-name">{{ c.name }}</span></td>
+                  <td class="t-right">
+                    {{ Number(c.total_qty_used || 0).toFixed(c.unit === 'pz' ? 0 : 0) }}
+                    <span class="bar-muted">{{ c.unit || '' }}</span>
+                  </td>
+                  <td class="t-right">
+                    <template v-if="c.unit_size">
+                      {{ Number(c.unit_size).toFixed(0) }}
+                      <span class="bar-muted">{{ c.unit || '' }}</span>
+                    </template>
+                    <span v-else class="bar-muted" title="Imposta il formato bottiglia in dispensa">— non impostato</span>
+                  </td>
+                  <td class="t-right">
+                    <strong v-if="c.units_consumed !== null">{{ c.units_consumed }}</strong>
+                    <span v-else class="bar-muted" title="Imposta il formato bottiglia per calcolare">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div
           v-if="currentReport && currentReport.freeform && currentReport.freeform.length > 0"
           class="ds-card bar-table-card"
         >
@@ -448,111 +428,6 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </template>
-    </template>
-
-    <template v-else>
-      <div class="ds-card bar-history-card">
-        <div v-if="historyLoading" class="bar-table-empty">
-          <i class="bi bi-arrow-repeat bar-spin"></i> Caricamento…
-        </div>
-        <div v-else-if="history.length === 0" class="bar-table-empty">
-          <i class="bi bi-inbox"></i>
-          <span>Nessun turno chiuso ancora.</span>
-        </div>
-        <table v-else class="bar-table">
-          <thead>
-            <tr>
-              <th>Apertura</th>
-              <th>Chiusura</th>
-              <th>Durata</th>
-              <th class="t-right">Unita</th>
-              <th class="t-right">Incasso</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in history" :key="s.id">
-              <td>{{ formatDateTime(s.opened_at) }}</td>
-              <td>{{ formatDateTime(s.closed_at) }}</td>
-              <td>
-                {{ formatDuration(
-                  s.opened_at && s.closed_at
-                    ? Math.max(0, Math.floor((new Date(s.closed_at).getTime() - new Date(s.opened_at).getTime()) / 1000))
-                    : 0
-                ) }}
-              </td>
-              <td class="t-right">
-                {{ (s.snapshot?.units || []).reduce((sum, u) => sum + (Number(u.units_consumed) || 0), 0) }}
-              </td>
-              <td class="t-right">
-                {{ Number(s.snapshot?.totals?.revenue || 0).toFixed(2) }} &euro;
-              </td>
-              <td class="t-right">
-                <button class="ds-btn ds-btn-ghost ds-btn-sm" @click="loadHistoryDetail(s)">
-                  <i class="bi bi-eye"></i>
-                  <span class="bar-hist-text">Dettaglio</span>
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-if="historyTotal > historyPageSize" class="bar-history-pager">
-          <button
-            class="ds-btn ds-btn-ghost ds-btn-sm"
-            :disabled="historyPage <= 1 || historyLoading"
-            @click="loadHistory(historyPage - 1)"
-          >
-            <i class="bi bi-chevron-left"></i> Prec
-          </button>
-          <span>Pag. {{ historyPage }} / {{ Math.ceil(historyTotal / historyPageSize) }}</span>
-          <button
-            class="ds-btn ds-btn-ghost ds-btn-sm"
-            :disabled="historyPage >= Math.ceil(historyTotal / historyPageSize) || historyLoading"
-            @click="loadHistory(historyPage + 1)"
-          >
-            Succ <i class="bi bi-chevron-right"></i>
-          </button>
-        </div>
-      </div>
-
-      <div v-if="historyDetailReport" class="bar-detail-overlay" @click.self="historyDetailReport = null">
-        <div class="bar-detail-card ds-card">
-          <header class="bar-detail-head">
-            <div>
-              <h3>Dettaglio turno</h3>
-              <p>{{ formatDateTime(historyDetailReport.opened_at) }} → {{ formatDateTime(historyDetailReport.closed_at) }}</p>
-            </div>
-            <button class="ds-btn ds-btn-ghost ds-btn-icon" @click="historyDetailReport = null">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </header>
-          <div v-if="historyDetailReport.units && historyDetailReport.units.length > 0">
-            <table class="bar-table">
-              <thead>
-                <tr>
-                  <th>Bevanda</th>
-                  <th class="t-right">Servite</th>
-                  <th class="t-right">Unita</th>
-                  <th class="t-right">Incasso</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="u in historyDetailReport.units" :key="u.element_documentId">
-                  <td>{{ u.name }}</td>
-                  <td class="t-right">{{ u.served_count }}</td>
-                  <td class="t-right">{{ u.units_consumed ?? '—' }}</td>
-                  <td class="t-right">{{ Number(u.revenue || 0).toFixed(2) }} &euro;</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div v-else class="bar-table-empty">
-            <i class="bi bi-inbox"></i>
-            <span>Nessuna bevanda nel turno.</span>
-          </div>
-        </div>
-      </div>
-    </template>
 
     <CaricoFattoModal
       v-if="showCarico"
@@ -578,16 +453,6 @@ onBeforeUnmount(() => {
 .bar-head h1 { margin: 0 0 6px; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
 .bar-head p { margin: 0; max-width: 640px; font-size: 14px; color: var(--ink-2, #4b5563); line-height: 1.5; }
 .bar-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-.bar-tabs { display: inline-flex; gap: 4px; border-bottom: 1px solid var(--color-border); }
-.bar-tab {
-  appearance: none; background: transparent; border: none;
-  padding: 10px 16px; font-size: 14px; font-weight: 500;
-  color: var(--ink-3, #6b7280); cursor: pointer;
-  border-bottom: 2px solid transparent;
-}
-.bar-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
-.bar-tab i { margin-right: 6px; }
 
 .bar-toast {
   display: flex; align-items: center; gap: 10px;
@@ -625,29 +490,12 @@ onBeforeUnmount(() => {
 .bar-row-name { font-weight: 500; margin-right: 6px; }
 .bar-muted { color: var(--color-text-muted); }
 
-.bar-history-card { padding: 0; overflow: hidden; }
-.bar-history-pager {
-  display: flex; align-items: center; justify-content: center; gap: 16px;
-  padding: 12px; border-top: 1px solid var(--color-border); font-size: 13px;
-}
-.bar-hist-text { display: inline; }
-
-.bar-detail-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center; z-index: 400; padding: 16px;
-}
-.bar-detail-card { max-width: 720px; width: 100%; max-height: 80vh; overflow: auto; padding: 0; }
-.bar-detail-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--color-border); }
-.bar-detail-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
-.bar-detail-head p { margin: 2px 0 0; font-size: 13px; color: var(--color-text-muted); }
-
 .bar-spin { animation: bar-spin 0.8s linear infinite; display: inline-block; }
 @keyframes bar-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 @media (max-width: 860px) {
   .bar-kpis { grid-template-columns: repeat(2, 1fr); }
   .bar-table th, .bar-table td { padding: 10px 12px; font-size: 13px; }
-  .bar-hist-text { display: none; }
 }
 @media (max-width: 480px) {
   .bar-kpis { grid-template-columns: 1fr; }

@@ -11,6 +11,7 @@ import IngredientsManager from '@/components/IngredientsManager.vue';
 import BeverageList from '@/components/BeverageList.vue';
 import PantryView from '@/components/PantryView.vue';
 import BarShiftPanel from '@/components/BarShiftPanel.vue';
+import OrdersHistory from '@/components/OrdersHistory.vue';
 import TeleportCompat from '@/lib/compat/teleport.js';
 import { STAFF_ROLES, staffRole } from '@/staffAccess';
 
@@ -23,6 +24,7 @@ const activeTab = ref('list');
 // 'dish' (default) per piatti | 'beverage' per bevande — controlla MenuAdder
 const adderMode = ref('dish');
 const showBarShiftModal = ref(false);
+const showHistoryModal = ref(false);
 
 const currentUser = computed(() => store.getters.getUser || null);
 const isOwner = computed(() => staffRole(currentUser.value) === STAFF_ROLES.OWNER);
@@ -129,8 +131,10 @@ const onElementUpdated = async () => {
 };
 
 // Tab disponibili in base al piano:
-//   starter: Piatti | Bevande | Ingredienti
-//   pro:     Piatti | Bevande | Magazzino
+//   starter: Menu | Bevande | Ingredienti
+//   pro:     Menu | Bevande | Magazzino
+// La tab "Menu" mostra tutti gli element (sia piatti che bevande). La tab
+// "Bevande" e' un di un sottoinsieme filtrato dedicato al turno bar.
 // Su starter la tab "pantry" non esiste; su pro la tab "ingredients" e' sostituita da "pantry".
 const isValidTab = (tab) => {
   if (tab === 'list' || tab === 'adder' || tab === 'beverages') return true;
@@ -205,19 +209,8 @@ onBeforeUnmount(() => {
           <p>Aggiungi piatti, ingredienti e categorie. Ogni modifica si propaga subito al QR pubblico.</p>
         </div>
         <div class="md-top-tools">
-          <button
-            v-if="activeTab === 'beverages'"
-            type="button"
-            class="btn btn-sm"
-            @click="showBarShiftModal = true"
-          >
-            <i class="bi bi-cup-hot"></i><span>Turno bar</span>
-          </button>
-          <button v-if="activeTab === 'list'" type="button" class="btn btn-sm" @click="onRequestImport">
-            <i class="bi bi-upload"></i><span>Importa</span>
-          </button>
-          <button type="button" class="btn btn-sm btn-primary" @click="handleAdder">
-            <i class="bi bi-plus-lg"></i><span>{{ activeTab === 'beverages' ? 'Nuova bevanda' : 'Nuovo piatto' }}</span>
+          <button type="button" class="btn btn-sm" @click="showHistoryModal = true">
+            <i class="bi bi-clock-history"></i><span>Storico ordini</span>
           </button>
         </div>
       </header>
@@ -229,7 +222,7 @@ onBeforeUnmount(() => {
           :class="{ active: activeTab === 'list' }"
           @click="handleList"
         >
-          <i class="bi bi-list-ul"></i> Piatti
+          <i class="bi bi-list-ul"></i> Menu
         </button>
         <button
           type="button"
@@ -273,6 +266,7 @@ onBeforeUnmount(() => {
           v-else-if="activeTab === 'beverages'"
           ref="beverageListRef"
           @AddBeverage="handleAdderFromBeverage"
+          @open-bar-shift="showBarShiftModal = true"
         />
         <IngredientsManager v-else-if="activeTab === 'ingredients' && !isPro" />
         <PantryView v-else-if="activeTab === 'pantry' && isPro" />
@@ -301,6 +295,24 @@ onBeforeUnmount(() => {
         >
           <div class="bar-modal-card">
             <BarShiftPanel mode="modal" @close="showBarShiftModal = false" />
+          </div>
+        </div>
+      </Transition>
+    </TeleportCompat>
+
+    <!-- Modal Storico ordini — apertura dal bottone "Storico ordini" in header pagina -->
+    <TeleportCompat to="body">
+      <Transition name="bar-modal">
+        <div
+          v-if="showHistoryModal"
+          class="bar-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Storico ordini"
+          @click.self="showHistoryModal = false"
+        >
+          <div class="bar-modal-card">
+            <OrdersHistory mode="modal" @close="showHistoryModal = false" />
           </div>
         </div>
       </Transition>

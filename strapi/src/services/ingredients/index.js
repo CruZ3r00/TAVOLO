@@ -55,7 +55,10 @@ async function findOrCreateIngredient(strapi, ownerId, rawName, opts = {}) {
   });
   if (existing) return existing;
 
-  // Idempotenza best-effort: race condition gestita via secondo lookup post-error.
+  // Idempotenza: il DB ha un trigger su `ingredients_fk_user_lnk` che impone
+  // l'univocita' di `(owner, name_normalized)` con `pg_advisory_xact_lock`.
+  // Se due processi creano contemporaneamente, il secondo prende il lock e
+  // alza `unique_violation` (23505 / errcode mappato). Catchiamo e ri-lookup.
   try {
     return await strapi.documents('api::ingredient.ingredient').create({
       data: {
@@ -71,12 +74,18 @@ async function findOrCreateIngredient(strapi, ownerId, rawName, opts = {}) {
       },
     });
   } catch (err) {
-    // Race: un altro processo ha creato l'ingrediente nel frattempo.
+    const code = err && (err.code || err.errno || err.original?.code);
+    const msg = String(err && err.message ? err.message : '').toLowerCase();
+    const isUniqueViolation = code === '23505' || msg.includes('duplicate ingredient name') || msg.includes('unique_violation');
+
     const retry = await strapi.db.query('api::ingredient.ingredient').findOne({
       where: { fk_user: { id: ownerId }, name_normalized: key },
     });
     if (retry) return retry;
-    strapi.log.warn(`ingredients.findOrCreate fallita per "${display}" owner=${ownerId}: ${err.message}`);
+
+    if (!isUniqueViolation) {
+      strapi.log.warn(`ingredients.findOrCreate fallita per "${display}" owner=${ownerId}: ${err.message}`);
+    }
     throw err;
   }
 }
@@ -219,23 +228,11 @@ async function listElementIngredientNames(strapi, elementId) {
     populate: { fk_ingredient: true },
   });
 
-  if (Array.isArray(rows) && rows.length > 0) {
-    const names = rows
-      .map((r) => r?.fk_ingredient?.name)
-      .filter((n) => typeof n === 'string' && n.trim())
-      .map(trim);
-    if (names.length > 0) return names;
-  }
-
-  // Fallback al JSON legacy se ancora popolato (durante migrazione).
-  const element = await strapi.db.query('api::element.element').findOne({
-    where: { id: elementId },
-    select: ['ingredients'],
-  });
-  if (element && Array.isArray(element.ingredients)) {
-    return element.ingredients.map(trim).filter(Boolean);
-  }
-  return [];
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  return rows
+    .map((r) => r?.fk_ingredient?.name)
+    .filter((n) => typeof n === 'string' && n.trim())
+    .map(trim);
 }
 
 /**
@@ -265,54 +262,7 @@ async function batchListElementIngredientNames(strapi, elementIds) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Backfill lazy: Element.ingredients JSON → ElementIngredient        */
-/* ------------------------------------------------------------------ */
-
-/**
- * Sync best-effort dei vecchi Element che hanno `ingredients` JSON popolato
- * ma nessuna ElementIngredient associata. Idempotente: dopo la prima esecuzione
- * tutti gli Element dell'owner hanno ricetta strutturata, le run successive
- * sono no-op.
- *
- * Chiamato a regime da `listOwnerIngredientsAggregate` e da `listAdvanced`
- * per assicurarsi che la dispensa mostri sempre tutti gli ingredienti dei
- * piatti gia presenti nel menu (anche se non hanno ancora stock/dosaggi).
- *
- * @returns {Promise<number>} numero di Element backfillati
- */
-async function backfillLegacyJsonIngredients(strapi, ownerId) {
-  if (!ownerId) return 0;
-
-  // 1) Carica gli Element dell'owner con il campo legacy `ingredients` JSON
-  //    e l'eventuale lista di ElementIngredient gia presenti.
-  const elements = await strapi.db.query('api::element.element').findMany({
-    where: { fk_user: { id: ownerId } },
-    populate: { fk_element_ingredients: { select: ['id'] } },
-    select: ['id', 'documentId', 'ingredients'],
-  });
-
-  let backfilled = 0;
-  for (const el of elements || []) {
-    const legacy = Array.isArray(el.ingredients) ? el.ingredients.map(trim).filter(Boolean) : [];
-    if (legacy.length === 0) continue;
-    const existingLinks = Array.isArray(el.fk_element_ingredients) ? el.fk_element_ingredients : [];
-    if (existingLinks.length > 0) continue;
-
-    try {
-      await syncElementRecipe(strapi, ownerId, el.id, legacy);
-      backfilled += 1;
-    } catch (err) {
-      strapi.log.warn(`backfillLegacyJsonIngredients: element ${el.documentId} fallito: ${err.message}`);
-    }
-  }
-  if (backfilled > 0) {
-    strapi.log.info(`backfillLegacyJsonIngredients: owner=${ownerId} backfillati ${backfilled} Element`);
-  }
-  return backfilled;
-}
-
-/* ------------------------------------------------------------------ */
-/* IngredientsManager aggregate (legacy compat)                       */
+/* IngredientsManager aggregate                                       */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -322,14 +272,6 @@ async function backfillLegacyJsonIngredients(strapi, ownerId) {
  * Output: [{ key, name, count, dishes: [{documentId,name,available}], unavailable }]
  */
 async function listOwnerIngredientsAggregate(strapi, ownerId) {
-  // 0) Backfill lazy: se ci sono Element con `ingredients` JSON popolato ma
-  //    nessuna ElementIngredient associata, sincronizziamo prima di leggere.
-  //    Idempotente: dopo il primo passaggio e' no-op.
-  try {
-    await backfillLegacyJsonIngredients(strapi, ownerId);
-  } catch (err) {
-    strapi.log.warn(`listOwnerIngredientsAggregate: backfill fallito (ignoro) owner=${ownerId}: ${err.message}`);
-  }
 
   // 1) Tutti gli Ingredient attivi dell'owner. Dedup difensivo per
   //    name_normalized per gestire duplicati storici.
@@ -428,27 +370,19 @@ async function setIngredientUnavailable(strapi, ownerId, ingredientName, unavail
   const elements = await strapi.db.query('api::element.element').findMany({
     where: { fk_user: { id: ownerId } },
     populate: { fk_element_ingredients: { populate: { fk_ingredient: { select: ['id'] } } } },
-    select: ['id', 'documentId', 'name', 'available', 'ingredients'],
+    select: ['id', 'documentId', 'name', 'available'],
   });
 
   const affected = [];
   const unavailableIdSet = new Set(unavailableIngIds);
 
   for (const el of elements || []) {
-    // Determina se l'Element ha almeno un ingrediente "non disponibile":
-    // 1) Via ElementIngredient relazioni (preferito).
+    // Element ha un ingrediente non-disponibile? sorgente: relazione ElementIngredient.
     let hasUnavail = false;
     const links = Array.isArray(el.fk_element_ingredients) ? el.fk_element_ingredients : [];
     for (const link of links) {
       const ingId = link?.fk_ingredient?.id;
       if (ingId && unavailableIdSet.has(ingId)) { hasUnavail = true; break; }
-    }
-    // 2) Fallback JSON legacy (durante migrazione).
-    if (!hasUnavail && Array.isArray(el.ingredients) && el.ingredients.length > 0) {
-      const elKeys = new Set(el.ingredients.map(norm).filter(Boolean));
-      for (const uName of unavailableNames) {
-        if (elKeys.has(norm(uName))) { hasUnavail = true; break; }
-      }
     }
 
     const nextAvailable = !hasUnavail;
@@ -489,7 +423,7 @@ async function resolveElementRows(strapi, elementIdOrDoc) {
   const q = isNumeric
     ? knex('elements').where('id', Number(elementIdOrDoc))
     : knex('elements').where('document_id', String(elementIdOrDoc));
-  return q.select('id', 'document_id', 'name', 'ingredients', 'published_at');
+  return q.select('id', 'document_id', 'name', 'published_at');
 }
 
 /**
@@ -672,28 +606,7 @@ async function listElementRecipe(strapi, elementIdOrDoc) {
     }
   }
 
-  if (byIngId.size > 0) return [...byIngId.values()];
-
-  // Fallback legacy JSON — preferiamo la riga published se presente.
-  const sorted = elementRows.slice().sort((a, b) => {
-    if (a.published_at && !b.published_at) return -1;
-    if (!a.published_at && b.published_at) return 1;
-    return 0;
-  });
-  const legacy = Array.isArray(sorted[0]?.ingredients) ? sorted[0].ingredients : [];
-  const names = legacy.map(trim).filter(Boolean);
-  if (names.length === 0) return [];
-  return names.map((name) => ({
-    ingredient: {
-      id: null,
-      documentId: null,
-      name,
-      unit: 'ml',
-      unit_size: null,
-      stock_qty: 0,
-    },
-    qty_per_serving: 0,
-  }));
+  return [...byIngId.values()];
 }
 
 module.exports = {
@@ -707,5 +620,4 @@ module.exports = {
   listOwnerIngredientsAggregate,
   setIngredientUnavailable,
   listElementRecipe,
-  backfillLegacyJsonIngredients,
 };

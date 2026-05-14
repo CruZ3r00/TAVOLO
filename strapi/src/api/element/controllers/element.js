@@ -54,9 +54,10 @@ function buildElementData(raw, { partial = false } = {}) {
     data.category = category;
   }
 
-  if (raw.ingredients !== undefined || !partial) {
-    data.ingredients = normalizeStringArray(raw.ingredients);
-  }
+  // NOTA: `ingredients` non viene piu' scritto sul campo JSON legacy
+  // `Element.ingredients` — la sorgente di verita' e' la relazione
+  // ElementIngredient via `ingredientsService.syncElementRecipe`. La
+  // sanitizzazione viene fatta dal caller (vedi `create`/`update`).
 
   if (raw.allergens !== undefined || !partial) {
     data.allergens = normalizeStringArray(raw.allergens);
@@ -87,7 +88,7 @@ function buildElementData(raw, { partial = false } = {}) {
   return { ok: true, data };
 }
 
-function serializeElement(element) {
+function serializeElement(element, ingredientNames) {
   if (!element) return null;
 
   const parsedPrice = Number(element.price);
@@ -98,7 +99,9 @@ function serializeElement(element) {
     name: element.name,
     price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
     category: element.category || '',
-    ingredients: Array.isArray(element.ingredients) ? element.ingredients : [],
+    // Nomi ingredienti derivati dalla relazione ElementIngredient → Ingredient.
+    // Il caller passa `ingredientNames` (lookup via service); se omesso, [].
+    ingredients: Array.isArray(ingredientNames) ? ingredientNames : [],
     allergens: Array.isArray(element.allergens) ? element.allergens : [],
     image: element.image || null,
     available: element.available !== false,
@@ -164,6 +167,13 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
     const parsed = buildElementData(payload);
     if (!parsed.ok) return ctx.badRequest(parsed.message);
 
+    // Sanitizza la lista nomi ingredienti separatamente da `parsed.data`:
+    // non va nel JSON legacy (dropped), va passata a `syncElementRecipe`
+    // che gestisce la sorgente di verita' (Ingredient + ElementIngredient).
+    const ingredientNames = payload.ingredients !== undefined
+      ? normalizeStringArray(payload.ingredients)
+      : undefined;
+
     try {
       // Risolve `is_beverage` se non fornito esplicitamente: rispecchia il
       // routing staff per quella categoria (override pro se presente, regex
@@ -186,11 +196,10 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
       await ensureCategoryRouting(strapi, user.id, parsed.data.category);
 
       // Sincronizza la "ricetta strutturata" (ElementIngredient) con la lista
-      // di stringhe fornita. Dual-write: il JSON legacy resta su Element.ingredients
-      // finche FASE 4 non lo elimina.
-      if (parsed.data.ingredients !== undefined) {
+      // di stringhe fornita. Sorgente unica di verita' dopo il drop del JSON.
+      if (ingredientNames !== undefined) {
         try {
-          await ingredientsService.syncElementRecipe(strapi, user.id, created.id, parsed.data.ingredients);
+          await ingredientsService.syncElementRecipe(strapi, user.id, created.id, ingredientNames);
         } catch (recipeErr) {
           strapi.log.warn(`element.create: syncElementRecipe fallita per ${created.documentId}: ${recipeErr.message}`);
         }
@@ -213,8 +222,13 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
         status: 'published',
       });
 
+      // Risposta: legge i nomi dalla relazione appena scritta.
+      let namesOut = [];
+      try {
+        namesOut = await ingredientsService.listElementIngredientNames(strapi, created.id);
+      } catch (_e) { /* ignore */ }
       ctx.status = 201;
-      ctx.body = { data: serializeElement(created) };
+      ctx.body = { data: serializeElement(created, namesOut) };
     } catch (error) {
       strapi.log.error('Errore in element.create:', error);
       return ctx.internalServerError('Impossibile creare l\'elemento.');
@@ -231,6 +245,13 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
     const payload = ctx.request.body?.data || ctx.request.body || {};
     const parsed = buildElementData(payload, { partial: true });
     if (!parsed.ok) return ctx.badRequest(parsed.message);
+
+    // Sanitizza la lista nomi ingredienti separatamente: non scritta nel
+    // JSON legacy, va passata a `syncElementRecipe` (sorgente di verita').
+    // partial update: se assente, no-op.
+    const ingredientNames = payload.ingredients !== undefined
+      ? normalizeStringArray(payload.ingredients)
+      : undefined;
 
     try {
       if (!(await userOwnsElement(strapi, user.id, documentId))) {
@@ -256,17 +277,19 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
         await ensureCategoryRouting(strapi, user.id, parsed.data.category);
       }
 
-      // Sincronizza ricetta strutturata se il campo ingredients e' stato fornito
-      // (partial update: undefined => no-op).
-      if (parsed.data.ingredients !== undefined) {
+      if (ingredientNames !== undefined) {
         try {
-          await ingredientsService.syncElementRecipe(strapi, user.id, updated.id, parsed.data.ingredients);
+          await ingredientsService.syncElementRecipe(strapi, user.id, updated.id, ingredientNames);
         } catch (recipeErr) {
           strapi.log.warn(`element.update: syncElementRecipe fallita per ${updated.documentId}: ${recipeErr.message}`);
         }
       }
 
-      ctx.body = { data: serializeElement(updated) };
+      let namesOut = [];
+      try {
+        namesOut = await ingredientsService.listElementIngredientNames(strapi, updated.id);
+      } catch (_e) { /* ignore */ }
+      ctx.body = { data: serializeElement(updated, namesOut) };
     } catch (error) {
       strapi.log.error('Errore in element.update:', error);
       return ctx.internalServerError('Impossibile aggiornare l\'elemento.');

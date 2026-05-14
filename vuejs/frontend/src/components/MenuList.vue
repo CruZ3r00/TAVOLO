@@ -96,11 +96,12 @@
 
             const data = await response.json();
             if (data.data && data.data.length > 0) {
-                // Piatti tab: mostra solo i non-bevande. Le bevande hanno la
-                // loro tab dedicata (BeverageList) — split netto basato sul
-                // flag `is_beverage`, allineato al routing staff "bar".
-                const allElements = data.data[0].fk_elements || [];
-                list.value = allElements.filter(el => el.is_beverage !== true);
+                // Tab "Menu": mostra TUTTI gli elementi (piatti + bevande).
+                // La distinzione tra bevande e non bevande resta governata dal
+                // flag `is_beverage` (visibile nel modale di modifica), ma la
+                // lista qui non filtra — la tab "Bevande" e' la vista
+                // filtrata dedicata al turno bar.
+                list.value = data.data[0].fk_elements || [];
                 syncListMeta();
             } else {
                 list.value = [];

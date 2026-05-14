@@ -32,10 +32,6 @@
       "type": "string",
       "required": true
     },
-    "ingredients": {
-      "type": "json",
-      "required": true
-    },
     "allergens": {
       "type": "json",
       "required": true

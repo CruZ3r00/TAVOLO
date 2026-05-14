@@ -170,16 +170,6 @@ module.exports = {
       const actor = await resolveStaffContext(strapi, user);
       if (!isOwnerActor(actor)) throw appError('NOT_OWNER', 'Solo il titolare puo accedere al magazzino.');
 
-      // Backfill lazy: assicura che gli Element con `ingredients` JSON legacy
-      // abbiano la ricetta strutturata (Ingredient + ElementIngredient). Cosi'
-      // i piatti gia esistenti compaiono in dispensa anche senza dosaggi
-      // ancora impostati.
-      try {
-        await ingredientsService.backfillLegacyJsonIngredients(strapi, actor.ownerId);
-      } catch (err) {
-        strapi.log.warn(`listAdvanced: backfill fallito owner=${actor.ownerId}: ${err.message}`);
-      }
-
       const rows = await strapi.db.query('api::ingredient.ingredient').findMany({
         where: { fk_user: { id: actor.ownerId }, is_active: true },
         orderBy: { name: 'asc' },

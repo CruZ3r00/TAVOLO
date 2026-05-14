@@ -489,6 +489,15 @@ async function grantImportPermissions(strapi) {
       'api::restock-order.restock-order.cancel',
       'api::inventory-alert.inventory-alert.list',
       'api::inventory-alert.inventory-alert.acknowledge',
+      'api::bar-shift.bar-shift.getCurrent',
+      'api::bar-shift.bar-shift.getCurrentReport',
+      'api::bar-shift.bar-shift.openShift',
+      'api::bar-shift.bar-shift.caricoFatto',
+      'api::bar-shift.bar-shift.getHistory',
+      'api::bar-shift.bar-shift.closeShift',
+      'api::bar-shift.bar-shift.getReport',
+      'api::bar-shift.bar-shift.findOne',
+      'api::order-archive.order-archive.history',
       'api::reservation.reservation.createAuthenticated',
       'api::reservation.reservation.list',
       'api::reservation.reservation.updateStatus',
@@ -682,15 +691,24 @@ async function seedDemoData(strapi) {
       },
     ];
 
+    const ingredientsService = require('./services/ingredients');
     const createdElements = [];
     for (const el of demoElements) {
+      // Sorgente di verita' per gli ingredienti: relazione ElementIngredient.
+      // Il campo legacy `Element.ingredients` JSON non viene piu' scritto.
+      const { ingredients: ingredientNames, ...rest } = el;
       const created = await strapi.documents('api::element.element').create({
         data: {
-          ...el,
+          ...rest,
           fk_user: { connect: [{ id: demoUser.id }] },
         },
         status: 'published',
       });
+      try {
+        await ingredientsService.syncElementRecipe(strapi, demoUser.id, created.id, ingredientNames || []);
+      } catch (recipeErr) {
+        strapi.log.warn(`Seed: syncElementRecipe fallita per ${created.documentId}: ${recipeErr.message}`);
+      }
       createdElements.push(created);
     }
 

@@ -243,14 +243,10 @@ function serializeElement(el, recipeMap) {
   if (!el) return null;
 
   const parsedPrice = Number(el.price);
-  // Compone la lista di nomi ingredienti. Ordine di preferenza:
-  // 1) recipeMap (passato dal caller, batch lookup ElementIngredient → Ingredient.name)
-  // 2) Element.ingredients JSON legacy (durante migrazione)
-  let ingredients = Array.isArray(el.ingredients) ? el.ingredients : [];
-  if (recipeMap && recipeMap.has(el.id)) {
-    const fromRel = recipeMap.get(el.id);
-    if (Array.isArray(fromRel) && fromRel.length > 0) ingredients = fromRel;
-  }
+  // Nomi ingredienti: sorgente unica = relazione ElementIngredient → Ingredient.
+  // Il caller pre-calcola `recipeMap` con `batchListElementIngredientNames`.
+  const fromRel = recipeMap && recipeMap.has(el.id) ? recipeMap.get(el.id) : null;
+  const ingredients = Array.isArray(fromRel) ? fromRel : [];
 
   return {
     id: el.id,
@@ -408,9 +404,7 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
 
       const formattedElements = elements.map((el) => {
         const fromRel = recipeMap.get(el.id);
-        const ingredients = Array.isArray(fromRel) && fromRel.length > 0
-          ? fromRel
-          : (Array.isArray(el.ingredients) ? el.ingredients : []);
+        const ingredients = Array.isArray(fromRel) ? fromRel : [];
         return {
           documentId: el.documentId,
           name: el.name,
@@ -636,7 +630,6 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
               name: el.name,
               price: el.price,
               category: el.category,
-              ingredients: el.ingredients,
               allergens: el.allergens,
               is_beverage: isBeverage,
               fk_user: { connect: [{ id: user.id }] },
@@ -645,7 +638,8 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
           });
           await ensureCategoryRouting(strapi, user.id, el.category);
 
-          // Sincronizza la ricetta strutturata via service (dual-write).
+          // Sincronizza la ricetta strutturata via service. Sorgente unica
+          // di verita': il JSON legacy non viene piu' scritto su Element.
           // Fail-soft: errore qui non rompe il bulk import.
           try {
             await ingredientsService.syncElementRecipe(strapi, user.id, doc.id, el.ingredients);
