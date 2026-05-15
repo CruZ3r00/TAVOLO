@@ -120,6 +120,20 @@ const onElementUpdated = async () => {
   await beverageListRef.value?.refresh?.();
 };
 
+// MenuAdder ha appena salvato una nuova bevanda con `is_beverage=true` e
+// l'utente ha cliccato "Configura ricetta →". Passa alla tab Bevande,
+// aspetta il mount di BeverageList e gli chiede di aprire l'editor avanzato
+// sul nuovo elemento (la lista verrà refreshata in parallelo).
+const onOpenRecipeFromAdder = async (created) => {
+  activeTab.value = 'beverages';
+  fabOpen.value = false;
+  await nextTick();
+  // aspetta un tick aggiuntivo per dare tempo al fetchList di BeverageList
+  // di registrarsi (se serve, mergiamo l'elemento nella lista a posteriori).
+  beverageListRef.value?.openAdvancedFor?.(created);
+  beverageListRef.value?.refresh?.();
+};
+
 const isValidTab = (tab) => {
   if (tab === 'list' || tab === 'adder' || tab === 'beverages') return true;
   if (tab === 'pantry') return isOwner.value && isPro.value;
@@ -275,6 +289,7 @@ onBeforeUnmount(() => { document.removeEventListener('click', closeFab); });
             v-if="activeTab === 'adder'"
             :mode="adderMode"
             @ViewList="adderMode === 'beverage' ? handleBeverages() : handleList()"
+            @open-recipe="onOpenRecipeFromAdder"
           />
           <MenuList
             v-else-if="activeTab === 'list'"

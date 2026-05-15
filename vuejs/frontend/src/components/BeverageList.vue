@@ -108,6 +108,29 @@ const onAdvancedDeactivated = (el) => {
   advancedTarget.value = null;
 };
 
+// Aperto da MenuSetter dopo che MenuAdder ha creato una nuova bevanda con
+// is_beverage = true e l'utente ha cliccato "Configura ricetta →".
+// Si occupa di settare il flag `is_beverage_advanced` se non gia attivo,
+// poi apre l'editor della ricetta avanzata sulla nuova bevanda.
+const openAdvancedFor = async (element) => {
+  if (!element) return;
+  // L'elemento appena creato potrebbe non essere ancora nella `list` (la
+  // refresh dovrebbe arrivare a breve via @element-updated). Garantiamo
+  // un riferimento usabile dall'editor.
+  const merged = { is_beverage_advanced: false, ...element };
+  if (!merged.is_beverage_advanced) {
+    try {
+      await patchElement(merged.documentId, { is_beverage_advanced: true });
+      merged.is_beverage_advanced = true;
+    } catch (e) {
+      error.value = e.message || 'Errore aggiornamento.';
+      return;
+    }
+  }
+  advancedTarget.value = merged;
+  showAdvancedEditor.value = true;
+};
+
 const removeBeverageFlag = async (el) => {
   if (togglingId.value) return;
   togglingId.value = el.documentId;
@@ -144,7 +167,7 @@ const handleDelete = async (el) => {
 
 onMounted(fetchList);
 
-defineExpose({ refresh: fetchList });
+defineExpose({ refresh: fetchList, openAdvancedFor });
 </script>
 
 <template>
