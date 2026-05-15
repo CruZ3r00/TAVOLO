@@ -29,6 +29,18 @@
     const existingIngredients = ref([]);
     const focusedRowIdx = ref(-1);
     const allergens = ref([]);
+
+    // Array paralleli di uid stabili usati come :key nei v-for. Senza,
+    // l'<input> v-model si "sposta" tra le righe dopo una rimozione/aggiunta
+    // (Vue riusa i nodi DOM in base all'indice → display disallineato dallo
+    // stato reale, l'utente vede valori che saltano).
+    let nextRowUid = 0;
+    const newRowUid = () => {
+        nextRowUid += 1;
+        return nextRowUid;
+    };
+    const ingredientUids = ref([]);
+    const allergenUids = ref([]);
     const image = ref(null);
     const price = ref(null);
     const category = ref('');
@@ -126,9 +138,24 @@
             return;
         }
 
-        // Filtra ingredienti e allergeni vuoti
-        ingredients.value = ingredients.value.filter((i) => i.trim() !== '');
-        allergens.value = allergens.value.filter((a) => a.trim() !== '');
+        // Filtra ingredienti e allergeni vuoti, mantenendo allineati gli uid.
+        const filterWithUids = (values, uids) => {
+            const nextValues = [];
+            const nextUids = [];
+            values.forEach((v, i) => {
+                if (String(v || '').trim() !== '') {
+                    nextValues.push(v);
+                    nextUids.push(uids[i] ?? newRowUid());
+                }
+            });
+            return [nextValues, nextUids];
+        };
+        const [filteredIng, filteredIngUids] = filterWithUids(ingredients.value, ingredientUids.value);
+        const [filteredAll, filteredAllUids] = filterWithUids(allergens.value, allergenUids.value);
+        ingredients.value = filteredIng;
+        ingredientUids.value = filteredIngUids;
+        allergens.value = filteredAll;
+        allergenUids.value = filteredAllUids;
 
         isSubmitting.value = true;
         if (thenOpenRecipe) submittingForRecipe.value = true;
@@ -155,8 +182,14 @@
     const onPrimarySubmit = () => submit();
     const onConfigureRecipe = () => submit({ thenOpenRecipe: true });
 
-    const addIngredient = () => ingredients.value.push('');
-    const removeIngredient = (index) => ingredients.value.splice(index, 1);
+    const addIngredient = () => {
+        ingredients.value.push('');
+        ingredientUids.value.push(newRowUid());
+    };
+    const removeIngredient = (index) => {
+        ingredients.value.splice(index, 1);
+        ingredientUids.value.splice(index, 1);
+    };
 
     const ingredientSuggestions = (index) => {
         const query = String(ingredients.value[index] || '').trim().toLowerCase();
@@ -214,15 +247,23 @@
         } catch (_e) { /* silenzio: il typeahead diventa solo "free text" */ }
     };
 
-    const addAllergen = () => allergens.value.push('');
-    const removeAllergen = (index) => allergens.value.splice(index, 1);
+    const addAllergen = () => {
+        allergens.value.push('');
+        allergenUids.value.push(newRowUid());
+    };
+    const removeAllergen = (index) => {
+        allergens.value.splice(index, 1);
+        allergenUids.value.splice(index, 1);
+    };
 
     const resetForm = () => {
         imagePreview.value = null;
         uploadedImageId.value = null;
         name.value = '';
         ingredients.value = [];
+        ingredientUids.value = [];
         allergens.value = [];
+        allergenUids.value = [];
         image.value = null;
         price.value = null;
         category.value = isBeverageMode.value ? 'Bevande' : '';
@@ -484,7 +525,7 @@
                         <p class="ma-section-sub">Typeahead dal magazzino. Aggiungi al volo o seleziona esistente.</p>
                     </aside>
                     <div class="ma-section-body">
-                        <div v-for="(_ingredient, index) in ingredients" :key="index" class="ma-list-row">
+                        <div v-for="(_ingredient, index) in ingredients" :key="ingredientUids[index]" class="ma-list-row">
                             <span class="ma-list-bullet" aria-hidden="true"></span>
                             <div class="ma-typeahead">
                                 <input
@@ -546,7 +587,7 @@
                     </aside>
                     <div class="ma-section-body">
                         <div v-if="allergens.length === 0" class="ma-empty">Nessun allergene specificato.</div>
-                        <div v-for="(_allergen, index) in allergens" :key="index" class="ma-list-row">
+                        <div v-for="(_allergen, index) in allergens" :key="allergenUids[index]" class="ma-list-row">
                             <span class="ma-list-warn" aria-hidden="true">⚠</span>
                             <input
                                 v-model="allergens[index]"

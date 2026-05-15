@@ -110,9 +110,24 @@ const fetchList = async () => {
   }
 };
 
+// Array paralleli di uid stabili per ingredienti/allergeni dentro la modale.
+// Senza, :key="idx" sull'<input> dei row fa sì che Vue riusi i nodi DOM in
+// base alla posizione: dopo una rimozione/aggiunta i valori "saltano" tra
+// le righe e l'utente non riesce ad aggiungere un ingrediente perché il
+// display rimane disallineato dallo stato reale.
+let nextUid = 0;
+const newUid = () => {
+  nextUid += 1;
+  return nextUid;
+};
+const ingredientUids = ref([]);
+const allergenUids = ref([]);
+
 const handleModify = (e) => {
   modalShow.value = true;
   toModify.value = JSON.parse(JSON.stringify(e));
+  ingredientUids.value = (toModify.value.ingredients || []).map(() => newUid());
+  allergenUids.value = (toModify.value.allergens || []).map(() => newUid());
   imagePreview.value = null;
 };
 
@@ -369,10 +384,22 @@ const handleDelete = async (id) => {
   }
 };
 
-const addIngredient = () => toModify.value.ingredients.push('');
-const removeIngredient = (i) => toModify.value.ingredients.splice(i, 1);
-const addAllergen = () => toModify.value.allergens.push('');
-const removeAllergen = (i) => toModify.value.allergens.splice(i, 1);
+const addIngredient = () => {
+  toModify.value.ingredients.push('');
+  ingredientUids.value.push(newUid());
+};
+const removeIngredient = (i) => {
+  toModify.value.ingredients.splice(i, 1);
+  ingredientUids.value.splice(i, 1);
+};
+const addAllergen = () => {
+  toModify.value.allergens.push('');
+  allergenUids.value.push(newUid());
+};
+const removeAllergen = (i) => {
+  toModify.value.allergens.splice(i, 1);
+  allergenUids.value.splice(i, 1);
+};
 
 const getImageUrl = (obj) => {
   if (!obj) return '';
@@ -714,7 +741,7 @@ defineExpose({ refresh: fetchList });
 
           <div class="ds-field">
             <label class="ds-label">Ingredienti</label>
-            <div v-for="(_ing, idx) in toModify.ingredients" :key="idx" class="list-input-row">
+            <div v-for="(_ing, idx) in toModify.ingredients" :key="ingredientUids[idx]" class="list-input-row">
               <input v-model="toModify.ingredients[idx]" class="ds-input" required>
               <button type="button" class="ds-btn ds-btn-ghost ds-btn-icon" @click="removeIngredient(idx)">
                 <i class="bi bi-x-lg" aria-hidden="true"></i>
@@ -727,7 +754,7 @@ defineExpose({ refresh: fetchList });
 
           <div class="ds-field">
             <label class="ds-label">Allergeni</label>
-            <div v-for="(_alg, idx) in toModify.allergens" :key="idx" class="list-input-row">
+            <div v-for="(_alg, idx) in toModify.allergens" :key="allergenUids[idx]" class="list-input-row">
               <input v-model="toModify.allergens[idx]" class="ds-input" required>
               <button type="button" class="ds-btn ds-btn-ghost ds-btn-icon" @click="removeAllergen(idx)">
                 <i class="bi bi-x-lg" aria-hidden="true"></i>
