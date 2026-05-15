@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, onBeforeUnmount, ref, computed } from 'vue';
 import { useStore } from 'vuex';
 import Modal from '@/components/Modal.vue';
 import Skeleton from '@/components/Skeleton.vue';
@@ -24,6 +24,24 @@ const deletingIds = ref(new Set());
 const selected = ref(new Set());
 const editingPriceId = ref(null);
 const pendingPrice = ref('');
+const editingNameId = ref(null);
+const pendingName = ref('');
+const editingCategoryId = ref(null);
+const showBulkCategoryMenu = ref(false);
+const duplicatingIds = ref(new Set());
+
+const PREDEFINED_CATEGORIES = [
+  'Bevande',
+  'Dessert',
+  'Pizze classiche',
+  'Pizze bianche',
+  'Pizze rosse',
+  'Primi',
+  'Secondi',
+  'Primi di pesce',
+  'Secondi di pesce',
+  'Contorni',
+];
 
 const list = ref([]);
 const categories = ref([]);
@@ -98,6 +116,8 @@ const handleModify = (e) => {
   imagePreview.value = null;
 };
 
+// Modale ridotta: nome/prezzo/categoria/is_beverage si modificano inline
+// dalla card. La modale ora salva solo immagine + ingredienti + allergeni.
 const update = async () => {
   try {
     const res = await fetch(`${API_BASE}/api/elements/${toModify.value.documentId}`, {
@@ -105,13 +125,9 @@ const update = async () => {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tkn}` },
       body: JSON.stringify({
         data: {
-          name: toModify.value.name,
           ingredients: toModify.value.ingredients,
           allergens: toModify.value.allergens,
           image: toModify.value.image?.id ?? null,
-          price: toModify.value.price,
-          category: toModify.value.category,
-          is_beverage: !!toModify.value.is_beverage,
         },
       }),
     });
@@ -122,6 +138,47 @@ const update = async () => {
     emit('element-updated');
   } catch (error) {
     console.error(error);
+  }
+};
+
+// Helper PUT generico per inline edit (nome / categoria).
+const patchElement = async (el, dataPatch) => {
+  const res = await fetch(`${API_BASE}/api/elements/${el.documentId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+    body: JSON.stringify({ data: dataPatch }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "Errore durante l'aggiornamento."));
+};
+
+// Duplica un elemento. POST con payload identico + suffisso "(copia)" sul nome.
+const duplicate = async (el) => {
+  if (duplicatingIds.value.has(el.documentId)) return;
+  duplicatingIds.value = new Set([...duplicatingIds.value, el.documentId]);
+  try {
+    const payload = {
+      name: `${el.name} (copia)`,
+      price: el.price,
+      category: el.category,
+      ingredients: Array.isArray(el.ingredients) ? [...el.ingredients] : [],
+      allergens: Array.isArray(el.allergens) ? [...el.allergens] : [],
+      image: el.image?.id ?? null,
+      is_beverage: !!el.is_beverage,
+    };
+    const res = await fetch(`${API_BASE}/api/elements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+      body: JSON.stringify({ data: payload }),
+    });
+    if (!res.ok) throw new Error(await readErrorMessage(res, 'Duplicazione non riuscita.'));
+    await fetchList();
+    emit('element-updated');
+  } catch (error) {
+    console.error(error);
+  } finally {
+    const d = new Set(duplicatingIds.value);
+    d.delete(el.documentId);
+    duplicatingIds.value = d;
   }
 };
 
@@ -158,6 +215,55 @@ const handlePriceKeydown = (e, el) => {
   if (e.key === 'Escape') { e.preventDefault(); cancelPriceEdit(); }
 };
 
+// Inline name edit: click sul nome → input → blur/Enter salva via PUT, Esc annulla.
+const startNameEdit = (el) => {
+  editingNameId.value = el.documentId;
+  pendingName.value = el.name;
+};
+
+const commitNameEdit = async (el) => {
+  const next = String(pendingName.value || '').trim();
+  if (next && next !== el.name) {
+    try {
+      await patchElement(el, { name: next });
+      el.name = next;
+      emit('element-updated');
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  editingNameId.value = null;
+};
+
+const cancelNameEdit = () => { editingNameId.value = null; };
+const handleNameKeydown = (e, el) => {
+  if (e.key === 'Enter') { e.preventDefault(); commitNameEdit(el); }
+  if (e.key === 'Escape') { e.preventDefault(); cancelNameEdit(); }
+};
+
+// Inline category edit: click sul badge → dropdown.
+const startCategoryEdit = (el) => { editingCategoryId.value = el.documentId; };
+const cancelCategoryEdit = () => { editingCategoryId.value = null; };
+const commitCategoryEdit = async (el, cat) => {
+  if (cat && cat !== el.category) {
+    try {
+      await patchElement(el, { category: cat });
+      el.category = cat;
+      syncListMeta();
+      emit('element-updated');
+    } catch (error) {
+      console.error(error);
+    }
+  }
+  editingCategoryId.value = null;
+};
+
+// Categorie disponibili = predefinite + quelle realmente esistenti nel menu.
+const availableCategories = computed(() => {
+  const fromList = categories.value.filter((c) => c && !PREDEFINED_CATEGORIES.includes(c));
+  return [...PREDEFINED_CATEGORIES, ...fromList];
+});
+
 // Selection
 const toggleSelect = (id) => {
   const s = new Set(selected.value);
@@ -165,6 +271,59 @@ const toggleSelect = (id) => {
   selected.value = s;
 };
 const clearSelection = () => { selected.value = new Set(); };
+
+// Bulk duplicate: duplica tutti gli elementi selezionati con suffisso "(copia)".
+const bulkDuplicate = async () => {
+  const ids = [...selected.value];
+  if (!ids.length) return;
+  const elementsToDup = list.value.filter((el) => selected.value.has(el.documentId));
+  selected.value = new Set();
+  try {
+    await Promise.all(elementsToDup.map((el) => {
+      const payload = {
+        name: `${el.name} (copia)`,
+        price: el.price,
+        category: el.category,
+        ingredients: Array.isArray(el.ingredients) ? [...el.ingredients] : [],
+        allergens: Array.isArray(el.allergens) ? [...el.allergens] : [],
+        image: el.image?.id ?? null,
+        is_beverage: !!el.is_beverage,
+      };
+      return fetch(`${API_BASE}/api/elements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+        body: JSON.stringify({ data: payload }),
+      });
+    }));
+    await fetchList();
+    emit('element-updated');
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+// Bulk move-category: sposta tutti i selezionati nella categoria scelta.
+const bulkMoveCategory = async (newCategory) => {
+  const ids = [...selected.value];
+  if (!ids.length || !newCategory) return;
+  const elementsToMove = list.value.filter((el) => selected.value.has(el.documentId));
+  showBulkCategoryMenu.value = false;
+  try {
+    await Promise.all(elementsToMove.map((el) =>
+      fetch(`${API_BASE}/api/elements/${el.documentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+        body: JSON.stringify({ data: { category: newCategory } }),
+      }),
+    ));
+    elementsToMove.forEach((el) => { el.category = newCategory; });
+    syncListMeta();
+    selected.value = new Set();
+    emit('element-updated');
+  } catch (error) {
+    console.error(error);
+  }
+};
 
 // Bulk delete
 const bulkDelete = async () => {
@@ -232,9 +391,26 @@ const handleFile = async (event) => {
   await uploadImage();
 };
 
+// Click-outside per chiudere dropdown bulk-categoria + inline category popover.
+const handleDocClick = (e) => {
+  const t = e.target;
+  if (!(t instanceof Element)) return;
+  if (showBulkCategoryMenu.value && !t.closest('.ml-bulk-cat-wrap')) {
+    showBulkCategoryMenu.value = false;
+  }
+  if (editingCategoryId.value && !t.closest('.ml-cat-wrap')) {
+    editingCategoryId.value = null;
+  }
+};
+
 onMounted(async () => {
   document.title = 'Gestione Menu';
+  document.addEventListener('click', handleDocClick);
   await fetchList();
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocClick);
 });
 
 defineExpose({ refresh: fetchList });
@@ -248,10 +424,39 @@ defineExpose({ refresh: fetchList });
       <div v-if="selected.size > 0" class="ml-bulk-bar" role="status">
         <span class="ml-bulk-count">{{ selected.size }} selezionat{{ selected.size === 1 ? 'o' : 'i' }}</span>
         <div class="ml-bulk-actions">
-          <button type="button" class="ml-bulk-btn ml-bulk-btn--danger" @click="bulkDelete">
-            <i class="bi bi-trash"></i> Elimina
+          <div class="ml-bulk-cat-wrap">
+            <button
+              type="button"
+              class="ml-bulk-btn"
+              :aria-expanded="showBulkCategoryMenu"
+              @click="showBulkCategoryMenu = !showBulkCategoryMenu"
+            >
+              <i class="bi bi-tags"></i>
+              <span>Sposta categoria</span>
+              <i class="bi bi-chevron-down ml-bulk-chev"></i>
+            </button>
+            <Transition name="bulk-menu">
+              <div v-if="showBulkCategoryMenu" class="ml-bulk-menu" role="menu">
+                <button
+                  v-for="cat in availableCategories"
+                  :key="cat"
+                  type="button"
+                  class="ml-bulk-menu-item"
+                  role="menuitem"
+                  @click="bulkMoveCategory(cat)"
+                >{{ cat }}</button>
+              </div>
+            </Transition>
+          </div>
+          <button type="button" class="ml-bulk-btn" @click="bulkDuplicate">
+            <i class="bi bi-files"></i>
+            <span>Duplica</span>
           </button>
-          <button type="button" class="ml-bulk-btn" @click="clearSelection">
+          <button type="button" class="ml-bulk-btn ml-bulk-btn--danger" @click="bulkDelete">
+            <i class="bi bi-trash"></i>
+            <span>Elimina</span>
+          </button>
+          <button type="button" class="ml-bulk-btn" aria-label="Chiudi selezione" @click="clearSelection">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
@@ -357,15 +562,26 @@ defineExpose({ refresh: fetchList });
             <i v-if="selected.has(element.documentId)" class="bi bi-check-lg" aria-hidden="true"></i>
           </button>
 
-          <!-- Quick actions top-right -->
+          <!-- Quick actions top-right (sempre visibili) -->
           <div class="ml-quick-actions" aria-label="Azioni rapide">
             <button
               type="button"
               class="ml-action-btn"
-              title="Modifica"
+              title="Modifica immagine, ingredienti e allergeni"
               aria-label="Modifica elemento"
               @click.stop="handleModify(element)"
             ><i class="bi bi-pencil" aria-hidden="true"></i></button>
+            <button
+              type="button"
+              class="ml-action-btn"
+              title="Duplica"
+              aria-label="Duplica elemento"
+              :disabled="duplicatingIds.has(element.documentId)"
+              @click.stop="duplicate(element)"
+            >
+              <span v-if="duplicatingIds.has(element.documentId)" class="ds-spinner ds-spinner-sm" aria-hidden="true"></span>
+              <i v-else class="bi bi-files" aria-hidden="true"></i>
+            </button>
             <button
               type="button"
               class="ml-action-btn ml-action-btn--danger"
@@ -387,7 +603,25 @@ defineExpose({ refresh: fetchList });
 
           <div class="ml-card-body">
             <div class="ml-card-row">
-              <h3 class="ml-el-name">{{ element.name }}</h3>
+              <!-- Inline name edit -->
+              <button
+                v-if="editingNameId !== element.documentId"
+                type="button"
+                class="ml-el-name ml-el-name-btn"
+                title="Clicca per modificare il nome"
+                @click.stop="startNameEdit(element)"
+              >{{ element.name }}</button>
+              <input
+                v-else
+                :value="pendingName"
+                @input="pendingName = $event.target.value"
+                @blur="commitNameEdit(element)"
+                @keydown="handleNameKeydown($event, element)"
+                type="text"
+                class="ml-name-input"
+                aria-label="Modifica nome"
+                autofocus
+              />
               <!-- Inline price edit -->
               <button
                 v-if="editingPriceId !== element.documentId"
@@ -410,7 +644,27 @@ defineExpose({ refresh: fetchList });
                 autofocus
               >
             </div>
-            <span class="ds-badge ds-badge-neutral">{{ element.category }}</span>
+            <!-- Inline category edit: click sul badge → dropdown -->
+            <div class="ml-cat-wrap">
+              <button
+                v-if="editingCategoryId !== element.documentId"
+                type="button"
+                class="ds-badge ds-badge-neutral ml-cat-btn"
+                title="Clicca per cambiare categoria"
+                @click.stop="startCategoryEdit(element)"
+              >{{ element.category }}</button>
+              <div v-else class="ml-cat-popover" @click.stop>
+                <button
+                  v-for="cat in availableCategories"
+                  :key="cat"
+                  type="button"
+                  class="ml-cat-item"
+                  :class="{ 'ml-cat-item--active': cat === element.category }"
+                  @click="commitCategoryEdit(element, cat)"
+                >{{ cat }}</button>
+                <button type="button" class="ml-cat-cancel" @click="cancelCategoryEdit">Annulla</button>
+              </div>
+            </div>
 
             <div v-if="element.ingredients && element.ingredients.length" class="ml-detail">
               <span class="ml-detail-label">Ingredienti</span>
@@ -425,82 +679,22 @@ defineExpose({ refresh: fetchList });
       </div>
     </div>
 
-    <!-- Edit modal -->
+    <!-- Edit modal: solo immagine + ingredienti + allergeni.
+         Nome / prezzo / categoria / is_beverage si modificano inline dalla card. -->
     <Modal :show="modalShow" @close="modalShow = false">
       <template #title>
         <h3 class="modal-edit-title">
           <i class="bi bi-pencil" aria-hidden="true"></i>
-          Modifica elemento
+          Modifica dettagli
         </h3>
       </template>
       <template #body>
         <form v-if="toModify" @submit.prevent="update" class="edit-form">
-          <div class="edit-form-row">
-            <div class="ds-field" style="flex: 1;">
-              <label class="ds-label">Nome</label>
-              <input type="text" v-model="toModify.name" class="ds-input" required>
-            </div>
-            <div class="ds-field" style="width: 140px;">
-              <label class="ds-label">Prezzo</label>
-              <div class="price-input-wrap">
-                <input type="number" v-model="toModify.price" class="ds-input" step="0.01" required>
-                <span class="price-suffix">&euro;</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="ds-field">
-            <label class="ds-label">Ingredienti</label>
-            <div v-for="(ing, idx) in toModify.ingredients" :key="idx" class="list-input-row">
-              <input v-model="toModify.ingredients[idx]" class="ds-input" required>
-              <button type="button" class="ds-btn ds-btn-ghost ds-btn-icon" @click="removeIngredient(idx)">
-                <i class="bi bi-x-lg" aria-hidden="true"></i>
-              </button>
-            </div>
-            <button type="button" class="ds-btn ds-btn-ghost ds-btn-sm" @click="addIngredient">
-              <i class="bi bi-plus" aria-hidden="true"></i> Aggiungi ingrediente
-            </button>
-          </div>
-
-          <div class="ds-field">
-            <label class="ds-label">Allergeni</label>
-            <div v-for="(alg, idx) in toModify.allergens" :key="idx" class="list-input-row">
-              <input v-model="toModify.allergens[idx]" class="ds-input" required>
-              <button type="button" class="ds-btn ds-btn-ghost ds-btn-icon" @click="removeAllergen(idx)">
-                <i class="bi bi-x-lg" aria-hidden="true"></i>
-              </button>
-            </div>
-            <button type="button" class="ds-btn ds-btn-ghost ds-btn-sm" @click="addAllergen">
-              <i class="bi bi-plus" aria-hidden="true"></i> Aggiungi allergene
-            </button>
-          </div>
-
-          <div class="ds-field">
-            <label class="ds-label">Categoria</label>
-            <select v-model="toModify.category" class="ds-input ds-select" required>
-              <option>Bevande</option>
-              <option>Dessert</option>
-              <option>Pizze classiche</option>
-              <option>Pizze bianche</option>
-              <option>Pizze rosse</option>
-              <option>Primi</option>
-              <option>Secondi</option>
-              <option>Primi di pesce</option>
-              <option>Secondi di pesce</option>
-              <option>Contorni</option>
-            </select>
-          </div>
-
-          <div class="ds-field bev-toggle-field">
-            <label class="bev-toggle-row">
-              <input type="checkbox" v-model="toModify.is_beverage" class="bev-toggle-input">
-              <span class="bev-toggle-track"><span class="bev-toggle-thumb"></span></span>
-              <span class="bev-toggle-label">
-                <strong>Questa è una bevanda</strong>
-                <span class="bev-toggle-hint">Se attivo, l'elemento appare nella tab Bevande e contribuisce al turno bar.</span>
-              </span>
-            </label>
-          </div>
+          <p class="edit-form-hint">
+            Nome, prezzo, categoria e flag bevanda si modificano direttamente
+            sulla card cliccando sul valore. Qui aggiorni solo immagine,
+            ingredienti e allergeni.
+          </p>
 
           <div class="ds-field">
             <label class="ds-label">Immagine</label>
@@ -516,6 +710,32 @@ defineExpose({ refresh: fetchList });
                 <span class="file-upload-change">Clicca per cambiare</span>
               </div>
             </label>
+          </div>
+
+          <div class="ds-field">
+            <label class="ds-label">Ingredienti</label>
+            <div v-for="(_ing, idx) in toModify.ingredients" :key="idx" class="list-input-row">
+              <input v-model="toModify.ingredients[idx]" class="ds-input" required>
+              <button type="button" class="ds-btn ds-btn-ghost ds-btn-icon" @click="removeIngredient(idx)">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+              </button>
+            </div>
+            <button type="button" class="ds-btn ds-btn-ghost ds-btn-sm" @click="addIngredient">
+              <i class="bi bi-plus" aria-hidden="true"></i> Aggiungi ingrediente
+            </button>
+          </div>
+
+          <div class="ds-field">
+            <label class="ds-label">Allergeni</label>
+            <div v-for="(_alg, idx) in toModify.allergens" :key="idx" class="list-input-row">
+              <input v-model="toModify.allergens[idx]" class="ds-input" required>
+              <button type="button" class="ds-btn ds-btn-ghost ds-btn-icon" @click="removeAllergen(idx)">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+              </button>
+            </div>
+            <button type="button" class="ds-btn ds-btn-ghost ds-btn-sm" @click="addAllergen">
+              <i class="bi bi-plus" aria-hidden="true"></i> Aggiungi allergene
+            </button>
           </div>
 
           <button type="submit" class="ds-btn ds-btn-primary" style="width: 100%;">
@@ -566,9 +786,44 @@ defineExpose({ refresh: fetchList });
 .ml-bulk-btn:hover { background: color-mix(in oklab, white 15%, transparent); }
 .ml-bulk-btn--danger { color: oklch(0.78 0.16 22); }
 .ml-bulk-btn--danger:hover { background: color-mix(in oklab, oklch(0.78 0.16 22) 15%, transparent); }
+.ml-bulk-chev { font-size: 10px; opacity: 0.7; margin-left: 2px; }
+
+.ml-bulk-cat-wrap { position: relative; }
+.ml-bulk-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  z-index: 30;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.ml-bulk-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.ml-bulk-menu-item:hover { background: var(--bg-hover); }
 
 .bulk-bar-enter-active, .bulk-bar-leave-active { transition: transform 200ms var(--ease-out), opacity 160ms; }
 .bulk-bar-enter-from, .bulk-bar-leave-to { transform: translateY(-100%); opacity: 0; }
+.bulk-menu-enter-active, .bulk-menu-leave-active { transition: opacity 140ms, transform 160ms; }
+.bulk-menu-enter-from, .bulk-menu-leave-to { opacity: 0; transform: translateY(-4px); }
 
 /* ── Container ── */
 .ml-container {
@@ -670,7 +925,7 @@ defineExpose({ refresh: fetchList });
   box-shadow: 0 0 0 3px var(--ac-soft) !important;
 }
 
-/* Checkbox */
+/* Checkbox: sempre visibile (opacity 0.5 idle, 1 hover/selezionato). */
 .ml-checkbox {
   position: absolute;
   top: 8px;
@@ -686,17 +941,18 @@ defineExpose({ refresh: fetchList });
   place-items: center;
   font-size: 11px;
   z-index: 2;
-  opacity: 0;
+  opacity: 0.5;
   transition: opacity var(--dur-fast), border-color var(--dur-fast), background var(--dur-fast);
 }
 .ml-card:hover .ml-checkbox,
+.ml-checkbox:hover,
 .ml-checkbox--checked { opacity: 1; }
 .ml-checkbox--checked {
   border-color: var(--ac);
   background: var(--ac);
 }
 
-/* Quick actions */
+/* Quick actions: sempre visibili (opacity 0.5 idle, 1 hover). */
 .ml-quick-actions {
   position: absolute;
   top: 6px;
@@ -704,10 +960,12 @@ defineExpose({ refresh: fetchList });
   display: flex;
   gap: 2px;
   z-index: 2;
-  opacity: 0;
+  opacity: 0.5;
   transition: opacity var(--dur-fast);
 }
-.ml-card:hover .ml-quick-actions { opacity: 1; }
+.ml-card:hover .ml-quick-actions,
+.ml-quick-actions:hover,
+.ml-quick-actions:focus-within { opacity: 1; }
 
 .ml-action-btn {
   width: 28px;
@@ -772,6 +1030,31 @@ defineExpose({ refresh: fetchList });
   flex: 1;
   min-width: 0;
 }
+.ml-el-name-btn {
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: text;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: background var(--dur-fast);
+}
+.ml-el-name-btn:hover { background: var(--bg-hover); }
+.ml-name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1.5px solid var(--ac);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  background: var(--paper);
+  color: var(--ink);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ac-soft);
+}
 
 /* Inline price */
 .ml-price {
@@ -807,6 +1090,60 @@ defineExpose({ refresh: fetchList });
   flex-shrink: 0;
 }
 
+/* Inline category edit */
+.ml-cat-wrap { position: relative; display: inline-block; }
+.ml-cat-btn {
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: background var(--dur-fast);
+}
+.ml-cat-btn:hover { background: var(--bg-elev); }
+.ml-cat-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 12;
+  min-width: 200px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.ml-cat-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12.5px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.ml-cat-item:hover { background: var(--bg-hover); }
+.ml-cat-item--active { background: var(--ac-soft); color: var(--ac-ink); }
+.ml-cat-cancel {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  margin-top: 2px;
+  border: none;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-3);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+.ml-cat-cancel:hover { color: var(--ink); }
+
 .ml-detail { margin-top: 2px; }
 .ml-detail-label {
   font-size: 10px;
@@ -830,7 +1167,17 @@ defineExpose({ refresh: fetchList });
   display: flex; align-items: center; gap: 8px;
   font-size: 17px; font-weight: 600; margin: 0;
 }
-.edit-form { display: flex; flex-direction: column; }
+.edit-form { display: flex; flex-direction: column; gap: 12px; }
+.edit-form-hint {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  background: var(--bg-sunk);
+  border-left: 3px solid var(--ac);
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.45;
+}
 .edit-form-row { display: flex; gap: 16px; }
 .price-input-wrap { position: relative; }
 .price-input-wrap .ds-input { padding-right: 32px; }
