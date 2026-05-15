@@ -6,7 +6,21 @@ import PaperCardsScene from '@/components/PaperCardsScene.vue';
 const sceneError = ref(false);
 const reason = ref('demo');
 const sent = ref(false);
-const form = ref({ locale: '', email: '', telefono: '', messaggio: '', privacy: true });
+const form = ref({ locale: '', email: '', telefono: '', messaggio: '', privacy: false });
+const formError = ref('');
+
+// Backend Strapi non espone /api/contact: usiamo mailto: come fallback
+// (vincolo confermato nel handoff). Destinatario confermato dall'utente.
+const CONTACT_RECIPIENT = 'support@comfortables.eu';
+
+// Validatori basici (no nuove dipendenze).
+const isValidEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || '').trim());
+const isValidPhone = (s) => /^[+\d][\d\s().-]{6,}$/.test(String(s || '').trim());
+
+const reasonLabelFor = (k) => {
+  const r = reasons.find((x) => x.k === k);
+  return r ? r.label : k;
+};
 
 const reasons = [
   { k: 'demo', icon: '▶', label: 'Voglio provare COMFORTABLES', sub: 'Demo guidata o tour del prodotto' },
@@ -47,7 +61,49 @@ const toggleFaq = (i) => {
   openFaqs.value = s;
 };
 
-const handleSubmit = () => { sent.value = true; };
+const handleSubmit = () => {
+  formError.value = '';
+  const f = form.value;
+
+  if (!String(f.locale || '').trim()) {
+    formError.value = 'Inserisci il nome del locale.';
+    return;
+  }
+  const hasEmail = String(f.email || '').trim() !== '';
+  const hasPhone = String(f.telefono || '').trim() !== '';
+  if (!hasEmail && !hasPhone) {
+    formError.value = 'Inserisci almeno un recapito (email o telefono).';
+    return;
+  }
+  if (hasEmail && !isValidEmail(f.email)) {
+    formError.value = "L'indirizzo email non sembra valido.";
+    return;
+  }
+  if (hasPhone && !isValidPhone(f.telefono)) {
+    formError.value = 'Il numero di telefono non sembra valido.';
+    return;
+  }
+  if (!f.privacy) {
+    formError.value = 'Devi acconsentire al trattamento dei dati per essere ricontattato.';
+    return;
+  }
+
+  // Costruisci mailto: con tutti i dati nel body. Nessun POST: backend non
+  // ha /api/contact e il vincolo del handoff è no-modifiche-Strapi.
+  const subject = `[ComforTables] Richiesta · ${reasonLabelFor(reason.value)}`;
+  const bodyLines = [
+    `Locale: ${f.locale}`,
+    `Email: ${f.email || '(non fornita)'}`,
+    `Telefono: ${f.telefono || '(non fornito)'}`,
+    `Motivo: ${reasonLabelFor(reason.value)}`,
+    '',
+    'Messaggio:',
+    f.messaggio || '(nessun messaggio)',
+  ];
+  const mailto = `mailto:${CONTACT_RECIPIENT}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyLines.join('\n'))}`;
+  window.location.href = mailto;
+  sent.value = true;
+};
 
 onMounted(() => {
   nextTick(() => { document.title = 'Contattaci · ComforTables'; });
@@ -122,11 +178,11 @@ onMounted(() => {
                 </div>
                 <div class="ct-field-row">
                   <div class="ct-field">
-                    <label class="ct-label">Email</label>
-                    <input v-model="form.email" type="email" class="ct-input" placeholder="info@locale.it" required>
+                    <label class="ct-label">Email <span class="ct-label-opt">(o telefono)</span></label>
+                    <input v-model="form.email" type="email" class="ct-input" placeholder="info@locale.it">
                   </div>
                   <div class="ct-field">
-                    <label class="ct-label">Telefono</label>
+                    <label class="ct-label">Telefono <span class="ct-label-opt">(o email)</span></label>
                     <input v-model="form.telefono" type="tel" class="ct-input" placeholder="+39 …">
                   </div>
                 </div>
@@ -140,14 +196,19 @@ onMounted(() => {
                   ></textarea>
                 </div>
                 <label class="ct-privacy">
-                  <input v-model="form.privacy" type="checkbox" class="ct-privacy-check">
+                  <input v-model="form.privacy" type="checkbox" class="ct-privacy-check" required>
                   <span>Acconsento al trattamento dei dati per essere ricontattato. Mai newsletter, mai spam.</span>
                 </label>
+                <p v-if="formError" class="ct-form-error" role="alert">
+                  <span aria-hidden="true">⚠</span>
+                  <span>{{ formError }}</span>
+                </p>
                 <button type="submit" class="ct-submit-btn">
                   Invia messaggio <span aria-hidden="true">→</span>
                 </button>
                 <p class="ct-direct-mail">
-                  Oppure scrivici: <a href="mailto:filippomanzini02@outlook.com" class="ct-mail-link">filippomanzini02@outlook.com</a>
+                  Si aprirà il tuo client email predefinito · oppure scrivi a
+                  <a :href="`mailto:${CONTACT_RECIPIENT}`" class="ct-mail-link">{{ CONTACT_RECIPIENT }}</a>
                 </p>
               </form>
             </div>
@@ -480,6 +541,19 @@ onMounted(() => {
   line-height: 1.4;
 }
 .ct-privacy-check { margin-top: 2px; flex-shrink: 0; }
+.ct-form-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  background: color-mix(in oklab, var(--danger) 10%, var(--paper));
+  color: var(--danger);
+  border: 1px solid color-mix(in oklab, var(--danger) 30%, transparent);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
 .ct-submit-btn {
   height: 48px;
   margin-top: 4px;
