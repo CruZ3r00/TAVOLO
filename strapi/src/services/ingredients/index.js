@@ -215,48 +215,86 @@ async function syncElementRecipe(strapi, ownerId, elementIdOrDoc, ingredientName
 
 /**
  * Ritorna la lista di nomi degli ingredienti collegati a un Element via
- * ElementIngredient. Se nessuno trovato e l'Element ha il JSON legacy
- * popolato, fallback a quello (backward compat durante migrazione).
+ * ElementIngredient. Sorgente di verita': link table dirette
+ * (element_ingredients_fk_element_lnk + element_ingredients_fk_ingredient_lnk).
+ *
+ * NOTA: NON si usa Strapi populate sulla relazione fk_element. setStructuredRecipe
+ * (vedi sotto) collega via knex diretto una stessa ElementIngredient a TUTTE le
+ * righe del documento (draft + published). Strapi v5, su una relazione `manyToOne`
+ * con piu' link, in populate sceglie UNA sola riga arbitrariamente: a volte
+ * draft, a volte published. Il chiamante (menu.list / publicMenu) confronta poi
+ * con l'id della published row e finiva per "perdere" ingredienti random a ogni
+ * fetch. Bypassiamo il populate e leggiamo direttamente le link table.
  *
  * @param {object} strapi
  * @param {number} elementId
  * @returns {Promise<string[]>}
  */
 async function listElementIngredientNames(strapi, elementId) {
-  const rows = await strapi.db.query('api::element-ingredient.element-ingredient').findMany({
-    where: { fk_element: { id: elementId } },
-    populate: { fk_ingredient: true },
-  });
+  const knex = strapi.db.connection;
+  if (!knex) return [];
+  const id = Number(elementId);
+  if (!Number.isFinite(id) || id <= 0) return [];
 
-  if (!Array.isArray(rows) || rows.length === 0) return [];
-  return rows
-    .map((r) => r?.fk_ingredient?.name)
-    .filter((n) => typeof n === 'string' && n.trim())
-    .map(trim);
+  const rows = await knex('element_ingredients as ei')
+    .join('element_ingredients_fk_element_lnk as fke', 'fke.element_ingredient_id', 'ei.id')
+    .join('element_ingredients_fk_ingredient_lnk as fki', 'fki.element_ingredient_id', 'ei.id')
+    .join('ingredients as i', 'i.id', 'fki.ingredient_id')
+    .where('fke.element_id', id)
+    .orderBy('ei.id', 'asc')
+    .select('i.id as ing_id', 'i.name as ing_name');
+
+  // Dedup per ingredient_id (una stessa ei puo' essere joinata piu' volte).
+  const seenIngIds = new Set();
+  const out = [];
+  for (const r of rows || []) {
+    if (!r || !r.ing_id || seenIngIds.has(r.ing_id)) continue;
+    const n = trim(r.ing_name);
+    if (!n) continue;
+    seenIngIds.add(r.ing_id);
+    out.push(n);
+  }
+  return out;
 }
 
 /**
- * Variante batch: per una lista di Element (con id) ritorna una Map
- * elementId -> string[]. Una query sola.
+ * Variante batch: per una lista di Element (id) ritorna una Map
+ * elementId -> string[]. Una query sola via knex sulle link table.
+ *
+ * Stessa motivazione di listElementIngredientNames: bypass del populate
+ * Strapi che su `manyToOne` con link multipli (draft+published) ritorna
+ * solo uno degli id, causando "perdita" random di ingredienti dalle card.
  */
 async function batchListElementIngredientNames(strapi, elementIds) {
+  const knex = strapi.db.connection;
+  if (!knex) return new Map();
   const ids = (Array.isArray(elementIds) ? elementIds : []).filter(
     (x) => Number.isFinite(Number(x)) && Number(x) > 0
   ).map((x) => Number(x));
   if (ids.length === 0) return new Map();
 
-  const rows = await strapi.db.query('api::element-ingredient.element-ingredient').findMany({
-    where: { fk_element: { id: { $in: ids } } },
-    populate: { fk_element: { select: ['id'] }, fk_ingredient: { select: ['name'] } },
-  });
+  const rows = await knex('element_ingredients as ei')
+    .join('element_ingredients_fk_element_lnk as fke', 'fke.element_ingredient_id', 'ei.id')
+    .join('element_ingredients_fk_ingredient_lnk as fki', 'fki.element_ingredient_id', 'ei.id')
+    .join('ingredients as i', 'i.id', 'fki.ingredient_id')
+    .whereIn('fke.element_id', ids)
+    .orderBy('ei.id', 'asc')
+    .select('fke.element_id as el_id', 'i.id as ing_id', 'i.name as ing_name');
 
-  const map = new Map();
+  // Per ogni element_id, dedup degli ingredient_id (una stessa ei puo'
+  // comparire piu' volte tra le righe per via dei join sulle link table).
+  const seenByEl = new Map(); // el_id -> Set<ing_id>
+  const map = new Map(); // el_id -> string[]
   for (const r of rows || []) {
-    const elId = r?.fk_element?.id;
-    const name = r?.fk_ingredient?.name;
-    if (!elId || !name) continue;
+    const elId = Number(r?.el_id);
+    const ingId = Number(r?.ing_id);
+    const name = trim(r?.ing_name);
+    if (!elId || !ingId || !name) continue;
+    if (!seenByEl.has(elId)) seenByEl.set(elId, new Set());
+    if (seenByEl.get(elId).has(ingId)) continue;
+    seenByEl.get(elId).add(ingId);
     if (!map.has(elId)) map.set(elId, []);
-    map.get(elId).push(trim(name));
+    map.get(elId).push(name);
   }
   return map;
 }
