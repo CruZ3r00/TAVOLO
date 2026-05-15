@@ -105,6 +105,21 @@ const walkinErrors = ref({});
 
 const orderDetailRef = ref(null);
 
+// Filtro tavoli (modalità cameriere): controllato dalla sidebar laterale
+// della pagina. Sostituisce l'ex SalaFiltersBar interna a OrdersTableGrid.
+const tableFilter = ref('all');
+const tableCounts = ref({ all: 0, free: 0, busy: 0, ready: 0, res: 0 });
+const onTableCountsChanged = (next) => {
+  tableCounts.value = { all: 0, free: 0, busy: 0, ready: 0, res: 0, ...(next || {}) };
+};
+const tableFilterPills = computed(() => ([
+  { key: 'all',   label: 'Tutti',       icon: 'bi-grid-3x3-gap',     count: tableCounts.value.all },
+  { key: 'free',  label: 'Liberi',      icon: 'bi-circle',           count: tableCounts.value.free },
+  { key: 'busy',  label: 'Occupati',    icon: 'bi-people-fill',      count: tableCounts.value.busy },
+  { key: 'ready', label: 'Da chiudere', icon: 'bi-check-circle',     count: tableCounts.value.ready },
+  { key: 'res',   label: 'Prenotati',   icon: 'bi-calendar-check',   count: tableCounts.value.res },
+]));
+
 const stats = computed(() => {
   const tableOrders = orders.value.filter(o => o.service_type !== 'takeaway');
   const activeOrders = tableOrders.filter(o => o.status === 'active');
@@ -547,11 +562,13 @@ watch(() => route.path, async () => {
   <AppLayout :page-title="pageTitle">
     <div class="ord-layout">
       <!-- Sidebar laterale dedicata alla pagina (stile MenuSetter):
-           switcher di reparto. Visibile solo per owner/gestione in modalità
-           produzione (cucina/bar/pizzeria/sg). Su mobile diventa una row
-           orizzontale scrollabile. -->
-      <aside v-if="isOwnerProductionMode" class="ord-sidebar">
-        <div class="ord-sidebar-section">
+           - Modalità produzione (owner/gestione su /kitchen, /bar, …):
+             switcher di reparto.
+           - Modalità cameriere: filtro stato tavoli (Tutti/Liberi/Occupati/
+             Da chiudere/Prenotati). Sostituisce l'ex SalaFiltersBar.
+           Su mobile diventa una row orizzontale scrollabile. -->
+      <aside v-if="isOwnerProductionMode || mode === 'cameriere'" class="ord-sidebar">
+        <div v-if="isOwnerProductionMode" class="ord-sidebar-section">
           <div class="ord-sidebar-label">Reparto</div>
           <nav class="ord-sidebar-nav">
             <button
@@ -570,9 +587,27 @@ watch(() => route.path, async () => {
             </button>
           </nav>
         </div>
-        <div v-if="!isPro" class="ord-sidebar-note">
+        <div v-if="isOwnerProductionMode && !isPro" class="ord-sidebar-note">
           <i class="bi bi-info-circle" aria-hidden="true"></i>
           <span>Piano Essenziale: solo Cucina disponibile.</span>
+        </div>
+
+        <div v-if="mode === 'cameriere'" class="ord-sidebar-section">
+          <div class="ord-sidebar-label">Filtra tavoli</div>
+          <nav class="ord-sidebar-nav">
+            <button
+              v-for="pill in tableFilterPills"
+              :key="pill.key"
+              type="button"
+              class="ord-nav-item"
+              :class="{ 'ord-nav-item--active': tableFilter === pill.key }"
+              @click="tableFilter = pill.key"
+            >
+              <i :class="['bi', pill.icon]" aria-hidden="true"></i>
+              <span>{{ pill.label }}</span>
+              <span v-if="pill.count > 0" class="ord-nav-count">{{ pill.count }}</span>
+            </button>
+          </nav>
         </div>
       </aside>
 
@@ -780,6 +815,9 @@ watch(() => route.path, async () => {
             :tables="tables"
             :orders="orders"
             :can-remove-tables="canManageTables"
+            :filter="tableFilter"
+            @update:filter="tableFilter = $event"
+            @counts-changed="onTableCountsChanged"
             @view-order="handleViewOrder"
             @open-table="handleOpenTable"
             @remove-table="handleRemoveTable"
@@ -958,6 +996,15 @@ watch(() => route.path, async () => {
   font-family: var(--f-mono);
   flex-shrink: 0;
 }
+
+.ord-nav-count {
+  font-size: 11px;
+  color: var(--ink-3);
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.ord-nav-item--active .ord-nav-count { color: var(--ink); font-weight: 700; }
 
 .ord-main { flex: 1; min-width: 0; }
 

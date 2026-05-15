@@ -1,19 +1,25 @@
 <script setup>
-import { computed, ref } from 'vue';
+// OrdersTableGrid: griglia dei tavoli (modalità cameriere).
+//
+// Il filtro stato (Tutti/Liberi/Occupati/Da chiudere/Prenotati) è ora
+// controllato dal parent (Orders.vue) tramite la sidebar laterale della
+// pagina. Niente più SalaFiltersBar interna né input "Cerca tavolo, area…"
+// (rimosso su richiesta utente — creava confusione).
+
+import { computed, watch } from 'vue';
 import SalaTableCard from '@/components/SalaTableCard.vue';
-import SalaFiltersBar from '@/components/SalaFiltersBar.vue';
 import SalaAreaSummary from '@/components/SalaAreaSummary.vue';
 
 const props = defineProps({
   tables: { type: Array, default: () => [] },
   orders: { type: Array, default: () => [] },
   canRemoveTables: { type: Boolean, default: false },
+  // Stato filtro corrente (controllato dal parent). Vue 2.7 dual-build:
+  // niente v-model:filter — il parent fa :filter + @update:filter.
+  filter: { type: String, default: 'all' },
 });
 
-const emit = defineEmits(['view-order', 'open-table', 'remove-table']);
-
-const filter = ref('all');
-const search = ref('');
+const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'counts-changed']);
 
 function activeOrderForTable(table) {
   return props.orders.find(
@@ -40,18 +46,14 @@ const counts = computed(() => {
   return c;
 });
 
+// Notifica il parent ogni volta che i counts cambiano: gli serve per
+// mostrarli come badge accanto alle voci della sidebar.
+watch(counts, (next) => emit('counts-changed', next), { immediate: true, deep: true });
+
 const filtered = computed(() => {
   let list = [...props.tables];
-  if (filter.value !== 'all') {
-    list = list.filter(t => tableState(t) === filter.value);
-  }
-  const q = search.value.trim().toLowerCase();
-  if (q) {
-    list = list.filter(t => {
-      const num = String(t.number || '').toLowerCase();
-      const area = (t.area || '').toLowerCase();
-      return num.includes(q) || area.includes(q);
-    });
+  if (props.filter !== 'all') {
+    list = list.filter(t => tableState(t) === props.filter);
   }
   // Sort by number asc
   list.sort((a, b) => (a.number || 0) - (b.number || 0));
@@ -61,13 +63,6 @@ const filtered = computed(() => {
 
 <template>
   <div class="sala-wrap" v-if="tables.length">
-    <SalaFiltersBar
-      :filter="filter"
-      :search="search"
-      :counts="counts"
-      @update:filter="filter = $event"
-      @update:search="search = $event"
-    />
     <SalaAreaSummary :tables="tables" :orders="orders" />
 
     <div v-if="filtered.length" class="sl-grid">
