@@ -8,6 +8,7 @@ import { canSeeNavItem, defaultRouteForUser, effectiveUserId } from '@/staffAcce
 import AppSidebar from '@/components/AppSidebar.vue';
 import MobileBottomNav from '@/components/MobileBottomNav.vue';
 import MobileTopBar from '@/components/MobileTopBar.vue';
+import MobileDrawer from '@/components/MobileDrawer.vue';
 import AlertHeaderBar from '@/components/AlertHeaderBar.vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 import TeleportCompat from '@/lib/compat/teleport.js';
@@ -25,13 +26,24 @@ const restaurantSub = ref('');
 const store = useStore();
 const route = useRoute();
 const isLoggedIn = computed(() => store.getters.isAuthenticated);
-const mobileMenuOpen = ref(false);
+const mobileMenuOpen = ref(false); // drawer mobile dell'app variant + mobile-nav-panel del public variant
 const userMenuOpen = ref(false);
 const pendingCount = ref(0);
 const activeOrdersCount = ref(0);
+const paletteRef = ref(null);
 let pollId = null;
 let realtimeChannel = null;
 let realtimeRefreshHandle = null;
+
+const notificationCount = computed(() => Number(pendingCount.value || 0) + Number(activeOrdersCount.value || 0));
+const hasNotifications = computed(() => notificationCount.value > 0);
+const formatNotificationBadge = (n) => (n > 9 ? '9+' : String(n));
+
+const openPalette = () => {
+  // CommandPalette espone `open` via defineExpose. È mounted via TeleportCompat
+  // a body, quindi il ref è valido subito.
+  paletteRef.value?.open?.();
+};
 
 const applyUserToDisplay = (userData) => {
   if (!userData) return;
@@ -163,65 +175,130 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 </script>
 
 <template>
-  <!-- ============== APP variant: sidebar + bottom nav ============== -->
+  <!-- ============== APP variant: top nav + sidebar + bottom nav ============== -->
   <div v-if="variantResolved === 'app'" class="app-shell-app">
+    <!-- Top nav globale (desktop) -->
+    <header class="app-top-nav">
+      <div class="app-top-inner">
+        <router-link :to="defaultAppRoute" class="app-top-brand" aria-label="Home">
+          <span class="tv-brand-mark sm">C</span>
+          <span class="app-top-brand-text">comforTables</span>
+        </router-link>
+
+        <button
+          type="button"
+          class="app-top-search"
+          @click="openPalette"
+          aria-label="Cerca, naviga, esegui un'azione"
+        >
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <span class="app-top-search-text">Cerca, naviga, esegui un'azione…</span>
+          <span class="app-top-search-kbds">
+            <kbd>⌘</kbd><kbd>K</kbd>
+          </span>
+        </button>
+
+        <div class="app-top-tools">
+          <ThemeToggle compact class="app-top-theme" />
+          <router-link
+            v-if="hasNotifications"
+            to="/reservations"
+            class="app-top-icon-btn app-top-icon-btn--badged"
+            :aria-label="`Notifiche (${notificationCount})`"
+          >
+            <i class="bi bi-bell" aria-hidden="true"></i>
+            <span class="app-top-bell-badge">{{ formatNotificationBadge(notificationCount) }}</span>
+          </router-link>
+          <button
+            v-else
+            type="button"
+            class="app-top-icon-btn"
+            aria-label="Notifiche"
+            disabled
+          >
+            <i class="bi bi-bell" aria-hidden="true"></i>
+          </button>
+
+          <div class="user-menu">
+            <button
+              type="button"
+              class="app-top-avatar"
+              :aria-expanded="userMenuOpen"
+              aria-label="Menu utente"
+              @click.stop="toggleUserMenu"
+            >
+              <span>{{ userInitial }}</span>
+            </button>
+            <Transition name="fade">
+              <ul v-if="userMenuOpen" class="user-dropdown" role="menu">
+                <li class="user-dropdown-header">
+                  <div class="user-dropdown-name">{{ username || 'Utente' }}</div>
+                  <div class="user-dropdown-role">{{ restaurantName }}</div>
+                </li>
+                <li v-if="showMobileProfile">
+                  <router-link to="/profile/show" class="user-dropdown-item" @click="closeUserMenu">
+                    <i class="bi bi-person"></i><span>Profilo</span>
+                  </router-link>
+                </li>
+                <li><hr class="user-dropdown-sep"></li>
+                <li>
+                  <router-link to="/logout" class="user-dropdown-item user-dropdown-item--danger" @click="closeUserMenu">
+                    <i class="bi bi-box-arrow-right"></i><span>Esci</span>
+                  </router-link>
+                </li>
+              </ul>
+            </Transition>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Mobile top bar (visibile solo <= 860px tramite media query interna) -->
     <MobileTopBar
       :title="pageTitle || 'ComforTables'"
       :username="username"
       :restaurant-name="restaurantName"
-      :show-menu-button="false"
       :show-profile="showMobileProfile"
-      @menu="toggleMobileMenu"
+      @open-drawer="toggleMobileMenu"
+      @open-palette="openPalette"
     />
 
-    <AppSidebar
-      class="app-shell-sidebar"
-      :username="username"
-      :restaurant-name="restaurantName"
-      :restaurant-sub="restaurantSub"
-      :pending-count="pendingCount"
-      :active-orders-count="activeOrdersCount"
-      :user="currentUser"
-    />
+    <div class="app-shell-body">
+      <AppSidebar
+        class="app-shell-sidebar"
+        :username="username"
+        :restaurant-name="restaurantName"
+        :restaurant-sub="restaurantSub"
+        :pending-count="pendingCount"
+        :active-orders-count="activeOrdersCount"
+        :user="currentUser"
+      />
 
-    <main class="app-shell-main">
-      <AlertHeaderBar />
-      <slot />
-    </main>
+      <main class="app-shell-main">
+        <AlertHeaderBar />
+        <slot />
+      </main>
+    </div>
 
     <MobileBottomNav
       :pending-count="pendingCount"
       :active-orders-count="activeOrdersCount"
       :user="currentUser"
+      @open-drawer="toggleMobileMenu"
     />
 
     <TeleportCompat to="body">
-      <CommandPalette />
-      <Transition name="drawer">
-        <div v-if="mobileMenuOpen" class="mobile-drawer-backdrop" @click="closeMobileMenu">
-          <aside class="mobile-drawer" @click.stop>
-            <header class="mobile-drawer-h">
-              <span class="tv-brand-mark">C</span>
-              <div>
-                <div class="md-side-name">{{ restaurantName }}</div>
-                <div class="md-side-sub">{{ restaurantSub }}</div>
-              </div>
-              <button class="fm-close" @click="closeMobileMenu" aria-label="Chiudi"><i class="bi bi-x-lg"></i></button>
-            </header>
-            <nav class="mobile-drawer-nav">
-              <router-link v-if="showNav('manager')" to="/dashboard" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-speedometer2"></i> Manager</router-link>
-              <router-link v-if="showNav('sala')" to="/orders" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-grid-3x3-gap"></i> Sala</router-link>
-              <router-link v-if="showNav('cucina')" to="/kitchen" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-fire"></i> Cucina</router-link>
-              <router-link v-if="showNav('prenotazioni')" to="/reservations" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-calendar-check"></i> Prenotazioni</router-link>
-              <router-link v-if="showNav('menu')" to="/menu-handler" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-journal-text"></i> Menu</router-link>
-              <hr v-if="showNav('sito') || showNav('profilo')" class="mobile-drawer-sep">
-              <router-link v-if="showNav('sito')" to="/profile/show?section=sito" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-globe2"></i> Sito pubblico</router-link>
-              <router-link v-if="showNav('profilo')" to="/profile/show" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-person"></i> Profilo</router-link>
-              <router-link to="/logout" class="md-side-item md-side-item--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"></i> Esci</router-link>
-            </nav>
-          </aside>
-        </div>
-      </Transition>
+      <CommandPalette ref="paletteRef" />
+      <MobileDrawer
+        :open="mobileMenuOpen"
+        :username="username"
+        :restaurant-name="restaurantName"
+        :restaurant-sub="restaurantSub"
+        :pending-count="pendingCount"
+        :active-orders-count="activeOrdersCount"
+        :user="currentUser"
+        @update:open="mobileMenuOpen = $event"
+      />
     </TeleportCompat>
   </div>
 
@@ -322,12 +399,147 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 <style scoped>
 /* ============== APP variant — workspace shell ============== */
 .app-shell-app {
-  display: grid;
-  grid-template-columns: 240px 1fr;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  background: var(--bg-sunk, var(--bg-2));
+  background: var(--bg);
   color: var(--ink);
   font-family: var(--f-sans);
+}
+
+/* ── Top nav ── */
+.app-top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  backdrop-filter: saturate(1.2) blur(10px);
+  -webkit-backdrop-filter: saturate(1.2) blur(10px);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.app-top-inner {
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  align-items: center;
+  gap: var(--s-4, 16px);
+  height: 56px;
+  padding: 0 var(--s-5, 20px);
+  max-width: none;
+}
+.app-top-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+.app-top-brand-text {
+  font-family: var(--f-sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app-top-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  color: var(--ink-3);
+  font-family: var(--f-sans);
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 540px;
+  margin: 0 auto;
+  width: 100%;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.app-top-search:hover { border-color: var(--line-strong); background: var(--paper); }
+.app-top-search i { font-size: 14px; }
+.app-top-search-text { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-top-search-kbds { display: inline-flex; gap: 2px; flex-shrink: 0; }
+.app-top-search-kbds kbd {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-3);
+}
+
+.app-top-tools { display: flex; align-items: center; gap: 6px; }
+.app-top-theme {}
+
+.app-top-icon-btn {
+  appearance: none;
+  width: 34px; height: 34px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--ink-2);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.app-top-icon-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--ink); }
+.app-top-icon-btn:disabled { color: var(--ink-3); cursor: default; opacity: 0.7; }
+.app-top-icon-btn i { font-size: 16px; line-height: 1; }
+.app-top-bell-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ac);
+  color: var(--ac-contrast, var(--bg));
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: inline-grid;
+  place-items: center;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.app-top-icon-btn--badged i { color: var(--ink); }
+
+.app-top-avatar {
+  appearance: none;
+  width: 32px; height: 32px;
+  border: 1px solid var(--line);
+  background: var(--ac-soft);
+  color: var(--ac-ink);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--f-mono);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.app-top-avatar:hover { background: var(--ac); color: var(--bg); }
+
+/* ── Body (sidebar + main) ── */
+.app-shell-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  flex: 1;
+  min-height: 0;
 }
 .app-shell-sidebar { grid-column: 1; grid-row: 1; }
 .app-shell-main {
@@ -337,49 +549,12 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
   flex-direction: column;
 }
 
-.mobile-drawer-backdrop {
-  position: fixed; inset: 0;
-  background: color-mix(in oklab, black 35%, transparent);
-  z-index: 300;
-  display: flex;
-}
-.mobile-drawer {
-  width: 280px; max-width: 86%;
-  background: var(--paper);
-  height: 100%;
-  display: flex; flex-direction: column;
-  box-shadow: 4px 0 24px rgb(0 0 0 / 0.16);
-  overflow-y: auto;
-}
-.mobile-drawer-h {
-  display: flex; align-items: center; gap: 10px;
-  padding: 16px;
-  border-bottom: 1px solid var(--line);
-}
-.mobile-drawer-h > div:first-of-type { flex: 1; min-width: 0; }
-.mobile-drawer-nav { padding: 12px; display: flex; flex-direction: column; gap: 2px; }
-.mobile-drawer-sep { border: none; border-top: 1px solid var(--line); margin: 8px 4px; }
-.mobile-drawer .md-side-item { color: var(--ink-2); padding: 12px 14px; }
-.mobile-drawer .md-side-item--danger { color: var(--danger); }
-.mobile-drawer .md-side-item--danger i { color: var(--danger); }
-
-.drawer-enter-active, .drawer-leave-active { transition: opacity 200ms ease; }
-.drawer-enter-active .mobile-drawer, .drawer-leave-active .mobile-drawer {
-  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.drawer-enter-from, .drawer-leave-to { opacity: 0; }
-.drawer-enter-from .mobile-drawer, .drawer-leave-to .mobile-drawer { transform: translateX(-100%); }
-
-/* Tablet — narrower sidebar */
-@media (min-width: 861px) and (max-width: 1199px) {
-  .app-shell-app { grid-template-columns: 64px 1fr; }
-}
-
-/* Mobile — sidebar completamente nascosta, nessuno spazio riservato */
+/* Mobile: sidebar nascosta, top-nav desktop nascosta. */
 @media (max-width: 860px) {
-  .app-shell-app { grid-template-columns: 1fr !important; }
+  .app-top-nav { display: none; }
+  .app-shell-body { grid-template-columns: 1fr !important; }
   .app-shell-sidebar { display: none !important; }
-  .app-shell-main { grid-column: 1; }
+  .app-shell-main { grid-column: 1; padding-bottom: 96px; /* spazio per bottom nav */ }
 }
 
 /* ============== PUBLIC variant — landing/auth nav ============== */
