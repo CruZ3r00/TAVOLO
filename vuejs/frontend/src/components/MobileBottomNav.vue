@@ -2,9 +2,9 @@
 // MobileBottomNav: barra di navigazione fissa in basso, visibile SOLO su
 // mobile (<= 860px). Su desktop sempre nascosta.
 //
-// Spec: max 5 voci, indicatore active = barra accent in alto al pulsante
-// (non sfondo), badge in alto a destra dell'icona, voce "Altro" che apre
-// il drawer (sostituisce profilo/staff/impostazioni inline).
+// 5 macro-schede principali (filtrate per ruolo).
+// Profilo / Impostazioni / Esci NON sono qui — accessibili dall'avatar
+// nella MobileTopBar (dropdown).
 
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -16,8 +16,6 @@ const props = defineProps({
   user: { type: Object, default: null },
 });
 
-const emit = defineEmits(['open-drawer']);
-
 const route = useRoute();
 const router = useRouter();
 const role = computed(() => staffRole(props.user));
@@ -25,7 +23,7 @@ const isOwnerOrGestione = computed(
   () => role.value === STAFF_ROLES.OWNER || role.value === STAFF_ROLES.GESTIONE,
 );
 
-// Costruzione voci per ruolo. Max 5 inclusa "Altro" (apre drawer).
+// Costruzione voci per ruolo. Max 5 macro-schede principali.
 const items = computed(() => {
   const homePath = defaultRouteForUser(props.user) || '/dashboard';
 
@@ -33,9 +31,9 @@ const items = computed(() => {
     return [
       { id: 'manager', icon: 'bi-house', iconActive: 'bi-house-fill', label: 'Home', path: homePath },
       { id: 'menu', icon: 'bi-journal', iconActive: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
-      { id: 'sala', icon: 'bi-grid-3x3-gap', iconActive: 'bi-grid-3x3-gap-fill', label: 'Sala', path: '/orders', badge: props.pendingCount },
+      { id: 'sala', icon: 'bi-grid-3x3-gap', iconActive: 'bi-grid-3x3-gap-fill', label: 'Sala', path: '/orders' },
       { id: 'ordini', icon: 'bi-receipt', iconActive: 'bi-receipt-cutoff', label: 'Ordini', path: '/kitchen', badge: props.activeOrdersCount },
-      { id: 'altro', icon: 'bi-list', iconActive: 'bi-list', label: 'Altro', drawer: true },
+      { id: 'prenotazioni', icon: 'bi-calendar-check', iconActive: 'bi-calendar-check-fill', label: 'Prenota', path: '/reservations', badge: props.pendingCount },
     ];
   }
 
@@ -44,11 +42,10 @@ const items = computed(() => {
       { id: 'manager', icon: 'bi-house', iconActive: 'bi-house-fill', label: 'Home', path: homePath },
       { id: 'sala', icon: 'bi-grid-3x3-gap', iconActive: 'bi-grid-3x3-gap-fill', label: 'Sala', path: '/orders' },
       { id: 'prenotazioni', icon: 'bi-calendar-check', iconActive: 'bi-calendar-check-fill', label: 'Prenota', path: '/reservations', badge: props.pendingCount },
-      { id: 'altro', icon: 'bi-list', iconActive: 'bi-list', label: 'Altro', drawer: true },
     ];
   }
 
-  // Staff di reparto: solo home + reparto + altro.
+  // Staff di reparto: home + reparto + carico bar (se applicabile).
   const dept = (() => {
     if (role.value === STAFF_ROLES.CUCINA) return { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen' };
     if (role.value === STAFF_ROLES.BAR) return { id: 'bar', icon: 'bi-cup-straw', label: 'Bar', path: '/bar' };
@@ -64,7 +61,6 @@ const items = computed(() => {
   if (canSeeNavItem(props.user, 'bar-management')) {
     out.push({ id: 'bar-management', icon: 'bi-cup-hot', iconActive: 'bi-cup-hot-fill', label: 'Carico', path: '/bar-management' });
   }
-  out.push({ id: 'altro', icon: 'bi-list', iconActive: 'bi-list', label: 'Altro', drawer: true });
   return out;
 });
 
@@ -83,10 +79,6 @@ const activeKey = computed(() => {
 });
 
 const onItemClick = (it) => {
-  if (it.drawer) {
-    emit('open-drawer');
-    return;
-  }
   if (it.path) router.push(it.path);
 };
 

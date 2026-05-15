@@ -5,10 +5,8 @@ import { useStore } from 'vuex';
 import { fetchReservations, fetchOrders } from '@/utils';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
 import { STAFF_ROLES, canSeeNavItem, defaultRouteForUser, effectiveUserId, staffRole } from '@/staffAccess';
-import AppSidebar from '@/components/AppSidebar.vue';
 import MobileBottomNav from '@/components/MobileBottomNav.vue';
 import MobileTopBar from '@/components/MobileTopBar.vue';
-import MobileDrawer from '@/components/MobileDrawer.vue';
 import AlertHeaderBar from '@/components/AlertHeaderBar.vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 import TeleportCompat from '@/lib/compat/teleport.js';
@@ -26,7 +24,7 @@ const restaurantSub = ref('');
 const store = useStore();
 const route = useRoute();
 const isLoggedIn = computed(() => store.getters.isAuthenticated);
-const mobileMenuOpen = ref(false); // drawer mobile dell'app variant + mobile-nav-panel del public variant
+const mobileMenuOpen = ref(false); // mobile-nav-panel del public variant (landing/auth hamburger). L'app variant non usa più drawer.
 const userMenuOpen = ref(false);
 const pendingCount = ref(0);
 const activeOrdersCount = ref(0);
@@ -339,7 +337,6 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
       :username="username"
       :restaurant-name="restaurantName"
       :show-profile="showMobileProfile"
-      @open-drawer="toggleMobileMenu"
       @open-palette="openPalette"
     />
 
@@ -352,21 +349,10 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
       :pending-count="pendingCount"
       :active-orders-count="activeOrdersCount"
       :user="currentUser"
-      @open-drawer="toggleMobileMenu"
     />
 
     <TeleportCompat to="body">
       <CommandPalette ref="paletteRef" />
-      <MobileDrawer
-        :open="mobileMenuOpen"
-        :username="username"
-        :restaurant-name="restaurantName"
-        :restaurant-sub="restaurantSub"
-        :pending-count="pendingCount"
-        :active-orders-count="activeOrdersCount"
-        :user="currentUser"
-        @update:open="mobileMenuOpen = $event"
-      />
     </TeleportCompat>
   </div>
 
