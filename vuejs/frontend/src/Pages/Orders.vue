@@ -5,16 +5,13 @@ import { useRoute, useRouter } from 'vue-router';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import OrdersTableGrid from '@/components/OrdersTableGrid.vue';
 import KitchenBoard from '@/components/KitchenBoard.vue';
-import OrderDetailModal from '@/components/OrderDetailModal.vue';
-import AddItemModal from '@/components/AddItemModal.vue';
-import CheckoutModal from '@/components/CheckoutModal.vue';
+import OrderDetailPage from '@/components/OrderDetailPage.vue';
 import Modal from '@/components/Modal.vue';
 import Skeleton from '@/components/Skeleton.vue';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
 import { STAFF_ROLES, effectiveUserId, staffRole } from '@/staffAccess';
 import {
-  fetchTables, fetchOrders, fetchOrder, closeOrder,
-  addOrderItem, updateItemStatus, orderErrorMessage,
+  fetchTables, fetchOrders, updateItemStatus, orderErrorMessage,
   pickupTakeaway,
   createWalkin, reservationErrorMessage,
   deleteTable,
@@ -88,13 +85,7 @@ const headerOverline = computed(() => {
   return `${modeInfo.value.overline} · ${now.value}`;
 });
 
-const showOrderDetail = ref(false);
 const currentOrderDocId = ref(null);
-const addItemOrderDocId = ref(null);
-const addItemLockVersion = ref(0);
-const showCheckout = ref(false);
-const checkoutOrder = ref(null);
-const checkoutBusy = ref(false);
 const busyItemIds = ref(new Set());
 const showWalkin = ref(false);
 const walkinTable = ref(null);
@@ -102,14 +93,11 @@ const walkinSaving = ref(false);
 const walkinForm = ref({ number_of_people: 2, customer_name: 'Walk-in', phone: '', notes: '' });
 const walkinErrors = ref({});
 
-const orderDetailRef = ref(null);
-
 // View interna della pagina Sala (cameriere): 'grid' (lista tavoli, default)
-// vs 'add-item' (vista full-page per aggiungere piatti). Pattern MenuSetter.
+// vs 'order-detail' (vista full-page del tavolo con add cumulative + invio
+// in cucina). Pattern MenuSetter -> MenuAdder.
+// La chiusura del conto NON e' qui: avviene esclusivamente dalla Dashboard.
 const salaView = ref('grid');
-const addItemTableLabel = ref('');
-const addItemSubmitting = ref(false);
-const addItemPageRef = ref(null);
 
 // Filtro tavoli (modalità cameriere): controllato dalla sidebar laterale
 // della pagina. Sostituisce l'ex SalaFiltersBar interna a OrdersTableGrid.
@@ -280,11 +268,30 @@ const showToast = (type, message) => {
   setTimeout(() => { toast.value = null; }, 3500);
 };
 
+// Click su un tavolo occupato: apre la vista full-page del dettaglio ordine
+// (sostituisce la grid). La pagina permette aggiunta cumulative dei piatti
+// per portata + invio in cucina finale. Pattern MenuSetter -> MenuAdder.
 const handleViewOrder = (order) => {
   if (!order?.documentId) return;
   currentOrderDocId.value = order.documentId;
-  showOrderDetail.value = true;
+  salaView.value = 'order-detail';
 };
+
+const onOrderDetailBack = () => {
+  salaView.value = 'grid';
+  currentOrderDocId.value = null;
+};
+
+const onOrderSent = async ({ sent }) => {
+  await loadData({ silent: true });
+  salaView.value = 'grid';
+  currentOrderDocId.value = null;
+  showToast('success', sent > 0
+    ? `Comanda inviata in cucina (${sent} ${sent === 1 ? 'piatto' : 'piatti'}).`
+    : 'Tutto già in cucina.');
+};
+
+const onOrderDetailUpdated = async () => { await loadData({ silent: true }); };
 
 const handleOpenTable = async (table) => {
   if (!table?.documentId || !token.value) return;
@@ -340,8 +347,10 @@ const confirmWalkin = async () => {
     showWalkin.value = false;
     await loadData({ silent: true });
     if (result?.order?.documentId) {
+      // Apri direttamente la vista dettaglio del nuovo ordine: cosi' il
+      // cameriere puo' iniziare ad aggiungere piatti subito dopo il walk-in.
       currentOrderDocId.value = result.order.documentId;
-      showOrderDetail.value = true;
+      salaView.value = 'order-detail';
     }
     showToast('success', `Walk-in aperto al tavolo ${walkinTable.value.number}.`);
   } catch (err) {
@@ -349,98 +358,6 @@ const confirmWalkin = async () => {
     await loadData({ silent: true });
   } finally {
     walkinSaving.value = false;
-  }
-};
-
-const onOrderUpdated = async () => { await loadData({ silent: true }); };
-
-// Apertura della vista AddItemPage (sostituisce la grid). Chiamata sia
-// dalla card tavolo direttamente sia dall'OrderDetailModal via emit
-// open-add-item. Memorizza orderDocId, lockVersion, etichetta tavolo.
-const onOpenAddItem = ({ orderDocumentId, lockVersion, tableLabel }) => {
-  addItemOrderDocId.value = orderDocumentId;
-  addItemLockVersion.value = Number(lockVersion) || 0;
-  addItemTableLabel.value = tableLabel || '';
-  // Chiudi modal di dettaglio se aperto: la nuova UX è full-page.
-  showOrderDetail.value = false;
-  salaView.value = 'add-item';
-};
-
-const onCancelAddItem = () => {
-  salaView.value = 'grid';
-  addItemOrderDocId.value = null;
-  addItemTableLabel.value = '';
-};
-
-// Nuova signature: { payload, keepOpen }
-//  - keepOpen=true → "Aggiungi un altro": resta nella view, resetta solo
-//    nome/qty/notes (mantiene portata) e propaga la nuova lockVersion.
-//  - keepOpen=false → "Aggiungi e torna alla sala": switch back to grid.
-const onAddItem = async ({ payload, keepOpen } = {}) => {
-  if (!payload || !addItemOrderDocId.value) return;
-  addItemSubmitting.value = true;
-  try {
-    await addOrderItem(addItemOrderDocId.value, payload, token.value);
-    // Recupera la nuova lockVersion (l'add la incrementa lato server).
-    try {
-      const fresh = await fetchOrder(addItemOrderDocId.value, token.value);
-      addItemLockVersion.value = Number(fresh?.lock_version) || addItemLockVersion.value + 1;
-    } catch (_e) {
-      addItemLockVersion.value += 1;
-    }
-    if (keepOpen) {
-      addItemPageRef.value?.resetItemFields?.();
-      showToast('success', 'Piatto aggiunto. Continua con un altro.');
-    } else {
-      onCancelAddItem();
-      showToast('success', 'Piatto aggiunto al tavolo.');
-    }
-    await loadData({ silent: true });
-  } catch (err) {
-    if (err?.code === 'STALE_ORDER') {
-      try {
-        const fresh = await fetchOrder(addItemOrderDocId.value, token.value);
-        addItemLockVersion.value = Number(fresh?.lock_version) || addItemLockVersion.value;
-      } catch (_e) { /* fail-soft */ }
-      showToast('error', 'Dati obsoleti, aggiornati. Riprova.');
-    } else {
-      showToast('error', orderErrorMessage(err));
-    }
-  } finally {
-    addItemSubmitting.value = false;
-  }
-};
-
-const onOpenCheckout = (order) => {
-  checkoutOrder.value = order;
-  showCheckout.value = true;
-};
-
-const onConfirmCheckout = async (payload) => {
-  if (!checkoutOrder.value || checkoutBusy.value) return;
-  checkoutBusy.value = true;
-  try {
-    const result = await closeOrder(checkoutOrder.value.documentId, payload, token.value);
-    showCheckout.value = false;
-    if (result.queued) {
-      showToast('success', `Richiesta inviata al dispositivo POS/RT. Rif: ${result.event_id || 'OK'}`);
-    } else {
-      showOrderDetail.value = false;
-      currentOrderDocId.value = null;
-      showToast('success', `Conto chiuso. Rif: ${result.payment?.transactionId || 'OK'}`);
-    }
-    await loadData({ silent: true });
-  } catch (err) {
-    if (err?.code === 'STALE_ORDER') {
-      showCheckout.value = false;
-      if (orderDetailRef.value) await orderDetailRef.value.silentReload();
-      showToast('error', 'Dati obsoleti, aggiornati. Riprova il pagamento.');
-    } else {
-      showToast('error', orderErrorMessage(err));
-    }
-  }
-  finally {
-    checkoutBusy.value = false;
   }
 };
 
@@ -500,9 +417,8 @@ const scheduleRealtimeRefresh = () => {
   realtimeRefreshHandle = setTimeout(async () => {
     realtimeRefreshHandle = null;
     await loadData({ silent: true });
-    if (showOrderDetail.value && currentOrderDocId.value && orderDetailRef.value) {
-      await orderDetailRef.value.silentReload();
-    }
+    // Quando si è dentro la vista dettaglio tavolo, OrderDetailPage si
+    // aggiorna autonomamente ricaricando l'ordine dopo ogni mutazione.
   }, 250);
 };
 
@@ -545,9 +461,6 @@ const subscribeRealtime = async (userId) => {
 const onVisibilityChange = () => {
   if (document.visibilityState === 'visible') {
     loadData({ silent: true });
-    if (showOrderDetail.value && currentOrderDocId.value && orderDetailRef.value) {
-      orderDetailRef.value.silentReload();
-    }
   }
 };
 
@@ -555,7 +468,7 @@ const openOrderFromQuery = () => {
   const docId = typeof route.query?.order === 'string' ? route.query.order : null;
   if (!docId) return;
   currentOrderDocId.value = docId;
-  showOrderDetail.value = true;
+  salaView.value = 'order-detail';
 };
 
 const updateDocumentTitle = () => {
@@ -608,7 +521,7 @@ watch(() => route.path, async () => {
              Da chiudere/Prenotati). Sostituisce l'ex SalaFiltersBar.
            Su mobile diventa una row orizzontale scrollabile. -->
       <aside
-        v-if="(isOwnerProductionMode || mode === 'cameriere') && !(mode === 'cameriere' && salaView === 'add-item')"
+        v-if="(isOwnerProductionMode || mode === 'cameriere') && !(mode === 'cameriere' && salaView !== 'grid')"
         class="ord-sidebar"
       >
         <div v-if="isOwnerProductionMode" class="ord-sidebar-section">
@@ -655,7 +568,7 @@ watch(() => route.path, async () => {
       </aside>
 
       <div class="md-main ord-main" :class="{ 'kt-main': isKitchenMode }">
-      <header v-if="!(mode === 'cameriere' && salaView === 'add-item')" class="md-top">
+      <header v-if="!(mode === 'cameriere' && salaView !== 'grid')" class="md-top">
         <div>
           <div class="overline">{{ headerOverline }}</div>
           <h1>{{ headerTitle }}</h1>
@@ -866,15 +779,13 @@ watch(() => route.path, async () => {
             @open-table="handleOpenTable"
             @remove-table="handleRemoveTable"
           />
-          <AddItemModal
-            v-else-if="salaView === 'add-item' && addItemOrderDocId"
-            ref="addItemPageRef"
-            :order-document-id="addItemOrderDocId"
-            :lock-version="addItemLockVersion"
-            :table-label="addItemTableLabel"
-            :submitting="addItemSubmitting"
-            @cancel="onCancelAddItem"
-            @add="onAddItem"
+          <OrderDetailPage
+            v-else-if="salaView === 'order-detail' && currentOrderDocId"
+            :order-document-id="currentOrderDocId"
+            :token="token"
+            @back="onOrderDetailBack"
+            @sent="onOrderSent"
+            @order-updated="onOrderDetailUpdated"
           />
         </template>
 
@@ -888,25 +799,6 @@ watch(() => route.path, async () => {
       </template>
       </div>
     </div>
-
-    <OrderDetailModal
-      ref="orderDetailRef"
-      :show="showOrderDetail"
-      :order-document-id="currentOrderDocId"
-      :token="token"
-      @close="showOrderDetail = false"
-      @order-updated="onOrderUpdated"
-      @open-add-item="onOpenAddItem"
-    />
-
-
-    <CheckoutModal
-      :show="showCheckout"
-      :order="checkoutOrder"
-      :busy="checkoutBusy"
-      @close="showCheckout = false"
-      @confirm="onConfirmCheckout"
-    />
 
     <Modal :show="showWalkin" slim @close="showWalkin = false">
       <template #title>

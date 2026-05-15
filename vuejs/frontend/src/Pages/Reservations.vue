@@ -13,7 +13,6 @@ import SeatReservationModal from '@/components/SeatReservationModal.vue';
 import WalkinModal from '@/components/WalkinModal.vue';
 import TableManagerModal from '@/components/TableManagerModal.vue';
 import OrderDetailModal from '@/components/OrderDetailModal.vue';
-import AddItemModal from '@/components/AddItemModal.vue';
 import CheckoutModal from '@/components/CheckoutModal.vue';
 import Skeleton from '@/components/Skeleton.vue';
 import {
@@ -24,7 +23,6 @@ import {
   fetchTakeaways,
   fetchTables,
   closeOrder,
-  addOrderItem,
   acceptTakeaway,
   rejectTakeaway,
   sendTakeawayToDepartments,
@@ -59,9 +57,6 @@ const showTableManager = ref(false);
 
 const showOrderDetail = ref(false);
 const currentOrderDocId = ref(null);
-const showAddItem = ref(false);
-const addItemOrderDocId = ref(null);
-const addItemLockVersion = ref(0);
 const showCheckout = ref(false);
 const checkoutOrder = ref(null);
 const checkoutBusy = ref(false);
@@ -276,26 +271,11 @@ const handleOpenOrder = (order) => {
 };
 const handleCheckout = (order) => { checkoutOrder.value = order; showCheckout.value = true; };
 const onOrderUpdated = async () => { await loadData({ silent: true }); };
-const onOpenAddItem = ({ orderDocumentId, lockVersion }) => {
-  addItemOrderDocId.value = orderDocumentId;
-  addItemLockVersion.value = lockVersion;
-  showAddItem.value = true;
-};
-const onAddItem = async (payload) => {
-  try {
-    await addOrderItem(addItemOrderDocId.value, payload, token.value);
-    showAddItem.value = false;
-    if (orderDetailRef.value) await orderDetailRef.value.onItemAdded();
-    await loadData({ silent: true });
-  } catch (err) {
-    if (err?.code === 'STALE_ORDER') {
-      showAddItem.value = false;
-      if (orderDetailRef.value) await orderDetailRef.value.silentReload();
-      showToast('error', 'Dati obsoleti, aggiornati. Riprova.');
-    } else {
-      showToast('error', orderErrorMessage(err));
-    }
-  }
+// L'aggiunta piatti a un ordine NON e' piu' fatta da Reservations: passa
+// per la pagina Sala (/orders) che ha la vista full-page dedicata. Da qui
+// OrderDetailModal mostra solo lettura + chiusura conto.
+const onOpenAddItem = () => {
+  router.push('/orders');
 };
 const onConfirmCheckout = async (payload) => {
   if (!checkoutOrder.value || checkoutBusy.value) return;
@@ -833,7 +813,6 @@ const switchSection = (section) => {
     <WalkinModal :show="showWalkinModal" :tables="tables" :token="token" @close="showWalkinModal = false" @created="onWalkinCreated" />
     <TableManagerModal :show="showTableManager" :token="token" :tables="tables" :editing-table="null" @close="showTableManager = false" @updated="onTableManagerUpdated" />
     <OrderDetailModal ref="orderDetailRef" :show="showOrderDetail" :order-document-id="currentOrderDocId" :token="token" @close="showOrderDetail = false" @order-updated="onOrderUpdated" @open-add-item="onOpenAddItem" @open-checkout="(o) => { checkoutOrder = o; showCheckout = true; }" />
-    <AddItemModal :show="showAddItem" :order-document-id="addItemOrderDocId" :lock-version="addItemLockVersion" @close="showAddItem = false" @add="onAddItem" />
     <CheckoutModal :show="showCheckout" :order="checkoutOrder" :busy="checkoutBusy" @close="showCheckout = false" @confirm="onConfirmCheckout" />
   </AppLayout>
 </template>
