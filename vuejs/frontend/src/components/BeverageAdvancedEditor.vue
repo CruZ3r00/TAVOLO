@@ -39,19 +39,33 @@ const error = ref('');
 const rows = ref([]);
 const servings = ref(0);
 
+// Ogni riga ha un _uid stabile usato come :key nel v-for. Senza, Vue
+// riutilizza i nodi <input> in base all'indice e dopo una rimozione i
+// valori "saltano" tra le righe (bug: aggiungi gin → sparisce un altro
+// ingrediente, valori che appaiono in posti sbagliati).
+let nextRowId = 0;
+const newRowId = () => {
+  nextRowId += 1;
+  return nextRowId;
+};
+const blankRow = () => ({
+  _uid: newRowId(), name: '', unit: 'ml', unit_size: '', qty_per_serving: '',
+});
+
 const loadAll = async () => {
   loading.value = true;
   error.value = '';
   try {
     const recipe = await fetchElementRecipe(token.value, props.element.documentId);
     rows.value = recipe.map((r) => ({
+      _uid: newRowId(),
       name: r.ingredient.name,
       unit: r.ingredient.unit || 'ml',
       unit_size: r.ingredient.unit_size !== null ? String(r.ingredient.unit_size) : '',
       qty_per_serving: r.qty_per_serving > 0 ? String(r.qty_per_serving) : '',
     }));
     if (rows.value.length === 0) {
-      rows.value.push({ name: '', unit: 'ml', unit_size: '', qty_per_serving: '' });
+      rows.value.push(blankRow());
     }
   } catch (e) {
     error.value = inventoryErrorMessage(e);
@@ -61,7 +75,7 @@ const loadAll = async () => {
 };
 
 const addRow = () => {
-  rows.value.push({ name: '', unit: 'ml', unit_size: '', qty_per_serving: '' });
+  rows.value.push(blankRow());
 };
 
 const removeRow = (idx) => {
@@ -80,7 +94,7 @@ const simulation = computed(() =>
     const unitsConsumed = cap > 0 ? Math.ceil(totalUse / cap) : 0;
     const leftover = unitsConsumed * cap - totalUse;
     const pct = cap > 0 ? Math.min(100, (totalUse / cap) * 100) : 0;
-    return { name: r.name, unit: r.unit, unit_size: r.unit_size, dose: r.qty_per_serving, totalUse, unitsConsumed, leftover, pct };
+    return { _uid: r._uid, name: r.name, unit: r.unit, unit_size: r.unit_size, dose: r.qty_per_serving, totalUse, unitsConsumed, leftover, pct };
   }),
 );
 
@@ -244,7 +258,7 @@ onBeforeUnmount(() => { document.body.style.overflow = savedOverflow; });
                     <span aria-hidden="true"></span>
                   </div>
                   <div class="bae-table-body">
-                    <div v-for="(row, idx) in rows" :key="idx" class="bae-row">
+                    <div v-for="(row, idx) in rows" :key="row._uid" class="bae-row">
                       <input
                         v-model="row.name"
                         type="text"
@@ -329,7 +343,7 @@ onBeforeUnmount(() => { document.body.style.overflow = savedOverflow; });
               </div>
 
               <div class="bae-sim-rows">
-                <div v-for="(s, idx) in simulation" :key="idx" class="bae-sim-row">
+                <div v-for="s in simulation" :key="s._uid" class="bae-sim-row">
                   <div class="bae-sim-name">
                     <div class="bae-sim-name-text">{{ s.name || '—' }}</div>
                     <div class="bae-sim-name-meta">
