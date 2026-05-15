@@ -55,74 +55,8 @@
         'Contorni',
     ];
 
-    // Mappa categorie → reparto destinazione (allineata a Strapi categoryRouting di default).
-    // Quando is_beverage = true il reparto è sempre 'bar'.
-    const departmentForCategory = (cat) => {
-        const c = String(cat || '').toLowerCase();
-        if (c.includes('pizz')) return 'pizzeria';
-        if (c.includes('bevand')) return 'bar';
-        return 'cucina';
-    };
-
     const effectiveCategory = computed(() =>
         useCustomCategory.value ? customCategory.value : category.value,
-    );
-
-    const behaviorPreview = computed(() => {
-        const bev = !!isBeverage.value;
-        const dept = bev ? 'Bar' : departmentForCategory(effectiveCategory.value).replace(/^./, (s) => s.toUpperCase());
-        return {
-            tabVisibleIn: bev ? 'Menu + Bevande' : 'Solo Menu',
-            department: dept,
-            barShiftCount: bev ? 'Sì, scalato a ogni vendita' : 'No',
-            inventory: bev ? 'Magazzino bevande' : 'Solo ingredienti',
-        };
-    });
-
-    const payloadPreview = computed(() => {
-        const ing = ingredients.value.filter((i) => String(i || '').trim() !== '');
-        const all = allergens.value.filter((a) => String(a || '').trim() !== '');
-        return {
-            name: name.value || '',
-            price: Number(price.value) || 0,
-            category: effectiveCategory.value || '',
-            image: uploadedImageId.value ? '<upload_id>' : null,
-            ingredients: ing,
-            allergens: all,
-            is_beverage: !!isBeverage.value,
-        };
-    });
-
-    const payloadJson = computed(() => {
-        const p = payloadPreview.value;
-        const trim = (arr, n = 2) => {
-            const head = arr.slice(0, n).map((s) => `"${s}"`).join(', ');
-            return arr.length > n ? `${head}, …` : head;
-        };
-        return `{
-  name: "${p.name}",
-  price: ${p.price.toFixed(2)},
-  category: "${p.category}",
-  image: ${p.image ? '<upload_id>' : 'null'},
-  ingredients: [${trim(p.ingredients)}],
-  allergens: [${trim(p.allergens)}],
-  is_beverage: ${p.is_beverage}
-}`;
-    });
-
-    const previewIcon = computed(() => (isBeverage.value ? '🍷' : '🍝'));
-    const previewName = computed(() => name.value || (isBeverage.value ? 'Nuova bevanda' : 'Nuovo elemento'));
-    const previewPrice = computed(() => {
-        const v = Number(price.value);
-        if (!Number.isFinite(v) || v <= 0) return '—';
-        return `${v.toFixed(2)} €`;
-    });
-    const previewCategory = computed(() => effectiveCategory.value || (isBeverageMode.value ? 'Bevande' : 'Categoria'));
-    const previewIngredients = computed(() =>
-        ingredients.value.filter((i) => String(i || '').trim() !== '').join(', '),
-    );
-    const previewAllergens = computed(() =>
-        allergens.value.filter((a) => String(a || '').trim() !== '').join(', ').toLowerCase(),
     );
 
     const readErrorMessage = async (response, fallback) => {
@@ -631,55 +565,6 @@
                 </section>
             </div>
 
-            <!-- ── Preview live ── -->
-            <aside class="ma-preview-col" aria-label="Anteprima">
-                <div class="ma-preview-overline">Come apparirà al cliente</div>
-                <div class="ma-preview-card">
-                    <div
-                        class="ma-preview-img"
-                        :class="{ 'ma-preview-img--bev': isBeverage }"
-                    >
-                        <img v-if="imagePreview" :src="imagePreview" alt="" class="ma-preview-img-real" />
-                        <span v-else class="ma-preview-img-emoji" aria-hidden="true">{{ previewIcon }}</span>
-                    </div>
-                    <div class="ma-preview-card-row">
-                        <h3 class="ma-preview-card-name">{{ previewName }}</h3>
-                        <span class="ma-preview-card-price">{{ previewPrice }}</span>
-                    </div>
-                    <span class="ma-preview-card-cat">{{ previewCategory }}</span>
-                    <div v-if="previewIngredients" class="ma-preview-card-ings">{{ previewIngredients }}</div>
-                    <div v-if="previewAllergens" class="ma-preview-card-allergens">⚠ {{ previewAllergens }}</div>
-                </div>
-
-                <div class="ma-preview-behavior">
-                    <div class="ma-preview-overline">Comportamento operativo</div>
-                    <div class="ma-preview-rows">
-                        <div class="ma-preview-row">
-                            <span class="ma-preview-row-k">Tab visibile in</span>
-                            <strong class="ma-preview-row-v">{{ behaviorPreview.tabVisibleIn }}</strong>
-                        </div>
-                        <div class="ma-preview-row">
-                            <span class="ma-preview-row-k">Reparto destinazione</span>
-                            <strong class="ma-preview-row-v">{{ behaviorPreview.department }}</strong>
-                        </div>
-                        <div class="ma-preview-row">
-                            <span class="ma-preview-row-k">Conteggio turno bar</span>
-                            <strong class="ma-preview-row-v" :class="{ 'ma-preview-row-v--accent': isBeverage }">
-                                {{ behaviorPreview.barShiftCount }}
-                            </strong>
-                        </div>
-                        <div class="ma-preview-row">
-                            <span class="ma-preview-row-k">Magazzino</span>
-                            <strong class="ma-preview-row-v">{{ behaviorPreview.inventory }}</strong>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="ma-preview-payload">
-                    <div class="ma-preview-payload-head">Payload POST /api/elements</div>
-                    <pre class="ma-preview-payload-pre">{{ payloadJson }}</pre>
-                </div>
-            </aside>
         </form>
 
         <!-- Sticky bottom action bar -->
@@ -792,11 +677,13 @@
 
 /* ─────────────── Grid ─────────────── */
 .ma-grid {
-    display: grid;
-    grid-template-columns: 1fr 360px;
+    display: block;
     flex: 1;
     min-width: 0;
     padding-bottom: 80px; /* spazio per la sticky bar */
+    max-width: 980px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 .ma-form-col { min-width: 0; }
@@ -1113,121 +1000,6 @@
 }
 .ma-typeahead-item--new .ma-typeahead-icon { color: var(--ac); }
 
-/* ─────────────── Preview column ─────────────── */
-.ma-preview-col {
-    background: var(--bg-sunk);
-    border-left: 1px solid var(--line);
-    padding: 24px;
-    align-self: stretch;
-}
-.ma-preview-overline {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--ink-3);
-    margin-bottom: 12px;
-}
-.ma-preview-card {
-    background: var(--paper);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 14px;
-    box-shadow: var(--shadow-sm, var(--shadow-xs));
-}
-.ma-preview-img {
-    width: 100%; height: 130px;
-    border-radius: 10px;
-    margin-bottom: 12px;
-    background: linear-gradient(135deg, oklch(0.96 0.04 60), var(--bg-sunk));
-    display: grid; place-items: center;
-    font-size: 50px;
-    overflow: hidden;
-    position: relative;
-}
-.ma-preview-img--bev {
-    background: linear-gradient(135deg, oklch(0.96 0.04 248), var(--bg-sunk));
-}
-.ma-preview-img-real { width: 100%; height: 100%; object-fit: cover; }
-.ma-preview-img-emoji { line-height: 1; }
-.ma-preview-card-row {
-    display: flex; align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-.ma-preview-card-name {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 650;
-    color: var(--ink);
-}
-.ma-preview-card-price {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--ac-ink, var(--ac));
-    font-family: var(--f-mono);
-}
-.ma-preview-card-cat {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: var(--bg-sunk);
-    color: var(--ink-2);
-    font-size: 11px;
-    font-weight: 500;
-    margin-bottom: 8px;
-}
-.ma-preview-card-ings {
-    font-size: 12px;
-    color: var(--ink-3);
-    line-height: 1.45;
-    margin-bottom: 8px;
-}
-.ma-preview-card-allergens {
-    font-size: 11px;
-    color: var(--danger);
-    font-weight: 500;
-}
-
-.ma-preview-behavior {
-    margin-top: 16px;
-    padding: 14px;
-    background: var(--paper);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-}
-.ma-preview-rows { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
-.ma-preview-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-}
-.ma-preview-row-k { color: var(--ink-3); }
-.ma-preview-row-v { color: var(--ink); font-weight: 600; }
-.ma-preview-row-v--accent { color: var(--ac-ink, var(--ac)); }
-
-.ma-preview-payload {
-    margin-top: 16px;
-    padding: 12px;
-    background: var(--ink);
-    color: var(--bg);
-    border-radius: 10px;
-    font-family: var(--f-mono);
-    font-size: 11px;
-}
-.ma-preview-payload-head { opacity: 0.6; margin-bottom: 4px; }
-.ma-preview-payload-pre {
-    margin: 0;
-    font-size: 11px;
-    line-height: 1.5;
-    color: var(--bg);
-    font-family: var(--f-mono);
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
 /* ─────────────── Sticky bottom action bar ─────────────── */
 .ma-actions-bar {
     position: sticky;
@@ -1321,15 +1093,7 @@
 .ma-fade-enter-from, .ma-fade-leave-to { opacity: 0; transform: translateY(-4px); }
 
 /* ─────────────── Responsive ─────────────── */
-@media (max-width: 1100px) {
-    .ma-grid { grid-template-columns: 1fr 320px; }
-}
 @media (max-width: 980px) {
-    .ma-grid { grid-template-columns: 1fr; }
-    .ma-preview-col {
-        border-left: none;
-        border-top: 1px solid var(--line);
-    }
     .ma-section { flex-direction: column; gap: 12px; }
     .ma-section-head { width: 100%; padding-top: 0; }
 }
@@ -1339,6 +1103,5 @@
     .ma-row-2 { flex-direction: column; gap: 12px; }
     .ma-actions-bar { padding: 0 16px; }
     .ma-actions-left { display: none; }
-    .ma-preview-col { padding: 16px; }
 }
 </style>

@@ -93,21 +93,6 @@ const totalDosePerServing = computed(() =>
 );
 const validityLabel = computed(() => (recipeIsValid.value ? '✓ OK' : '⚠ Incompleta'));
 
-const payloadJson = computed(() => {
-  const items = validRows.value.map((r) => {
-    const unitSize = r.unit_size === '' || !Number.isFinite(Number(r.unit_size)) ? null : Number(r.unit_size);
-    const sizeFrag = unitSize !== null ? `, unit_size: ${unitSize}` : '';
-    return `    { name: "${r.name}", unit: "${r.unit}"${sizeFrag}, qty_per_serving: ${Number(r.qty_per_serving)} }`;
-  });
-  if (items.length === 0) return '{ recipe: [] }';
-  const truncated = items.length > 3 ? items.slice(0, 3).concat(['    …']) : items;
-  return `{
-  recipe: [
-${truncated.join(',\n')}
-  ]
-}`;
-});
-
 const onSubmit = async () => {
   // Validazione: ogni riga deve avere name + qty > 0
   const recipe = [];
@@ -222,17 +207,17 @@ onBeforeUnmount(() => { document.body.style.overflow = savedOverflow; });
         <!-- 2-col body -->
         <div class="bae-grid">
           <div class="bae-main">
-            <!-- 1 · Callout esplicazione -->
+            <!-- 1 · Callout esplicazione (linguaggio naturale, niente formule) -->
             <section class="bae-callout-wrap">
               <div class="bae-callout">
                 <span class="bae-callout-icon" aria-hidden="true">✱</span>
                 <div class="bae-callout-text">
-                  <strong>Come funziona:</strong> per ogni ingrediente registri
-                  <strong>capacità unità</strong> (es. <em>750ml</em> = bottiglia)
-                  e <strong>uso per porzione</strong> (es. <em>20ml</em> per un
-                  Negroni). A fine turno il sistema calcola
-                  <code class="bae-code">units_consumed = ceil(uso_totale / capacità)</code>
-                  e scala il magazzino bottiglie.
+                  <strong>Come funziona, in due righe:</strong> dicci quanto è grande
+                  ogni bottiglia (es. <em>una bottiglia di gin da 750ml</em>) e
+                  quanto ne metti in una porzione (es. <em>20ml di gin per un
+                  Negroni</em>). A fine turno la nostra <strong>AI</strong> conta
+                  da sola quante bottiglie hai svuotato e aggiorna il magazzino,
+                  così non devi pensarci tu.
                 </div>
               </div>
             </section>
@@ -408,10 +393,6 @@ onBeforeUnmount(() => { document.body.style.overflow = savedOverflow; });
               </div>
             </div>
 
-            <div class="bae-payload">
-              <div class="bae-payload-head">PUT /api/elements/:id/recipe</div>
-              <pre class="bae-payload-pre">{{ payloadJson }}</pre>
-            </div>
           </aside>
         </div>
 
@@ -928,28 +909,6 @@ onBeforeUnmount(() => { document.body.style.overflow = savedOverflow; });
 .bae-status-v { color: var(--ink); font-weight: 600; }
 .bae-status-v--ok { color: var(--ok-ink, var(--ok)); }
 .bae-status-v--warn { color: var(--danger); }
-
-.bae-payload {
-  padding: 12px;
-  background: var(--ink);
-  color: var(--bg);
-  border-radius: 10px;
-  font-family: var(--f-mono);
-  font-size: 11px;
-}
-.bae-payload-head {
-  opacity: 0.6;
-  margin-bottom: 4px;
-}
-.bae-payload-pre {
-  margin: 0;
-  font-size: 10.5px;
-  line-height: 1.5;
-  color: var(--bg);
-  font-family: var(--f-mono);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 
 /* ─────────────── Sticky footer ─────────────── */
 .bae-foot {
