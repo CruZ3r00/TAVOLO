@@ -100,6 +100,12 @@ module.exports = {
     },
     {
       method: 'POST',
+      path: '/orders/:documentId/send',
+      handler: 'order.sendDineInToDepartments',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
       path: '/orders/:documentId/close',
       handler: 'order.close',
       config: { policies: [], middlewares: [] },

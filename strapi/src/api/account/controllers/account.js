@@ -629,6 +629,16 @@ module.exports = {
       user.username ||
       'Ristorante';
 
+    // cover_charge: opzionale, decimale >= 0. Se omesso, non viene toccato.
+    let coverCharge;
+    if (body.cover_charge !== undefined && body.cover_charge !== null && body.cover_charge !== '') {
+      const parsed = Number(body.cover_charge);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return ctx.badRequest('cover_charge non valido (numero >= 0).');
+      }
+      coverCharge = parsed;
+    }
+
     const data = {
       restaurant_name: restaurantName,
       site_url: siteUrl,
@@ -636,6 +646,7 @@ module.exports = {
       coperti_estivi: cEst,
       fk_user: { connect: [{ id: user.id }] },
     };
+    if (coverCharge !== undefined) data.cover_charge = coverCharge;
 
     const existing = await findUserWebsiteConfig(user.id);
     if (body.logo !== undefined && body.logo !== null && body.logo !== '') {

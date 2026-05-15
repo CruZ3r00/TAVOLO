@@ -2,9 +2,16 @@
 import { useRouter } from 'vue-router';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import Skeleton from '@/components/Skeleton.vue';
+import CheckoutModal from '@/components/CheckoutModal.vue';
 import { onMounted, nextTick, ref, computed } from 'vue';
 import { useStore } from 'vuex';
-import { API_BASE, fetchTables, fetchOrders, fetchReservations } from '@/utils';
+import {
+  API_BASE,
+  fetchTables, fetchOrders, fetchReservations, fetchTakeaways,
+  closeOrder, pickupTakeaway,
+  fetchWebsiteConfig, updateCoverCharge,
+  orderErrorMessage,
+} from '@/utils';
 
 const router = useRouter();
 const store = useStore();
@@ -20,13 +27,30 @@ const categoriesDetail = ref([]);
 
 const tables = ref([]);
 const activeOrders = ref([]);
+const activeTakeaways = ref([]);
 const todayReservations = ref([]);
 
 const hasSiteConfig = ref(false);
 const restaurantName = ref('');
 const siteUrl = ref('');
+const coverCharge = ref(0);
 
 const loading = ref(true);
+
+// Checkout modal: stato unificato per tavoli e takeaway. Aprire il
+// CheckoutModal e' l'unico modo di chiudere un conto in tutta l'app
+// (rimosso da OrderDetailModal per evitare confusione UX).
+const showCheckout = ref(false);
+const checkoutOrder = ref(null);
+const checkoutBusy = ref(false);
+const checkoutPersons = ref(0);
+const toast = ref(null);
+let toastTimer = null;
+const showToast = (type, message) => {
+  if (toastTimer) clearTimeout(toastTimer);
+  toast.value = { type, message };
+  toastTimer = setTimeout(() => { toast.value = null; }, type === 'error' ? 5000 : 3500);
+};
 
 const now = ref(new Date());
 const serviceTime = computed(() => now.value.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }));
@@ -102,21 +126,25 @@ const loadStats = async () => {
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-    const [tablesResp, ordersResp, resvResp] = await Promise.all([
+    const [tablesResp, ordersResp, takeawayResp, resvResp, wcData] = await Promise.all([
       fetchTables(tkn).catch(() => ({ data: [] })),
-      fetchOrders({ status: 'active', pageSize: 100 }, tkn).catch(() => ({ data: [] })),
+      fetchOrders({ status: 'active', service_type: 'table', pageSize: 100 }, tkn).catch(() => ({ data: [] })),
+      fetchTakeaways({ status: 'active', pageSize: 100 }, tkn).catch(() => ({ data: [] })),
       fetchReservations({
         status: 'pending,confirmed,at_restaurant,completed',
         from: today.toISOString(),
         to: tomorrow.toISOString(),
         pageSize: 100,
       }, tkn).catch(() => ({ data: [] })),
+      fetchWebsiteConfig(tkn).catch(() => null),
     ]);
     tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
-    activeOrders.value = Array.isArray(ordersResp?.data)
-      ? ordersResp.data.filter(o => o.service_type !== 'takeaway')
-      : [];
+    activeOrders.value = Array.isArray(ordersResp?.data) ? ordersResp.data : [];
+    activeTakeaways.value = Array.isArray(takeawayResp?.data) ? takeawayResp.data : [];
     todayReservations.value = Array.isArray(resvResp?.data) ? resvResp.data : [];
+    if (wcData) {
+      coverCharge.value = Number(wcData.cover_charge) || 0;
+    }
   } catch (_e) { /* silent */ }
   finally { loading.value = false; }
 };
@@ -150,6 +178,88 @@ const previewTables = computed(() => {
     .sort((a, b) => (a.number || 0) - (b.number || 0))
     .slice(0, 12);
 });
+
+// Apertura checkout: la chiusura conto avviene SOLO da Dashboard.
+// Click su un tavolo occupato → trova l'ordine attivo e apre CheckoutModal.
+const openCheckoutForTable = (t) => {
+  const order = tableOrder(t);
+  if (!order) return;
+  checkoutOrder.value = order;
+  checkoutPersons.value = Number(order.covers) || 1;
+  showCheckout.value = true;
+};
+
+// Click su una card asporto → checkout. I takeaway non hanno coperto.
+const openCheckoutForTakeaway = (order) => {
+  if (!order || order.takeaway_status !== 'picked_up') return;
+  checkoutOrder.value = order;
+  checkoutPersons.value = 0;
+  showCheckout.value = true;
+};
+
+// Marca takeaway come ritirato (passaggio FSM richiesto prima del pagamento).
+const markTakeawayPicked = async (order) => {
+  const tkn = store.getters.getToken;
+  if (!tkn) return;
+  try {
+    await pickupTakeaway(order.documentId, tkn);
+    showToast('success', 'Asporto ritirato. Ora puoi chiudere il conto.');
+    await loadStats();
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
+  }
+};
+
+const onConfirmCheckout = async (payload) => {
+  if (!checkoutOrder.value || checkoutBusy.value) return;
+  checkoutBusy.value = true;
+  const tkn = store.getters.getToken;
+  try {
+    const result = await closeOrder(checkoutOrder.value.documentId, payload, tkn);
+    showCheckout.value = false;
+    if (result?.queued) {
+      showToast('success', `Richiesta inviata al POS/RT. Rif: ${result.event_id || 'OK'}`);
+    } else {
+      showToast('success', `Conto chiuso. Rif: ${result?.payment?.transactionId || 'OK'}`);
+    }
+    checkoutOrder.value = null;
+    await loadStats();
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
+  } finally {
+    checkoutBusy.value = false;
+  }
+};
+
+const onSaveCoverDefault = async (value) => {
+  const tkn = store.getters.getToken;
+  if (!tkn) return;
+  try {
+    const updated = await updateCoverCharge(value, tkn);
+    coverCharge.value = Number(updated?.cover_charge) || Number(value) || 0;
+    showToast('success', `Coperto di default impostato a € ${(Number(value) || 0).toFixed(2)}.`);
+  } catch (err) {
+    showToast('error', orderErrorMessage(err) || 'Errore nel salvataggio del coperto.');
+  }
+};
+
+const fmtTime = (iso) => {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  } catch (_e) { return '—'; }
+};
+const takeawayStatusLabel = (s) => {
+  switch (s) {
+    case 'pending_acceptance': return 'In attesa';
+    case 'confirmed': return 'Confermato';
+    case 'sent_to_departments': return 'In preparazione';
+    case 'ready': return 'Pronto';
+    case 'picked_up': return 'Ritirato';
+    default: return s || '—';
+  }
+};
+const isTakeawayPickedUp = (o) => o?.takeaway_status === 'picked_up';
 </script>
 
 <template>
@@ -252,13 +362,14 @@ const previewTables = computed(() => {
               v-for="t in previewTables"
               :key="t.documentId"
               class="md-tbl"
-              :class="[tableState(t), { alert: tableMinutes(t) > 60 }]"
-              @click="router.push('/orders')"
+              :class="[tableState(t), { alert: tableMinutes(t) > 60, occupied: t.status === 'occupied' }]"
+              :title="t.status === 'occupied' ? 'Apri checkout per chiudere il conto' : (tableState(t) === 'free' ? 'Tavolo libero' : 'Tavolo prenotato')"
+              @click="t.status === 'occupied' ? openCheckoutForTable(t) : router.push('/orders')"
               style="cursor: pointer;"
             >
               <div class="md-tbl-head">
                 <span class="md-tbl-n">{{ String(t.number).padStart(2, '0') }}</span>
-                <span v-if="t.status === 'occupied'" class="md-tbl-cov"><i class="bi bi-people"></i>{{ t.seats }}</span>
+                <span v-if="t.status === 'occupied'" class="md-tbl-cov"><i class="bi bi-people"></i>{{ tableOrder(t)?.covers || t.seats }}</span>
                 <span v-if="tableState(t) === 'ready'" class="chip ok" style="padding: 1px 6px; font-size: 10px;">CONTO</span>
                 <span v-if="tableMinutes(t) > 60" class="md-tbl-alert"><i class="bi bi-exclamation-triangle-fill"></i></span>
               </div>
@@ -267,12 +378,62 @@ const previewTables = computed(() => {
               <template v-else>
                 <div class="md-tbl-total">{{ fmtEuro(parseFloat(tableOrder(t)?.total_amount || 0)) }}</div>
                 <div class="md-tbl-mins">{{ tableMinutes(t) }} min al tavolo</div>
+                <div class="md-tbl-cta">
+                  <i class="bi bi-receipt-cutoff" aria-hidden="true"></i>
+                  <span>Chiudi conto</span>
+                </div>
               </template>
             </div>
           </div>
           <div v-else class="kr-col-empty" style="margin-top: 8px;">
             <i class="bi bi-grid-3x3-gap"></i>
             <span>Nessun tavolo configurato. <router-link to="/reservations">Aggiungi i tuoi tavoli</router-link>.</span>
+          </div>
+        </div>
+
+        <!-- Asporto attivo: monitoring + chiusura conto -->
+        <div v-if="activeTakeaways.length > 0" class="md-card md-takeaway">
+          <div class="md-card-h">
+            <div>
+              <div class="md-card-t">Asporto attivo</div>
+              <div class="md-card-st">{{ activeTakeaways.length }} {{ activeTakeaways.length === 1 ? 'ordine' : 'ordini' }} in coda · chiudi i conti dopo il ritiro</div>
+            </div>
+          </div>
+          <div class="md-takeaway-list">
+            <article
+              v-for="o in activeTakeaways"
+              :key="o.documentId"
+              class="md-takeaway-row"
+              :class="`s-${o.takeaway_status || 'unknown'}`"
+            >
+              <div class="md-takeaway-head">
+                <strong class="md-takeaway-name">{{ o.customer_name || 'Cliente' }}</strong>
+                <span class="md-takeaway-status">{{ takeawayStatusLabel(o.takeaway_status) }}</span>
+              </div>
+              <div class="md-takeaway-meta">
+                <span><i class="bi bi-clock"></i> ritiro {{ fmtTime(o.pickup_at) }}</span>
+                <span v-if="o.customer_phone"><i class="bi bi-telephone"></i> {{ o.customer_phone }}</span>
+                <span class="md-takeaway-total">{{ fmtEuro(parseFloat(o.total_amount || 0)) }}</span>
+              </div>
+              <div class="md-takeaway-actions">
+                <button
+                  v-if="o.takeaway_status === 'ready'"
+                  type="button"
+                  class="btn btn-sm"
+                  @click="markTakeawayPicked(o)"
+                >
+                  <i class="bi bi-box-arrow-up"></i><span>Segna ritirato</span>
+                </button>
+                <button
+                  v-if="isTakeawayPickedUp(o)"
+                  type="button"
+                  class="btn btn-sm btn-primary"
+                  @click="openCheckoutForTakeaway(o)"
+                >
+                  <i class="bi bi-receipt-cutoff"></i><span>Chiudi conto</span>
+                </button>
+              </div>
+            </article>
           </div>
         </div>
 
@@ -360,6 +521,26 @@ const previewTables = computed(() => {
         </div>
       </template>
     </div>
+
+    <!-- Toast feedback (success/error) -->
+    <Transition name="fade">
+      <div v-if="toast" class="md-toast" :class="`md-toast-${toast.type}`" role="status">
+        <i :class="['bi', toast.type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle']" aria-hidden="true"></i>
+        <span>{{ toast.message }}</span>
+      </div>
+    </Transition>
+
+    <!-- Checkout modal: chiusura conto unificata per tavoli e takeaway. -->
+    <CheckoutModal
+      :show="showCheckout"
+      :order="checkoutOrder"
+      :busy="checkoutBusy"
+      :cover-charge="coverCharge"
+      :default-persons="checkoutPersons"
+      @close="showCheckout = false"
+      @confirm="onConfirmCheckout"
+      @save-cover-default="onSaveCoverDefault"
+    />
   </AppLayout>
 </template>
 
@@ -375,4 +556,115 @@ const previewTables = computed(() => {
   word-break: break-all;
 }
 .md-site-link:hover { text-decoration: underline; }
+
+.md-tbl.occupied { transition: transform var(--dur-fast), box-shadow var(--dur-fast); }
+.md-tbl.occupied:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.md-tbl-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  font-family: var(--f-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ac);
+  background: var(--ac-soft);
+  border-radius: 6px;
+  width: fit-content;
+}
+.md-tbl-cta i { font-size: 12px; }
+
+/* ── Asporto attivo ── */
+.md-takeaway { display: flex; flex-direction: column; gap: var(--s-3); }
+.md-takeaway-list { display: flex; flex-direction: column; gap: 8px; }
+.md-takeaway-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 10px;
+}
+.md-takeaway-row.s-ready { border-left-color: var(--ok, #16a34a); }
+.md-takeaway-row.s-picked_up { border-left-color: var(--ac); }
+.md-takeaway-row.s-pending_acceptance { border-left-color: var(--warn, var(--ac)); }
+
+.md-takeaway-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.md-takeaway-name { font-size: 14px; color: var(--ink); }
+.md-takeaway-status {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  background: var(--bg-sunk);
+  border-radius: 999px;
+}
+.md-takeaway-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.md-takeaway-meta i { margin-right: 4px; }
+.md-takeaway-total {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.md-takeaway-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* ── Toast ── */
+.md-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.14));
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 13.5px;
+  font-weight: 500;
+  max-width: 420px;
+}
+.md-toast-success {
+  background: color-mix(in oklab, var(--ok, #16a34a) 10%, var(--paper));
+  color: var(--ok-ink, #166534);
+  border-color: color-mix(in oklab, var(--ok, #16a34a) 30%, transparent);
+}
+.md-toast-error {
+  background: color-mix(in oklab, var(--danger) 10%, var(--paper));
+  color: var(--danger);
+  border-color: color-mix(in oklab, var(--danger) 30%, transparent);
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 200ms, transform 200ms; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(8px); }
+
+@media (max-width: 640px) {
+  .md-toast { left: 16px; right: 16px; bottom: 88px; max-width: none; }
+  .md-takeaway-meta { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .md-takeaway-total { margin-left: 0; }
+}
 </style>

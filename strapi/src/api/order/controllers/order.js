@@ -1768,6 +1768,58 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
     }
   },
 
+  /**
+   * POST /api/orders/:documentId/send
+   * Invia un ordine dine-in (tavolo) in produzione: avanza in batch tutti
+   * gli OrderItem con status='taken' a 'preparing'. Idempotente: se non ci
+   * sono items in 'taken' ritorna l'ordine senza errori.
+   * Replica il pattern di sendTakeawayToDepartments per consistenza.
+   */
+  async sendDineInToDepartments(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const { documentId } = ctx.params;
+      const order = await loadOrder(documentId, actor.ownerId);
+      if (order.service_type === 'takeaway') {
+        throw appError('INVALID_PAYLOAD', 'Per gli asporti usare /takeaways/:id/send.');
+      }
+      if (order.status !== 'active') {
+        throw appError('ORDER_NOT_ACTIVE', "L'ordine non e attivo.");
+      }
+      const items = Array.isArray(order.fk_items) ? order.fk_items : [];
+      const taken = items.filter((it) => it.status === 'taken');
+      if (taken.length === 0) {
+        // Niente da inviare: ritorna l'ordine corrente come no-op.
+        const routingLookup = await loadRoutingMap(strapi, actor.owner);
+        ctx.body = { data: serializeOrder(order, true, routingLookup), meta: { sent: 0 } };
+        return;
+      }
+
+      let advanced = 0;
+      for (const item of taken) {
+        try {
+          await strapi.documents('api::order-item.order-item').update({
+            documentId: item.documentId,
+            data: { status: 'preparing' },
+          });
+          advanced += 1;
+        } catch (itemErr) {
+          strapi.log.warn(`sendDineInToDepartments: update item ${item.documentId} fallito: ${itemErr.message}`);
+        }
+      }
+
+      const full = await loadOrder(documentId, actor.ownerId);
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      ctx.body = { data: serializeOrder(full, true, routingLookup), meta: { sent: advanced } };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
   async pickupTakeaway(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.unauthorized('Autenticazione richiesta.');

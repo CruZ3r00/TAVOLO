@@ -52,3 +52,40 @@ export const updateCategoryRouting = async (category, role, token) => {
   if (!resp.ok) throw buildApiError(resp, payload);
   return payload.data;
 };
+
+/**
+ * Recupera la WebsiteConfig dell'owner (include cover_charge, restaurant_name,
+ * coperti, logo, ecc.). Resp { data: config | null }.
+ */
+export const fetchWebsiteConfig = async (token) => {
+  const resp = await fetch(`${API_BASE}/api/account/website-config`, {
+    method: 'GET',
+    headers: jsonHeaders(token),
+  });
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw buildApiError(resp, payload);
+  return payload?.data || null;
+};
+
+/**
+ * Aggiorna SOLO il campo cover_charge mantenendo gli altri valori esistenti
+ * (l'endpoint PUT richiede sempre coperti_invernali). Lettura preliminare per
+ * non sovrascrivere i campi non passati.
+ */
+export const updateCoverCharge = async (coverCharge, token) => {
+  const current = await fetchWebsiteConfig(token);
+  const body = {
+    restaurant_name: current?.restaurant_name || '',
+    coperti_invernali: current?.coperti_invernali ?? 1,
+    coperti_estivi: current?.coperti_estivi ?? null,
+    cover_charge: Number(coverCharge),
+  };
+  const resp = await fetch(`${API_BASE}/api/account/website-config`, {
+    method: 'PUT',
+    headers: jsonHeaders(token),
+    body: JSON.stringify(body),
+  });
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw buildApiError(resp, payload);
+  return payload?.data || null;
+};

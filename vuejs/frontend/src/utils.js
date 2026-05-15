@@ -26,6 +26,8 @@ export {
   fetchStaffSettings,
   updateStaffSetting,
   updateCategoryRouting,
+  fetchWebsiteConfig,
+  updateCoverCharge,
 } from './lib/api/account.js';
 export {
   fetchReservations,
@@ -60,6 +62,7 @@ export {
   updateItemStatus,
   voidOrderItem,
   closeOrder,
+  sendOrderToProduction,
   orderErrorMessage,
 } from './lib/api/orders.js';
 export {

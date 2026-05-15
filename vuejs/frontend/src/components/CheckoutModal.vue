@@ -6,9 +6,15 @@ const props = defineProps({
     show: { type: Boolean, default: false },
     order: { type: Object, default: null },
     busy: { type: Boolean, default: false },
+    // Coperto a persona — default da WebsiteConfig.cover_charge.
+    // Se 0/null l'utente viene avvisato e puo' settare il valore al volo
+    // (con opzione di salvarlo permanentemente come default).
+    coverCharge: { type: Number, default: 0 },
+    // Default persons (override = order.covers se presente)
+    defaultPersons: { type: Number, default: 0 },
 });
 
-const emit = defineEmits(['close', 'confirm']);
+const emit = defineEmits(['close', 'confirm', 'save-cover-default']);
 
 const paymentMethod = ref('simulator');
 const submitting = ref(false);
@@ -16,18 +22,50 @@ const errorMessage = ref('');
 const paymentResult = ref(null);
 const isSubmitting = computed(() => props.busy);
 
+// Coperto editabili nel modale (override one-shot).
+const persons = ref(0);
+const coverPerPerson = ref(0);
+const savingDefault = ref(false);
+
 watch(() => props.show, (v) => {
     if (v) {
         paymentMethod.value = 'simulator';
         submitting.value = false;
         errorMessage.value = '';
         paymentResult.value = null;
+        // Inizializza persone: prop > order.covers > 1
+        persons.value = Number(props.defaultPersons) || Number(props.order?.covers) || 1;
+        coverPerPerson.value = Number(props.coverCharge) || 0;
+        savingDefault.value = false;
     }
 });
 
-const items = computed(() => props.order?.items || []);
-const totalAmount = computed(() => parseFloat(props.order?.total_amount || 0).toFixed(2));
+watch(() => props.coverCharge, (v) => {
+    if (props.show) coverPerPerson.value = Number(v) || coverPerPerson.value;
+});
+watch(() => props.defaultPersons, (v) => {
+    if (props.show && (!persons.value || persons.value === 1)) persons.value = Number(v) || 1;
+});
+
+const items = computed(() => props.order?.items || props.order?.fk_items || []);
+const subtotal = computed(() => {
+    // Preferisci total_amount server-side se disponibile (riflette void/sconti).
+    const serverTotal = parseFloat(props.order?.total_amount);
+    if (Number.isFinite(serverTotal) && serverTotal > 0) return serverTotal;
+    return items.value.reduce((s, it) => s + (parseFloat(it.price) * parseInt(it.quantity, 10) || 0), 0);
+});
+const safePersons = computed(() => Math.max(0, Math.floor(Number(persons.value) || 0)));
+const safeCoverPerPerson = computed(() => Math.max(0, Number(coverPerPerson.value) || 0));
+const coverTotal = computed(() => safePersons.value * safeCoverPerPerson.value);
+const grandTotal = computed(() => subtotal.value + coverTotal.value);
 const lockVersion = computed(() => props.order?.lock_version ?? 0);
+
+const isCoverConfigured = computed(() => Number(props.coverCharge) > 0);
+const isTakeawayOrder = computed(() => props.order?.service_type === 'takeaway');
+// Takeaway: niente coperto (asporto).
+const showCoverSection = computed(() => !isTakeawayOrder.value);
+
+const fmt = (v) => `€ ${(Number(v) || 0).toFixed(2)}`;
 
 const METHODS = [
     { value: 'simulator', label: 'Chiudi conto', icon: 'bi-receipt-cutoff' },
@@ -37,8 +75,8 @@ const METHODS = [
 
 const confirmLabel = computed(() => (
     paymentMethod.value === 'simulator'
-        ? 'Chiudi conto'
-        : `Paga € ${totalAmount.value}`
+        ? `Chiudi · ${fmt(grandTotal.value)}`
+        : `Paga ${fmt(grandTotal.value)}`
 ));
 
 const doCheckout = () => {
@@ -47,7 +85,30 @@ const doCheckout = () => {
     emit('confirm', {
         payment_method: paymentMethod.value,
         lock_version: lockVersion.value,
+        // Info coperto: il backend può ignorarli oggi (display-only sullo
+        // scontrino UI); restano nel payload per future integrazioni con il
+        // cassetto fiscale / POS reale che vorranno scaricare il dettaglio.
+        cover_charge: showCoverSection.value ? {
+            per_person: safeCoverPerPerson.value,
+            persons: safePersons.value,
+            total: coverTotal.value,
+        } : null,
     });
+};
+
+const onSaveCoverDefault = async () => {
+    if (savingDefault.value) return;
+    savingDefault.value = true;
+    try {
+        // Il parent gestisce la chiamata API e il toast; questo modale non
+        // sa di /account/website-config. Aspettiamo finché props.coverCharge
+        // viene aggiornato dal parent — eventuale errore lo notifica lui.
+        emit('save-cover-default', safeCoverPerPerson.value);
+    } finally {
+        // Lascia il flag a true qualche ms per evitare doppio click; il parent
+        // di solito chiude/aggiorna il modale subito.
+        setTimeout(() => { savingDefault.value = false; }, 800);
+    }
 };
 
 const onClose = () => {
@@ -85,10 +146,73 @@ const onClose = () => {
                             </span>
                         </div>
                     </div>
-                    <div class="ckm-total-row">
-                        <span class="ckm-total-label">Totale</span>
-                        <span class="ckm-total-value">&euro; {{ totalAmount }}</span>
+                    <div class="ckm-line ckm-line--sub">
+                        <span class="ckm-line-l">Subtotale</span>
+                        <span class="ckm-line-v">{{ fmt(subtotal) }}</span>
                     </div>
+                </div>
+
+                <!-- Coperto (solo dine-in) -->
+                <div v-if="showCoverSection" class="ckm-cover">
+                    <h3 class="ckm-section-title">Coperto</h3>
+                    <div v-if="!isCoverConfigured" class="ckm-cover-alert">
+                        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                        <span>
+                            Il coperto non è configurato in <strong>Impostazioni</strong>.
+                            Inseriscilo qui sotto per questo conto e, se vuoi, salvalo come default.
+                        </span>
+                    </div>
+                    <div v-else class="ckm-cover-hint">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                        <span>Default da Impostazioni · modificabile per questo conto.</span>
+                    </div>
+                    <div class="ckm-cover-row">
+                        <div class="ckm-cover-field">
+                            <label class="ckm-label" for="ckm-persons">Persone al tavolo</label>
+                            <input
+                                id="ckm-persons"
+                                v-model.number="persons"
+                                type="number"
+                                min="0"
+                                step="1"
+                                class="ckm-input"
+                            />
+                        </div>
+                        <div class="ckm-cover-field">
+                            <label class="ckm-label" for="ckm-cover">Coperto a persona</label>
+                            <div class="ckm-input-suffix-wrap">
+                                <input
+                                    id="ckm-cover"
+                                    v-model.number="coverPerPerson"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    class="ckm-input"
+                                />
+                                <span class="ckm-input-suffix">€</span>
+                            </div>
+                        </div>
+                        <div class="ckm-cover-field">
+                            <label class="ckm-label">Totale coperto</label>
+                            <div class="ckm-cover-total">{{ fmt(coverTotal) }}</div>
+                        </div>
+                    </div>
+                    <button
+                        v-if="!isCoverConfigured && safeCoverPerPerson > 0"
+                        type="button"
+                        class="ckm-link-btn"
+                        :disabled="savingDefault"
+                        @click="onSaveCoverDefault"
+                    >
+                        <i class="bi bi-bookmark" aria-hidden="true"></i>
+                        Salva {{ fmt(safeCoverPerPerson) }} come coperto di default
+                    </button>
+                </div>
+
+                <!-- Totale finale -->
+                <div class="ckm-grand-total">
+                    <span>Totale da pagare</span>
+                    <strong>{{ fmt(grandTotal) }}</strong>
                 </div>
 
                 <!-- Metodo pagamento -->
@@ -163,152 +287,178 @@ const onClose = () => {
     gap: var(--s-5);
     font-family: var(--f-sans, 'Geist', sans-serif);
 }
-
 .ckm-section-title {
-    font-family: var(--f-mono, 'Geist Mono', monospace);
-    font-size: 11px;
-    font-weight: 500;
+    margin: 0 0 var(--s-3);
+    font-size: 12px;
+    font-weight: 600;
     color: var(--ink-3);
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin: 0 0 var(--s-2) 0;
+    letter-spacing: 0.08em;
 }
 
-.ckm-summary {
-    display: flex;
-    flex-direction: column;
-    padding: 14px 16px;
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-}
+.ckm-summary { display: flex; flex-direction: column; gap: var(--s-2); }
 .ckm-items {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    max-height: 220px;
+    display: flex; flex-direction: column;
+    gap: 6px;
+    max-height: 260px;
     overflow-y: auto;
+    padding: var(--s-3);
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
+    border-radius: 10px;
 }
 .ckm-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px dashed var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
     font-size: 13px;
+    color: var(--ink);
 }
-.ckm-item:last-child { border-bottom: none; }
-.ckm-item-name {
-    color: var(--ink-2);
-    font-weight: 500;
-}
+.ckm-item-name { display: inline-flex; align-items: center; gap: 8px; }
 .ckm-item-qty {
-    font-family: var(--f-mono, 'Geist Mono', monospace);
+    font-family: var(--f-mono); font-size: 11px;
     color: var(--ink-3);
-    margin-left: 6px;
-    font-weight: 600;
-    font-size: 12px;
+    padding: 1px 6px;
+    background: var(--paper);
+    border-radius: 999px;
 }
 .ckm-item-total {
-    font-family: var(--f-mono, 'Geist Mono', monospace);
-    font-weight: 600;
-    color: var(--ink);
-    flex-shrink: 0;
+    font-family: var(--f-mono); font-weight: 700;
+    color: var(--ink); flex-shrink: 0;
 }
 
-.ckm-total-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 0 4px;
-    margin-top: 8px;
-    border-top: 2px solid var(--line);
+.ckm-line {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 4px;
+    font-size: 13px;
 }
-.ckm-total-label {
-    font-family: var(--f-mono, 'Geist Mono', monospace);
-    font-size: 11px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--ink-3);
+.ckm-line-l { color: var(--ink-2); }
+.ckm-line-v { font-family: var(--f-mono); font-weight: 600; color: var(--ink); }
+
+.ckm-cover {
+    display: flex; flex-direction: column; gap: var(--s-3);
+    padding: var(--s-4);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
 }
-.ckm-total-value {
-    font-family: var(--f-mono, 'Geist Mono', monospace);
-    font-size: 24px;
+.ckm-cover-alert {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 10px 12px;
+    background: color-mix(in oklab, var(--warn, var(--ac)) 12%, var(--paper));
+    color: var(--ink);
+    border: 1px solid color-mix(in oklab, var(--warn, var(--ac)) 30%, transparent);
+    border-radius: 8px;
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+.ckm-cover-alert i { color: var(--warn, var(--ac)); flex-shrink: 0; margin-top: 2px; }
+.ckm-cover-hint {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--ink-3);
+}
+.ckm-cover-hint i { color: var(--ac); }
+.ckm-cover-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--s-3);
+}
+.ckm-cover-field { display: flex; flex-direction: column; gap: 4px; }
+.ckm-label {
+    font-size: 12px; font-weight: 600;
+    color: var(--ink-2);
+}
+.ckm-input {
+    width: 100%;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+}
+.ckm-input:focus { border-color: var(--ac); box-shadow: 0 0 0 3px var(--ac-soft); }
+.ckm-input-suffix-wrap { position: relative; }
+.ckm-input-suffix-wrap .ckm-input { padding-right: 32px; }
+.ckm-input-suffix {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--ink-3); font-size: 13px; pointer-events: none;
+}
+.ckm-cover-total {
+    height: 38px;
+    display: inline-flex; align-items: center; justify-content: flex-end;
+    padding: 0 12px;
+    background: var(--bg-sunk);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-family: var(--f-mono);
+    font-size: 14px;
     font-weight: 700;
     color: var(--ink);
-    letter-spacing: -0.02em;
+}
+.ckm-link-btn {
+    align-self: flex-start;
+    background: none; border: none; padding: 0;
+    color: var(--ac); font-family: inherit;
+    font-size: 12.5px; font-weight: 500;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.ckm-link-btn:hover:not(:disabled) { color: var(--ac-ink); }
+.ckm-link-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ckm-grand-total {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--ink); color: var(--bg);
+    border-radius: 10px;
+    font-size: 15px; font-weight: 600;
+}
+.ckm-grand-total strong {
+    font-family: var(--f-mono);
+    font-size: 22px;
+    font-weight: 700;
 }
 
+.ckm-method { display: flex; flex-direction: column; gap: var(--s-3); }
 .ckm-method-options {
-    display: flex;
-    gap: var(--s-2);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
 }
 .ckm-method-option {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
     padding: 14px 10px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
     background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
     cursor: pointer;
-    font-family: var(--f-sans, 'Geist', sans-serif);
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--ink-2);
-    transition: border-color 120ms, background 120ms, color 120ms, transform 120ms;
-    text-align: center;
+    transition: background var(--dur-fast), border-color var(--dur-fast);
+    font-size: 12.5px; color: var(--ink-2);
 }
-.ckm-method-option i {
-    font-size: 22px;
-    color: var(--ink-3);
-    transition: color 120ms;
-}
-.ckm-method-option:hover {
-    border-color: color-mix(in oklab, var(--ink) 20%, var(--line));
-    background: var(--bg-2);
-    transform: translateY(-1px);
-}
+.ckm-method-option i { font-size: 20px; color: var(--ink-2); }
+.ckm-method-option:hover { background: var(--bg-hover); }
 .ckm-method-option.selected {
+    background: var(--ac-soft);
     border-color: var(--ac);
-    background: color-mix(in oklab, var(--ac) 8%, var(--paper));
-    color: var(--ac);
-    box-shadow: 0 0 0 1px var(--ac);
+    color: var(--ac-ink);
 }
-.ckm-method-option.selected i { color: var(--ac); }
+.ckm-method-option.selected i { color: var(--ac-ink); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
 
 .form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--s-3);
-    padding-top: var(--s-3);
+    display: flex; justify-content: flex-end; gap: var(--s-3);
+    padding-top: var(--s-2);
     border-top: 1px solid var(--line);
 }
 
-.visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-}
-
 @media (max-width: 640px) {
-    .ckm-method-options {
-        flex-direction: column;
-    }
-    .form-actions {
-        flex-direction: column-reverse;
-    }
-    .form-actions :deep(.ds-btn) {
-        width: 100%;
-    }
+    .ckm-cover-row { grid-template-columns: 1fr; }
+    .ckm-method-options { grid-template-columns: 1fr; }
+    .form-actions { flex-direction: column-reverse; }
+    .form-actions :deep(.ds-btn) { width: 100%; }
 }
 </style>

@@ -6,7 +6,7 @@ import OrderStatusBadge from '@/components/OrderStatusBadge.vue';
 import VoidItemModal from '@/components/VoidItemModal.vue';
 import {
     fetchOrder, addOrderItem, updateOrderItem, deleteOrderItem,
-    updateItemStatus, voidOrderItem, orderErrorMessage,
+    updateItemStatus, voidOrderItem, sendOrderToProduction, orderErrorMessage,
 } from '@/utils';
 
 const props = defineProps({
@@ -15,7 +15,8 @@ const props = defineProps({
     token: { type: String, default: null },
 });
 
-const emit = defineEmits(['close', 'order-updated', 'open-add-item', 'open-checkout']);
+const emit = defineEmits(['close', 'order-updated', 'open-add-item']);
+const sendingToCucina = ref(false);
 
 const order = ref(null);
 const loading = ref(false);
@@ -62,6 +63,12 @@ const isActive = computed(() => order.value?.status === 'active');
 const isTakeaway = computed(() => order.value?.service_type === 'takeaway');
 const canEditItems = computed(() => isActive.value && (!isTakeaway.value || !order.value?.sent_to_departments_at));
 const canCheckout = computed(() => isActive.value && (!isTakeaway.value || order.value?.takeaway_status === 'picked_up'));
+const itemsTakenCount = computed(() => {
+    const items = order.value?.items || order.value?.fk_items;
+    if (!Array.isArray(items)) return 0;
+    return items.filter((it) => it && it.status === 'taken').length;
+});
+const canSendToCucina = computed(() => isActive.value && !isTakeaway.value && itemsTakenCount.value > 0);
 const totalAmount = computed(() => parseFloat(order.value?.total_amount || 0).toFixed(2));
 const tableNumber = computed(() => order.value?.table?.number ?? '?');
 const itemsSorted = computed(() => {
@@ -263,9 +270,27 @@ const openAddItem = () => {
     });
 };
 
-const openCheckout = () => {
-    if (!canCheckout.value) return;
-    emit('open-checkout', order.value);
+// "Invia alla cucina": avanza tutti gli items con status='taken' a 'preparing'
+// in unica chiamata atomica al backend. La chiusura del conto NON e' qui:
+// avviene esclusivamente dalla Dashboard (vista monitoring). Tipico flow:
+// il cameriere prende l'ordine completo del tavolo poi invia in produzione,
+// non un piatto alla volta.
+const sendToCucina = async () => {
+    if (!canSendToCucina.value || sendingToCucina.value) return;
+    sendingToCucina.value = true;
+    try {
+        const resp = await sendOrderToProduction(props.orderDocumentId, props.token);
+        const sent = resp?.meta?.sent ?? 0;
+        await silentReload();
+        emit('order-updated');
+        showToast('success', sent > 0
+            ? `${sent} ${sent === 1 ? 'piatto inviato' : 'piatti inviati'} in cucina.`
+            : 'Tutto già in cucina.');
+    } catch (err) {
+        showToast('error', orderErrorMessage(err));
+    } finally {
+        sendingToCucina.value = false;
+    }
 };
 
 const onClose = () => {
@@ -418,13 +443,19 @@ defineExpose({ onItemAdded, silentReload });
                                 <span>Aggiungi</span>
                             </button>
                             <button
+                                v-if="!isTakeaway"
                                 type="button"
                                 class="ds-btn ds-btn-primary"
-                                :disabled="!canCheckout"
-                                @click="openCheckout"
+                                :disabled="!canSendToCucina || sendingToCucina"
+                                :title="canSendToCucina
+                                    ? 'Manda in produzione tutti i piatti appena ordinati'
+                                    : 'Aggiungi prima dei piatti per poterli inviare in cucina'"
+                                @click="sendToCucina"
                             >
-                                <i class="bi bi-receipt-cutoff" aria-hidden="true"></i>
-                                <span>Chiudi conto</span>
+                                <i v-if="sendingToCucina" class="bi bi-arrow-repeat odm-spin" aria-hidden="true"></i>
+                                <i v-else class="bi bi-send-check" aria-hidden="true"></i>
+                                <span>Invia alla cucina</span>
+                                <span v-if="itemsTakenCount > 0" class="odm-send-count">{{ itemsTakenCount }}</span>
                             </button>
                         </div>
                         <div v-else class="odm-closed-info">
@@ -640,6 +671,23 @@ defineExpose({ onItemAdded, silentReload });
 }
 .odm-actions :deep(.ds-btn) {
     flex: 1;
+}
+.odm-spin { animation: odm-spin-anim 0.8s linear infinite; display: inline-block; }
+@keyframes odm-spin-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.odm-send-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background: color-mix(in oklab, white 25%, transparent);
+    color: var(--bg);
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
 
 .odm-closed-info {
