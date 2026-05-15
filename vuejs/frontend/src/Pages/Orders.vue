@@ -545,7 +545,38 @@ watch(() => route.path, async () => {
 
 <template>
   <AppLayout :page-title="pageTitle">
-    <div class="md-main" :class="{ 'kt-main': isKitchenMode }">
+    <div class="ord-layout">
+      <!-- Sidebar laterale dedicata alla pagina (stile MenuSetter):
+           switcher di reparto. Visibile solo per owner/gestione in modalità
+           produzione (cucina/bar/pizzeria/sg). Su mobile diventa una row
+           orizzontale scrollabile. -->
+      <aside v-if="isOwnerProductionMode" class="ord-sidebar">
+        <div class="ord-sidebar-section">
+          <div class="ord-sidebar-label">Reparto</div>
+          <nav class="ord-sidebar-nav">
+            <button
+              v-for="pill in departmentPills"
+              :key="pill.key"
+              type="button"
+              class="ord-nav-item"
+              :class="{ 'ord-nav-item--active': monitorDept === pill.key }"
+              :disabled="!pill.allowed"
+              :title="pill.allowed ? '' : 'Disponibile con il piano Professionale'"
+              @click="setMonitorDept(pill.key, pill.allowed)"
+            >
+              <i :class="['bi', pill.icon]" aria-hidden="true"></i>
+              <span>{{ pill.label }}</span>
+              <span v-if="!pill.allowed" class="ord-pro-badge">PRO</span>
+            </button>
+          </nav>
+        </div>
+        <div v-if="!isPro" class="ord-sidebar-note">
+          <i class="bi bi-info-circle" aria-hidden="true"></i>
+          <span>Piano Essenziale: solo Cucina disponibile.</span>
+        </div>
+      </aside>
+
+      <div class="md-main ord-main" :class="{ 'kt-main': isKitchenMode }">
       <header class="md-top">
         <div>
           <div class="overline">{{ headerOverline }}</div>
@@ -572,28 +603,6 @@ watch(() => route.path, async () => {
           </button>
         </div>
       </header>
-
-      <!-- ===== OWNER · monitor toolbar ===== -->
-      <div v-if="isOwnerProductionMode" class="ct-dept-bar" aria-label="Reparto monitorato">
-        <button
-          v-for="pill in departmentPills"
-          :key="pill.key"
-          type="button"
-          class="ct-dept-pill"
-          :class="{ active: monitorDept === pill.key }"
-          :disabled="!pill.allowed"
-          :title="pill.allowed ? '' : 'Disponibile con il piano Professionale'"
-          @click="setMonitorDept(pill.key, pill.allowed)"
-        >
-          <i :class="['bi', pill.icon]" aria-hidden="true"></i>
-          <span>{{ pill.label }}</span>
-          <span v-if="!pill.allowed" class="lock-pill">PRO</span>
-        </button>
-        <span v-if="!isPro" class="ct-dept-bar__note">
-          <i class="bi bi-info-circle" style="color: var(--ac);"></i>
-          Piano Essenziale: solo Cucina
-        </span>
-      </div>
 
       <Transition name="fade">
         <div v-if="errorMessage" class="md-card" style="border-color: var(--danger); background: var(--danger-bg); padding: 12px 16px; color: var(--danger);">
@@ -785,6 +794,7 @@ watch(() => route.path, async () => {
           @advance="handleKitchenAdvance"
         />
       </template>
+      </div>
     </div>
 
     <OrderDetailModal
@@ -866,6 +876,109 @@ watch(() => route.path, async () => {
 </template>
 
 <style scoped>
+/* ── Layout sidebar pagina (stesso pattern di MenuSetter) ── */
+.ord-layout {
+  display: flex;
+  min-height: calc(100vh - 0px);
+  position: relative;
+}
+
+.ord-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg-sunk);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ord-sidebar-section { display: flex; flex-direction: column; gap: 2px; }
+.ord-sidebar-label {
+  padding: 0 8px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+.ord-sidebar-nav { display: flex; flex-direction: column; gap: 1px; }
+.ord-sidebar-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+.ord-sidebar-note i { color: var(--ac); flex-shrink: 0; margin-top: 1px; }
+
+.ord-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--f-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.ord-nav-item:hover:not(:disabled) { background: var(--bg-hover); color: var(--ink); }
+.ord-nav-item:disabled { opacity: 0.55; cursor: not-allowed; }
+.ord-nav-item--active {
+  background: var(--bg-elev);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+.ord-nav-item--active i { color: var(--ac); }
+.ord-nav-item i { font-size: 14px; opacity: 0.8; flex-shrink: 0; }
+.ord-nav-item span:nth-child(2) { flex: 1; }
+
+.ord-pro-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--ac-soft);
+  color: var(--ac-ink);
+  font-family: var(--f-mono);
+  flex-shrink: 0;
+}
+
+.ord-main { flex: 1; min-width: 0; }
+
+@media (max-width: 860px) {
+  .ord-layout { flex-direction: column; }
+  .ord-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 10px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    gap: 6px;
+  }
+  .ord-sidebar-section { flex-direction: row; flex-wrap: nowrap; gap: 4px; }
+  .ord-sidebar-label { display: none; }
+  .ord-sidebar-note { display: none; }
+  .ord-nav-item { white-space: nowrap; padding: 7px 12px; }
+}
+
 .md-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 12px; padding: 56px 16px;
