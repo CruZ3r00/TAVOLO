@@ -122,6 +122,47 @@
   .status-badge-cancelled,
   .ds-badge-danger { background: #fdeceb; color: #8f2c22; }
 
+  /* --- CommandPalette backdrop --- */
+  .cp-backdrop {
+    background: rgba(0, 0, 0, 0.45);
+  }
+
+  /* --- MenuList bulk-bar hover e action danger --- */
+  .ml-bulk-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .ml-bulk-btn--danger:hover {
+    background: rgba(200, 79, 75, 0.15);
+  }
+  .ml-action-btn--danger:hover {
+    background: #fdeceb;
+    color: #8f2c22;
+    border-color: rgba(194, 65, 50, 0.3);
+  }
+
+  /* --- MenuSetter: bar-modal overlay, spinner, progress bar, close hover --- */
+  .bar-modal-overlay {
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .import-overlay-spinner {
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+  .import-overlay-progress-bar {
+    background: #c84f4b;
+  }
+  .import-toast-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  /* --- WhoAreUs e ContactUs: hover border con accent tint --- */
+  .wa-value-card:hover,
+  .wa-team-card:hover {
+    border-color: #c84f4b;
+  }
+  .ct-contact-card--accent {
+    border-color: #c84f4b;
+  }
+
   /* --- Landing: card sovrapposte sempre opache e leggibili --- */
   .public-context-inner,
   .public-takeaway-inner,

@@ -11,6 +11,7 @@ import MobileTopBar from '@/components/MobileTopBar.vue';
 import AlertHeaderBar from '@/components/AlertHeaderBar.vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 import TeleportCompat from '@/lib/compat/teleport.js';
+import CommandPalette from '@/components/CommandPalette.vue';
 
 const props = defineProps({
   // 'app' = sidebar + bottom nav, 'public' = top nav, 'auto' = decide da auth + path
@@ -195,6 +196,7 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
     />
 
     <TeleportCompat to="body">
+      <CommandPalette />
       <Transition name="drawer">
         <div v-if="mobileMenuOpen" class="mobile-drawer-backdrop" @click="closeMobileMenu">
           <aside class="mobile-drawer" @click.stop>
@@ -290,6 +292,10 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
         </div>
       </Transition>
     </nav>
+
+    <TeleportCompat to="body">
+      <CommandPalette />
+    </TeleportCompat>
 
     <main class="main-content">
       <slot />
