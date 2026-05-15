@@ -39,15 +39,6 @@ const planLabel = computed(() => {
   if (p === 'starter') return 'STARTER';
   return p.toUpperCase() || 'STARTER';
 });
-const planRenewLabel = computed(() => {
-  const ts = props.user?.subscription_renews_at || props.user?.subscription_current_period_end;
-  if (!ts) return null;
-  try {
-    const d = new Date(ts);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch (_e) { return null; }
-});
 const isPro = computed(() => String(props.user?.subscription_plan || '').toLowerCase() === 'pro');
 
 const restaurantInitial = computed(() => {
@@ -57,10 +48,8 @@ const restaurantInitial = computed(() => {
 
 // id → visibile per ruolo (extends canSeeNavItem con id mancanti).
 const canSee = (id) => {
-  // Voci aggiuntive non in canSeeNavItem: staff, statistiche, impostazioni.
-  if (id === 'staff' || id === 'statistiche' || id === 'impostazioni') {
-    return isOwnerOrGestione.value;
-  }
+  // Voci aggiuntive non in canSeeNavItem: impostazioni.
+  if (id === 'impostazioni') return isOwnerOrGestione.value;
   return canSeeNavItem(props.user, id);
 };
 
@@ -95,11 +84,10 @@ const groupReparti = computed(() => {
   return items.filter((it) => canSee(it.id));
 });
 
-// Gruppo "Gestione": Staff / Statistiche / Impostazioni — owner+gestione only.
+// Gruppo "Gestione": solo Impostazioni — owner+gestione only.
+// (Staff / Statistiche / footer plan card rimossi su richiesta utente.)
 const groupGestione = computed(() => {
   const items = [
-    { id: 'staff', icon: 'bi-people', label: 'Staff', path: '/profile/show?section=staff' },
-    { id: 'statistiche', icon: 'bi-bar-chart', label: 'Statistiche', path: '/dashboard?section=stats', pro: !isPro.value },
     { id: 'impostazioni', icon: 'bi-gear', label: 'Impostazioni', path: '/profile/show' },
   ];
   return items.filter((it) => canSee(it.id));
@@ -122,24 +110,10 @@ const activeKey = computed(() => {
   if (p.startsWith('/orders')) return 'sala';
   if (p.startsWith('/reservations')) return 'prenotazioni';
   if (p.startsWith('/menu-handler')) return 'menu';
-  if (p.startsWith('/profile')) {
-    if (route.query.section === 'staff') return 'staff';
-    if (route.query.section === 'sito') return 'impostazioni';
-    return 'impostazioni';
-  }
-  if (p.startsWith('/dashboard')) {
-    if (route.query.section === 'stats') return 'statistiche';
-    return 'manager';
-  }
+  if (p.startsWith('/profile')) return 'impostazioni';
+  if (p.startsWith('/dashboard')) return 'manager';
   return '';
 });
-
-const goToBilling = () => {
-  // Apre il pannello profilo dove vivono le impostazioni billing.
-  // Su starter + scaduto va invece a /renew-sub.
-  const status = String(props.user?.subscription_status || '').toLowerCase();
-  return ['past_due', 'cancelled', 'unpaid'].includes(status) ? '/renew-sub' : '/profile/show';
-};
 </script>
 
 <template>
@@ -209,16 +183,6 @@ const goToBilling = () => {
     </div>
 
     <div class="app-sidebar-spacer"></div>
-
-    <div class="app-sidebar-footer">
-      <div class="app-sidebar-footer-overline">Piano {{ planLabel }}</div>
-      <div v-if="planRenewLabel" class="app-sidebar-footer-meta">
-        Rinnovo: {{ planRenewLabel }}
-      </div>
-      <router-link :to="goToBilling()" class="app-sidebar-footer-cta" @click="$emit('close')">
-        Gestisci abbonamento
-      </router-link>
-    </div>
 
     <NavItem
       v-if="canSeeNavItem(user, 'logout')"
@@ -348,45 +312,6 @@ const goToBilling = () => {
 }
 
 .app-sidebar-spacer { flex: 1; min-height: 12px; }
-
-.app-sidebar-footer {
-  margin-top: 12px;
-  padding: 12px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-.app-sidebar-footer-overline {
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-3);
-  margin-bottom: 4px;
-}
-.app-sidebar-footer-meta {
-  font-size: 12px;
-  color: var(--ink-2);
-  line-height: 1.45;
-  margin-bottom: 8px;
-}
-.app-sidebar-footer-cta {
-  display: block;
-  width: 100%;
-  height: 30px;
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid var(--line);
-  background: var(--bg);
-  color: var(--ink-2);
-  border-radius: 6px;
-  text-align: center;
-  text-decoration: none;
-  line-height: 28px;
-  cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast);
-}
-.app-sidebar-footer-cta:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
 @media (max-width: 860px) {
   /* Sidebar è completamente nascosta su mobile (drawer la sostituisce). */

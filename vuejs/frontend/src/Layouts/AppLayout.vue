@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router';
 import { useStore } from 'vuex';
 import { fetchReservations, fetchOrders } from '@/utils';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
-import { canSeeNavItem, defaultRouteForUser, effectiveUserId } from '@/staffAccess';
+import { STAFF_ROLES, canSeeNavItem, defaultRouteForUser, effectiveUserId, staffRole } from '@/staffAccess';
 import AppSidebar from '@/components/AppSidebar.vue';
 import MobileBottomNav from '@/components/MobileBottomNav.vue';
 import MobileTopBar from '@/components/MobileTopBar.vue';
@@ -141,6 +141,54 @@ const defaultAppRoute = computed(() => defaultRouteForUser(currentUser.value));
 const showNav = (id) => canSeeNavItem(currentUser.value, id);
 const showMobileProfile = computed(() => showNav('profilo'));
 
+// Global navigation items mostrati come pills nella sub-navbar orizzontale
+// (desktop). Su mobile la stessa nav è disponibile via drawer (AppSidebar).
+const userRole = computed(() => staffRole(currentUser.value));
+const isOwnerOrGestione = computed(
+  () => userRole.value === STAFF_ROLES.OWNER || userRole.value === STAFF_ROLES.GESTIONE,
+);
+
+const globalNavItems = computed(() => {
+  if (isOwnerOrGestione.value) {
+    return [
+      { id: 'manager', icon: 'bi-speedometer2', label: 'Dashboard', path: '/dashboard' },
+      { id: 'sala', icon: 'bi-grid-3x3-gap', label: 'Sala', path: '/orders', badge: pendingCount.value },
+      { id: 'ordini', icon: 'bi-receipt', label: 'Ordini', path: '/kitchen', badge: activeOrdersCount.value, badgeAccent: true },
+      { id: 'menu', icon: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
+      { id: 'prenotazioni', icon: 'bi-calendar-check', label: 'Prenotazioni', path: '/reservations', badge: pendingCount.value },
+    ].filter((it) => showNav(it.id));
+  }
+
+  // Staff (cameriere / cucina / bar / pizzeria / cucina_sg): vedono solo
+  // le voci legate al loro ruolo + carico bar quando applicabile.
+  return [
+    { id: 'sala', icon: 'bi-grid-3x3-gap', label: 'Sala', path: '/orders', badge: pendingCount.value },
+    { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen' },
+    { id: 'bar', icon: 'bi-cup-straw', label: 'Bar', path: '/bar' },
+    { id: 'pizzeria', icon: 'bi-record-circle', label: 'Pizzeria', path: '/pizzeria' },
+    { id: 'cucina_sg', icon: 'bi-shield-check', label: 'Cucina SG', path: '/kitchen-sg' },
+    { id: 'bar-management', icon: 'bi-cup-hot', label: 'Carico bar', path: '/bar-management' },
+    { id: 'prenotazioni', icon: 'bi-calendar-check', label: 'Prenotazioni', path: '/reservations', badge: pendingCount.value },
+  ].filter((it) => showNav(it.id));
+});
+
+const activeNavKey = computed(() => {
+  const p = route.path;
+  if (p.startsWith('/bar-management')) return 'bar-management';
+  if (p.startsWith('/kitchen-sg')) return isOwnerOrGestione.value ? 'ordini' : 'cucina_sg';
+  if (p.startsWith('/kitchen')) return isOwnerOrGestione.value ? 'ordini' : 'cucina';
+  if (p === '/bar' || p.startsWith('/bar/')) return 'bar';
+  if (p.startsWith('/pizzeria')) return 'pizzeria';
+  if (p.startsWith('/orders')) return 'sala';
+  if (p.startsWith('/reservations')) return 'prenotazioni';
+  if (p.startsWith('/menu-handler')) return 'menu';
+  if (p.startsWith('/dashboard')) return 'manager';
+  return '';
+});
+
+const showBadge = (n) => Number.isFinite(Number(n)) && Number(n) > 0;
+const formatBadge = (n) => (Number(n) > 9 ? '9+' : String(n));
+
 const handleClickOutside = (e) => {
   const target = e.target;
   if (!(target instanceof Element)) return;
@@ -240,6 +288,11 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
                     <i class="bi bi-person"></i><span>Profilo</span>
                   </router-link>
                 </li>
+                <li v-if="showNav('impostazioni') || isOwnerOrGestione">
+                  <router-link to="/profile/show" class="user-dropdown-item" @click="closeUserMenu">
+                    <i class="bi bi-gear"></i><span>Impostazioni</span>
+                  </router-link>
+                </li>
                 <li><hr class="user-dropdown-sep"></li>
                 <li>
                   <router-link to="/logout" class="user-dropdown-item user-dropdown-item--danger" @click="closeUserMenu">
@@ -253,6 +306,33 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
       </div>
     </header>
 
+    <!-- Sub-navbar orizzontale (sostituisce la sidebar globale su desktop) -->
+    <nav
+      v-if="globalNavItems.length > 0"
+      class="app-subnav"
+      role="navigation"
+      aria-label="Navigazione principale"
+    >
+      <div class="app-subnav-inner">
+        <router-link
+          v-for="it in globalNavItems"
+          :key="it.id"
+          :to="it.path"
+          class="app-subnav-item"
+          :class="{ 'is-active': activeNavKey === it.id }"
+          :aria-current="activeNavKey === it.id ? 'page' : null"
+        >
+          <i :class="['bi', it.icon]" aria-hidden="true"></i>
+          <span>{{ it.label }}</span>
+          <span
+            v-if="showBadge(it.badge)"
+            class="app-subnav-badge"
+            :class="{ 'app-subnav-badge--accent': it.badgeAccent }"
+          >{{ formatBadge(it.badge) }}</span>
+        </router-link>
+      </div>
+    </nav>
+
     <!-- Mobile top bar (visibile solo <= 860px tramite media query interna) -->
     <MobileTopBar
       :title="pageTitle || 'ComforTables'"
@@ -263,22 +343,10 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
       @open-palette="openPalette"
     />
 
-    <div class="app-shell-body">
-      <AppSidebar
-        class="app-shell-sidebar"
-        :username="username"
-        :restaurant-name="restaurantName"
-        :restaurant-sub="restaurantSub"
-        :pending-count="pendingCount"
-        :active-orders-count="activeOrdersCount"
-        :user="currentUser"
-      />
-
-      <main class="app-shell-main">
-        <AlertHeaderBar />
-        <slot />
-      </main>
-    </div>
+    <main class="app-shell-main">
+      <AlertHeaderBar />
+      <slot />
+    </main>
 
     <MobileBottomNav
       :pending-count="pendingCount"
@@ -534,27 +602,88 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 }
 .app-top-avatar:hover { background: var(--ac); color: var(--bg); }
 
-/* ── Body (sidebar + main) ── */
-.app-shell-body {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  flex: 1;
-  min-height: 0;
+/* ── Sub-navbar orizzontale (sostituisce la sidebar globale su desktop) ── */
+.app-subnav {
+  position: sticky;
+  top: 56px; /* sotto al top-nav */
+  z-index: 35;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
 }
-.app-shell-sidebar { grid-column: 1; grid-row: 1; }
+.app-subnav-inner {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0 var(--s-5, 20px);
+  height: 44px;
+  max-width: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.app-subnav-inner::-webkit-scrollbar { height: 4px; }
+.app-subnav-inner::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+.app-subnav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--f-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  position: relative;
+  transition: color var(--dur-fast), background var(--dur-fast);
+}
+.app-subnav-item:hover { color: var(--ink); background: var(--bg-hover); }
+.app-subnav-item i { font-size: 14px; opacity: 0.85; }
+.app-subnav-item.is-active { color: var(--ink); font-weight: 600; }
+.app-subnav-item.is-active i { opacity: 1; color: var(--ac); }
+.app-subnav-item.is-active::after {
+  content: "";
+  position: absolute;
+  left: 8px; right: 8px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--ink);
+  border-radius: 2px 2px 0 0;
+}
+
+.app-subnav-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: inline-grid;
+  place-items: center;
+}
+.app-subnav-badge--accent { background: var(--ac); color: var(--ac-contrast, var(--bg)); }
+
+/* ── Main content area ── */
 .app-shell-main {
-  grid-column: 2;
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-/* Mobile: sidebar nascosta, top-nav desktop nascosta. */
+/* Mobile: top-nav desktop e sub-navbar nascoste, MobileTopBar+BottomNav prendono il posto. */
 @media (max-width: 860px) {
-  .app-top-nav { display: none; }
-  .app-shell-body { grid-template-columns: 1fr !important; }
-  .app-shell-sidebar { display: none !important; }
-  .app-shell-main { grid-column: 1; padding-bottom: 96px; /* spazio per bottom nav */ }
+  .app-top-nav,
+  .app-subnav { display: none; }
+  .app-shell-main { padding-bottom: 96px; /* spazio per bottom nav */ }
 }
 
 /* ============== PUBLIC variant — landing/auth nav ============== */
