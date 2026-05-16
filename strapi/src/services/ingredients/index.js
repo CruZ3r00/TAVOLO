@@ -188,8 +188,12 @@ async function syncElementRecipe(strapi, ownerId, elementIdOrDoc, ingredientName
     for (const [ingId, ing] of desiredIngById.entries()) {
       if (survivingByIng.has(ingId)) continue;
       const docId = randomDocumentId();
+      // qty_per_serving=null = "ingrediente noto, dosaggio non definito".
+      // Distingue il quick-form (no advanced) dal setStructuredRecipe (dosaggio
+      // esplicito 0). I consumer downstream (bar-shift, inventory) usano
+      // `Number(qty) || 0` quindi null si comporta come 0 nei calcoli.
       const inserted = await trx('element_ingredients').insert({
-        qty_per_serving: 0,
+        qty_per_serving: null,
         document_id: docId,
         created_at: now,
         updated_at: now,
@@ -625,7 +629,8 @@ async function listElementRecipe(strapi, elementIdOrDoc) {
 
   const byIngId = new Map();
   for (const r of rows || []) {
-    const qty = Number(r.qty_per_serving) || 0;
+    // null = dosaggio non definito (quick-form). Preservato fino al client.
+    const qty = r.qty_per_serving == null ? null : Number(r.qty_per_serving);
     const existing = byIngId.get(r.ing_id);
     if (!existing) {
       byIngId.set(r.ing_id, {
@@ -639,8 +644,10 @@ async function listElementRecipe(strapi, elementIdOrDoc) {
         },
         qty_per_serving: qty,
       });
-    } else if (qty > existing.qty_per_serving) {
-      existing.qty_per_serving = qty;
+    } else {
+      const currentNum = Number(existing.qty_per_serving) || 0;
+      const newNum = Number(qty) || 0;
+      if (newNum > currentNum) existing.qty_per_serving = qty;
     }
   }
 

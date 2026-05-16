@@ -13,8 +13,7 @@
   "attributes": {
     "qty_per_serving": {
       "type": "decimal",
-      "default": 0,
-      "required": true,
+      "required": false,
       "min": 0
     },
     "unit_override": {

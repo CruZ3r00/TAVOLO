@@ -197,9 +197,12 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
 
       // Sincronizza la "ricetta strutturata" (ElementIngredient) con la lista
       // di stringhe fornita. Sorgente unica di verita' dopo il drop del JSON.
+      // Passa il documentId (non l'id numerico): Element ha draftAndPublish=true
+      // e i link devono coprire TUTTE le righe del documento — vedi lessons.md
+      // 2026-05-14 e setStructuredRecipe per il pattern.
       if (ingredientNames !== undefined) {
         try {
-          await ingredientsService.syncElementRecipe(strapi, user.id, created.id, ingredientNames);
+          await ingredientsService.syncElementRecipe(strapi, user.id, created.documentId, ingredientNames);
         } catch (recipeErr) {
           strapi.log.warn(`element.create: syncElementRecipe fallita per ${created.documentId}: ${recipeErr.message}`);
         }
@@ -279,7 +282,7 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
 
       if (ingredientNames !== undefined) {
         try {
-          await ingredientsService.syncElementRecipe(strapi, user.id, updated.id, ingredientNames);
+          await ingredientsService.syncElementRecipe(strapi, user.id, updated.documentId, ingredientNames);
         } catch (recipeErr) {
           strapi.log.warn(`element.update: syncElementRecipe fallita per ${updated.documentId}: ${recipeErr.message}`);
         }
