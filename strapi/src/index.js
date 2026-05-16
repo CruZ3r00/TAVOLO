@@ -515,6 +515,8 @@ async function grantImportPermissions(strapi) {
       'api::order.order.updateItem',
       'api::order.order.deleteItem',
       'api::order.order.updateItemStatus',
+      'api::order.order.voidItem',
+      'api::order.order.sendDineInToDepartments',
       'api::order.order.close',
       'api::order.order.createTakeawayAuthenticated',
       'api::order.order.updateTakeaway',
