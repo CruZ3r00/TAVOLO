@@ -197,7 +197,12 @@ function canTransitionItem(actor, fromStatus, toStatus) {
       (fromStatus === 'preparing' && toStatus === 'ready');
   }
   if (role === STAFF_ROLES.CAMERIERE) {
-    return fromStatus === 'ready' && toStatus === 'served';
+    // pending → taken e' il "Invia in cucina" del cameriere (anche se nel
+    // dine-in il path passa per sendDineInToDepartments e non per
+    // updateItemStatus, ammettere la transizione qui mantiene la FSM
+    // coerente per eventuali tool batch).
+    return (fromStatus === 'pending' && toStatus === 'taken') ||
+      (fromStatus === 'ready' && toStatus === 'served');
   }
   return false;
 }

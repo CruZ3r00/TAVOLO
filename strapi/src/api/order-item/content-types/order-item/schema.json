@@ -46,8 +46,8 @@
     },
     "status": {
       "type": "enumeration",
-      "enum": ["taken", "preparing", "ready", "served"],
-      "default": "taken",
+      "enum": ["pending", "taken", "preparing", "ready", "served"],
+      "default": "pending",
       "required": true
     },
     "voided": {

@@ -19,7 +19,7 @@ const props = defineProps({
   filter: { type: String, default: 'all' },
 });
 
-const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'counts-changed']);
+const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'serve-ready', 'counts-changed']);
 
 function activeOrderForTable(table) {
   return props.orders.find(
@@ -75,6 +75,7 @@ const filtered = computed(() => {
         @view-order="(ord) => emit('view-order', ord)"
         @open-table="(table) => emit('open-table', table)"
         @remove-table="(table) => emit('remove-table', table)"
+        @serve-ready="(ord) => emit('serve-ready', ord)"
       />
     </div>
     <div v-else class="kt-empty" style="padding: 40px 16px;">

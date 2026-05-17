@@ -66,7 +66,8 @@ const canCheckout = computed(() => isActive.value && (!isTakeaway.value || order
 const itemsTakenCount = computed(() => {
     const items = order.value?.items || order.value?.fk_items;
     if (!Array.isArray(items)) return 0;
-    return items.filter((it) => it && it.status === 'taken').length;
+    // pending = ancora nelle mani del cameriere, pronti per "Invia in cucina".
+    return items.filter((it) => it && it.status === 'pending').length;
 });
 const canSendToCucina = computed(() => isActive.value && !isTakeaway.value && itemsTakenCount.value > 0);
 const totalAmount = computed(() => parseFloat(order.value?.total_amount || 0).toFixed(2));
@@ -270,11 +271,12 @@ const openAddItem = () => {
     });
 };
 
-// "Invia alla cucina": avanza tutti gli items con status='taken' a 'preparing'
-// in unica chiamata atomica al backend. La chiusura del conto NON e' qui:
-// avviene esclusivamente dalla Dashboard (vista monitoring). Tipico flow:
-// il cameriere prende l'ordine completo del tavolo poi invia in produzione,
-// non un piatto alla volta.
+// "Invia alla cucina": avanza tutti gli items con status='pending' a 'taken'
+// in unica chiamata atomica al backend (la cucina li vedra' nella colonna
+// "Da fare" e potra' poi avanzarli a preparing/ready). La chiusura del conto
+// NON e' qui: avviene esclusivamente dalla Dashboard (vista monitoring).
+// Tipico flow: il cameriere prende l'ordine completo del tavolo poi invia
+// in produzione, non un piatto alla volta.
 const sendToCucina = async () => {
     if (!canSendToCucina.value || sendingToCucina.value) return;
     sendingToCucina.value = true;

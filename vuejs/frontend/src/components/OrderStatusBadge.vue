@@ -5,12 +5,13 @@ const props = defineProps({
     status: {
         type: String,
         required: true,
-        validator: (v) => ['taken', 'preparing', 'ready', 'served', 'active', 'closed'].includes(v),
+        validator: (v) => ['pending', 'taken', 'preparing', 'ready', 'served', 'active', 'closed'].includes(v),
     },
 });
 
 const META = {
-    taken:     { label: 'Preso',        cls: 'ds-badge-neutral',  icon: 'bi-receipt' },
+    pending:   { label: 'Da inviare',   cls: 'ds-badge-neutral',  icon: 'bi-pencil-square' },
+    taken:     { label: 'Da fare',      cls: 'ds-badge-neutral',  icon: 'bi-receipt' },
     preparing: { label: 'In preparazione', cls: 'ds-badge-warning', icon: 'bi-fire' },
     ready:     { label: 'Pronto',       cls: 'ds-badge-accent',   icon: 'bi-check-circle' },
     served:    { label: 'Servito',      cls: 'ds-badge-primary',  icon: 'bi-cup-straw' },
@@ -18,7 +19,7 @@ const META = {
     closed:    { label: 'Chiuso',       cls: 'ds-badge-neutral',  icon: 'bi-lock' },
 };
 
-const meta = computed(() => META[props.status] || META.taken);
+const meta = computed(() => META[props.status] || META.pending);
 </script>
 
 <template>
@@ -47,6 +48,12 @@ const meta = computed(() => META[props.status] || META.taken);
 }
 .order-status-badge i { font-size: 10px; }
 
+.osb-pending {
+    background: color-mix(in oklab, var(--ink) 4%, var(--paper));
+    color: var(--ink-3);
+    border-color: color-mix(in oklab, var(--ink) 12%, transparent);
+    font-style: italic;
+}
 .osb-taken {
     background: color-mix(in oklab, var(--ink) 6%, var(--paper));
     color: var(--ink-2);

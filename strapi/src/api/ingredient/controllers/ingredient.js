@@ -188,21 +188,22 @@ module.exports = {
       }
       const deduped = [...byKey.values()];
 
-      const out = [];
-      for (const ing of deduped) {
-        const base = serializeIngredient(ing);
-        try {
-          const f = await inventoryAlerts.computeDepletionForecast(strapi, ing);
-          base.rate_per_day = f.rate_per_day;
-          base.days_to_depletion = f.days_to_depletion;
-          base.predicted_depletion_at = f.predicted_depletion_at;
-        } catch (_e) {
-          base.rate_per_day = 0;
-          base.days_to_depletion = null;
-          base.predicted_depletion_at = null;
-        }
-        out.push(base);
+      // Forecast in batch: una sola query sui movements per evitare N+1.
+      let forecastMap;
+      try {
+        forecastMap = await inventoryAlerts.computeDepletionForecastBatch(strapi, deduped, actor.ownerId);
+      } catch (_e) {
+        forecastMap = new Map();
       }
+
+      const out = deduped.map((ing) => {
+        const base = serializeIngredient(ing);
+        const f = forecastMap.get(ing.id) || { rate_per_day: 0, days_to_depletion: null, predicted_depletion_at: null };
+        base.rate_per_day = f.rate_per_day;
+        base.days_to_depletion = f.days_to_depletion;
+        base.predicted_depletion_at = f.predicted_depletion_at;
+        return base;
+      });
 
       ctx.body = { data: out };
     } catch (err) { sendError(ctx, err); }

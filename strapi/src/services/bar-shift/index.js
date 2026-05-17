@@ -236,32 +236,44 @@ async function aggregateServedItems(strapi, ownerId, fromISO, toISO) {
     // else: piatto non-bar → ignora nel report bar
   }
 
-  // Costruisce sezione "units" per Element (piatti/bevande serviti).
-  // - is_beverage_advanced=false: 1 servita = 1 unita' (es. bottiglia chiusa, lattina).
-  // - is_beverage_advanced=true:  units_consumed=null (il calcolo bottiglie
-  //   bottiglie aperte avviene in ingredients_consumption[] sotto).
+  // Sezione `ingredients_consumption[]`: aggrega il consumo per Ingredient
+  // sommando due sorgenti:
+  //   1) Element advanced (cocktail dosati): contributo = ElementIngredient.qty_per_serving × served_count.
+  //   2) Element non-advanced (bottiglie/lattine) che name-matchano un Ingredient
+  //      con unit_size>0: contributo = served_count × ingredient.unit_size.
+  // Cosi' "1 bottiglia di Campari venduta + 9 negroni con 297ml di Campari"
+  // → 750 + 297 = 1047ml → ceil(1047/750) = 2 bottiglie aperte.
+  const allBarElements = [...byElement.values()];
+  const ingredientsConsumptionResult = await aggregateIngredientsConsumption(
+    strapi, ownerId, allBarElements
+  );
+  const ingredientsConsumption = ingredientsConsumptionResult.rows;
+  const mergedElementIds = ingredientsConsumptionResult.mergedElementIds;
+
+  // Costruisce sezione "units" per Element (bevande servite).
+  // - is_beverage_advanced=true:  units_consumed=null (calcolato in ingredients_consumption).
+  // - non-advanced merged in ingredient: units_consumed=null + merged_into_ingredient
+  //   = ingredient_documentId, per evitare doppio conteggio e annotare nella UI.
+  // - non-advanced non-merged: 1 servita = 1 unita' (es. acqua minerale, lattine).
   const units = [];
   for (const e of byElement.values()) {
-    const units_consumed = e.is_beverage_advanced ? null : e.served_count;
+    const mergedIngId = mergedElementIds.get(e.element_id) || null;
+    let units_consumed;
+    if (e.is_beverage_advanced) units_consumed = null;
+    else if (mergedIngId) units_consumed = null;
+    else units_consumed = e.served_count;
     units.push({
       element_documentId: e.element_documentId,
       name: e.name,
       category: e.category,
       is_beverage_advanced: e.is_beverage_advanced,
+      merged_into_ingredient: mergedIngId,
       served_count: e.served_count,
       units_consumed,
       revenue: Number(e.revenue.toFixed(2)),
     });
   }
   units.sort((a, b) => a.name.localeCompare(b.name, 'it'));
-
-  // Sezione `ingredients_consumption[]`: per ogni Element con
-  // `is_beverage_advanced=true`, recupera la ricetta strutturata e accumula
-  // per Ingredient il `total_qty_used = servings × qty_per_serving`. Calcola
-  // poi `units_consumed = ceil(total_qty_used / unit_size)`: ogni bottiglia
-  // aperta vale 1, anche se non interamente consumata.
-  const advancedElements = [...byElement.values()].filter((e) => e.is_beverage_advanced);
-  const ingredientsConsumption = await aggregateIngredientsConsumption(strapi, advancedElements);
 
   const freeform = [];
   for (const e of freeformByName.values()) {
@@ -315,80 +327,139 @@ async function buildReport(strapi, ownerId, shift) {
 }
 
 /**
- * Aggrega il consumo per ingrediente dato un insieme di Element advanced.
+ * Aggrega il consumo per ingrediente sommando due sorgenti distinte:
+ *   A) Element con is_beverage_advanced=true: usa la ricetta strutturata
+ *      ElementIngredient (qty_per_serving × served_count).
+ *   B) Element non-advanced: name-match su Ingredient.name_normalized
+ *      dell'owner. Se trovato e ingredient.unit_size>0, contributo =
+ *      served_count × unit_size (1 bottiglia venduta = 1 formato bottiglia).
  *
- * Input: `advancedElements` = [{ element_id, name, served_count, ... }]
- * Output: [{ ingredient_documentId, name, unit, unit_size, qty_per_serving_avg,
- *            total_qty_used, units_consumed }]
+ * Input: `allElements` = [{ element_id, name, served_count, is_beverage_advanced, ... }]
+ * Output: { rows: [...], mergedElementIds: Map<element_id, ingredient_documentId> }
  *
- * Logica:
- *   1) Carica le ElementIngredient con qty_per_serving>0 collegate agli element_id.
- *   2) Per ciascuna riga: `contribution = ei.qty_per_serving × element.served_count`.
- *   3) Aggrega per ingredient_id sommando i contributi.
- *   4) `units_consumed = ceil(total_qty_used / unit_size)` se unit_size>0, altrimenti null.
+ * `mergedElementIds` permette al chiamante di marcare i row units come
+ * "merged_into_ingredient" cosi' la UI evita di sommarli di nuovo.
  *
  * Una ElementIngredient puo' avere link a piu' rows draft/published dello stesso
  * Element: la query usa una clausola IN sugli `element_id` che derivano dagli
  * OrderItem realmente serviti, quindi non si conteggia mai due volte.
  */
-async function aggregateIngredientsConsumption(strapi, advancedElements) {
-  if (!Array.isArray(advancedElements) || advancedElements.length === 0) return [];
+async function aggregateIngredientsConsumption(strapi, ownerId, allElements) {
+  const emptyResult = { rows: [], mergedElementIds: new Map() };
+  if (!Array.isArray(allElements) || allElements.length === 0) return emptyResult;
   const knex = strapi.db.connection;
-  if (!knex) return [];
+  if (!knex) return emptyResult;
 
-  const elementIds = advancedElements.map((e) => e.element_id).filter(Boolean);
-  if (elementIds.length === 0) return [];
+  const advancedElements = allElements.filter((e) => e.is_beverage_advanced);
+  const nonAdvancedElements = allElements.filter((e) => !e.is_beverage_advanced);
 
   const servingsByEl = new Map();
-  for (const e of advancedElements) {
+  for (const e of allElements) {
     servingsByEl.set(e.element_id, Number(e.served_count) || 0);
   }
 
-  const rows = await knex({ ei: 'element_ingredients' })
-    .innerJoin('element_ingredients_fk_element_lnk as ellnk', 'ellnk.element_ingredient_id', 'ei.id')
-    .innerJoin('element_ingredients_fk_ingredient_lnk as ilnk', 'ilnk.element_ingredient_id', 'ei.id')
-    .innerJoin('ingredients as i', 'i.id', 'ilnk.ingredient_id')
-    .whereIn('ellnk.element_id', elementIds)
-    .where('ei.qty_per_serving', '>', 0)
-    .select(
-      'ellnk.element_id as element_id',
-      'i.id as ing_id',
-      'i.document_id as ing_documentId',
-      'i.name as ing_name',
-      'i.unit as ing_unit',
-      'i.unit_size as ing_unit_size',
-      'ei.qty_per_serving as qty_per_serving',
-    );
-
-  // Dedup per (ingredient_id, element_id): se ci sono due ElementIngredient
-  // identici (cioe' stessa coppia ingrediente↔element) tieni il MAX qty_per_serving.
-  const dedup = new Map();
-  for (const r of rows) {
-    const key = `${r.ing_id}|${r.element_id}`;
-    const qty = Number(r.qty_per_serving) || 0;
-    const existing = dedup.get(key);
-    if (!existing || qty > existing.qty_per_serving) {
-      dedup.set(key, { ...r, qty_per_serving: qty });
-    }
-  }
-
+  // byIng aggrega entrambe le sorgenti per ingredient_id
   const byIng = new Map();
-  for (const r of dedup.values()) {
-    const servings = servingsByEl.get(r.element_id) || 0;
-    const contribution = servings * r.qty_per_serving;
-    if (contribution <= 0) continue;
-
-    if (!byIng.has(r.ing_id)) {
-      byIng.set(r.ing_id, {
-        ingredient_documentId: r.ing_documentId,
-        name: r.ing_name,
-        unit: r.ing_unit || null,
-        unit_size: r.ing_unit_size !== null && r.ing_unit_size !== undefined
-          ? Number(r.ing_unit_size) : null,
+  const ensureIngEntry = (id, info) => {
+    if (!byIng.has(id)) {
+      byIng.set(id, {
+        ingredient_documentId: info.ingredient_documentId,
+        name: info.name,
+        unit: info.unit || null,
+        unit_size: info.unit_size !== null && info.unit_size !== undefined
+          ? Number(info.unit_size) : null,
         total_qty_used: 0,
       });
     }
-    byIng.get(r.ing_id).total_qty_used += contribution;
+    return byIng.get(id);
+  };
+
+  /* ---- A) Advanced: via ElementIngredient ----------------------- */
+  const advancedElIds = advancedElements.map((e) => e.element_id).filter(Boolean);
+  if (advancedElIds.length > 0) {
+    const rows = await knex({ ei: 'element_ingredients' })
+      .innerJoin('element_ingredients_fk_element_lnk as ellnk', 'ellnk.element_ingredient_id', 'ei.id')
+      .innerJoin('element_ingredients_fk_ingredient_lnk as ilnk', 'ilnk.element_ingredient_id', 'ei.id')
+      .innerJoin('ingredients as i', 'i.id', 'ilnk.ingredient_id')
+      .whereIn('ellnk.element_id', advancedElIds)
+      .where('ei.qty_per_serving', '>', 0)
+      .select(
+        'ellnk.element_id as element_id',
+        'i.id as ing_id',
+        'i.document_id as ing_documentId',
+        'i.name as ing_name',
+        'i.unit as ing_unit',
+        'i.unit_size as ing_unit_size',
+        'ei.qty_per_serving as qty_per_serving',
+      );
+
+    // Dedup per (ingredient_id, element_id): se ci sono due ElementIngredient
+    // identici (cioe' stessa coppia ingrediente↔element) tieni il MAX qty_per_serving.
+    const dedup = new Map();
+    for (const r of rows) {
+      const key = `${r.ing_id}|${r.element_id}`;
+      const qty = Number(r.qty_per_serving) || 0;
+      const existing = dedup.get(key);
+      if (!existing || qty > existing.qty_per_serving) {
+        dedup.set(key, { ...r, qty_per_serving: qty });
+      }
+    }
+
+    for (const r of dedup.values()) {
+      const servings = servingsByEl.get(r.element_id) || 0;
+      const contribution = servings * r.qty_per_serving;
+      if (contribution <= 0) continue;
+      const entry = ensureIngEntry(r.ing_id, {
+        ingredient_documentId: r.ing_documentId,
+        name: r.ing_name,
+        unit: r.ing_unit,
+        unit_size: r.ing_unit_size,
+      });
+      entry.total_qty_used += contribution;
+    }
+  }
+
+  /* ---- B) Non-advanced: via name-match -------------------------- */
+  // mergedElementIds: element_id → ingredient_documentId, per dedupe nella UI.
+  const mergedElementIds = new Map();
+  if (nonAdvancedElements.length > 0) {
+    const nameKeys = [...new Set(nonAdvancedElements.map((e) => String(e.name || '').trim().toLowerCase()).filter(Boolean))];
+    if (nameKeys.length > 0) {
+      const ingRows = await knex({ i: 'ingredients' })
+        .innerJoin('ingredients_fk_user_lnk as ulnk', 'ulnk.ingredient_id', 'i.id')
+        .where('ulnk.user_id', ownerId)
+        .whereIn('i.name_normalized', nameKeys)
+        .select(
+          'i.id as ing_id',
+          'i.document_id as ing_documentId',
+          'i.name as ing_name',
+          'i.name_normalized as ing_name_normalized',
+          'i.unit as ing_unit',
+          'i.unit_size as ing_unit_size',
+        );
+      const ingByKey = new Map();
+      for (const r of ingRows) ingByKey.set(r.ing_name_normalized, r);
+
+      for (const el of nonAdvancedElements) {
+        const key = String(el.name || '').trim().toLowerCase();
+        if (!key) continue;
+        const match = ingByKey.get(key);
+        if (!match) continue;
+        const unitSize = match.ing_unit_size !== null && match.ing_unit_size !== undefined
+          ? Number(match.ing_unit_size) : null;
+        if (!unitSize || unitSize <= 0) continue;
+        const contribution = (Number(el.served_count) || 0) * unitSize;
+        if (contribution <= 0) continue;
+        const entry = ensureIngEntry(match.ing_id, {
+          ingredient_documentId: match.ing_documentId,
+          name: match.ing_name,
+          unit: match.ing_unit,
+          unit_size: match.ing_unit_size,
+        });
+        entry.total_qty_used += contribution;
+        mergedElementIds.set(el.element_id, match.ing_documentId);
+      }
+    }
   }
 
   const out = [];
@@ -407,7 +478,7 @@ async function aggregateIngredientsConsumption(strapi, advancedElements) {
     });
   }
   out.sort((a, b) => String(a.name).localeCompare(String(b.name), 'it'));
-  return out;
+  return { rows: out, mergedElementIds };
 }
 
 /* ------------------------------------------------------------------ */

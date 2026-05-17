@@ -136,6 +136,8 @@ const kitchenStats = computed(() => {
     if (o.status !== 'active' || !o.items) continue;
     for (const it of o.items) {
       if (it.status === 'served') continue;
+      // pending = ancora nelle mani del cameriere (non inviato in cucina).
+      if (it.status === 'pending') continue;
       total += 1;
       if (it.status === 'ready') ready += 1;
     }
@@ -160,7 +162,8 @@ const formatElapsed = (ts) => {
   return `${m}'`;
 };
 const orderTopStatus = (order) => {
-  const items = (order.items || []).filter(i => i.status !== 'served' && i.status !== 'cancelled');
+  // pending = cameriere only, non rilevante per il monitor cucina/owner.
+  const items = (order.items || []).filter(i => i.status !== 'served' && i.status !== 'cancelled' && i.status !== 'pending');
   if (items.length === 0) return 'consegnato';
   if (items.every(i => i.status === 'ready')) return 'pronto';
   if (items.some(i => i.status === 'preparing' || i.status === 'taken')) return 'lavorazione';
@@ -171,7 +174,8 @@ const filteredMonitorOrders = computed(() => {
   return orders.value
     .filter(o => o.status === 'active' && Array.isArray(o.items))
     .map(o => {
-      const items = dept === 'all' ? o.items : o.items.filter(i => itemStation(i) === dept);
+      const base = o.items.filter(i => i.status !== 'pending');
+      const items = dept === 'all' ? base : base.filter(i => itemStation(i) === dept);
       return { ...o, items };
     })
     .filter(o => o.items.length > 0)
@@ -385,6 +389,44 @@ const handleKitchenAdvance = async ({ item, next, orderDocumentId }) => {
     const s2 = new Set(busyItemIds.value);
     s2.delete(item.documentId);
     busyItemIds.value = s2;
+  }
+};
+
+// Bulk serve dei piatti ready di un tavolo: shortcut dalla card SalaTableCard
+// senza dover entrare nel dettaglio. Cameriere/owner/gestione possono fare
+// ready→served (vedi canTransitionItem).
+const handleServeReady = async (order) => {
+  if (!order?.documentId) return;
+  const ready = (order.items || []).filter(i => i.status === 'ready');
+  if (ready.length === 0) return;
+
+  const s = new Set(busyItemIds.value);
+  ready.forEach(i => s.add(i.documentId));
+  busyItemIds.value = s;
+
+  let ok = 0;
+  let fail = 0;
+  await Promise.all(ready.map(async (item) => {
+    try {
+      await updateItemStatus(order.documentId, item.documentId, 'served', token.value);
+      ok += 1;
+    } catch (err) {
+      fail += 1;
+      // eslint-disable-next-line no-console
+      console.error(`serve-ready: ${item.documentId} fallito`, err);
+    }
+  }));
+
+  const s2 = new Set(busyItemIds.value);
+  ready.forEach(i => s2.delete(i.documentId));
+  busyItemIds.value = s2;
+
+  if (ok > 0) {
+    showToast('success', `${ok} ${ok === 1 ? 'piatto servito' : 'piatti serviti'}.`);
+    await loadData({ silent: true });
+  }
+  if (fail > 0) {
+    showToast('error', `${fail} ${fail === 1 ? 'piatto non' : 'piatti non'} aggiornati.`);
   }
 };
 
@@ -778,6 +820,7 @@ watch(() => route.path, async () => {
             @view-order="handleViewOrder"
             @open-table="handleOpenTable"
             @remove-table="handleRemoveTable"
+            @serve-ready="handleServeReady"
           />
           <OrderDetailPage
             v-else-if="salaView === 'order-detail' && currentOrderDocId"

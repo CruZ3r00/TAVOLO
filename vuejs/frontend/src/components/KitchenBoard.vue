@@ -35,6 +35,10 @@ const allItems = computed(() => {
     const takeawayNum = takeawayDailyNumbers.value.get(order.documentId) ?? '?';
     for (const item of order.items) {
       if (item.status === 'served') continue;
+      // pending = cameriere lo "tiene" sul tavolo, non ancora inviato in
+      // cucina (vedi sendDineInToDepartments). Non deve apparire nei kanban
+      // di cucina/bar/pizzeria/cucina_sg.
+      if (item.status === 'pending') continue;
       items.push({
         ...item,
         _tableNumber: isTakeaway ? takeawayNum : tNum,

@@ -37,6 +37,7 @@ const currentReport = ref(null);
 const elapsed = ref('—');
 const openingShift = ref(false);
 const showCarico = ref(false);
+const showPreview = ref(false);
 const submittingCarico = ref(false);
 
 let pollTimer = null;
@@ -49,10 +50,12 @@ const totals = computed(() => {
   if (!r) return { revenue: 0, items_count: 0, units_total: 0, lines_count: 0 };
   const linesCount = (r.units?.length || 0) + (r.freeform?.length || 0);
   // Bottiglie aperte = somma di:
-  //  - units_consumed degli Element non-advanced (bottiglie/lattine pre-confezionate)
-  //  - units_consumed di ingredients_consumption[] (bottiglie aperte da cocktail dosati)
+  //  - units_consumed degli Element non-advanced NON mergiati (bottiglie/lattine standalone)
+  //  - units_consumed di ingredients_consumption[] (cocktail + bottiglie merged via name-match)
+  // I row con merged_into_ingredient hanno gia' units_consumed=null lato backend,
+  // ma li filtriamo esplicitamente per chiarezza.
   const simpleUnits = (r.units || [])
-    .filter((u) => !u.is_beverage_advanced)
+    .filter((u) => !u.is_beverage_advanced && !u.merged_into_ingredient)
     .reduce((s, u) => s + (Number(u.units_consumed) || 0), 0);
   const advancedUnits = (r.ingredients_consumption || [])
     .reduce((s, c) => s + (Number(c.units_consumed) || 0), 0);
@@ -166,7 +169,7 @@ const startPolling = () => {
   stopPolling();
   pollTimer = setInterval(() => {
     if (document.visibilityState !== 'visible') return;
-    if (showCarico.value) return;
+    if (showCarico.value || showPreview.value) return;
     loadCurrent();
   }, 20000);
   elapsedTimer = setInterval(updateElapsed, 30000);
@@ -218,6 +221,16 @@ onBeforeUnmount(() => {
         >
           <i class="bi" :class="refreshing ? 'bi-arrow-repeat bar-spin' : 'bi-arrow-clockwise'"></i>
           <span>Aggiorna</span>
+        </button>
+        <button
+          v-if="hasOpenShift"
+          type="button"
+          class="ds-btn ds-btn-secondary"
+          :disabled="!currentReport"
+          @click="showPreview = true"
+        >
+          <i class="bi bi-printer"></i>
+          <span>Riepilogo turno</span>
         </button>
         <button
           v-if="hasOpenShift"
@@ -329,6 +342,9 @@ onBeforeUnmount(() => {
                     <span v-if="u.is_beverage_advanced" class="ds-badge ds-badge-success ds-badge-sm">
                       <i class="bi bi-stars"></i> Avanzata
                     </span>
+                    <span v-else-if="u.merged_into_ingredient" class="ds-badge ds-badge-soft ds-badge-sm" title="Le unita di questa bevanda sono sommate all'ingrediente corrispondente nella tabella 'Bottiglie utilizzate'.">
+                      <i class="bi bi-arrow-down-right"></i> In bottiglie
+                    </span>
                   </td>
                   <td>
                     <span v-if="u.category" class="ds-badge ds-badge-soft">{{ u.category }}</span>
@@ -337,6 +353,7 @@ onBeforeUnmount(() => {
                   <td class="t-right">{{ u.served_count }}</td>
                   <td class="t-right">
                     <strong v-if="u.units_consumed !== null">{{ u.units_consumed }}</strong>
+                    <span v-else-if="u.merged_into_ingredient" class="bar-muted" title="Conteggio incluso in 'Bottiglie utilizzate'">→</span>
                     <span v-else class="bar-muted" title="Calcolato dopo attivazione magazzino">—</span>
                   </td>
                   <td class="t-right">{{ Number(u.revenue || 0).toFixed(2) }} &euro;</td>
@@ -435,8 +452,18 @@ onBeforeUnmount(() => {
       :submitting="submittingCarico"
       :opened-at="currentShift?.opened_at"
       :elapsed="elapsed"
+      mode="commit"
       @cancel="showCarico = false"
       @confirm="handleConfirmCarico"
+    />
+
+    <CaricoFattoModal
+      v-if="showPreview"
+      :report="currentReport"
+      :opened-at="currentShift?.opened_at"
+      :elapsed="elapsed"
+      mode="preview"
+      @cancel="showPreview = false"
     />
   </div>
 </template>

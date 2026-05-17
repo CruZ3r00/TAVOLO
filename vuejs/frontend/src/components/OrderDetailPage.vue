@@ -19,7 +19,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
     fetchOrder, addOrderItem, updateOrderItem, deleteOrderItem,
-    sendOrderToProduction, orderErrorMessage,
+    updateItemStatus, sendOrderToProduction, orderErrorMessage,
 } from '@/utils';
 import DishPickerOverlay from '@/components/DishPickerOverlay.vue';
 
@@ -43,7 +43,9 @@ const items = computed(() => order.value?.items || order.value?.fk_items || []);
 const lockVersion = computed(() => Number(order.value?.lock_version) || 0);
 const isActive = computed(() => order.value?.status === 'active');
 
-const itemsTakenCount = computed(() => items.value.filter((it) => it.status === 'taken').length);
+// "Da inviare" = item ancora nelle mani del cameriere (pending). Dopo
+// "Invia in cucina" passano a taken e diventano visibili in KitchenBoard.
+const itemsTakenCount = computed(() => items.value.filter((it) => it.status === 'pending').length);
 
 // Calcola le portate disponibili: union(courses esistenti) + 1..4 minimo +
 // portata correntemente selezionata. Permetto sempre di andare oltre con +.
@@ -61,10 +63,10 @@ const courses = computed(() => {
 const maxCourse = computed(() => courses.value[courses.value.length - 1] || 1);
 
 const itemsForCurrentCourse = computed(() => items.value.filter((it) => (Number(it.course) || 1) === selectedCourse.value));
-const takenItemsForCurrentCourse = computed(() => itemsForCurrentCourse.value.filter((it) => it.status === 'taken'));
-const sentItemsForCurrentCourse = computed(() => itemsForCurrentCourse.value.filter((it) => it.status !== 'taken'));
+const takenItemsForCurrentCourse = computed(() => itemsForCurrentCourse.value.filter((it) => it.status === 'pending'));
+const sentItemsForCurrentCourse = computed(() => itemsForCurrentCourse.value.filter((it) => it.status !== 'pending'));
 
-const takenCountByCourse = (course) => items.value.filter((it) => (Number(it.course) || 1) === course && it.status === 'taken').length;
+const takenCountByCourse = (course) => items.value.filter((it) => (Number(it.course) || 1) === course && it.status === 'pending').length;
 const totalCountByCourse = (course) => items.value.filter((it) => (Number(it.course) || 1) === course).length;
 
 const orderTotal = computed(() => {
@@ -86,7 +88,8 @@ const fmt = (v) => `€ ${(Number(v) || 0).toFixed(2)}`;
 
 const statusLabel = (s) => {
     switch (s) {
-        case 'taken': return 'Da inviare';
+        case 'pending': return 'Da inviare';
+        case 'taken': return 'Da fare';
         case 'preparing': return 'In preparazione';
         case 'ready': return 'Pronto';
         case 'served': return 'Servito';
@@ -197,6 +200,25 @@ const commitEdit = async (item) => {
         next.delete(item.documentId);
         busyItemIds.value = next;
         cancelEdit();
+    }
+};
+
+const markServed = async (item) => {
+    if (!order.value || item.status !== 'ready') return;
+    if (busyItemIds.value.has(item.documentId)) return;
+    busyItemIds.value = new Set([...busyItemIds.value, item.documentId]);
+    const previousStatus = item.status;
+    item.status = 'served';
+    try {
+        await updateItemStatus(order.value.documentId, item.documentId, 'served', props.token);
+        emit('order-updated');
+    } catch (err) {
+        item.status = previousStatus;
+        errorMessage.value = orderErrorMessage(err);
+    } finally {
+        const next = new Set(busyItemIds.value);
+        next.delete(item.documentId);
+        busyItemIds.value = next;
     }
 };
 
@@ -448,6 +470,18 @@ const courseLabel = (n) => `${n}ª portata`;
                                 <span class="odp-status-badge" :class="`s-${item.status}`">
                                     {{ statusLabel(item.status) }}
                                 </span>
+                                <button
+                                    v-if="item.status === 'ready'"
+                                    type="button"
+                                    class="odp-btn odp-btn--accent odp-btn--sm"
+                                    :disabled="busyItemIds.has(item.documentId)"
+                                    aria-label="Segna come servito"
+                                    @click="markServed(item)"
+                                >
+                                    <i v-if="busyItemIds.has(item.documentId)" class="bi bi-arrow-repeat odp-spin" aria-hidden="true"></i>
+                                    <i v-else class="bi bi-cup-straw" aria-hidden="true"></i>
+                                    <span>Servito</span>
+                                </button>
                             </div>
                         </li>
                     </ul>
@@ -794,6 +828,7 @@ const courseLabel = (n) => `${n}ª portata`;
     background: var(--bg-sunk);
     color: var(--ink-3);
 }
+.odp-status-badge.s-taken { background: color-mix(in oklab, var(--ac) 12%, transparent); color: var(--ac); }
 .odp-status-badge.s-preparing { background: color-mix(in oklab, var(--warn, var(--ac)) 14%, transparent); color: var(--warn, var(--ac)); }
 .odp-status-badge.s-ready { background: color-mix(in oklab, var(--ok, #16a34a) 14%, transparent); color: var(--ok, #16a34a); }
 .odp-status-badge.s-served { background: var(--bg-sunk); color: var(--ink-3); }
@@ -904,6 +939,16 @@ const courseLabel = (n) => `${n}ª portata`;
 .odp-btn--primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .odp-btn--primary:hover:not(:disabled) { background: var(--ac); border-color: var(--ac); }
 .odp-btn--send { font-weight: 600; }
+.odp-btn--accent {
+    background: var(--ac, var(--ink));
+    color: var(--bg, #fff);
+    border-color: var(--ac, var(--ink));
+}
+.odp-btn--accent:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--ac, var(--ink)) 88%, black);
+    border-color: color-mix(in oklab, var(--ac, var(--ink)) 88%, black);
+}
+.odp-btn--sm { height: 32px; padding: 0 10px; font-size: 13px; }
 .odp-btn i { font-size: 14px; }
 
 .odp-spin {

@@ -1056,10 +1056,10 @@ export interface ApiOrderItemOrderItem extends Struct.CollectionTypeSchema {
       Schema.Attribute.DefaultTo<1>;
     served_at: Schema.Attribute.DateTime;
     status: Schema.Attribute.Enumeration<
-      ['taken', 'preparing', 'ready', 'served']
+      ['pending', 'taken', 'preparing', 'ready', 'served']
     > &
       Schema.Attribute.Required &
-      Schema.Attribute.DefaultTo<'taken'>;
+      Schema.Attribute.DefaultTo<'pending'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

@@ -7,7 +7,7 @@ const props = defineProps({
   canRemove: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['view-order', 'open-table', 'remove-table']);
+const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'serve-ready']);
 
 const isOccupied = computed(() => props.table.status === 'occupied');
 const isReserved = computed(() => props.table.status === 'reserved');
@@ -56,6 +56,11 @@ const handleClick = () => {
 const handleRemove = () => {
   if (!canRemoveTable.value) return;
   emit('remove-table', props.table);
+};
+
+const handleServeReady = () => {
+  if (!props.activeOrder || readyCount.value === 0) return;
+  emit('serve-ready', props.activeOrder);
 };
 </script>
 
@@ -132,9 +137,17 @@ const handleRemove = () => {
         <span class="sl-card-action">
           <i class="bi bi-eye"></i>Dettagli
         </span>
-        <span v-if="readyCount > 0" class="sl-card-action ok">
-          <i class="bi bi-check2-circle"></i>Servi
-        </span>
+        <button
+          v-if="readyCount > 0"
+          type="button"
+          class="sl-card-action sl-card-action-btn ok"
+          :aria-label="`Segna come servito tutti i ${readyCount} piatti pronti del tavolo ${table.number}`"
+          @click.stop="handleServeReady"
+          @keydown.enter.stop="handleServeReady"
+          @keydown.space.stop="handleServeReady"
+        >
+          <i class="bi bi-check2-circle"></i>Servi {{ readyCount }}
+        </button>
       </template>
     </div>
   </article>

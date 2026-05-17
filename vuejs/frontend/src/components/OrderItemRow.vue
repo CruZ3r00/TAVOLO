@@ -12,15 +12,16 @@ const props = defineProps({
 const emit = defineEmits(['increment', 'decrement', 'delete', 'serve', 'void', 'edit-notes']);
 
 const isVoided = computed(() => !!props.item.voided);
-const isEditable = computed(() => !isVoided.value && props.item.status === 'taken' && props.orderActive);
+// Editabile = ancora nelle mani del cameriere (pending), non inviato in cucina.
+const isEditable = computed(() => !isVoided.value && props.item.status === 'pending' && props.orderActive);
 const isReady = computed(() => !isVoided.value && props.item.status === 'ready' && props.orderActive);
-// Annullamento: item gia in lavorazione (preparing/ready/served), ordine attivo, non gia voided,
-// e caller ha permesso (cameriere+).
+// Annullamento: item gia in lavorazione (taken/preparing/ready/served), ordine attivo,
+// non gia voided, e caller ha permesso (cameriere+).
 const showVoid = computed(() => (
     !isVoided.value
     && props.orderActive
     && props.canVoid
-    && props.item.status !== 'taken'
+    && props.item.status !== 'pending'
 ));
 
 const lineTotal = computed(() => {

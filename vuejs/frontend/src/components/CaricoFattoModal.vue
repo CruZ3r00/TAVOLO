@@ -15,9 +15,13 @@ const props = defineProps({
   submitting: { type: Boolean, default: false },
   openedAt: { type: String, default: null },
   elapsed: { type: String, default: '—' },
+  // 'commit'  = modale di chiusura turno (default): mostra note + Annulla + Carico fatto
+  // 'preview' = modale di sola consultazione/stampa: nasconde note e azioni di chiusura
+  mode: { type: String, default: 'commit' },
 });
 
 const emit = defineEmits(['cancel', 'confirm']);
+const isPreview = computed(() => props.mode === 'preview');
 
 const note = ref('');
 
@@ -50,7 +54,9 @@ const ingredientsConsumption = computed(() => {
 const prePackagedUnits = computed(() => {
   const units = props.report?.units || [];
   return units
-    .filter((u) => !u.is_beverage_advanced)
+    // Escludi advanced (vanno in ingredientsConsumption) e gli Element gia'
+    // mergiati per name-match con un Ingredient (gia' contati nelle bottiglie).
+    .filter((u) => !u.is_beverage_advanced && !u.merged_into_ingredient)
     .map((u) => ({
       key: 'pre-' + (u.element_documentId || u.name),
       name: u.name,
@@ -128,14 +134,18 @@ onBeforeUnmount(() => {
   <TeleportCompat to="body">
     <div class="cf-overlay" role="dialog" aria-modal="true" aria-labelledby="cf-title">
       <div class="cf-card">
-        <!-- Header non-dismissible: niente X di chiusura -->
+        <!-- Header: dismissibile solo in preview (X) -->
         <header class="cf-head">
           <div class="cf-head-info">
-            <div class="cf-overline">Carico fatto · Riepilogo turno</div>
+            <div class="cf-overline">
+              <template v-if="isPreview">Riepilogo turno · Visualizza/Stampa</template>
+              <template v-else>Carico fatto · Riepilogo turno</template>
+            </div>
             <h2 id="cf-title">Bottiglie e unita usate</h2>
             <p>
               Turno aperto il {{ formatDateTime(openedAt) }} ({{ elapsed }}).
-              Conta queste unita per riempire il frigo del bar.
+              <template v-if="isPreview">Stato corrente del turno in corso. Nessuna chiusura.</template>
+              <template v-else>Conta queste unita per riempire il frigo del bar.</template>
             </p>
           </div>
           <div class="cf-head-meta">
@@ -236,8 +246,8 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- Nota opzionale (non in stampa) -->
-          <div class="cf-note cf-no-print">
+          <!-- Nota opzionale (non in stampa, solo in modalita' commit) -->
+          <div v-if="!isPreview" class="cf-note cf-no-print">
             <label class="ds-label" for="cf-note-input">Nota (opzionale)</label>
             <textarea
               id="cf-note-input"
@@ -251,7 +261,7 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <!-- Footer: stampa + azioni non-dismissibili -->
+        <!-- Footer: stampa + azioni (commit: Annulla+Carico fatto, preview: Chiudi) -->
         <footer class="cf-foot cf-no-print">
           <button
             type="button"
@@ -263,24 +273,36 @@ onBeforeUnmount(() => {
             <span>Stampa report</span>
           </button>
           <div class="cf-foot-actions">
-            <button
-              type="button"
-              class="ds-btn ds-btn-ghost"
-              :disabled="submitting"
-              @click="onCancel"
-            >
-              Annulla
-            </button>
-            <button
-              type="button"
-              class="ds-btn ds-btn-primary ds-btn-lg"
-              :disabled="submitting"
-              @click="onConfirm"
-            >
-              <i v-if="submitting" class="bi bi-arrow-repeat cf-spin"></i>
-              <i v-else class="bi bi-check2-circle"></i>
-              <span>Carico fatto</span>
-            </button>
+            <template v-if="isPreview">
+              <button
+                type="button"
+                class="ds-btn ds-btn-primary"
+                @click="onCancel"
+              >
+                <i class="bi bi-x-lg"></i>
+                <span>Chiudi</span>
+              </button>
+            </template>
+            <template v-else>
+              <button
+                type="button"
+                class="ds-btn ds-btn-ghost"
+                :disabled="submitting"
+                @click="onCancel"
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                class="ds-btn ds-btn-primary ds-btn-lg"
+                :disabled="submitting"
+                @click="onConfirm"
+              >
+                <i v-if="submitting" class="bi bi-arrow-repeat cf-spin"></i>
+                <i v-else class="bi bi-check2-circle"></i>
+                <span>Carico fatto</span>
+              </button>
+            </template>
           </div>
         </footer>
       </div>

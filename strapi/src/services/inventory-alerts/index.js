@@ -109,6 +109,81 @@ async function computeDepletionForecast(strapi, ingredient) {
   };
 }
 
+/**
+ * Versione batch di computeDepletionForecast: calcola la forecast per N
+ * ingredienti di un owner usando UNA sola query sui movements (evita N+1).
+ *
+ * @param {Array<{id, stock_qty}>} ingredients
+ * @param {number} ownerId
+ * @returns {Promise<Map<number, { rate_per_day, days_to_depletion, predicted_depletion_at }>>}
+ */
+async function computeDepletionForecastBatch(strapi, ingredients, ownerId) {
+  const empty = { rate_per_day: 0, days_to_depletion: null, predicted_depletion_at: null };
+  const result = new Map();
+  for (const ing of ingredients || []) result.set(ing.id, { ...empty });
+  if (!ingredients || ingredients.length === 0 || !ownerId) return result;
+
+  const now = Date.now();
+  const fromDate = new Date(now - SCAN_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+  const movements = await strapi.db.query('api::inventory-movement.inventory-movement').findMany({
+    where: {
+      fk_user: { id: ownerId },
+      kind: 'consumption',
+      createdAt: { $gte: fromDate },
+    },
+    select: ['qty_delta', 'createdAt'],
+    populate: { fk_ingredient: { fields: ['id'] } },
+  });
+
+  const dayKey = (d) => {
+    const dt = new Date(d);
+    return `${dt.getUTCFullYear()}-${dt.getUTCMonth() + 1}-${dt.getUTCDate()}`;
+  };
+
+  const byIngredient = new Map();
+  for (const m of movements || []) {
+    const ingId = m.fk_ingredient && m.fk_ingredient.id;
+    if (!ingId || !result.has(ingId)) continue;
+    const k = dayKey(m.createdAt);
+    const abs = Math.abs(Number(m.qty_delta) || 0);
+    let inner = byIngredient.get(ingId);
+    if (!inner) { inner = new Map(); byIngredient.set(ingId, inner); }
+    inner.set(k, (inner.get(k) || 0) + abs);
+  }
+
+  const windowKeys = [];
+  for (let i = SCAN_WINDOW_DAYS - 1; i >= 0; i -= 1) {
+    const d = new Date(now - i * 24 * 60 * 60 * 1000);
+    windowKeys.push(`${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`);
+  }
+
+  for (const ing of ingredients) {
+    const byDay = byIngredient.get(ing.id);
+    if (!byDay || byDay.size === 0) continue;
+
+    const days = windowKeys.map((k) => byDay.get(k) || 0);
+    let ema = days[0];
+    for (let i = 1; i < days.length; i += 1) {
+      ema = EMA_ALPHA * days[i] + (1 - EMA_ALPHA) * ema;
+    }
+    const ratePerDay = ema;
+    if (ratePerDay <= 1e-9) continue;
+
+    const stock = Number(ing.stock_qty) || 0;
+    const daysToDepletion = stock / ratePerDay;
+    const predicted = new Date(now + daysToDepletion * 24 * 60 * 60 * 1000).toISOString();
+
+    result.set(ing.id, {
+      rate_per_day: Number(ratePerDay.toFixed(4)),
+      days_to_depletion: Number(daysToDepletion.toFixed(2)),
+      predicted_depletion_at: predicted,
+    });
+  }
+
+  return result;
+}
+
 /* ------------------------------------------------------------------ */
 /* runAlertScan                                                       */
 /* ------------------------------------------------------------------ */
@@ -154,14 +229,16 @@ async function runOwnerScan(strapi, owner) {
   const predictive = [];
   const threshold = [];
 
+  let forecastMap;
+  try {
+    forecastMap = await computeDepletionForecastBatch(strapi, ingredients, owner.id);
+  } catch (err) {
+    strapi.log.warn(`computeDepletionForecastBatch owner ${owner.id}: ${err.message}`);
+    forecastMap = new Map();
+  }
+
   for (const ing of ingredients) {
-    let forecast;
-    try {
-      forecast = await computeDepletionForecast(strapi, ing);
-    } catch (err) {
-      strapi.log.warn(`computeDepletionForecast ingredient ${ing.id}: ${err.message}`);
-      forecast = { rate_per_day: 0, days_to_depletion: null, predicted_depletion_at: null };
-    }
+    const forecast = forecastMap.get(ing.id) || { rate_per_day: 0, days_to_depletion: null, predicted_depletion_at: null };
 
     // Predittivo: days_to_depletion <= reorder_lead_days + safety_buffer
     if (forecast.rate_per_day > 0 && forecast.days_to_depletion !== null) {
@@ -396,6 +473,7 @@ function escapeHtml(s) {
 module.exports = {
   isProOwner,
   computeDepletionForecast,
+  computeDepletionForecastBatch,
   runAlertScan,
   dismissForRestock,
 };

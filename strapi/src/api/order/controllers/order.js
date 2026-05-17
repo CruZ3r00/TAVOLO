@@ -55,13 +55,14 @@ const { ApplicationError } = errors;
 /* ------------------------------------------------------------------ */
 
 const ITEM_TRANSITIONS = {
+  pending: ['taken'],
   taken: ['preparing'],
   preparing: ['ready'],
   ready: ['served'],
   served: [],
 };
 
-const ITEM_STATUS_ENUM = ['taken', 'preparing', 'ready', 'served'];
+const ITEM_STATUS_ENUM = ['pending', 'taken', 'preparing', 'ready', 'served'];
 const ORDER_STATUS_ENUM = ['active', 'closed'];
 const SERVICE_TYPE_ENUM = ['table', 'takeaway'];
 
@@ -435,7 +436,12 @@ async function buildOrderItemDataFromPayload(payload, ownerId, orderId) {
     category: itemCategory || null,
     course,
     notes: notes && notes.length > 0 ? notes : null,
-    status: 'taken',
+    // Dine-in: 'pending' = cameriere only, visibile in cucina solo dopo
+    //   "Invia in cucina" che avanza a 'taken'. Vedi sendDineInToDepartments.
+    // Takeaway: gating al livello Order.takeaway_status; il valore qui usato
+    //   non blocca la visibilita' in cucina, ma teniamo 'pending' coerente
+    //   per la prima fase pre-accettazione.
+    status: 'pending',
     fk_order: { connect: [{ id: orderId }] },
   };
   if (menuElement) {
@@ -1206,7 +1212,9 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
       const notes = typeof body.notes === 'string' ? body.notes.trim() : null;
 
-      // Crea item
+      // Crea item con status 'pending': il cameriere lo "tiene" sul tavolo
+      // (modificabile/cancellabile) finche' non preme "Invia in cucina", che
+      // avanza pending → taken e lo rende visibile alla KitchenBoard.
       const itemData = {
         name: itemName,
         price: itemPrice,
@@ -1214,7 +1222,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         category: itemCategory || null,
         course,
         notes: notes && notes.length > 0 ? notes : null,
-        status: 'taken',
+        status: 'pending',
         fk_order: { connect: [{ id: order.id }] },
       };
 
@@ -1261,7 +1269,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
   /**
    * PATCH /api/orders/:documentId/items/:itemDocumentId
-   * Aggiorna quantity/notes. Solo se item.status === 'taken' e order.status === 'active'.
+   * Aggiorna quantity/notes. Solo se item.status === 'pending' e order.status === 'active'.
    */
   async updateItem(ctx) {
     const user = ctx.state.user;
@@ -1292,8 +1300,8 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       const item = items.find((i) => i.documentId === itemDocumentId);
       if (!item) throw appError('ITEM_NOT_FOUND', 'Item non trovato.');
 
-      if (item.status !== 'taken') {
-        throw appError('ITEM_NOT_EDITABLE', 'Item non piu modificabile (gia in lavorazione).');
+      if (item.status !== 'pending') {
+        throw appError('ITEM_NOT_EDITABLE', 'Item non piu modificabile (gia inviato in cucina).');
       }
 
       const data = {};
@@ -1347,7 +1355,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
   /**
    * DELETE /api/orders/:documentId/items/:itemDocumentId
-   * Elimina item. Solo se status === 'taken'.
+   * Elimina item. Solo se status === 'pending'.
    */
   async deleteItem(ctx) {
     const user = ctx.state.user;
@@ -1377,8 +1385,8 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       const item = items.find((i) => i.documentId === itemDocumentId);
       if (!item) throw appError('ITEM_NOT_FOUND', 'Item non trovato.');
 
-      if (item.status !== 'taken') {
-        throw appError('ITEM_NOT_EDITABLE', 'Item non eliminabile (gia in lavorazione).');
+      if (item.status !== 'pending') {
+        throw appError('ITEM_NOT_EDITABLE', 'Item non eliminabile (gia inviato in cucina).');
       }
 
       await strapi.documents('api::order-item.order-item').delete({
@@ -1771,9 +1779,10 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
   /**
    * POST /api/orders/:documentId/send
    * Invia un ordine dine-in (tavolo) in produzione: avanza in batch tutti
-   * gli OrderItem con status='taken' a 'preparing'. Idempotente: se non ci
-   * sono items in 'taken' ritorna l'ordine senza errori.
-   * Replica il pattern di sendTakeawayToDepartments per consistenza.
+   * gli OrderItem con status='pending' a 'taken'. Da quel momento la
+   * KitchenBoard li mostra nella colonna "Da fare" e la cucina puo'
+   * iniziare a lavorarli (taken → preparing). Idempotente: se non ci sono
+   * items in 'pending' ritorna l'ordine senza errori.
    */
   async sendDineInToDepartments(ctx) {
     const user = ctx.state.user;
@@ -1791,8 +1800,8 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         throw appError('ORDER_NOT_ACTIVE', "L'ordine non e attivo.");
       }
       const items = Array.isArray(order.fk_items) ? order.fk_items : [];
-      const taken = items.filter((it) => it.status === 'taken');
-      if (taken.length === 0) {
+      const pending = items.filter((it) => it.status === 'pending');
+      if (pending.length === 0) {
         // Niente da inviare: ritorna l'ordine corrente come no-op.
         const routingLookup = await loadRoutingMap(strapi, actor.owner);
         ctx.body = { data: serializeOrder(order, true, routingLookup), meta: { sent: 0 } };
@@ -1800,11 +1809,11 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       }
 
       let advanced = 0;
-      for (const item of taken) {
+      for (const item of pending) {
         try {
           await strapi.documents('api::order-item.order-item').update({
             documentId: item.documentId,
-            data: { status: 'preparing' },
+            data: { status: 'taken' },
           });
           advanced += 1;
         } catch (itemErr) {
