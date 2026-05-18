@@ -212,6 +212,27 @@ const monitorActiveTitle = computed(() => (
 const monitorActiveIcon = computed(() => (
   monitorDept.value === 'all' ? 'bi-grid-3x3-gap' : (ROLE_ICONS[monitorDept.value] || 'bi-grid-3x3-gap')
 ));
+const monitorNextStatus = (item) => {
+  switch (item?.status) {
+    case 'taken': return 'preparing';
+    case 'preparing': return 'ready';
+    case 'ready': return 'served';
+    default: return null;
+  }
+};
+const monitorActionLabel = (status) => {
+  switch (status) {
+    case 'preparing': return 'Prepara';
+    case 'ready': return 'Pronto';
+    case 'served': return 'Servito';
+    default: return '';
+  }
+};
+const canAdvanceMonitorItem = (item, order) => {
+  if (!item || busyItemIds.value.has(item.documentId)) return false;
+  if (order?.service_type === 'takeaway' && item.status === 'ready') return false;
+  return !!monitorNextStatus(item);
+};
 const tableNumber = (order) => order?.table?.number ?? order?.fk_table?.number ?? order?.table_number ?? '?';
 const takeawayDailyNumbers = computed(() => {
   const map = new Map();
@@ -387,8 +408,11 @@ const handleKitchenAdvance = async ({ item, next, orderDocumentId }) => {
     if (itemInOrder) { oldStatus = itemInOrder.status; itemInOrder.status = next; }
   }
   try {
-    await updateItemStatus(orderDocumentId, item.documentId, next, token.value, { station: modeInfo.value.station });
+    const station = isOwnerProductionMode.value ? null : modeInfo.value.station;
+    const params = station ? { station } : {};
+    await updateItemStatus(orderDocumentId, item.documentId, next, token.value, params);
     showToast('success', `"${item.name}" → ${statusLabel(next)}`);
+    await loadData({ silent: true });
   } catch (err) {
     if (orderIdx !== -1) {
       const itemInOrder = orders.value[orderIdx].items?.find(i => i.documentId === item.documentId);
@@ -400,6 +424,16 @@ const handleKitchenAdvance = async ({ item, next, orderDocumentId }) => {
     s2.delete(item.documentId);
     busyItemIds.value = s2;
   }
+};
+
+const handleMonitorAdvance = (order, item, event = null) => {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const next = monitorNextStatus(item);
+  if (!next || !order?.documentId || !canAdvanceMonitorItem(item, order)) return;
+  handleKitchenAdvance({ item, next, orderDocumentId: order.documentId });
 };
 
 // Bulk serve dei piatti ready di un tavolo: shortcut dalla card SalaTableCard
@@ -483,6 +517,7 @@ function statusLabel(status) {
 
 let realtimeChannel = null;
 let realtimeRefreshHandle = null;
+let pollingRefreshHandle = null;
 // Tick incrementato a ogni evento realtime: OrderDetailPage lo osserva come
 // prop per ricaricare il proprio ordine quando la KitchenBoard avanza un item
 // (e.g. taken→preparing→ready), cosi' il cameriere vede il bottone "Servito"
@@ -510,6 +545,21 @@ const stopRealtime = async () => {
     } catch (_err) { /* realtime is optional */ }
     realtimeChannel = null;
   }
+};
+
+const stopPollingRefresh = () => {
+  if (pollingRefreshHandle) {
+    clearInterval(pollingRefreshHandle);
+    pollingRefreshHandle = null;
+  }
+};
+
+const startPollingRefresh = () => {
+  stopPollingRefresh();
+  pollingRefreshHandle = setInterval(() => {
+    if (document.visibilityState !== 'visible' || loading.value || refreshing.value) return;
+    loadData({ silent: true });
+  }, isOwnerProductionMode.value ? 3000 : 5000);
 };
 
 const subscribeRealtime = async (userId) => {
@@ -561,12 +611,14 @@ onMounted(async () => {
   updateDocumentTitle();
   await loadData();
   await subscribeRealtime(effectiveUserId(store.getters.getUser));
+  startPollingRefresh();
   document.addEventListener('visibilitychange', onVisibilityChange);
   openOrderFromQuery();
 });
 
 onBeforeUnmount(() => {
   stopRealtime();
+  stopPollingRefresh();
   document.removeEventListener('visibilitychange', onVisibilityChange);
 });
 
@@ -584,6 +636,7 @@ watch(() => route.path, async () => {
     }
   }
   await loadData();
+  startPollingRefresh();
   openOrderFromQuery();
 });
 </script>
@@ -823,6 +876,17 @@ watch(() => route.path, async () => {
                         >
                           {{ ROLE_LABELS[itemStation(it)] || itemStation(it) }}
                         </span>
+                        <button
+                          v-if="monitorNextStatus(it)"
+                          type="button"
+                          class="ct-order-course__action"
+                          :disabled="!canAdvanceMonitorItem(it, o)"
+                          @click="handleMonitorAdvance(o, it, $event)"
+                        >
+                          <span v-if="busyItemIds.has(it.documentId)" class="spin-icon"></span>
+                          <i v-else class="bi bi-arrow-right-circle" aria-hidden="true"></i>
+                          <span>{{ monitorActionLabel(monitorNextStatus(it)) }}</span>
+                        </button>
                       </li>
                     </ul>
                   </div>
@@ -1188,6 +1252,42 @@ watch(() => route.path, async () => {
 .ct-order-card:focus-visible {
   outline: 2px solid var(--ac);
   outline-offset: 2px;
+}
+.ct-order-course__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.ct-order-course__station {
+  grid-column: 2;
+  justify-self: start;
+}
+.ct-order-course__action {
+  grid-column: 3;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ct-order-course__action:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--ac) 45%, var(--line));
+  color: var(--ac);
+}
+.ct-order-course__action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 :deep(.ct-order-card__pill.takeaway) {
   background: color-mix(in oklab, var(--ac) 12%, var(--paper));

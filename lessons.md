@@ -51,3 +51,8 @@
 - A new custom controller action (`getRecipe`, `listAdvanced`, ecc.) richiede sia il middleware di gating (`subscription-gate.js`) sia un grant in `up_permissions` per il ruolo `authenticated`. Senza il grant, lo strato users-permissions risponde 403 *prima* che la subscription-gate venga consultata, e il sintomo è che owner Pro non riescono ad usare feature progettate per il loro piano.
 - Quando aggiungi una rotta in `strapi/src/api/<x>/routes/<x>.js` senza `auth: false`, aggiungi *sempre* l'action key `api::<api>.<controller>.<method>` all'array `actions` in `grantImportPermissions` dentro `strapi/src/index.js`. Se l'utente è già in produzione, applica anche l'INSERT manuale in `up_permissions` + `up_permissions_role_lnk` perché il bootstrap concede solo al boot.
 - Debug pattern: quando il sub-gate non spiega un 403, ispeziona `SELECT p.action FROM up_permissions p JOIN up_permissions_role_lnk l ON l.permission_id=p.id JOIN up_roles r ON r.id=l.role_id WHERE r.type='authenticated'` e confronta con i routes file.
+
+## 2026-05-18 — Match live-test target with user's browser
+
+- Before running operational/realtime tests, verify the target environment the user is watching. If the user is on `staging-app.comfortables.eu`, local `localhost` load tests will not be visible and can create misleading conclusions.
+- State the active target explicitly before generating data, then use that same target for API writes and browser observation.
