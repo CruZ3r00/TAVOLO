@@ -16,6 +16,7 @@ import RestockModal from '@/components/RestockModal.vue';
 import NewRestockModal from '@/components/NewRestockModal.vue';
 import WasteModal from '@/components/WasteModal.vue';
 import IngredientDepletionModal from '@/components/IngredientDepletionModal.vue';
+import AddonConfigModal from '@/components/AddonConfigModal.vue';
 import Modal from '@/components/Modal.vue';
 import {
   fetchIngredientsAdvanced,
@@ -27,6 +28,7 @@ import {
   fetchInventoryAlerts,
   acknowledgeAlert,
   inventoryErrorMessage,
+  setIngredientAddonConfig,
 } from '@/utils';
 
 const store = useStore();
@@ -257,6 +259,62 @@ const statusOf = (ing) => {
   return 'ok';
 };
 
+// --- Addon config (Pro) ---
+// Toggle ON->OFF: salva direttamente is_addon=false.
+// Toggle OFF->ON: apre il modale di configurazione (prezzo + qty media);
+//   se l'utente annulla, il toggle resta OFF.
+// Bottone "configura" (icona): apre il modale in modalita' edit per
+//   modificare prezzo/qty di un addon gia' attivo.
+const showAddonConfig = ref(false);
+const addonConfigTarget = ref(null);
+const addonConfigMode = ref('edit'); // 'enable' | 'edit'
+
+const onAddonToggle = async (ing) => {
+  if (!ing.documentId) return;
+  if (ing.is_addon) {
+    // ON -> OFF: disattiva direttamente, server azzera prezzo/qty.
+    ing.is_addon = false;
+    ing.addon_price = null;
+    ing.addon_avg_qty = null;
+    try {
+      await setIngredientAddonConfig(ing.documentId, { is_addon: false }, token.value);
+    } catch (e) {
+      console.error(e);
+      ing.is_addon = true; // rollback
+      showToast('error', inventoryErrorMessage(e) || 'Errore salvataggio addon.');
+    }
+  } else {
+    // OFF -> ON: apri modale per impostare prezzo/qty.
+    addonConfigTarget.value = ing;
+    addonConfigMode.value = 'enable';
+    showAddonConfig.value = true;
+  }
+};
+
+const openAddonConfig = (ing) => {
+  addonConfigTarget.value = ing;
+  addonConfigMode.value = 'edit';
+  showAddonConfig.value = true;
+};
+
+const onAddonSaved = (payload) => {
+  const t = addonConfigTarget.value;
+  if (t) {
+    t.is_addon = true;
+    t.addon_price = payload.addon_price;
+    t.addon_avg_qty = payload.addon_avg_qty;
+  }
+  showAddonConfig.value = false;
+  addonConfigTarget.value = null;
+  showToast('success', 'Aggiunta configurata.');
+};
+
+const onAddonCancel = () => {
+  // In modalita' 'enable' il toggle era ancora OFF, niente da ripristinare.
+  showAddonConfig.value = false;
+  addonConfigTarget.value = null;
+};
+
 onMounted(async () => {
   loading.value = true;
   await loadAll();
@@ -372,6 +430,7 @@ onMounted(async () => {
               <th class="t-right">Soglia</th>
               <th class="t-right">Esaurim.</th>
               <th>Stato</th>
+              <th>Aggiunta</th>
               <th class="t-right">Azioni</th>
             </tr>
           </thead>
@@ -394,6 +453,25 @@ onMounted(async () => {
                   <i class="bi" :class="statusOf(ing) === 'critical' ? 'bi-exclamation-circle-fill' : (statusOf(ing) === 'warning' ? 'bi-exclamation-triangle-fill' : 'bi-check-circle-fill')"></i>
                   {{ statusOf(ing) === 'critical' ? 'Critico' : (statusOf(ing) === 'warning' ? 'Attenzione' : 'OK') }}
                 </span>
+              </td>
+              <td>
+                <div class="pantry-addon-cell">
+                  <label class="pantry-addon-switch" :title="ing.is_addon ? 'Disattiva aggiunta' : 'Attiva come aggiunta'">
+                    <input type="checkbox" :checked="ing.is_addon" @change="onAddonToggle(ing)">
+                    <span class="pantry-addon-slider"></span>
+                  </label>
+                  <button
+                    v-if="ing.is_addon"
+                    class="ds-btn ds-btn-ghost ds-btn-sm pantry-addon-config-btn"
+                    title="Configura prezzo e quantita media"
+                    @click="openAddonConfig(ing)"
+                  >
+                    <i class="bi bi-gear"></i>
+                    <span class="pantry-addon-price">
+                      € {{ Number(ing.addon_price || 0).toFixed(2) }}
+                    </span>
+                  </button>
+                </div>
               </td>
               <td class="t-right">
                 <div class="pantry-row-actions">
@@ -476,6 +554,14 @@ onMounted(async () => {
       :ingredient="currentTarget"
       @cancel="showDepletion = false"
       @done="onActionDone('depletion')"
+    />
+    <AddonConfigModal
+      v-if="showAddonConfig && addonConfigTarget"
+      :ingredient="addonConfigTarget"
+      :is-pro="true"
+      :mode="addonConfigMode"
+      @cancel="onAddonCancel"
+      @saved="onAddonSaved"
     />
 
     <!-- Modale modifica -->
@@ -606,5 +692,60 @@ onMounted(async () => {
 }
 @media (max-width: 480px) {
   .pantry-kpis { grid-template-columns: 1fr; }
+}
+
+/* Addon cell — toggle compatto + bottone gear con prezzo. */
+.pantry-addon-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pantry-addon-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.pantry-addon-switch input[type="checkbox"] {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.pantry-addon-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--color-border, #ccc);
+  border-radius: 999px;
+  transition: background 160ms;
+}
+.pantry-addon-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 160ms;
+}
+.pantry-addon-switch input:checked + .pantry-addon-slider {
+  background: var(--color-primary, var(--ac));
+}
+.pantry-addon-switch input:checked + .pantry-addon-slider::before {
+  transform: translateX(14px);
+}
+.pantry-addon-config-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.pantry-addon-price {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary, var(--ac));
 }
 </style>

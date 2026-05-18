@@ -67,6 +67,9 @@ function serializeIngredient(ing) {
     reorder_lead_days: Number(ing.reorder_lead_days) || 3,
     is_unavailable: ing.is_unavailable === true,
     is_active: ing.is_active !== false,
+    is_addon: ing.is_addon === true,
+    addon_price: ing.addon_price !== null && ing.addon_price !== undefined ? Number(ing.addon_price) : null,
+    addon_avg_qty: ing.addon_avg_qty !== null && ing.addon_avg_qty !== undefined ? Number(ing.addon_avg_qty) : null,
     supplier_name: ing.supplier_name || null,
     supplier_email: ing.supplier_email || null,
     notes: ing.notes || null,
@@ -186,7 +189,33 @@ module.exports = {
         const b = Number(ing.stock_qty || 0);
         if (b > a || (b === a && ing.id < existing.id)) byKey.set(key, ing);
       }
-      const deduped = [...byKey.values()];
+      const allDeduped = [...byKey.values()];
+
+      // Filtro visibilita': servono solo ingredienti collegati ad almeno un
+      // piatto (count > 0), oppure con stock residuo, oppure flaggati addon.
+      // Pre-fetch dei link element-ingredient per calcolare "in uso".
+      let inUseIds = new Set();
+      try {
+        const allIds = allDeduped.map((r) => r.id);
+        if (allIds.length > 0) {
+          const links = await strapi.db.query('api::element-ingredient.element-ingredient').findMany({
+            where: { fk_ingredient: { id: { $in: allIds } } },
+            populate: { fk_ingredient: { select: ['id'] }, fk_element: { select: ['id', 'is_archived'] } },
+          });
+          for (const l of links || []) {
+            if (l?.fk_ingredient?.id && l?.fk_element && l.fk_element.is_archived !== true) {
+              inUseIds.add(l.fk_ingredient.id);
+            }
+          }
+        }
+      } catch (_e) { /* in caso di errore, mostro tutto */ inUseIds = new Set(allDeduped.map((r) => r.id)); }
+
+      const deduped = allDeduped.filter((ing) => {
+        if (inUseIds.has(ing.id)) return true;
+        if (Number(ing.stock_qty || 0) > 0) return true;
+        if (ing.is_addon === true) return true;
+        return false;
+      });
 
       // Forecast in batch: una sola query sui movements per evitare N+1.
       let forecastMap;
@@ -315,6 +344,21 @@ module.exports = {
       if (Array.isArray(body.allergens)) patch.allergens = body.allergens.filter((x) => typeof x === 'string');
       if (typeof body.is_unavailable === 'boolean') patch.is_unavailable = body.is_unavailable;
       if (typeof body.is_active === 'boolean') patch.is_active = body.is_active;
+      if (typeof body.is_addon === 'boolean') {
+        patch.is_addon = body.is_addon;
+        if (!body.is_addon) {
+          patch.addon_price = null;
+          patch.addon_avg_qty = null;
+        }
+      }
+      if (body.addon_price !== undefined) {
+        const v = body.addon_price === null ? null : Number(body.addon_price);
+        if (v === null || (Number.isFinite(v) && v >= 0)) patch.addon_price = v;
+      }
+      if (body.addon_avg_qty !== undefined) {
+        const v = body.addon_avg_qty === null ? null : Number(body.addon_avg_qty);
+        if (v === null || (Number.isFinite(v) && v >= 0)) patch.addon_avg_qty = v;
+      }
 
       if (Object.keys(patch).length === 0) throw appError('INVALID_PAYLOAD', 'Nessun campo da aggiornare.');
 
@@ -561,6 +605,134 @@ module.exports = {
         note: m.note || null,
         createdAt: m.createdAt,
       })) };
+    } catch (err) { sendError(ctx, err); }
+  },
+
+  /* ============================================================ */
+  /* ADDONS (entrambi i piani, owner + gestione)                  */
+  /* ============================================================ */
+
+  /**
+   * PUT /api/ingredients/:id/addon
+   * Body: { is_addon: bool, addon_price?: number|null, addon_avg_qty?: number|null }
+   *
+   * Configura un ingrediente come "aggiunta" disponibile per il cameriere.
+   * - Pro: salva tutti e 3 i campi.
+   * - Starter: `addon_avg_qty` viene forzato a null (manca tracking magazzino).
+   * Quando `is_addon=false`, azzera anche prezzo e qty media per pulizia.
+   */
+  async setAddonConfig(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      const ownerId = actor ? actor.ownerId : user.id;
+
+      // Risolvi piano dell'owner per gating addon_avg_qty.
+      const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: ownerId },
+      });
+      const isPro = owner && owner.subscription_plan === 'pro';
+
+      const { id } = ctx.params;
+      const isNumeric = /^\d+$/.test(String(id));
+      const where = { fk_user: { id: ownerId } };
+      if (isNumeric) where.id = Number(id);
+      else where.documentId = String(id);
+      const ing = await strapi.db.query('api::ingredient.ingredient').findOne({ where });
+      if (!ing) throw appError('INGREDIENT_NOT_FOUND', 'Ingrediente non trovato.');
+
+      const body = ctx.request.body?.data || ctx.request.body || {};
+      if (typeof body.is_addon !== 'boolean') {
+        throw appError('INVALID_PAYLOAD', 'is_addon (boolean) obbligatorio.');
+      }
+
+      const patch = { is_addon: body.is_addon };
+
+      if (!body.is_addon) {
+        patch.addon_price = null;
+        patch.addon_avg_qty = null;
+      } else {
+        if (body.addon_price !== undefined) {
+          const v = body.addon_price === null ? null : Number(body.addon_price);
+          if (v !== null && (!Number.isFinite(v) || v < 0)) {
+            throw appError('INVALID_PAYLOAD', 'addon_price non valido.');
+          }
+          patch.addon_price = v;
+        }
+        if (isPro && body.addon_avg_qty !== undefined) {
+          const v = body.addon_avg_qty === null ? null : Number(body.addon_avg_qty);
+          if (v !== null && (!Number.isFinite(v) || v < 0)) {
+            throw appError('INVALID_PAYLOAD', 'addon_avg_qty non valido.');
+          }
+          patch.addon_avg_qty = v;
+        } else if (!isPro) {
+          // Forza null su Starter (no tracking magazzino).
+          patch.addon_avg_qty = null;
+        }
+      }
+
+      await strapi.documents('api::ingredient.ingredient').update({
+        documentId: ing.documentId,
+        data: patch,
+      });
+
+      const fresh = await strapi.db.query('api::ingredient.ingredient').findOne({ where: { id: ing.id } });
+      ctx.body = { data: serializeIngredient(fresh) };
+    } catch (err) { sendError(ctx, err); }
+  },
+
+  /**
+   * GET /api/ingredients/addons
+   *
+   * Lista degli ingredienti flaggati come addon per la presa ordine.
+   * Filtri lato server (escludenti):
+   *   - is_addon = true (l'owner ha esplicitamente flaggato l'ingrediente)
+   *   - is_active = true (non eliminato)
+   *   - is_unavailable = false (non manualmente segnato come terminato)
+   *
+   * Lo stock NON e' un filtro escludente: e' un'informazione che il client
+   * usa per distinguere "addon disponibile" da "addon terminato/esaurito".
+   * Per Pro `out_of_stock = stock_qty <= 0`. Per Starter sempre false
+   * (niente tracking magazzino).
+   */
+  async listAddons(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized();
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      const ownerId = actor ? actor.ownerId : user.id;
+
+      const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: { id: ownerId },
+        select: ['id', 'subscription_plan'],
+      });
+      const isPro = owner && String(owner.subscription_plan || '').toLowerCase() === 'pro';
+
+      const rows = await strapi.db.query('api::ingredient.ingredient').findMany({
+        where: {
+          fk_user: { id: ownerId },
+          is_active: true,
+          is_addon: true,
+          is_unavailable: false,
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      const data = (rows || []).map((ing) => {
+        const stock = Number(ing.stock_qty) || 0;
+        return {
+          id: ing.id,
+          documentId: ing.documentId,
+          name: ing.name,
+          unit: ing.unit || 'pz',
+          addon_price: ing.addon_price !== null && ing.addon_price !== undefined ? Number(ing.addon_price) : 0,
+          addon_avg_qty: ing.addon_avg_qty !== null && ing.addon_avg_qty !== undefined ? Number(ing.addon_avg_qty) : null,
+          stock_qty: stock,
+          out_of_stock: isPro && stock <= 0,
+        };
+      });
+      ctx.body = { data };
     } catch (err) { sendError(ctx, err); }
   },
 };

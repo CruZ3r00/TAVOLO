@@ -1,7 +1,8 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue';
 import { useStore } from 'vuex';
-import { API_BASE } from '@/utils';
+import { API_BASE, setIngredientAddonConfig, inventoryErrorMessage } from '@/utils';
+import AddonConfigModal from '@/components/AddonConfigModal.vue';
 
 const store = useStore();
 const tkn = store.getters.getToken;
@@ -78,6 +79,56 @@ const toggleIngredient = async (ingredient) => {
     } finally {
         togglingKey.value = null;
     }
+};
+
+/**
+ * Gestione aggiunte:
+ *   - Toggle ON -> OFF: salva direttamente is_addon=false (server azzera il prezzo).
+ *   - Toggle OFF -> ON: apre il modale di configurazione; se annulla il toggle resta OFF.
+ *   - Bottone "Configura": riapre il modale per modificare il prezzo.
+ */
+const showAddonConfig = ref(false);
+const addonConfigTarget = ref(null);
+const addonConfigMode = ref('edit');
+
+const onAddonToggle = async (ingredient) => {
+    if (!ingredient.documentId) return;
+    if (ingredient.is_addon) {
+        ingredient.is_addon = false;
+        ingredient.addon_price = null;
+        try {
+            await setIngredientAddonConfig(ingredient.documentId, { is_addon: false }, tkn);
+        } catch (e) {
+            console.error(e);
+            ingredient.is_addon = true;
+            error.value = inventoryErrorMessage ? inventoryErrorMessage(e) : 'Errore salvataggio aggiunta.';
+        }
+    } else {
+        addonConfigTarget.value = ingredient;
+        addonConfigMode.value = 'enable';
+        showAddonConfig.value = true;
+    }
+};
+
+const openAddonConfig = (ingredient) => {
+    addonConfigTarget.value = ingredient;
+    addonConfigMode.value = 'edit';
+    showAddonConfig.value = true;
+};
+
+const onAddonSaved = (payload) => {
+    const t = addonConfigTarget.value;
+    if (t) {
+        t.is_addon = true;
+        t.addon_price = payload.addon_price;
+    }
+    showAddonConfig.value = false;
+    addonConfigTarget.value = null;
+};
+
+const onAddonCancel = () => {
+    showAddonConfig.value = false;
+    addonConfigTarget.value = null;
 };
 
 onMounted(fetchIngredients);
@@ -239,11 +290,42 @@ onMounted(fetchIngredients);
                                 </span>
                             </label>
                         </div>
+                        <!-- Addon config (Starter: toggle + bottone modale) -->
+                        <div class="ing-addon-row">
+                            <label class="ing-addon-switch" :title="ingredient.is_addon ? 'Disattiva aggiunta' : 'Attiva come aggiunta'">
+                                <input
+                                    type="checkbox"
+                                    :checked="ingredient.is_addon"
+                                    @change="onAddonToggle(ingredient)"
+                                >
+                                <span class="ing-addon-slider"></span>
+                            </label>
+                            <span class="ing-addon-label">Aggiunta</span>
+                            <button
+                                v-if="ingredient.is_addon"
+                                type="button"
+                                class="ds-btn ds-btn-ghost ds-btn-sm ing-addon-config-btn"
+                                title="Configura prezzo aggiunta"
+                                @click="openAddonConfig(ingredient)"
+                            >
+                                <i class="bi bi-gear"></i>
+                                <span class="ing-addon-price">€ {{ Number(ingredient.addon_price || 0).toFixed(2) }}</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </template>
 
         </div>
+
+        <AddonConfigModal
+            v-if="showAddonConfig && addonConfigTarget"
+            :ingredient="addonConfigTarget"
+            :is-pro="false"
+            :mode="addonConfigMode"
+            @cancel="onAddonCancel"
+            @saved="onAddonSaved"
+        />
     </div>
 </template>
 
@@ -555,6 +637,68 @@ onMounted(fetchIngredients);
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+/* Addon row — toggle switch + bottone configura */
+.ing-addon-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0 var(--space-4) var(--space-3);
+    flex-wrap: wrap;
+}
+.ing-addon-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.ing-addon-switch input[type="checkbox"] {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.ing-addon-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--color-border, #ccc);
+    border-radius: 999px;
+    transition: background 160ms;
+}
+.ing-addon-slider::before {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 160ms;
+}
+.ing-addon-switch input:checked + .ing-addon-slider {
+    background: var(--color-primary, var(--ac));
+}
+.ing-addon-switch input:checked + .ing-addon-slider::before {
+    transform: translateX(16px);
+}
+.ing-addon-label {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+}
+.ing-addon-config-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: auto;
+}
+.ing-addon-price {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-primary, var(--ac));
 }
 
 /* Responsive */

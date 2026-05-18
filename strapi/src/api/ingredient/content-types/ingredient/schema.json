@@ -59,6 +59,21 @@
       "default": true,
       "required": true
     },
+    "is_addon": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "addon_price": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "addon_avg_qty": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
     "supplier_name": {
       "type": "string",
       "required": false,

@@ -140,6 +140,8 @@ const REMOTE_MODIFIABLE_KEYS = new Set([
   'audit.retentionTechDays',
   'drivers.stub.latencyMs',
   'drivers.stub.failureRate',
+  'printer_targets',
+  'auto_print_kitchen_enabled',
 ]);
 
 function isRemoteModifiable(key) {

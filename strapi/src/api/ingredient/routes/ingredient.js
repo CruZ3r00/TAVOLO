@@ -10,7 +10,13 @@ module.exports = {
     { method: 'GET',    path: '/ingredients/advanced',                handler: 'ingredient.listAdvanced' },
     { method: 'POST',   path: '/ingredients',                         handler: 'ingredient.createAdvanced' },
     { method: 'POST',   path: '/ingredients/restock-batch',           handler: 'ingredient.restockBatch' },
+
+    // Addon: lista addons disponibili (cameriere, presa ordine).
+    { method: 'GET',    path: '/ingredients/addons',                  handler: 'ingredient.listAddons' },
+
     { method: 'PATCH',  path: '/ingredients/:id',                     handler: 'ingredient.updateAdvanced' },
+    // Addon: configurazione addon singolo ingrediente.
+    { method: 'PUT',    path: '/ingredients/:id/addon',               handler: 'ingredient.setAddonConfig' },
     { method: 'DELETE', path: '/ingredients/:id',                     handler: 'ingredient.removeAdvanced' },
     { method: 'POST',   path: '/ingredients/:id/restock',             handler: 'ingredient.restock' },
     { method: 'POST',   path: '/ingredients/:id/waste',               handler: 'ingredient.waste' },

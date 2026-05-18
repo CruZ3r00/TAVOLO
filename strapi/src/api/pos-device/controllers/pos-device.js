@@ -513,6 +513,22 @@ module.exports = {
   async myConfig(ctx) {
     const device = ctx.state.device;
     if (!device) return ctx.unauthorized();
+
+    // Carica config stampanti per il ristoratore proprietario del device
+    const printerConfigService = require('../../restaurant-printer-config/services/restaurant-printer-config');
+    const userId = device.fk_user?.id || device.fk_user;
+    let printerTargets = [];
+    let autoPrintKitchen = true;
+    try {
+      const record = await printerConfigService.loadForUser(userId);
+      if (record) {
+        printerTargets = printerConfigService.serializeForDevice(record);
+        autoPrintKitchen = record.auto_print_kitchen_enabled !== false;
+      }
+    } catch (err) {
+      strapi.log.warn(`myConfig: caricamento config stampanti fallito: ${err.message}`);
+    }
+
     ctx.body = {
       data: {
         polling_interval_connected_s: parseInt(process.env.POS_POLL_INTERVAL_CONNECTED_S, 10) || 60,
@@ -521,7 +537,10 @@ module.exports = {
         heartbeat_interval_s: parseInt(process.env.POS_HEARTBEAT_INTERVAL_S, 10) || 30,
         features: {
           fiscal_receipt_enabled: false,
+          kitchen_print_supported: true,
         },
+        printer_targets: printerTargets,
+        auto_print_kitchen_enabled: autoPrintKitchen,
       },
     };
   },

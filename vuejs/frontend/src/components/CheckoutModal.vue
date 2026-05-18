@@ -48,11 +48,24 @@ watch(() => props.defaultPersons, (v) => {
 });
 
 const items = computed(() => props.order?.items || props.order?.fk_items || []);
+
+// Helper: prezzo riga = (prezzo + somma addons) * quantita.
+const itemAddonsSum = (it) => {
+    const a = it && it.addons;
+    if (!Array.isArray(a) || a.length === 0) return 0;
+    return a.reduce((s, x) => s + (parseFloat(x.price) || 0), 0);
+};
+const itemLineTotal = (it) => {
+    const p = parseFloat(it?.price) || 0;
+    const q = parseInt(it?.quantity, 10) || 0;
+    return (p + itemAddonsSum(it)) * q;
+};
+
 const subtotal = computed(() => {
-    // Preferisci total_amount server-side se disponibile (riflette void/sconti).
+    // Preferisci total_amount server-side se disponibile (riflette void/sconti/addons).
     const serverTotal = parseFloat(props.order?.total_amount);
     if (Number.isFinite(serverTotal) && serverTotal > 0) return serverTotal;
-    return items.value.reduce((s, it) => s + (parseFloat(it.price) * parseInt(it.quantity, 10) || 0), 0);
+    return items.value.reduce((s, it) => s + itemLineTotal(it), 0);
 });
 const safePersons = computed(() => Math.max(0, Math.floor(Number(persons.value) || 0)));
 const safeCoverPerPerson = computed(() => Math.max(0, Number(coverPerPerson.value) || 0));
@@ -140,9 +153,14 @@ const onClose = () => {
                             <span class="ckm-item-name">
                                 {{ item.name }}
                                 <span class="ckm-item-qty">x{{ item.quantity }}</span>
+                                <span v-if="item.addons && item.addons.length" class="ckm-item-addons">
+                                    <span v-for="(addon, idx) in item.addons" :key="idx">
+                                        + {{ addon.name }}<template v-if="idx < item.addons.length - 1">,</template>
+                                    </span>
+                                </span>
                             </span>
                             <span class="ckm-item-total">
-                                &euro; {{ (parseFloat(item.price) * parseInt(item.quantity, 10)).toFixed(2) }}
+                                &euro; {{ itemLineTotal(item).toFixed(2) }}
                             </span>
                         </div>
                     </div>
@@ -314,13 +332,19 @@ const onClose = () => {
     font-size: 13px;
     color: var(--ink);
 }
-.ckm-item-name { display: inline-flex; align-items: center; gap: 8px; }
+.ckm-item-name { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ckm-item-qty {
     font-family: var(--f-mono); font-size: 11px;
     color: var(--ink-3);
     padding: 1px 6px;
     background: var(--paper);
     border-radius: 999px;
+}
+.ckm-item-addons {
+    font-size: 11px;
+    color: var(--ink-3, var(--color-text-muted));
+    flex-basis: 100%;
+    margin-top: 2px;
 }
 .ckm-item-total {
     font-family: var(--f-mono); font-weight: 700;

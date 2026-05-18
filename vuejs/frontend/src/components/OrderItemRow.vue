@@ -24,10 +24,16 @@ const showVoid = computed(() => (
     && props.item.status !== 'pending'
 ));
 
+const addonsTotal = computed(() => {
+    const addons = props.item.addons;
+    if (!Array.isArray(addons) || addons.length === 0) return 0;
+    return addons.reduce((s, a) => s + (parseFloat(a.price) || 0), 0);
+});
+
 const lineTotal = computed(() => {
     const p = parseFloat(props.item.price) || 0;
     const q = parseInt(props.item.quantity, 10) || 0;
-    return (p * q).toFixed(2);
+    return ((p + addonsTotal.value) * q).toFixed(2);
 });
 </script>
 
@@ -43,6 +49,12 @@ const lineTotal = computed(() => {
                 <span>Annullato</span>
             </span>
             <OrderStatusBadge v-else :status="item.status" />
+        </div>
+
+        <div v-if="item.addons && item.addons.length" class="oi-addons">
+            <span v-for="(addon, idx) in item.addons" :key="idx" class="oi-addon-tag">
+                + {{ addon.name }} &euro; {{ (parseFloat(addon.price) || 0).toFixed(2) }}
+            </span>
         </div>
 
         <div v-if="isVoided && item.voided_reason" class="oi-voided-reason">
@@ -289,6 +301,18 @@ const lineTotal = computed(() => {
 .oi-row-voided .oi-line-total {
     text-decoration: line-through;
     color: var(--ink-3);
+}
+
+.oi-addons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    padding: 0 2px;
+}
+.oi-addon-tag {
+    font-size: 12px;
+    color: var(--ink-2);
+    font-style: italic;
 }
 
 .oi-voided-badge {

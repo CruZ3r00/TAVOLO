@@ -11,6 +11,7 @@ import SubscriptionForm from '@/Pages/Profile/Partials/SubscriptionForm.vue';
 import StaffDepartmentsForm from '@/Pages/Profile/Partials/StaffDepartmentsForm.vue';
 import WebsiteConfigForm from '@/Pages/Profile/Partials/WebsiteConfigForm.vue';
 import PosCassaForm from '@/Pages/Profile/Partials/PosCassaForm.vue';
+import PosPrintersForm from '@/Pages/Profile/Partials/PosPrintersForm.vue';
 
 const store = useStore();
 const route = useRoute();
@@ -30,6 +31,7 @@ const sections = computed(() => ([
   { key: 'sicurezza',   label: 'Sicurezza',        icon: 'bi-shield-lock' },
   { key: 'sito',        label: 'Sito web',         icon: 'bi-globe2' },
   { key: 'poscassa',    label: 'POS / Cassa',      icon: 'bi-credit-card-2-front' },
+  { key: 'stampanti',   label: 'Stampanti',         icon: 'bi-printer' },
   { key: 'abbonamento', label: 'Abbonamento',      icon: 'bi-stars' },
   { key: 'delete',      label: 'Elimina account',  icon: 'bi-trash', danger: true },
 ]));
@@ -187,6 +189,7 @@ onMounted(async () => {
 
         <WebsiteConfigForm v-else-if="activeSection === 'sito'" />
         <PosCassaForm v-else-if="activeSection === 'poscassa'" />
+        <PosPrintersForm v-else-if="activeSection === 'stampanti'" :current-user="x" />
         <SubscriptionForm v-else-if="activeSection === 'abbonamento'" />
         <DeleteUserForm v-else-if="activeSection === 'delete'" />
       </div>

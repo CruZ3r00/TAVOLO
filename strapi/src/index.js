@@ -482,6 +482,8 @@ async function grantImportPermissions(strapi) {
       'api::ingredient.ingredient.waste',
       'api::ingredient.ingredient.confirmDepleted',
       'api::ingredient.ingredient.listMovements',
+      'api::ingredient.ingredient.setAddonConfig',
+      'api::ingredient.ingredient.listAddons',
       'api::restock-order.restock-order.create',
       'api::restock-order.restock-order.list',
       'api::restock-order.restock-order.findOne',

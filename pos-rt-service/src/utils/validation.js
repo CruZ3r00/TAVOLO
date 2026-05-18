@@ -18,7 +18,7 @@ const pairByTokenSchema = z.object({
   device_name: z.string().min(1).max(120).optional(),
 });
 
-const jobKindSchema = z.enum(['order.close', 'print.receipt', 'payment.charge', 'payment.refund']);
+const jobKindSchema = z.enum(['order.close', 'print.receipt', 'print.kitchen_ticket', 'payment.charge', 'payment.refund']);
 
 const jobSchema = z.object({
   event_id: z.string().min(1).max(64),

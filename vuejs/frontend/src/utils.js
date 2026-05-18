@@ -103,3 +103,12 @@ export {
   setElementRecipe,
   inventoryErrorMessage,
 } from './lib/api/inventory.js';
+export {
+  getPrinterConfig,
+  savePrinterConfig,
+  testPrint,
+} from './lib/api/printers.js';
+export {
+  fetchAddons,
+  setIngredientAddonConfig,
+} from './lib/api/addons.js';

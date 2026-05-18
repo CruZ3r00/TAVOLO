@@ -286,13 +286,17 @@ const onOrderDetailBack = () => {
   currentOrderDocId.value = null;
 };
 
-const onOrderSent = async ({ sent }) => {
+const onOrderSent = async ({ sent, printDispatched }) => {
   await loadData({ silent: true });
   salaView.value = 'grid';
   currentOrderDocId.value = null;
   showToast('success', sent > 0
     ? `Comanda inviata in cucina (${sent} ${sent === 1 ? 'piatto' : 'piatti'}).`
     : 'Tutto già in cucina.');
+  // Toast informativo se la stampante di cucina non e' raggiungibile
+  if (printDispatched && printDispatched.no_device === true) {
+    showToast('warning', 'Stampa cucina non disponibile, postazione offline.');
+  }
 };
 
 const onOrderDetailUpdated = async () => { await loadData({ silent: true }); };
@@ -646,7 +650,7 @@ watch(() => route.path, async () => {
 
       <Transition name="fade">
         <div v-if="toast" :class="['md-toast', `md-toast-${toast.type}`]" role="status">
-          <i :class="['bi', toast.type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle']"></i>
+          <i :class="['bi', toast.type === 'success' ? 'bi-check-circle' : toast.type === 'warning' ? 'bi-exclamation-triangle' : 'bi-exclamation-circle']"></i>
           <span>{{ toast.message }}</span>
         </div>
       </Transition>
@@ -1041,6 +1045,7 @@ watch(() => route.path, async () => {
 }
 .md-toast i { font-size: 16px; flex-shrink: 0; }
 .md-toast-success { background: color-mix(in oklab, var(--ok) 10%, var(--paper)); color: var(--ok-ink); border-color: color-mix(in oklab, var(--ok) 30%, transparent); }
+.md-toast-warning { background: color-mix(in oklab, var(--warn, #e6a817) 10%, var(--paper)); color: var(--warn, #b38600); border-color: color-mix(in oklab, var(--warn, #e6a817) 30%, transparent); }
 .md-toast-error { background: color-mix(in oklab, var(--danger) 10%, var(--paper)); color: var(--danger); border-color: color-mix(in oklab, var(--danger) 30%, transparent); }
 
 .ord-skel-grid {

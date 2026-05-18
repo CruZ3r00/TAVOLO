@@ -10,19 +10,59 @@ function buildRouter({ driverRegistry, queueManager }) {
   router.use(requireLocalPin);
 
   /**
-   * POST /admin/test-print — esegue una stampa di prova sul driver corrente.
+   * POST /admin/test-print — esegue una stampa di prova.
+   * Body opzionale: { role: 'station'|'cash', key: 'cucina'|'bar'|... }
+   * Senza body: usa il driver printer di default.
    */
   router.post('/test-print', async (req, res) => {
     try {
-      const out = await driverRegistry.printer.printReceipt({
-        items: [
-          { name: 'Test item', quantity: 1, unit_price: 1.0 },
-        ],
-        total: 1.0,
-        header: 'TEST DI STAMPA',
-        footer: new Date().toISOString(),
+      const { role, key } = req.body || {};
+      let out;
+
+      if (role === 'station' && key) {
+        // Test stampa su stampante di stazione
+        const driver = driverRegistry.getPrinterForStation(key);
+        const payload = {
+          station: key,
+          items: [{ name: 'TEST STAMPA', quantity: 1, price: 0.01 }],
+          action: 'add',
+          title: 'TEST STAMPA',
+          printed_at: new Date().toISOString(),
+        };
+        if (typeof driver.printKitchenTicket === 'function') {
+          out = await driver.printKitchenTicket(payload);
+        } else {
+          out = await driver.printReceipt({
+            header: `TEST STAMPA ${key.toUpperCase()}`,
+            items: [{ name: 'Test item', quantity: 1, unit_price: 0.01 }],
+            total: 0.01,
+            footer: new Date().toISOString(),
+          });
+        }
+      } else if (role === 'cash' && key) {
+        // Test stampa su dispositivo cassa
+        const device = driverRegistry.getCashDevice({ id: key });
+        out = await device.printReceipt({
+          items: [{ name: 'Test item', quantity: 1, unit_price: 1.0 }],
+          total: 1.0,
+          header: 'TEST DI STAMPA',
+          footer: new Date().toISOString(),
+        });
+      } else {
+        // Default: driver printer principale
+        out = await driverRegistry.printer.printReceipt({
+          items: [{ name: 'Test item', quantity: 1, unit_price: 1.0 }],
+          total: 1.0,
+          header: 'TEST DI STAMPA',
+          footer: new Date().toISOString(),
+        });
+      }
+
+      auditRepo.append({
+        kind: 'admin.test_print',
+        payload: { role: role || 'default', key: key || null },
+        meta: { receipt_no: out?.receipt_no },
       });
-      auditRepo.append({ kind: 'admin.test_print', payload: {}, meta: { receipt_no: out.receipt_no } });
       res.json({ data: out });
     } catch (err) {
       res.status(500).json({ code: err.code || 'INTERNAL', message: err.message });

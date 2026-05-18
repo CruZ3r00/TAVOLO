@@ -13,7 +13,7 @@
 
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import TeleportCompat from '@/lib/compat/teleport.js';
-import { fetchMenuElements } from '@/utils';
+import { fetchMenuElements, fetchAddons } from '@/utils';
 import { useStore } from 'vuex';
 import { effectiveUserDocumentId } from '@/staffAccess';
 
@@ -37,6 +37,10 @@ const freeErrors = ref({});
 const selectedElement = ref(null);
 const menuQty = ref(1);
 const menuNotes = ref('');
+const availableAddons = ref([]);
+const selectedAddons = ref([]);
+const addonsLoading = ref(false);
+const addonsError = ref('');
 
 let savedOverflow = '';
 
@@ -45,11 +49,32 @@ const resetState = () => {
     selectedElement.value = null;
     menuQty.value = 1;
     menuNotes.value = '';
+    selectedAddons.value = [];
     freeForm.value = { name: '', price: '', quantity: 1, category: 'Altro', notes: '' };
     freeErrors.value = {};
     searchQuery.value = '';
     selectedCategory.value = 'all';
     menuError.value = '';
+    addonsError.value = '';
+};
+
+const loadAddons = async () => {
+    addonsLoading.value = true;
+    addonsError.value = '';
+    try {
+        const tkn = store.getters.getToken;
+        const data = await fetchAddons(tkn);
+        availableAddons.value = Array.isArray(data) ? data : [];
+    } catch (err) {
+        availableAddons.value = [];
+        addonsError.value = err?.message
+            ? `Aggiunte non disponibili (${err.message}).`
+            : 'Aggiunte non disponibili.';
+        // Logga per diagnosi (es. 403 se i permessi non sono ancora attivi)
+        console.warn('[DishPickerOverlay] fetchAddons failed', err);
+    } finally {
+        addonsLoading.value = false;
+    }
 };
 
 watch(() => props.show, async (v) => {
@@ -63,7 +88,8 @@ watch(() => props.show, async (v) => {
     }
     if (!v) return;
     resetState();
-    await loadMenu();
+    // Ricarica sempre: l'owner potrebbe aver flaggato nuovi addon nel frattempo.
+    await Promise.all([loadMenu(), loadAddons()]);
 });
 
 const onKeydown = (e) => {
@@ -149,6 +175,29 @@ const validateFree = () => {
     return Object.keys(errs).length === 0;
 };
 
+const toggleAddon = (addon) => {
+    if (addon.out_of_stock) return; // esauriti non selezionabili
+    const idx = selectedAddons.value.findIndex((a) => a.ingredient_id === addon.documentId);
+    if (idx >= 0) {
+        selectedAddons.value.splice(idx, 1);
+    } else {
+        selectedAddons.value.push({
+            ingredient_id: addon.documentId,
+            name: addon.name,
+            price: Number(addon.addon_price) || 0,
+        });
+    }
+};
+
+const isAddonSelected = (addon) => selectedAddons.value.some((a) => a.ingredient_id === addon.documentId);
+
+const addonsAvailable = computed(() => availableAddons.value.filter((a) => !a.out_of_stock));
+const addonsOutOfStock = computed(() => availableAddons.value.filter((a) => a.out_of_stock));
+
+const addonsTotalPrice = computed(() =>
+    selectedAddons.value.reduce((s, a) => s + (Number(a.price) || 0), 0),
+);
+
 const canPick = computed(() => {
     if (tab.value === 'menu') return !!selectedElement.value && menuQty.value >= 1;
     return true;
@@ -164,6 +213,7 @@ const onPick = () => {
             element_price: selectedElement.value.price,
             quantity: menuQty.value,
             notes: menuNotes.value.trim() || undefined,
+            addons: selectedAddons.value.length > 0 ? [...selectedAddons.value] : [],
         });
         return;
     }
@@ -174,6 +224,7 @@ const onPick = () => {
         quantity: parseInt(freeForm.value.quantity, 10),
         category: freeForm.value.category.trim() || 'Altro',
         notes: freeForm.value.notes.trim() || undefined,
+        addons: selectedAddons.value.length > 0 ? [...selectedAddons.value] : [],
     });
 };
 
@@ -321,6 +372,64 @@ const onClose = () => emit('close');
                                                 placeholder="Es. senza cipolla"
                                             />
                                         </div>
+                                    </div>
+                                    <!-- Aggiunte (addons) -->
+                                    <div class="dpo-addons">
+                                        <div class="dpo-addons-head">
+                                            <span class="dpo-label">Aggiunte</span>
+                                            <span v-if="selectedAddons.length > 0" class="dpo-addons-badge">
+                                                {{ selectedAddons.length }}
+                                            </span>
+                                            <span v-if="addonsTotalPrice > 0" class="dpo-addons-total">
+                                                + &euro; {{ addonsTotalPrice.toFixed(2) }}
+                                            </span>
+                                        </div>
+                                        <div v-if="addonsLoading" class="dpo-addons-empty">
+                                            <span class="ds-spinner" aria-hidden="true"></span>
+                                            <span>Caricamento aggiunte&hellip;</span>
+                                        </div>
+                                        <div v-else-if="addonsError" class="dpo-addons-empty dpo-addons-empty--error">
+                                            <i class="bi bi-exclamation-circle"></i>
+                                            <span>{{ addonsError }}</span>
+                                        </div>
+                                        <div v-else-if="availableAddons.length === 0" class="dpo-addons-empty">
+                                            <i class="bi bi-info-circle"></i>
+                                            <span>Nessuna aggiunta configurata.</span>
+                                        </div>
+                                        <template v-else>
+                                            <div v-if="addonsAvailable.length > 0" class="dpo-addons-chips">
+                                                <button
+                                                    v-for="addon in addonsAvailable"
+                                                    :key="addon.documentId"
+                                                    type="button"
+                                                    class="dpo-addon-chip"
+                                                    :class="{ 'dpo-addon-chip--active': isAddonSelected(addon) }"
+                                                    @click="toggleAddon(addon)"
+                                                >
+                                                    <span>{{ addon.name }}</span>
+                                                    <span class="dpo-addon-chip-price">&euro; {{ (Number(addon.addon_price) || 0).toFixed(2) }}</span>
+                                                </button>
+                                            </div>
+                                            <div v-if="addonsOutOfStock.length > 0" class="dpo-addons-oos">
+                                                <div class="dpo-addons-oos-head">
+                                                    <i class="bi bi-exclamation-triangle"></i>
+                                                    <span>Terminate ({{ addonsOutOfStock.length }})</span>
+                                                </div>
+                                                <div class="dpo-addons-chips">
+                                                    <button
+                                                        v-for="addon in addonsOutOfStock"
+                                                        :key="addon.documentId"
+                                                        type="button"
+                                                        class="dpo-addon-chip dpo-addon-chip--oos"
+                                                        :title="`${addon.name} — magazzino esaurito, rifornisci dal Magazzino`"
+                                                        disabled
+                                                    >
+                                                        <span>{{ addon.name }}</span>
+                                                        <span class="dpo-addon-chip-oos">terminato</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
                             </template>
@@ -578,6 +687,73 @@ const onClose = () => emit('close');
 .dpo-btn--ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--ink); }
 .dpo-btn--primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .dpo-btn--primary:hover:not(:disabled) { background: var(--ac); border-color: var(--ac); }
+
+/* Addons section */
+.dpo-addons { margin-top: 6px; }
+.dpo-addons-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.dpo-addons-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 20px; padding: 0 6px;
+    border-radius: 999px; background: var(--ac); color: var(--bg);
+    font-size: 11px; font-weight: 700;
+}
+.dpo-addons-total {
+    font-family: var(--f-mono); font-size: 13px; font-weight: 600;
+    color: var(--ac-ink, var(--ac)); margin-left: auto;
+}
+.dpo-addons-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.dpo-addon-chip {
+    appearance: none; display: inline-flex; align-items: center; gap: 6px;
+    min-height: 44px; padding: 8px 14px;
+    border: 1.5px solid var(--line); border-radius: 999px;
+    background: var(--bg); color: var(--ink-2);
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms, color 120ms, border-color 120ms;
+}
+.dpo-addon-chip:hover { background: var(--bg-hover); }
+.dpo-addon-chip--active {
+    background: var(--ink); color: var(--bg); border-color: var(--ink);
+}
+.dpo-addon-chip-price {
+    font-family: var(--f-mono); font-size: 11px; opacity: 0.75;
+}
+.dpo-addons-empty {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-subtle, var(--bg-hover));
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    font-size: 13px; color: var(--ink-2, var(--color-text-muted));
+}
+.dpo-addons-empty--error {
+    border-color: var(--color-destructive, #dc2626);
+    color: var(--color-destructive, #dc2626);
+    background: color-mix(in oklab, var(--color-destructive, #dc2626) 8%, var(--bg, transparent));
+}
+.dpo-addons-oos { margin-top: 12px; }
+.dpo-addons-oos-head {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 6px;
+    font-size: 12px; font-weight: 600;
+    color: var(--color-warning, #d97706);
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.dpo-addon-chip--oos {
+    background: var(--bg-subtle, var(--bg-hover));
+    color: var(--color-text-muted, var(--ink-2));
+    border-style: dashed;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+.dpo-addon-chip--oos:hover { background: var(--bg-subtle, var(--bg-hover)); }
+.dpo-addon-chip-oos {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--color-warning, #d97706);
+}
 
 @media (max-width: 640px) {
     .dpo-overlay { padding: 0; }

@@ -21,12 +21,14 @@ const log = getLogger('services/scheduler');
  * Ogni job è single-flight (lock booleano) per evitare sovrapposizioni.
  */
 class Scheduler {
-  constructor({ queueManager, syncService, wsClient, config, driverRegistry }) {
+  constructor({ queueManager, syncService, wsClient, config, driverRegistry, printerTargetsRepo, configRepo }) {
     this.queue = queueManager;
     this.sync = syncService;
     this.ws = wsClient;
     this.config = config;
     this.driverRegistry = driverRegistry;
+    this.printerTargetsRepo = printerTargetsRepo || null;
+    this.configRepo = configRepo || null;
 
     this._timers = [];
     this._cronTasks = [];
@@ -52,6 +54,11 @@ class Scheduler {
 
     // Release stuck in_progress jobs (processo crashato)
     this._timers.push(this._interval('releaseStuck', () => this._releaseStuck(), 5 * 60_000));
+
+    // Pull printer config da Strapi (ogni 5 min + on-boot)
+    this._timers.push(this._interval('pullConfig', () => this._pullConfig(), 5 * 60_000));
+    // On-boot: pull immediato (single-flight, lo scheduler lock protegge)
+    this._runSafe('pullConfig', () => this._pullConfig());
 
     // Cleanup notturno
     if (cron.validate(sched.cleanupCron)) {
@@ -164,6 +171,15 @@ class Scheduler {
     auditRepo.append({
       kind: 'maintenance.cleanup',
       payload: { removed_jobs: removed },
+    });
+  }
+
+  async _pullConfig() {
+    if (!this.sync) return;
+    await this.sync.pullConfig({
+      printerTargetsRepo: this.printerTargetsRepo,
+      configRepo: this.configRepo,
+      driverRegistry: this.driverRegistry,
     });
   }
 

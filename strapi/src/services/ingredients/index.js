@@ -354,16 +354,25 @@ async function listOwnerIngredientsAggregate(strapi, ownerId) {
     });
   }
 
-  return ingredients.map((ing) => {
-    const dishes = dishesByIng.get(ing.id) || [];
-    return {
-      key: ing.name_normalized,
-      name: ing.name,
-      count: dishes.length,
-      dishes,
-      unavailable: ing.is_unavailable === true,
-    };
-  });
+  // Filtro visibilita': nascondi ingredienti orfani (mai usati in alcun piatto)
+  // se anche lo stock e' zero e non sono flaggati come addon. Restano visibili
+  // ingredienti collegati a un piatto, con stock residuo, o flaggati addon.
+  return ingredients
+    .map((ing) => {
+      const dishes = dishesByIng.get(ing.id) || [];
+      return {
+        documentId: ing.documentId,
+        key: ing.name_normalized,
+        name: ing.name,
+        count: dishes.length,
+        dishes,
+        unavailable: ing.is_unavailable === true,
+        is_addon: ing.is_addon === true,
+        addon_price: ing.addon_price !== null && ing.addon_price !== undefined ? Number(ing.addon_price) : null,
+        stock_qty: Number(ing.stock_qty) || 0,
+      };
+    })
+    .filter((r) => r.count > 0 || r.stock_qty > 0 || r.is_addon);
 }
 
 /* ------------------------------------------------------------------ */

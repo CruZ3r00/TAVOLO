@@ -70,6 +70,12 @@ const onAdvance = () => {
           <span class="kic-name">{{ item.name }}</span>
           <span class="kic-qty">×{{ item.quantity }}</span>
         </div>
+        <ul v-if="Array.isArray(item.addons) && item.addons.length > 0" class="kic-addons">
+          <li v-for="(addon, idx) in item.addons" :key="idx" class="kic-addon">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i>
+            <span>{{ addon.name }}</span>
+          </li>
+        </ul>
         <div class="kic-meta">
           <span class="kic-course">
             <i class="bi bi-layers"></i>{{ parseInt(item.course, 10) || 1 }}a
@@ -152,4 +158,27 @@ const onAdvance = () => {
   font-size: 11px;
   font-weight: 700;
 }
+
+/* Addons: ben visibili sotto il nome del piatto, devono saltare all'occhio
+   alla cucina. */
+.kic-addons {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: color-mix(in oklab, var(--ac, var(--color-primary)) 8%, var(--paper, var(--bg)));
+  border-left: 3px solid var(--ac, var(--color-primary));
+  border-radius: 4px;
+}
+.kic-addon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ac-ink, var(--color-primary));
+}
+.kic-addon i { font-size: 12px; opacity: 0.9; }
 </style>

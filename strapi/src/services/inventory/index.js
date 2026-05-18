@@ -208,6 +208,33 @@ async function applyOnServe(strapi, orderItem, opts = {}) {
           strapi.log.warn(`inventory.applyOnServe: scarico ingredient ${ing.id} fallito: ${err.message}`);
         }
       }
+
+      // Addon consumption (dopo le ricette del piatto)
+      const itemAddons = await strapi.db.query('api::order-item-addon.order-item-addon').findMany({
+        where: { fk_order_item: { id: item.id } },
+        populate: { fk_ingredient: { select: ['id', 'name', 'unit'] } },
+      });
+      for (const addon of (itemAddons || [])) {
+        const addonIng = addon.fk_ingredient;
+        if (!addonIng || !addonIng.id) continue;
+        const addonQty = Number(addon.qty_used) || 0;
+        if (addonQty <= 0) continue;
+        const totalAddonQty = addonQty * qtyServed;
+        try {
+          const freshAddon = await loadIngredientById(strapi, addonIng.id);
+          if (!freshAddon) continue;
+          await appendMovement(strapi, freshAddon, {
+            kind: 'consumption',
+            qty_delta: -totalAddonQty,
+            fk_order: item.fk_order ? item.fk_order.id : null,
+            fk_order_item: item.id,
+            note: `Addon: ${addon.name} (qty ${qtyServed} x ${addonQty} ${addonIng.unit || 'pz'})`,
+          });
+        } catch (err) {
+          strapi.log.warn(`inventory.applyOnServe: scarico addon ${addon.name} fallito: ${err.message}`);
+        }
+      }
+
       return;
     }
 
@@ -230,6 +257,32 @@ async function applyOnServe(strapi, orderItem, opts = {}) {
         } catch (err) {
           strapi.log.warn(`inventory.applyOnServe: free-form scarico ${m.matched_name} fallito: ${err.message}`);
         }
+      }
+    }
+
+    // Addon consumption (anche per free-form items)
+    const freeformAddons = await strapi.db.query('api::order-item-addon.order-item-addon').findMany({
+      where: { fk_order_item: { id: item.id } },
+      populate: { fk_ingredient: { select: ['id', 'name', 'unit'] } },
+    });
+    for (const addon of (freeformAddons || [])) {
+      const addonIng = addon.fk_ingredient;
+      if (!addonIng || !addonIng.id) continue;
+      const addonQty = Number(addon.qty_used) || 0;
+      if (addonQty <= 0) continue;
+      const totalAddonQty = addonQty * qtyServed;
+      try {
+        const freshAddon = await loadIngredientById(strapi, addonIng.id);
+        if (!freshAddon) continue;
+        await appendMovement(strapi, freshAddon, {
+          kind: 'consumption',
+          qty_delta: -totalAddonQty,
+          fk_order: item.fk_order ? item.fk_order.id : null,
+          fk_order_item: item.id,
+          note: `Addon: ${addon.name} (qty ${qtyServed} x ${addonQty} ${addonIng.unit || 'pz'})`,
+        });
+      } catch (err) {
+        strapi.log.warn(`inventory.applyOnServe: scarico addon ${addon.name} fallito: ${err.message}`);
       }
     }
   } catch (err) {

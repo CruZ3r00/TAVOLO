@@ -1,0 +1,41 @@
+{
+  "kind": "collectionType",
+  "collectionName": "order_item_addons",
+  "info": {
+    "singularName": "order-item-addon",
+    "pluralName": "order-item-addons",
+    "displayName": "OrderItemAddon",
+    "description": "Aggiunta (snapshot) attaccata a un OrderItem. Es. '+ Mozzarella' su una pizza."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "maxLength": 200
+    },
+    "price": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
+    },
+    "qty_used": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "fk_ingredient": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ingredient.ingredient"
+    },
+    "fk_order_item": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::order-item.order-item",
+      "inversedBy": "fk_addons"
+    }
+  }
+}

@@ -20,6 +20,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
     fetchOrder, addOrderItem, updateOrderItem, deleteOrderItem,
     updateItemStatus, sendOrderToProduction, orderErrorMessage,
+    fetchAddons,
 } from '@/utils';
 import DishPickerOverlay from '@/components/DishPickerOverlay.vue';
 
@@ -38,6 +39,19 @@ const selectedCourse = ref(1);
 const busyItemIds = ref(new Set());
 const editingItemId = ref(null);
 const editingPatch = ref({});
+// Lista globale degli addons configurati dal proprietario (chip nell'edit).
+const availableAddons = ref([]);
+const addonsLoadedOnce = ref(false);
+
+const loadAddonsList = async () => {
+    try {
+        availableAddons.value = await fetchAddons(props.token);
+        addonsLoadedOnce.value = true;
+    } catch (err) {
+        console.warn('[OrderDetailPage] fetchAddons failed', err);
+        availableAddons.value = [];
+    }
+};
 
 const items = computed(() => order.value?.items || order.value?.fk_items || []);
 const lockVersion = computed(() => Number(order.value?.lock_version) || 0);
@@ -69,10 +83,22 @@ const sentItemsForCurrentCourse = computed(() => itemsForCurrentCourse.value.fil
 const takenCountByCourse = (course) => items.value.filter((it) => (Number(it.course) || 1) === course && it.status === 'pending').length;
 const totalCountByCourse = (course) => items.value.filter((it) => (Number(it.course) || 1) === course).length;
 
+// Prezzo riga item = (prezzo base + somma prezzi addons) * quantita.
+const itemAddonsTotal = (it) => {
+    const addons = it && it.addons;
+    if (!Array.isArray(addons) || addons.length === 0) return 0;
+    return addons.reduce((s, a) => s + (parseFloat(a.price) || 0), 0);
+};
+const itemLineTotal = (it) => {
+    const p = parseFloat(it?.price) || 0;
+    const q = parseInt(it?.quantity, 10) || 0;
+    return (p + itemAddonsTotal(it)) * q;
+};
+
 const orderTotal = computed(() => {
     const t = parseFloat(order.value?.total_amount);
     if (Number.isFinite(t) && t > 0) return t;
-    return items.value.reduce((s, it) => s + (parseFloat(it.price) * parseInt(it.quantity, 10) || 0), 0);
+    return items.value.reduce((s, it) => s + itemLineTotal(it), 0);
 });
 
 const tableLabel = computed(() => {
@@ -127,6 +153,9 @@ const closePicker = () => { pickerOpen.value = false; };
 const onPickDish = async (picked) => {
     closePicker();
     if (!order.value) return;
+    const addonsPayload = Array.isArray(picked.addons) && picked.addons.length > 0
+        ? picked.addons.map((a) => ({ ingredient_id: a.ingredient_id }))
+        : undefined;
     const payload = picked.element_id
         ? {
             element_id: picked.element_id,
@@ -134,6 +163,7 @@ const onPickDish = async (picked) => {
             course: selectedCourse.value,
             notes: picked.notes,
             lock_version: lockVersion.value,
+            addons: addonsPayload,
         }
         : {
             name: picked.name,
@@ -143,6 +173,7 @@ const onPickDish = async (picked) => {
             course: selectedCourse.value,
             notes: picked.notes,
             lock_version: lockVersion.value,
+            addons: addonsPayload,
         };
     try {
         await addOrderItem(order.value.documentId, payload, props.token);
@@ -163,21 +194,75 @@ const incrementCourse = () => {
     selectedCourse.value = next;
 };
 
-// Inline edit quantità
+// Inline edit quantità + addons
 const startEdit = (item) => {
     editingItemId.value = item.documentId;
-    editingPatch.value = { quantity: item.quantity, notes: item.notes || '' };
+    // Copia gli addons attualmente attaccati (mappati al formato del payload).
+    const currentAddons = Array.isArray(item.addons)
+        ? item.addons
+            .map((a) => ({
+                ingredient_id: a.ingredient_id || a.fk_ingredient?.documentId || null,
+                name: a.name,
+                price: Number(a.price) || 0,
+            }))
+            .filter((a) => a.ingredient_id)
+        : [];
+    editingPatch.value = {
+        quantity: item.quantity,
+        notes: item.notes || '',
+        addons: currentAddons,
+        originalAddons: currentAddons,
+    };
+    if (!addonsLoadedOnce.value) loadAddonsList();
+    else loadAddonsList(); // refresh: l'owner puo' aver flaggato nuovi addon
 };
 const cancelEdit = () => {
     editingItemId.value = null;
     editingPatch.value = {};
 };
+const isEditAddonSelected = (addon) => {
+    const list = editingPatch.value?.addons || [];
+    return list.some((a) => a.ingredient_id === addon.documentId);
+};
+const toggleEditAddon = (addon) => {
+    if (!editingPatch.value || !Array.isArray(editingPatch.value.addons)) return;
+    // Permetti la rimozione di un addon esaurito gia' selezionato, ma blocca
+    // la selezione di nuovi esauriti.
+    const idx = editingPatch.value.addons.findIndex((a) => a.ingredient_id === addon.documentId);
+    if (idx >= 0) {
+        editingPatch.value.addons.splice(idx, 1);
+        return;
+    }
+    if (addon.out_of_stock) return;
+    editingPatch.value.addons.push({
+        ingredient_id: addon.documentId,
+        name: addon.name,
+        price: Number(addon.addon_price) || 0,
+    });
+};
+const editAddonsActive = computed(() => availableAddons.value.filter((a) => !a.out_of_stock));
+const editAddonsOutOfStock = computed(() => availableAddons.value.filter((a) => a.out_of_stock));
+const editAddonsChanged = computed(() => {
+    const cur = editingPatch.value?.addons || [];
+    const orig = editingPatch.value?.originalAddons || [];
+    if (cur.length !== orig.length) return true;
+    const curIds = new Set(cur.map((a) => a.ingredient_id));
+    for (const a of orig) if (!curIds.has(a.ingredient_id)) return true;
+    return false;
+});
+const editAddonsTotal = computed(() =>
+    (editingPatch.value?.addons || []).reduce((s, a) => s + (Number(a.price) || 0), 0)
+);
+
 const commitEdit = async (item) => {
     const newQty = parseInt(editingPatch.value.quantity, 10);
     const newNotes = String(editingPatch.value.notes || '').trim();
     const patch = {};
     if (Number.isFinite(newQty) && newQty >= 1 && newQty !== item.quantity) patch.quantity = newQty;
     if (newNotes !== (item.notes || '')) patch.notes = newNotes || null;
+    if (editAddonsChanged.value) {
+        patch.addons = (editingPatch.value.addons || []).map((a) => ({ ingredient_id: a.ingredient_id }));
+    }
     if (Object.keys(patch).length === 0) {
         cancelEdit();
         return;
@@ -251,7 +336,8 @@ const confirmAndSend = async () => {
     try {
         const resp = await sendOrderToProduction(order.value.documentId, props.token);
         const sent = resp?.meta?.sent ?? 0;
-        emit('sent', { sent, order: resp?.data });
+        const printDispatched = resp?.meta?.print_dispatched || null;
+        emit('sent', { sent, order: resp?.data, printDispatched });
     } catch (err) {
         errorMessage.value = orderErrorMessage(err);
     } finally {
@@ -376,7 +462,7 @@ const courseLabel = (n) => `${n}ª portata`;
                                     <span class="odp-item-qty-x">×</span>
                                     <strong>{{ item.quantity }}</strong>
                                 </div>
-                                <div class="odp-item-price">{{ fmt(parseFloat(item.price) * parseInt(item.quantity, 10)) }}</div>
+                                <div class="odp-item-price">{{ fmt(itemLineTotal(item)) }}</div>
                                 <div class="odp-item-actions">
                                     <button
                                         type="button"
@@ -420,6 +506,53 @@ const courseLabel = (n) => `${n}ª portata`;
                                             placeholder="Es. senza cipolla"
                                         />
                                     </label>
+                                </div>
+                                <div class="odp-edit-addons">
+                                    <div class="odp-edit-addons-head">
+                                        <span class="odp-edit-label">Aggiunte</span>
+                                        <span v-if="editAddonsTotal > 0" class="odp-edit-addons-total">
+                                            + &euro; {{ editAddonsTotal.toFixed(2) }}
+                                        </span>
+                                    </div>
+                                    <div v-if="availableAddons.length === 0" class="odp-edit-addons-empty">
+                                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                                        <span>Nessuna aggiunta configurata.</span>
+                                    </div>
+                                    <template v-else>
+                                        <div v-if="editAddonsActive.length > 0" class="odp-edit-addons-chips">
+                                            <button
+                                                v-for="addon in editAddonsActive"
+                                                :key="addon.documentId"
+                                                type="button"
+                                                class="odp-edit-addon-chip"
+                                                :class="{ 'odp-edit-addon-chip--active': isEditAddonSelected(addon) }"
+                                                @click="toggleEditAddon(addon)"
+                                            >
+                                                <span>{{ addon.name }}</span>
+                                                <span class="odp-edit-addon-chip-price">&euro; {{ (Number(addon.addon_price) || 0).toFixed(2) }}</span>
+                                            </button>
+                                        </div>
+                                        <div v-if="editAddonsOutOfStock.length > 0" class="odp-edit-addons-oos">
+                                            <div class="odp-edit-addons-oos-head">
+                                                <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                                                <span>Terminate ({{ editAddonsOutOfStock.length }})</span>
+                                            </div>
+                                            <div class="odp-edit-addons-chips">
+                                                <button
+                                                    v-for="addon in editAddonsOutOfStock"
+                                                    :key="addon.documentId"
+                                                    type="button"
+                                                    class="odp-edit-addon-chip odp-edit-addon-chip--oos"
+                                                    :class="{ 'odp-edit-addon-chip--active': isEditAddonSelected(addon) }"
+                                                    :title="`${addon.name} — magazzino esaurito`"
+                                                    @click="toggleEditAddon(addon)"
+                                                >
+                                                    <span>{{ addon.name }}</span>
+                                                    <span class="odp-edit-addon-chip-oos">terminato</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                                 <div class="odp-item-edit-actions">
                                     <button type="button" class="odp-btn odp-btn--ghost" @click="cancelEdit">Annulla</button>
@@ -466,7 +599,7 @@ const courseLabel = (n) => `${n}ª portata`;
                                     <span class="odp-item-qty-x">×</span>
                                     <strong>{{ item.quantity }}</strong>
                                 </div>
-                                <div class="odp-item-price">{{ fmt(parseFloat(item.price) * parseInt(item.quantity, 10)) }}</div>
+                                <div class="odp-item-price">{{ fmt(itemLineTotal(item)) }}</div>
                                 <span class="odp-status-badge" :class="`s-${item.status}`">
                                     {{ statusLabel(item.status) }}
                                 </span>
@@ -974,5 +1107,64 @@ const courseLabel = (n) => `${n}ª portata`;
     .odp-item-view { flex-wrap: wrap; }
     .odp-item-main { flex-basis: 100%; }
     .odp-item-edit-fields { flex-direction: column; }
+}
+
+/* Edit addons section */
+.odp-edit-addons { display: flex; flex-direction: column; gap: 6px; }
+.odp-edit-addons-head { display: flex; align-items: center; gap: 8px; }
+.odp-edit-addons-total {
+    margin-left: auto;
+    font-family: var(--f-mono, inherit);
+    font-size: 13px; font-weight: 600;
+    color: var(--color-primary, var(--ac));
+}
+.odp-edit-addons-empty {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 10px;
+    background: var(--color-bg-subtle, var(--bg-hover));
+    border: 1px dashed var(--color-border, var(--line));
+    border-radius: 6px;
+    font-size: 12px; color: var(--color-text-muted, var(--ink-2));
+}
+.odp-edit-addons-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.odp-edit-addon-chip {
+    appearance: none; display: inline-flex; align-items: center; gap: 6px;
+    min-height: 36px; padding: 6px 12px;
+    border: 1.5px solid var(--color-border, var(--line)); border-radius: 999px;
+    background: var(--color-bg, var(--bg)); color: var(--color-text-secondary, var(--ink-2));
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms, color 120ms, border-color 120ms;
+}
+.odp-edit-addon-chip:hover { background: var(--color-bg-subtle, var(--bg-hover)); }
+.odp-edit-addon-chip--active {
+    background: var(--color-text, var(--ink));
+    color: var(--color-bg, var(--bg));
+    border-color: var(--color-text, var(--ink));
+}
+.odp-edit-addon-chip-price {
+    font-family: var(--f-mono, inherit);
+    font-size: 11px; opacity: 0.75;
+}
+.odp-edit-addons-oos { margin-top: 6px; }
+.odp-edit-addons-oos-head {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 4px;
+    font-size: 11px; font-weight: 600;
+    color: var(--color-warning, #d97706);
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.odp-edit-addon-chip--oos {
+    border-style: dashed;
+    opacity: 0.7;
+}
+.odp-edit-addon-chip--oos:not(.odp-edit-addon-chip--active) {
+    background: var(--color-bg-subtle, var(--bg-hover));
+    color: var(--color-text-muted, var(--ink-2));
+}
+.odp-edit-addon-chip-oos {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--color-warning, #d97706);
 }
 </style>

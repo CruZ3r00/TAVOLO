@@ -592,6 +592,20 @@ export interface ApiIngredientIngredient extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    addon_avg_qty: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    addon_price: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
     allergens: Schema.Attribute.JSON;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -607,6 +621,9 @@ export interface ApiIngredientIngredient extends Struct.CollectionTypeSchema {
     is_active: Schema.Attribute.Boolean &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<true>;
+    is_addon: Schema.Attribute.Boolean &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<false>;
     is_unavailable: Schema.Attribute.Boolean &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<false>;
@@ -991,6 +1008,63 @@ export interface ApiOrderArchiveOrderArchive
   };
 }
 
+export interface ApiOrderItemAddonOrderItemAddon
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'order_item_addons';
+  info: {
+    description: "Aggiunta (snapshot) attaccata a un OrderItem. Es. '+ Mozzarella' su una pizza.";
+    displayName: 'OrderItemAddon';
+    pluralName: 'order-item-addons';
+    singularName: 'order-item-addon';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    fk_ingredient: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::ingredient.ingredient'
+    >;
+    fk_order_item: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::order-item.order-item'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::order-item-addon.order-item-addon'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    price: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    publishedAt: Schema.Attribute.DateTime;
+    qty_used: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiOrderItemOrderItem extends Struct.CollectionTypeSchema {
   collectionName: 'order_items';
   info: {
@@ -1019,6 +1093,10 @@ export interface ApiOrderItemOrderItem extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    fk_addons: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::order-item-addon.order-item-addon'
+    >;
     fk_element: Schema.Attribute.Relation<'manyToOne', 'api::element.element'>;
     fk_order: Schema.Attribute.Relation<'manyToOne', 'api::order.order'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1520,6 +1598,48 @@ export interface ApiRestaurantDailyStatRestaurantDailyStat
         number
       > &
       Schema.Attribute.DefaultTo<0>;
+  };
+}
+
+export interface ApiRestaurantPrinterConfigRestaurantPrinterConfig
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'restaurant_printer_configs';
+  info: {
+    description: 'Configurazione stampanti di stazione e dispositivi cassa per il ristorante';
+    displayName: 'RestaurantPrinterConfig';
+    pluralName: 'restaurant-printer-configs';
+    singularName: 'restaurant-printer-config';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  pluginOptions: {
+    'content-manager': {
+      visible: false;
+    };
+  };
+  attributes: {
+    auto_print_kitchen_enabled: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<true>;
+    cash_devices_json: Schema.Attribute.JSON;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    fk_user: Schema.Attribute.Relation<
+      'oneToOne',
+      'plugin::users-permissions.user'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::restaurant-printer-config.restaurant-printer-config'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    stations_json: Schema.Attribute.JSON;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
   };
 }
 
@@ -2274,6 +2394,7 @@ declare module '@strapi/strapi' {
       'api::menu-element-stat.menu-element-stat': ApiMenuElementStatMenuElementStat;
       'api::menu.menu': ApiMenuMenu;
       'api::order-archive.order-archive': ApiOrderArchiveOrderArchive;
+      'api::order-item-addon.order-item-addon': ApiOrderItemAddonOrderItemAddon;
       'api::order-item.order-item': ApiOrderItemOrderItem;
       'api::order.order': ApiOrderOrder;
       'api::pos-device.pos-device': ApiPosDevicePosDevice;
@@ -2281,6 +2402,7 @@ declare module '@strapi/strapi' {
       'api::pos-pairing-token.pos-pairing-token': ApiPosPairingTokenPosPairingToken;
       'api::reservation.reservation': ApiReservationReservation;
       'api::restaurant-daily-stat.restaurant-daily-stat': ApiRestaurantDailyStatRestaurantDailyStat;
+      'api::restaurant-printer-config.restaurant-printer-config': ApiRestaurantPrinterConfigRestaurantPrinterConfig;
       'api::restock-order.restock-order': ApiRestockOrderRestockOrder;
       'api::table.table': ApiTableTable;
       'api::website-config.website-config': ApiWebsiteConfigWebsiteConfig;

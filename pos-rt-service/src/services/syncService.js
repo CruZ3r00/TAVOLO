@@ -96,6 +96,53 @@ class SyncService {
     }
   }
 
+  /**
+   * Pull printer config da Strapi e applica a DB locale + driverRegistry.
+   * Errori loggati ma non bloccanti (la connettivita verso cloud e' inaffidabile by design).
+   * @param {{ printerTargetsRepo?: Object, configRepo?: Object, driverRegistry?: Object }} deps
+   */
+  async pullConfig({ printerTargetsRepo, configRepo, driverRegistry } = {}) {
+    if (!deviceRepo.isPaired()) {
+      log.debug('Non paired, skip pullConfig');
+      return;
+    }
+    try {
+      const res = await this.http.get('/api/pos-devices/me/config');
+      if (!res) return;
+
+      // Printer targets
+      if (printerTargetsRepo && Array.isArray(res.printer_targets)) {
+        const rows = res.printer_targets.map((t) => ({
+          role: t.role,
+          key: t.key,
+          driver: t.driver,
+          host: t.host,
+          port: t.port,
+          options_json: t.options ? JSON.stringify(t.options) : null,
+          capabilities_json: t.capabilities ? JSON.stringify(t.capabilities) : null,
+          enabled: t.enabled !== false,
+        }));
+        printerTargetsRepo.upsertMany(rows);
+        printerTargetsRepo.removeMissing(rows.map((r) => ({ role: r.role, key: r.key })));
+
+        if (driverRegistry) {
+          await driverRegistry.reload(printerTargetsRepo.list());
+        }
+        log.info({ count: rows.length }, 'pullConfig: printer_targets aggiornati');
+      }
+
+      // auto_print_kitchen_enabled
+      if (configRepo && res.auto_print_kitchen_enabled != null) {
+        configRepo.set('auto_print_kitchen_enabled', res.auto_print_kitchen_enabled);
+      }
+
+      log.debug('pullConfig completato');
+    } catch (err) {
+      // Non bloccante: log e via
+      log.warn({ err: err.message }, 'pullConfig fallito');
+    }
+  }
+
   async heartbeat(stats = {}) {
     if (!deviceRepo.isPaired()) return;
     try {

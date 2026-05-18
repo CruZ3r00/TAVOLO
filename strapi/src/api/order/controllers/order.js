@@ -132,6 +132,15 @@ function serializeItem(item, routingLookup) {
     voided_at: item.voided_at || null,
     station: routingLookup ? routingLookup(category) : null,
     fk_element: item.fk_element ? { documentId: item.fk_element.documentId } : null,
+    addons: Array.isArray(item.fk_addons)
+      ? item.fk_addons.map((a) => ({
+          documentId: a.documentId,
+          name: a.name,
+          price: Number(a.price) || 0,
+          qty_used: a.qty_used !== null && a.qty_used !== undefined ? Number(a.qty_used) : null,
+          fk_ingredient: a.fk_ingredient ? { documentId: a.fk_ingredient.documentId } : null,
+        }))
+      : [],
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };
@@ -216,7 +225,7 @@ async function beginImmediate(trx, dialect) {
  */
 async function loadOrder(documentId, userId, { populate } = {}) {
   const pop = populate || {
-    fk_items: { populate: ['fk_element'] },
+    fk_items: { populate: { fk_element: true, fk_addons: { populate: ['fk_ingredient'] } } },
     fk_table: true,
     fk_user: true,
     fk_reservation: true,
@@ -529,7 +538,7 @@ async function createTakeawayOrder({ ownerId, body, status, emailRequired }) {
 }
 
 function serializePosJobItem(item) {
-  return {
+  const result = {
     name: item.name,
     quantity: parseInt(item.quantity, 10) || 1,
     price: Number(item.price || 0),
@@ -538,6 +547,16 @@ function serializePosJobItem(item) {
     notes: item.notes || null,
     element_document_id: item.fk_element ? item.fk_element.documentId : null,
   };
+  if (Array.isArray(item.fk_addons) && item.fk_addons.length > 0) {
+    result.addons = item.fk_addons
+      .filter((a) => a && a.name)
+      .map((a) => ({
+        name: a.name,
+        price: Number(a.price || 0),
+        qty_used: a.qty_used != null ? Number(a.qty_used) : undefined,
+      }));
+  }
+  return result;
 }
 
 function buildKitchenTicketPayload({ order, item, station, action }) {
@@ -594,6 +613,102 @@ function queueKitchenTicketPrint({ actor, order, item, station, action }) {
       strapi.log.warn(`print.kitchen_ticket: enqueue fallito per ordine ${order && order.documentId}: ${err.message}`);
     }
   });
+}
+
+/**
+ * Costruisce il payload per una comanda bulk (piu' item per stazione).
+ * Usata dal trigger in sendDineInToDepartments.
+ */
+function buildKitchenTicketBulkPayload({ order, items, station, action = 'add' }) {
+  const serviceType = order.service_type || 'table';
+  return {
+    action,
+    station: station || null,
+    title: 'COMANDA',
+    printed_at: new Date().toISOString(),
+    order: {
+      documentId: order.documentId,
+      service_type: serviceType,
+      opened_at: order.opened_at || null,
+    },
+    table: order.fk_table
+      ? {
+          documentId: order.fk_table.documentId,
+          number: order.fk_table.number,
+          area: order.fk_table.area || null,
+        }
+      : null,
+    takeaway: serviceType === 'takeaway'
+      ? {
+          customer_name: order.customer_name || null,
+          pickup_at: order.pickup_at || null,
+        }
+      : null,
+    items: items.map(serializePosJobItem),
+  };
+}
+
+/**
+ * Accoda la stampa comande bulk raggruppate per stazione.
+ * Chiamata da sendDineInToDepartments dopo l'avanzamento pending → taken.
+ *
+ * Ritorna { attempted, queued, no_device } — usato nella response meta.
+ * NON usa setImmediate perche' il risultato serve nella response HTTP.
+ */
+async function queueKitchenTicketBulkPrint({ actor, order, items, routingLookup }) {
+  const result = { attempted: 0, queued: 0, no_device: false };
+  try {
+    if (!actor || !actor.ownerId || !order || !items || items.length === 0) return result;
+
+    // Carica config stampanti per verificare auto_print_kitchen_enabled
+    const printerConfigService = require('../../../api/restaurant-printer-config/services/restaurant-printer-config');
+    const printerConfig = await printerConfigService.loadForUser(actor.ownerId);
+
+    // Se la stampa automatica e' disattivata, non accodare nulla
+    if (printerConfig && printerConfig.auto_print_kitchen_enabled === false) {
+      return result;
+    }
+
+    const device = await posBridge.findActiveDeviceForUser(strapi, actor.ownerId);
+    if (!device) {
+      strapi.log.info(`print.kitchen_ticket bulk: nessun device POS/RT attivo per user ${actor.ownerId}`);
+      result.no_device = true;
+      return result;
+    }
+
+    // Raggruppa items per stazione
+    const stationGroups = new Map();
+    for (const item of items) {
+      const cat = item.category || (item.fk_element ? item.fk_element.category : null);
+      const station = routingLookup(cat) || 'cucina';
+      if (!stationGroups.has(station)) stationGroups.set(station, []);
+      stationGroups.get(station).push(item);
+    }
+
+    // Accoda un job per ogni stazione
+    for (const [station, stationItems] of stationGroups) {
+      result.attempted += 1;
+      try {
+        await posBridge.dispatchJob(strapi, {
+          device,
+          user: { id: actor.ownerId },
+          kind: 'print.kitchen_ticket',
+          orderId: order.documentId,
+          priority: 20,
+          payload: {
+            target: { role: 'station', key: station },
+            ...buildKitchenTicketBulkPayload({ order, items: stationItems, station }),
+          },
+        });
+        result.queued += 1;
+      } catch (err) {
+        strapi.log.warn(`print.kitchen_ticket bulk: enqueue fallito per stazione ${station}: ${err.message}`);
+      }
+    }
+  } catch (err) {
+    strapi.log.warn(`print.kitchen_ticket bulk: errore generico per ordine ${order && order.documentId}: ${err.message}`);
+  }
+  return result;
 }
 
 /** Verifica lock_version (optimistic locking). */
@@ -1048,7 +1163,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             filters: { id: { $in: ids } },
             populate: {
               fk_table: true,
-              fk_items: { populate: ['fk_element'] },
+              fk_items: { populate: { fk_element: true, fk_addons: { populate: ['fk_ingredient'] } } },
               fk_reservation: true,
             },
             sort: ['opened_at:desc'],
@@ -1063,7 +1178,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             filters,
             populate: {
               fk_table: true,
-              fk_items: { populate: ['fk_element'] },
+              fk_items: { populate: { fk_element: true, fk_addons: { populate: ['fk_ingredient'] } } },
               fk_reservation: true,
             },
             sort: ['opened_at:desc'],
@@ -1237,25 +1352,77 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         data: itemData,
       });
 
+      // --- Addon processing ---
+      const rawAddons = Array.isArray(body.addons) ? body.addons.slice(0, 10) : [];
+      const createdAddons = [];
+      if (rawAddons.length > 0) {
+        const ownerRow = await strapi.db.query('plugin::users-permissions.user').findOne({
+          where: { id: actor.ownerId },
+          select: ['id', 'subscription_plan'],
+        });
+        const isStarterPlan = !ownerRow || String(ownerRow.subscription_plan || '').toLowerCase() !== 'pro';
+
+        for (const addon of rawAddons) {
+          const ingDocId = addon.ingredient_id;
+          if (!ingDocId) continue;
+
+          const ingResults = await strapi.documents('api::ingredient.ingredient').findMany({
+            filters: {
+              documentId: { $eq: ingDocId },
+              fk_user: { id: { $eq: actor.ownerId } },
+              is_addon: { $eq: true },
+              is_active: { $ne: false },
+            },
+            fields: ['id', 'documentId', 'name', 'addon_price', 'addon_avg_qty', 'stock_qty'],
+            limit: 1,
+          });
+          const ing = ingResults && ingResults[0];
+          if (!ing) continue;
+
+          const snapshotPrice = Number(ing.addon_price) || 0;
+          let qtyUsed = null;
+          if (!isStarterPlan) {
+            qtyUsed = addon.qty_used !== undefined && addon.qty_used !== null
+              ? Number(addon.qty_used)
+              : (Number(ing.addon_avg_qty) || null);
+          }
+
+          const addonRecord = await strapi.documents('api::order-item-addon.order-item-addon').create({
+            data: {
+              name: ing.name,
+              price: snapshotPrice,
+              qty_used: qtyUsed,
+              fk_ingredient: { connect: [{ id: ing.id }] },
+              fk_order_item: { connect: [{ id: createdItem.id }] },
+            },
+          });
+          createdAddons.push(addonRecord);
+        }
+      }
+      // --- Fine addon processing ---
+
+      // Ricarica item con addons se presenti (serve per il totale)
+      let itemForTotal = createdItem;
+      if (createdAddons.length > 0) {
+        itemForTotal = await strapi.documents('api::order-item.order-item').findOne({
+          documentId: createdItem.documentId,
+          populate: { fk_addons: { populate: ['fk_ingredient'] } },
+        });
+      }
+
       const totalResult = await updateOrderTotalFromItems(order, [
         ...(order.fk_items || []),
-        createdItem,
+        itemForTotal,
       ]);
 
       const routingLookup = await loadRoutingMap(strapi, actor.owner);
-      const station = routingLookup(itemCategory);
-      queueKitchenTicketPrint({
-        actor,
-        order,
-        item: { ...createdItem, category: itemCategory, fk_element: menuElement || null },
-        station,
-        action: 'add',
-      });
+      // Stampa comanda rimossa da addItem: la comanda parte solo al click
+      // "Invia in cucina" (sendDineInToDepartments) in modalita' bulk.
 
       ctx.status = 201;
       ctx.body = {
         data: {
-          item: serializeItem(createdItem, routingLookup),
+          item: serializeItem(itemForTotal, routingLookup),
           order: {
             total_amount: totalResult.total,
             lock_version: totalResult.lock_version,
@@ -1315,14 +1482,80 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (body.notes !== undefined) {
         data.notes = typeof body.notes === 'string' ? body.notes.trim() : null;
       }
-      if (Object.keys(data).length === 0) {
+
+      const hasAddonsField = body.addons !== undefined;
+      if (Object.keys(data).length === 0 && !hasAddonsField) {
         throw appError('INVALID_PAYLOAD', 'Nessun campo da aggiornare.');
       }
 
-      const updatedItem = await strapi.documents('api::order-item.order-item').update({
-        documentId: itemDocumentId,
-        data,
-      });
+      let updatedItem = item;
+      if (Object.keys(data).length > 0) {
+        updatedItem = await strapi.documents('api::order-item.order-item').update({
+          documentId: itemDocumentId,
+          data,
+        });
+      }
+
+      // Gestione addons: se passato l'array, sostituisci completamente
+      // gli addon attuali (cancellazione + ricreazione con snapshot).
+      if (hasAddonsField) {
+        const rawAddons = Array.isArray(body.addons) ? body.addons.slice(0, 10) : [];
+
+        // Cancella addon esistenti dell'item (cascade manuale).
+        await strapi.db.query('api::order-item-addon.order-item-addon').deleteMany({
+          where: { fk_order_item: { id: item.id } },
+        });
+
+        if (rawAddons.length > 0) {
+          const ownerRow = await strapi.db.query('plugin::users-permissions.user').findOne({
+            where: { id: actor.ownerId },
+            select: ['id', 'subscription_plan'],
+          });
+          const isStarterPlan = !ownerRow || String(ownerRow.subscription_plan || '').toLowerCase() !== 'pro';
+
+          for (const addon of rawAddons) {
+            const ingDocId = addon.ingredient_id;
+            if (!ingDocId) continue;
+
+            const ingResults = await strapi.documents('api::ingredient.ingredient').findMany({
+              filters: {
+                documentId: { $eq: ingDocId },
+                fk_user: { id: { $eq: actor.ownerId } },
+                is_addon: { $eq: true },
+                is_active: { $ne: false },
+              },
+              fields: ['id', 'documentId', 'name', 'addon_price', 'addon_avg_qty', 'stock_qty'],
+              limit: 1,
+            });
+            const ing = ingResults && ingResults[0];
+            if (!ing) continue;
+
+            const snapshotPrice = Number(ing.addon_price) || 0;
+            let qtyUsed = null;
+            if (!isStarterPlan) {
+              qtyUsed = addon.qty_used !== undefined && addon.qty_used !== null
+                ? Number(addon.qty_used)
+                : (Number(ing.addon_avg_qty) || null);
+            }
+
+            await strapi.documents('api::order-item-addon.order-item-addon').create({
+              data: {
+                name: ing.name,
+                price: snapshotPrice,
+                qty_used: qtyUsed,
+                fk_ingredient: { connect: [{ id: ing.id }] },
+                fk_order_item: { connect: [{ id: item.id }] },
+              },
+            });
+          }
+        }
+
+        // Ricarica item con addons aggiornati per il totale e la response.
+        updatedItem = await strapi.documents('api::order-item.order-item').findOne({
+          documentId: itemDocumentId,
+          populate: { fk_addons: { populate: ['fk_ingredient'] }, fk_element: true },
+        });
+      }
 
       const nextItems = items.map((current) => (
         current.documentId === itemDocumentId ? { ...current, ...updatedItem } : current
@@ -1330,14 +1563,8 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       const totalResult = await updateOrderTotalFromItems(order, nextItems);
 
       const routingLookup = await loadRoutingMap(strapi, actor.owner);
-      const station = routingLookup(updatedItem.category || item.category);
-      queueKitchenTicketPrint({
-        actor,
-        order,
-        item: { ...item, ...updatedItem, category: updatedItem.category || item.category },
-        station,
-        action: 'update',
-      });
+      // Stampa comanda rimossa da updateItem: la comanda parte solo al click
+      // "Invia in cucina" (sendDineInToDepartments) in modalita' bulk.
 
       ctx.body = {
         data: {
@@ -1388,6 +1615,11 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (item.status !== 'pending') {
         throw appError('ITEM_NOT_EDITABLE', 'Item non eliminabile (gia inviato in cucina).');
       }
+
+      // Cascade delete addons dell'item
+      await strapi.db.query('api::order-item-addon.order-item-addon').deleteMany({
+        where: { fk_order_item: { id: item.id } },
+      });
 
       await strapi.documents('api::order-item.order-item').delete({
         documentId: itemDocumentId,
@@ -1823,7 +2055,26 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
 
       const full = await loadOrder(documentId, actor.ownerId);
       const routingLookup = await loadRoutingMap(strapi, actor.owner);
-      ctx.body = { data: serializeOrder(full, true, routingLookup), meta: { sent: advanced } };
+
+      // Stampa comande bulk: accoda un job per ogni stazione con item pending
+      const printResult = await queueKitchenTicketBulkPrint({
+        actor,
+        order: full,
+        items: pending,
+        routingLookup,
+      });
+
+      ctx.body = {
+        data: serializeOrder(full, true, routingLookup),
+        meta: {
+          sent: advanced,
+          print_dispatched: {
+            attempted: printResult.attempted,
+            queued: printResult.queued,
+            no_device: printResult.no_device,
+          },
+        },
+      };
     } catch (err) {
       sendError(ctx, err);
     }

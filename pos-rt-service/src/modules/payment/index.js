@@ -20,7 +20,28 @@ function createOrderCloseHandler({ driverRegistry }) {
   return async function handleOrderClose(payload, { job }) {
     parseOrThrow(orderClosePayloadSchema, payload);
 
-    const { payment, printer } = driverRegistry;
+    // Capability-aware routing: se payload.target e' presente, usa getCashDevice;
+    // altrimenti fallback al comportamento di default (retro-compat).
+    let payment, printer;
+    if (payload.target && payload.target.key) {
+      const cashDevice = driverRegistry.getCashDevice({ id: payload.target.key });
+      // Il cash device potrebbe essere sia printer che payment, a seconda del driver.
+      // Se ha charge(), usalo come payment; altrimenti usa il default.
+      payment = typeof cashDevice?.charge === 'function' ? cashDevice : driverRegistry.payment;
+      // Per la stampa: se il cash device ha printReceipt/printFiscalReceipt, usalo;
+      // altrimenti cerca un device con can_print_fiscal o usa il default.
+      if (typeof cashDevice?.printReceipt === 'function' || typeof cashDevice?.printFiscalReceipt === 'function') {
+        printer = cashDevice;
+      } else {
+        // Cerca un altro cash device con can_print_fiscal
+        const fiscalDevice = driverRegistry.getCashDevice({ capability: 'can_print_fiscal' });
+        printer = (typeof fiscalDevice?.printFiscalReceipt === 'function') ? fiscalDevice : driverRegistry.printer;
+      }
+    } else {
+      payment = driverRegistry.payment;
+      printer = driverRegistry.printer;
+    }
+
     if (!payment) throw new AppError(CODES.DRIVER_UNAVAILABLE, 'Payment driver non caricato');
     if (!printer) throw new AppError(CODES.DRIVER_UNAVAILABLE, 'Printer driver non caricato');
 
