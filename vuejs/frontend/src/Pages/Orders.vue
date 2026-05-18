@@ -8,6 +8,8 @@ import KitchenBoard from '@/components/KitchenBoard.vue';
 import OrderDetailPage from '@/components/OrderDetailPage.vue';
 import Modal from '@/components/Modal.vue';
 import Skeleton from '@/components/Skeleton.vue';
+import WalkinModal from '@/components/WalkinModal.vue';
+import TableManagerModal from '@/components/TableManagerModal.vue';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
 import { STAFF_ROLES, effectiveUserId, staffRole } from '@/staffAccess';
 import {
@@ -92,6 +94,10 @@ const walkinTable = ref(null);
 const walkinSaving = ref(false);
 const walkinForm = ref({ number_of_people: 2, customer_name: 'Walk-in', phone: '', notes: '' });
 const walkinErrors = ref({});
+// Strumenti sidebar (mirror della pagina Prenotazioni): walk-in libero (con
+// scelta del tavolo o auto) + gestione tavoli (CRUD).
+const showWalkinModal = ref(false);
+const showTableManager = ref(false);
 
 // View interna della pagina Sala (cameriere): 'grid' (lista tavoli, default)
 // vs 'order-detail' (vista full-page del tavolo con add cumulative + invio
@@ -434,6 +440,27 @@ const handleServeReady = async (order) => {
   }
 };
 
+// Handler dei modali "Strumenti" della sidebar (mirror Prenotazioni).
+const onWalkinModalCreated = async () => {
+  showToast('success', 'Walk-in registrato.');
+  await loadData({ silent: true });
+};
+const onTableManagerUpdated = async (payload = null) => {
+  if (payload?.table?.documentId) {
+    if (payload.action === 'created') {
+      tables.value = [...tables.value, payload.table].sort((a, b) => (a.number || 0) - (b.number || 0));
+    } else if (payload.action === 'updated') {
+      tables.value = tables.value.map((t) => (
+        t.documentId === payload.table.documentId ? { ...t, ...payload.table } : t
+      ));
+    } else if (payload.action === 'deleted') {
+      tables.value = tables.value.filter((t) => t.documentId !== payload.table.documentId);
+    }
+    return;
+  }
+  await loadData({ silent: true });
+};
+
 const handleTakeawayPickupFromSala = async (order) => {
   if (!order?.documentId) return;
   try {
@@ -456,15 +483,19 @@ function statusLabel(status) {
 
 let realtimeChannel = null;
 let realtimeRefreshHandle = null;
+// Tick incrementato a ogni evento realtime: OrderDetailPage lo osserva come
+// prop per ricaricare il proprio ordine quando la KitchenBoard avanza un item
+// (e.g. taken→preparing→ready), cosi' il cameriere vede il bottone "Servito"
+// senza dover chiudere/riaprire la pagina dettaglio.
+const realtimeTick = ref(0);
 
 const scheduleRealtimeRefresh = () => {
   if (document.visibilityState !== 'visible') return;
   if (realtimeRefreshHandle) clearTimeout(realtimeRefreshHandle);
   realtimeRefreshHandle = setTimeout(async () => {
     realtimeRefreshHandle = null;
+    realtimeTick.value += 1;
     await loadData({ silent: true });
-    // Quando si è dentro la vista dettaglio tavolo, OrderDetailPage si
-    // aggiorna autonomamente ricaricando l'ordine dopo ogni mutazione.
   }, 250);
 };
 
@@ -608,6 +639,20 @@ watch(() => route.path, async () => {
               <i :class="['bi', pill.icon]" aria-hidden="true"></i>
               <span>{{ pill.label }}</span>
               <span v-if="pill.count > 0" class="ord-nav-count">{{ pill.count }}</span>
+            </button>
+          </nav>
+        </div>
+
+        <div v-if="mode === 'cameriere'" class="ord-sidebar-section">
+          <div class="ord-sidebar-label">Strumenti</div>
+          <nav class="ord-sidebar-nav">
+            <button type="button" class="ord-nav-item" @click="showTableManager = true">
+              <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+              <span>Tavoli</span>
+            </button>
+            <button type="button" class="ord-nav-item" @click="showWalkinModal = true">
+              <i class="bi bi-person-plus" aria-hidden="true"></i>
+              <span>Walk-in</span>
             </button>
           </nav>
         </div>
@@ -830,6 +875,7 @@ watch(() => route.path, async () => {
             v-else-if="salaView === 'order-detail' && currentOrderDocId"
             :order-document-id="currentOrderDocId"
             :token="token"
+            :refresh-tick="realtimeTick"
             @back="onOrderDetailBack"
             @sent="onOrderSent"
             @order-updated="onOrderDetailUpdated"
@@ -895,6 +941,22 @@ watch(() => route.path, async () => {
         </form>
       </template>
     </Modal>
+
+    <WalkinModal
+      :show="showWalkinModal"
+      :tables="tables"
+      :token="token"
+      @close="showWalkinModal = false"
+      @created="onWalkinModalCreated"
+    />
+    <TableManagerModal
+      :show="showTableManager"
+      :token="token"
+      :tables="tables"
+      :editing-table="null"
+      @close="showTableManager = false"
+      @updated="onTableManagerUpdated"
+    />
   </AppLayout>
 </template>
 

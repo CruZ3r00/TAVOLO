@@ -27,6 +27,10 @@ import DishPickerOverlay from '@/components/DishPickerOverlay.vue';
 const props = defineProps({
     orderDocumentId: { type: String, default: null },
     token: { type: String, default: null },
+    // Tick incrementato dal parent (Orders.vue) a ogni evento realtime: usato
+    // per ricaricare l'ordine corrente quando la KitchenBoard avanza un item
+    // (cosi' il cameriere vede "Servito" senza refresh manuale).
+    refreshTick: { type: Number, default: 0 },
 });
 const emit = defineEmits(['back', 'sent', 'order-updated']);
 
@@ -146,6 +150,19 @@ const load = async () => {
 };
 
 watch(() => props.orderDocumentId, async () => { await load(); }, { immediate: false });
+
+// Ricarica l'ordine quando il parent segnala un evento realtime. Non
+// ricarico se sono nel mezzo di una mutazione locale (loading true) o se
+// l'utente sta editando un item (per non perdere lo stato del form).
+watch(() => props.refreshTick, async (next, prev) => {
+    if (!next || next === prev) return;
+    if (loading.value || sendingToCucina.value || editingItemId.value) return;
+    if (!props.orderDocumentId) return;
+    try {
+        const fresh = await fetchOrder(props.orderDocumentId, props.token);
+        order.value = fresh;
+    } catch (_err) { /* silenzioso: il polling parent gestira' il retry */ }
+});
 
 const openPicker = () => { pickerOpen.value = true; };
 const closePicker = () => { pickerOpen.value = false; };

@@ -38,14 +38,17 @@ const items = computed(() => {
   }
 
   if (role.value === STAFF_ROLES.CAMERIERE) {
+    // No "Home": per il cameriere la home coincide con /orders, quindi il
+    // bottone non navigherebbe da nessuna parte.
     return [
-      { id: 'manager', icon: 'bi-house', iconActive: 'bi-house-fill', label: 'Home', path: homePath },
       { id: 'sala', icon: 'bi-grid-3x3-gap', iconActive: 'bi-grid-3x3-gap-fill', label: 'Sala', path: '/orders' },
       { id: 'prenotazioni', icon: 'bi-calendar-check', iconActive: 'bi-calendar-check-fill', label: 'Prenota', path: '/reservations', badge: props.pendingCount },
     ];
   }
 
-  // Staff di reparto: home + reparto + carico bar (se applicabile).
+  // Staff di reparto: reparto + carico bar (se applicabile). Niente "Home":
+  // la home coincide con la stessa pagina di reparto, quindi il bottone non
+  // navigherebbe da nessuna parte.
   const dept = (() => {
     if (role.value === STAFF_ROLES.CUCINA) return { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen' };
     if (role.value === STAFF_ROLES.BAR) return { id: 'bar', icon: 'bi-cup-straw', label: 'Bar', path: '/bar' };
@@ -54,9 +57,7 @@ const items = computed(() => {
     return null;
   })();
 
-  const out = [
-    { id: 'manager', icon: 'bi-house', iconActive: 'bi-house-fill', label: 'Home', path: homePath },
-  ];
+  const out = [];
   if (dept) out.push({ ...dept, iconActive: dept.icon });
   if (canSeeNavItem(props.user, 'bar-management')) {
     out.push({ id: 'bar-management', icon: 'bi-cup-hot', iconActive: 'bi-cup-hot-fill', label: 'Carico', path: '/bar-management' });

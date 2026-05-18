@@ -119,6 +119,7 @@ function isStaffApiAllowed(role, method, path, ownerPlan) {
 
   if (role === 'cameriere') {
     if (path === '/api/tables') return method === 'GET';
+    if (path === '/api/ingredients/addons') return method === 'GET';
     if (path === '/api/reservations') return method === 'GET' || method === 'POST';
     if (path === '/api/reservations/walkin') return method === 'POST';
     if (/^\/api\/reservations\/[^/]+\/status$/.test(path)) return method === 'PATCH';
@@ -134,6 +135,7 @@ function isStaffApiAllowed(role, method, path, ownerPlan) {
       return method === 'PATCH' || method === 'DELETE';
     }
     if (/^\/api\/orders\/[^/]+\/items\/[^/]+\/status$/.test(path)) return method === 'PATCH';
+    if (/^\/api\/orders\/[^/]+\/send$/.test(path)) return method === 'POST';
     if (/^\/api\/orders\/[^/]+\/close$/.test(path)) return method === 'POST';
     return false;
   }
