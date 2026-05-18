@@ -511,6 +511,8 @@ async function grantImportPermissions(strapi) {
       'api::table.table.remove',
       'api::order.order.create',
       'api::order.order.list',
+      'api::order.order.board',
+      'api::order.order.sala',
       'api::order.order.findOne',
       'api::order.order.getTotal',
       'api::order.order.addItem',

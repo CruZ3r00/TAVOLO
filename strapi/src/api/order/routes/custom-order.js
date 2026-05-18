@@ -58,6 +58,18 @@ module.exports = {
     },
     {
       method: 'GET',
+      path: '/orders/board',
+      handler: 'order.board',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'GET',
+      path: '/orders/sala',
+      handler: 'order.sala',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'GET',
       path: '/orders/:documentId',
       handler: 'order.findOne',
       config: { policies: [], middlewares: [] },

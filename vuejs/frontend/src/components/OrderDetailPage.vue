@@ -105,6 +105,39 @@ const orderTotal = computed(() => {
     return items.value.reduce((s, it) => s + itemLineTotal(it), 0);
 });
 
+const applyOrderSummary = (summary) => {
+    if (!order.value || !summary) return;
+    order.value = {
+        ...order.value,
+        total_amount: summary.total_amount ?? order.value.total_amount,
+        lock_version: summary.lock_version ?? order.value.lock_version,
+    };
+};
+
+const appendItemLocal = (item) => {
+    if (!order.value || !item) return;
+    const current = order.value.items || order.value.fk_items || [];
+    order.value = { ...order.value, items: [...current, item] };
+};
+
+const replaceItemLocal = (documentId, item) => {
+    if (!order.value || !documentId || !item) return;
+    const current = order.value.items || order.value.fk_items || [];
+    order.value = {
+        ...order.value,
+        items: current.map((it) => (it.documentId === documentId ? { ...it, ...item } : it)),
+    };
+};
+
+const removeItemLocal = (documentId) => {
+    if (!order.value || !documentId) return;
+    const current = order.value.items || order.value.fk_items || [];
+    order.value = {
+        ...order.value,
+        items: current.filter((it) => it.documentId !== documentId),
+    };
+};
+
 const tableLabel = computed(() => {
     const t = order.value?.table;
     if (!t) return 'Ordine';
@@ -193,8 +226,9 @@ const onPickDish = async (picked) => {
             addons: addonsPayload,
         };
     try {
-        await addOrderItem(order.value.documentId, payload, props.token);
-        await load();
+        const result = await addOrderItem(order.value.documentId, payload, props.token);
+        appendItemLocal(result?.item);
+        applyOrderSummary(result?.order);
         emit('order-updated');
     } catch (err) {
         if (err?.code === 'STALE_ORDER') {
@@ -287,8 +321,9 @@ const commitEdit = async (item) => {
     patch.lock_version = lockVersion.value;
     busyItemIds.value = new Set([...busyItemIds.value, item.documentId]);
     try {
-        await updateOrderItem(order.value.documentId, item.documentId, patch, props.token);
-        await load();
+        const result = await updateOrderItem(order.value.documentId, item.documentId, patch, props.token);
+        replaceItemLocal(item.documentId, result?.item);
+        applyOrderSummary(result?.order);
         emit('order-updated');
     } catch (err) {
         if (err?.code === 'STALE_ORDER') {
@@ -328,8 +363,9 @@ const removeItem = async (item) => {
     if (!confirm(`Rimuovere "${item.name}" dall'ordine?`)) return;
     busyItemIds.value = new Set([...busyItemIds.value, item.documentId]);
     try {
-        await deleteOrderItem(order.value.documentId, item.documentId, { lock_version: lockVersion.value }, props.token);
-        await load();
+        const result = await deleteOrderItem(order.value.documentId, item.documentId, { lock_version: lockVersion.value }, props.token);
+        removeItemLocal(item.documentId);
+        applyOrderSummary(result?.order);
         emit('order-updated');
     } catch (err) {
         if (err?.code === 'STALE_ORDER') {
@@ -354,6 +390,7 @@ const confirmAndSend = async () => {
         const resp = await sendOrderToProduction(order.value.documentId, props.token);
         const sent = resp?.meta?.sent ?? 0;
         const printDispatched = resp?.meta?.print_dispatched || null;
+        if (resp?.data) order.value = resp.data;
         emit('sent', { sent, order: resp?.data, printDispatched });
     } catch (err) {
         errorMessage.value = orderErrorMessage(err);

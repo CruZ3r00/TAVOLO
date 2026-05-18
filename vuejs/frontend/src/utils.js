@@ -54,6 +54,8 @@ export {
 } from './lib/api/tables.js';
 export {
   fetchOrders,
+  fetchOrdersBoard,
+  fetchOrdersSala,
   openOrder,
   fetchOrder,
   addOrderItem,

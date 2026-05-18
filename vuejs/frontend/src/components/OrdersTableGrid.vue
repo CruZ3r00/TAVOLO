@@ -13,6 +13,7 @@ import SalaAreaSummary from '@/components/SalaAreaSummary.vue';
 const props = defineProps({
   tables: { type: Array, default: () => [] },
   orders: { type: Array, default: () => [] },
+  ordersByTableId: { default: null },
   canRemoveTables: { type: Boolean, default: false },
   // Stato filtro corrente (controllato dal parent). Vue 2.7 dual-build:
   // niente v-model:filter — il parent fa :filter + @update:filter.
@@ -22,6 +23,9 @@ const props = defineProps({
 const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'serve-ready', 'counts-changed']);
 
 function activeOrderForTable(table) {
+  if (props.ordersByTableId && typeof props.ordersByTableId.get === 'function') {
+    return props.ordersByTableId.get(table.documentId) || null;
+  }
   return props.orders.find(
     o => o.status === 'active' && o.table?.documentId === table.documentId
   ) || null;

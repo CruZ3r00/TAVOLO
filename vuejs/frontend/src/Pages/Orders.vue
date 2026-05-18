@@ -13,7 +13,7 @@ import TableManagerModal from '@/components/TableManagerModal.vue';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
 import { STAFF_ROLES, effectiveUserId, staffRole } from '@/staffAccess';
 import {
-  fetchTables, fetchOrders, updateItemStatus, orderErrorMessage,
+  fetchTables, fetchOrders, fetchOrdersBoard, fetchOrdersSala, updateItemStatus, orderErrorMessage,
   pickupTakeaway,
   createWalkin, reservationErrorMessage,
   deleteTable,
@@ -33,6 +33,15 @@ const loading = ref(false);
 const refreshing = ref(false);
 const errorMessage = ref('');
 const toast = ref(null);
+const activeOrdersByTableId = computed(() => {
+  const map = new Map();
+  for (const order of orders.value || []) {
+    if (order?.status === 'active' && order.table?.documentId) {
+      map.set(order.table.documentId, order);
+    }
+  }
+  return map;
+});
 
 const kitchenModes = {
   cucina: { title: 'Cucina', overline: 'Cucina', station: 'cucina' },
@@ -279,12 +288,22 @@ const loadData = async ({ silent = false } = {}) => {
   if (!token.value) return;
   if (silent) refreshing.value = true; else loading.value = true;
   try {
-    const [tablesResp, ordersResp] = await Promise.all([
-      isKitchenMode.value ? Promise.resolve({ data: [] }) : fetchTables(token.value),
-      fetchOrders({ status: 'active', pageSize: 100, station: effectiveStation.value }, token.value),
-    ]);
-    tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
-    orders.value = filterOrdersForView(ordersResp?.data);
+    if (mode.value === 'cameriere' && salaView.value === 'grid') {
+      const salaResp = await fetchOrdersSala({ status: 'active' }, token.value);
+      tables.value = Array.isArray(salaResp?.data?.tables) ? salaResp.data.tables : [];
+      orders.value = filterOrdersForView(salaResp?.data?.orders);
+    } else if (isKitchenMode.value) {
+      const ordersResp = await fetchOrdersBoard({ status: 'active', pageSize: 100, station: effectiveStation.value }, token.value);
+      tables.value = [];
+      orders.value = filterOrdersForView(ordersResp?.data);
+    } else {
+      const [tablesResp, ordersResp] = await Promise.all([
+        fetchTables(token.value),
+        fetchOrders({ status: 'active', pageSize: 100, station: effectiveStation.value }, token.value),
+      ]);
+      tables.value = Array.isArray(tablesResp?.data) ? tablesResp.data : [];
+      orders.value = filterOrdersForView(ordersResp?.data);
+    }
     errorMessage.value = '';
   } catch (err) {
     errorMessage.value = orderErrorMessage(err);
@@ -326,7 +345,21 @@ const onOrderSent = async ({ sent, printDispatched }) => {
   }
 };
 
-const onOrderDetailUpdated = async () => { await loadData({ silent: true }); };
+const onOrderDetailUpdated = async () => {
+  if (salaView.value === 'grid') await loadData({ silent: true });
+};
+
+const patchOrderItemLocal = (orderDocumentId, itemDocumentId, patch) => {
+  orders.value = orders.value.map((order) => {
+    if (order.documentId !== orderDocumentId || !Array.isArray(order.items)) return order;
+    return {
+      ...order,
+      items: order.items.map((item) => (
+        item.documentId === itemDocumentId ? { ...item, ...(patch || {}) } : item
+      )),
+    };
+  });
+};
 
 const handleOpenTable = async (table) => {
   if (!table?.documentId || !token.value) return;
@@ -410,9 +443,10 @@ const handleKitchenAdvance = async ({ item, next, orderDocumentId }) => {
   try {
     const station = isOwnerProductionMode.value ? null : modeInfo.value.station;
     const params = station ? { station } : {};
-    await updateItemStatus(orderDocumentId, item.documentId, next, token.value, params);
+    const result = await updateItemStatus(orderDocumentId, item.documentId, next, token.value, params);
+    const updatedItem = result?.item || result?.data?.item || null;
+    if (updatedItem) patchOrderItemLocal(orderDocumentId, item.documentId, updatedItem);
     showToast('success', `"${item.name}" → ${statusLabel(next)}`);
-    await loadData({ silent: true });
   } catch (err) {
     if (orderIdx !== -1) {
       const itemInOrder = orders.value[orderIdx].items?.find(i => i.documentId === item.documentId);
@@ -452,7 +486,9 @@ const handleServeReady = async (order) => {
   let fail = 0;
   await Promise.all(ready.map(async (item) => {
     try {
-      await updateItemStatus(order.documentId, item.documentId, 'served', token.value);
+      const result = await updateItemStatus(order.documentId, item.documentId, 'served', token.value);
+      const updatedItem = result?.item || result?.data?.item || { status: 'served' };
+      patchOrderItemLocal(order.documentId, item.documentId, updatedItem);
       ok += 1;
     } catch (err) {
       fail += 1;
@@ -467,7 +503,6 @@ const handleServeReady = async (order) => {
 
   if (ok > 0) {
     showToast('success', `${ok} ${ok === 1 ? 'piatto servito' : 'piatti serviti'}.`);
-    await loadData({ silent: true });
   }
   if (fail > 0) {
     showToast('error', `${fail} ${fail === 1 ? 'piatto non' : 'piatti non'} aggiornati.`);
@@ -530,6 +565,7 @@ const scheduleRealtimeRefresh = () => {
   realtimeRefreshHandle = setTimeout(async () => {
     realtimeRefreshHandle = null;
     realtimeTick.value += 1;
+    if (mode.value === 'cameriere' && salaView.value !== 'grid') return;
     await loadData({ silent: true });
   }, 250);
 };
@@ -558,6 +594,7 @@ const startPollingRefresh = () => {
   stopPollingRefresh();
   pollingRefreshHandle = setInterval(() => {
     if (document.visibilityState !== 'visible' || loading.value || refreshing.value) return;
+    if (mode.value === 'cameriere' && salaView.value !== 'grid') return;
     loadData({ silent: true });
   }, isOwnerProductionMode.value ? 3000 : 5000);
 };
@@ -926,6 +963,7 @@ watch(() => route.path, async () => {
             v-if="salaView === 'grid'"
             :tables="tables"
             :orders="orders"
+            :orders-by-table-id="activeOrdersByTableId"
             :can-remove-tables="canManageTables"
             :filter="tableFilter"
             @update:filter="tableFilter = $event"
