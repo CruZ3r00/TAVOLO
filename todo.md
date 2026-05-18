@@ -1,3 +1,27 @@
+# Plan — Fix staging authenticated API 500 after deploy (2026-05-18)
+
+## Problema
+
+- Frontend staging risponde 200.
+- Login API staging risponde 200.
+- API autenticate (`/api/users/me`, `/api/tables`, `/api/orders`) rispondono 500.
+- API anonime sugli stessi path rispondono 403 correttamente.
+
+## Ipotesi tecnica
+
+Il middleware `subscription-gate` chiama `resolveStaffContext()` prima dei controller.
+Se il contesto staff fallisce per drift schema/DB/relazioni in staging, il middleware
+propaga l'errore e trasforma tutta l'API autenticata in 500.
+
+## Checklist
+
+- [x] Rendere `resolveStaffContext()` resiliente: se il refresh completo dell'utente fallisce, usare il payload JWT come fallback.
+- [x] Rendere `subscription-gate` resiliente: se la risoluzione staff fallisce, loggare warning e applicare fallback owner invece di 500.
+- [x] Verificare sintassi Node.
+- [x] Verificare test Strapi.
+- [x] Aggiornare lessons con la regola di prevenzione.
+- [ ] Attendere deploy prima di rifare qualunque test live/carico.
+
 # Plan — Element.ingredients legacy JSON cleanup (2026-05-14)
 
 ## Problema riportato dall'utente

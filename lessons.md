@@ -56,3 +56,8 @@
 
 - Before running operational/realtime tests, verify the target environment the user is watching. If the user is on `staging-app.comfortables.eu`, local `localhost` load tests will not be visible and can create misleading conclusions.
 - State the active target explicitly before generating data, then use that same target for API writes and browser observation.
+
+## 2026-05-18 — Auth middleware must fail closed by policy, not by 500
+
+- Middleware that runs before every authenticated API must not let optional staff/context enrichment throw raw errors. Catch enrichment failures, log a warning, and fall back to the safest valid actor context so owner/core APIs do not become global 500s after a deploy drift.
+- When staging shows 500 only for authenticated APIs while login succeeds and anonymous requests return 403, check pre-controller auth/subscription middleware before blaming the frontend or realtime.

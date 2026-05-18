@@ -153,10 +153,15 @@ function staffError(message = 'Non autorizzato per questo reparto.') {
 async function resolveStaffContext(strapi, user) {
   if (!user || !user.id) return null;
 
-  const fresh = await strapi.db.query('plugin::users-permissions.user').findOne({
-    where: { id: user.id },
-    populate: { fk_owner: true },
-  });
+  let fresh = null;
+  try {
+    fresh = await strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: user.id },
+      populate: { fk_owner: true },
+    });
+  } catch (err) {
+    strapi.log.warn(`staff context user refresh fallito, uso fallback JWT: ${err.message}`);
+  }
 
   const actor = fresh || user;
   const staffRecord = await resolveRestaurantStaffRecord(strapi, actor);

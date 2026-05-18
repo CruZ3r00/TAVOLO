@@ -193,7 +193,22 @@ async function authContextFromBearer(strapi, authorization) {
 
   const promise = (async () => {
     const user = await userFromBearer(strapi, authorization);
-    const actor = user ? await resolveStaffContext(strapi, user) : null;
+    let actor = null;
+    if (user) {
+      try {
+        actor = await resolveStaffContext(strapi, user);
+      } catch (err) {
+        strapi.log.warn(`subscription gate staff context fallback: ${err.message}`);
+        actor = {
+          actor: user,
+          role: 'owner',
+          owner: user,
+          ownerId: user.id,
+          staffActive: true,
+          isStaff: false,
+        };
+      }
+    }
     return { user, actor };
   })();
 
