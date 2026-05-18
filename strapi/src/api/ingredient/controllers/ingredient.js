@@ -672,8 +672,13 @@ module.exports = {
         }
       }
 
-      await strapi.documents('api::ingredient.ingredient').update({
-        documentId: ing.documentId,
+      // Usa db.query (e non strapi.documents()) per scrivere direttamente la
+      // riga: il documents API di Strapi v5 ha quirk noti su content-type
+      // senza draftAndPublish, dove l'update partial puo' "perdere" il flag
+      // boolean richiesto (vedi appendMovement in services/inventory che usa
+      // lo stesso pattern per stock_qty). Garantisce persistenza affidabile.
+      await strapi.db.query('api::ingredient.ingredient').update({
+        where: { id: ing.id },
         data: patch,
       });
 
