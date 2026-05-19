@@ -1,3 +1,56 @@
+# Plan — Deploy Strapi: backfill is_beverage fallisce senza colonna (2026-05-19)
+
+## Problema
+
+In deploy Strapi si ferma durante la user migration
+`202605140001_backfill_is_beverage.js` perche' la migration legge
+`elements.is_beverage` prima che la sincronizzazione schema di Strapi abbia
+creato la colonna sul database target.
+
+## Checklist
+
+- [x] Rendere la migration autosufficiente: creare `elements.is_beverage` se manca.
+- [x] Aggiungere una nuova migration idempotente per i flag Element usati a runtime.
+- [x] Mantenere la migration idempotente su staging/produzione gia' aggiornati.
+- [x] Verificare sintassi migration e diff.
+- [x] Aggiornare review e lessons se emerge un errore di codice/migration.
+
+## Review
+
+- Root cause: le user migrations Strapi girano durante `db.schema.sync`, prima
+  che il diff dei content type garantisca la presenza della nuova colonna.
+  La migration di backfill quindi non poteva selezionare `e.is_beverage` su un
+  DB target non ancora sincronizzato.
+- Fix: la migration bloccante ora crea `elements.is_beverage boolean default
+  false` solo se manca, poi esegue il backfill esistente.
+- Robustezza: aggiunta `202605190004_element_flag_columns.js` per garantire
+  anche `is_beverage_advanced`, `is_archived` e gli indici Element che una
+  migration precedente poteva aver saltato quando le colonne mancavano.
+- Verifica: `node --check` passato; test Knex in-memory senza colonna iniziale
+  passato (`before=false`, `after=true`, `updates=1`); doppia esecuzione della
+  migration nuova passata; `npm test` Strapi passato (37 test).
+
+# Plan — Deploy Strapi: cleanup ingredienti legacy senza link table (2026-05-19)
+
+## Problema
+
+Dopo il fix `is_beverage`, Strapi arriva alla migration
+`202605140003_drop_legacy_element_ingredients_json.js` e fallisce perche'
+interroga `element_ingredients_fk_element_lnk` prima che la link table esista
+nel database target.
+
+## Checklist
+
+- [x] Rendere il cleanup legacy fail-soft quando la link table non esiste.
+- [x] Preservare il dato legacy `elements.ingredients` se il backfill strutturato
+  non puo' essere verificato.
+- [ ] Verificare sintassi e deploy restart.
+
+## Review
+
+- Fix: se `element_ingredients_fk_element_lnk` non esiste, la migration fa skip
+  del cleanup distruttivo invece di crashare.
+
 # Plan — Mobile turno bar: contenuti modale devono scrollare (2026-05-19)
 
 ## Problema

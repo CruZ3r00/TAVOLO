@@ -31,6 +31,10 @@ module.exports = {
       console.log('[drop_legacy_element_ingredients_json] colonna gia\' assente, skip.');
       return;
     }
+    if (!(await knex.schema.hasTable('element_ingredients_fk_element_lnk'))) {
+      console.log('[drop_legacy_element_ingredients_json] link table assente, skip cleanup legacy.');
+      return;
+    }
 
     // Sanity: tutti gli Element con JSON popolato hanno gia' ElementIngredient.
     const orphans = await knex.raw(`

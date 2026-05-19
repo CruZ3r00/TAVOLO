@@ -41,7 +41,21 @@ function isProRouting(owner) {
   return !Number.isNaN(periodEndDate.getTime()) && periodEndDate.getTime() >= Date.now();
 }
 
+async function ensureBooleanColumn(knex, tableName, columnName, defaultValue = false) {
+  if (!(await knex.schema.hasTable(tableName))) return false;
+  if (await knex.schema.hasColumn(tableName, columnName)) return true;
+
+  await knex.schema.alterTable(tableName, (table) => {
+    table.boolean(columnName).defaultTo(defaultValue);
+  });
+
+  return true;
+}
+
 async function up(knex) {
+  const hasIsBeverage = await ensureBooleanColumn(knex, 'elements', 'is_beverage', false);
+  if (!hasIsBeverage) return 0;
+
   // 1) Carica owner con campi subscription per decidere pro vs non-pro.
   const owners = await knex('up_users').select(
     'id', 'subscription_status', 'subscription_plan',

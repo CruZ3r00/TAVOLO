@@ -112,3 +112,8 @@
 ## 2026-05-19 — Mobile modals with dense operational text should scroll as one page
 
 - On small screens, avoid locking the viewport while only an inner panel scrolls when the modal contains examples, notes, or operational advice. Let the overlay/card scroll as a single document so explanatory text and actions move together and remain readable on iOS/Android.
+
+## 2026-05-19 — Strapi data migrations must own columns they read
+
+- Strapi user migrations can run before the content-type schema diff has created newly declared columns on a fresh deploy target. If a migration reads or backfills a new content-type field, first guard `hasTable`/`hasColumn` and add the column idempotently inside the same migration.
+- Index-only migrations should continue to skip missing columns, but data migrations must not skip silently when runtime code depends on the backfilled field existing at boot.
