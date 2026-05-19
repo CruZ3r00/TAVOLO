@@ -102,3 +102,8 @@
 - Never add new columns only by editing a migration that may already be recorded in staging/production. Add a new idempotent migration so deployed databases actually receive the schema change.
 - Mail flows that can silently skip must log the exact skip reason before returning; otherwise provider dashboards can make an old unrelated notification look like the current email.
 - Customer access emails must always be sent to the owner registration email (`owner.email`). Internal support notifications are separate emails and must never replace or share the customer access email path.
+
+## 2026-05-19 — Essential "Ordini" is a unified production queue
+
+- In Essential, the technical `cucina` role is displayed as `Ordini` and must behave as a unified queue. Backend station filters cannot keep using `restaurant_category_routing.staff_role`, because historical or regex-created rows may classify beverages as `bar` even though the plan has no bar staff.
+- Keep Pro routing untouched: category routing drives separate Cucina/Bar/Pizzeria/Cucina SG stations only when the owner has an active `pro` subscription.

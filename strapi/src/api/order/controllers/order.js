@@ -37,6 +37,7 @@ const {
   normalizeStation,
   ensureCategoryRouting,
   loadRoutingMap,
+  ownerHasProfessionalRouting,
 } = require('../../../utils/category-routing');
 const {
   sendTakeawayEmail,
@@ -848,6 +849,7 @@ function filterOrdersForStation(orders, routingLookup, station) {
 async function listOrderIdsForStation(strapi, params) {
   const {
     ownerId,
+    owner,
     station,
     statusFilter,
     serviceTypeFilter,
@@ -861,16 +863,15 @@ async function listOrderIdsForStation(strapi, params) {
     pageSize,
   } = params;
   const conn = strapi.db.connection;
+  const usesProfessionalRouting = ownerHasProfessionalRouting(owner);
+  const usesUnifiedStarterQueue = !usesProfessionalRouting && station === STAFF_ROLES.CUCINA;
 
   const applyFilters = (q) => {
     let query = q
       .innerJoin('orders_fk_user_lnk as ul', 'ul.order_id', 'o.id')
       .innerJoin('order_items_fk_order_lnk as il', 'il.order_id', 'o.id')
       .innerJoin('order_items as oi', 'oi.id', 'il.order_item_id')
-      .innerJoin('restaurant_category_routing as rcr', 'rcr.owner_id', 'ul.user_id')
-      .whereRaw('rcr.category_key = LOWER(TRIM(oi.category))')
       .where('ul.user_id', ownerId)
-      .where('rcr.staff_role', station)
       .where('oi.status', '<>', 'served')
       .andWhere(function () {
         this.where(function () {
@@ -883,6 +884,15 @@ async function listOrderIdsForStation(strapi, params) {
             .whereIn('o.takeaway_status', ['sent_to_departments', 'ready']);
         });
       });
+
+    if (usesProfessionalRouting) {
+      query = query
+        .innerJoin('restaurant_category_routing as rcr', 'rcr.owner_id', 'ul.user_id')
+        .whereRaw('rcr.category_key = LOWER(TRIM(oi.category))')
+        .where('rcr.staff_role', station);
+    } else if (!usesUnifiedStarterQueue) {
+      query = query.whereRaw('1 = 0');
+    }
 
     if (statusFilter && statusFilter.length) {
       query = query.whereIn('o.status', statusFilter);
@@ -1217,6 +1227,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         // in JS contava il subset di una pagina invece del totale filtrato.
         const { ids, total: filteredTotal } = await listOrderIdsForStation(strapi, {
           ownerId,
+          owner: actor.owner,
           station,
           statusFilter,
           serviceTypeFilter,
@@ -1323,6 +1334,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (station) {
         const { ids, total: filteredTotal } = await listOrderIdsForStation(strapi, {
           ownerId,
+          owner: actor.owner,
           station,
           statusFilter,
           serviceTypeFilter,

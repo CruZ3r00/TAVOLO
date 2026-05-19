@@ -1,3 +1,33 @@
+# Plan — Essential Ordini deve mostrare tutte le categorie (2026-05-19)
+
+## Problema
+
+Nel piano Essenziale l'owner vede le comande nella scheda `Tutti`, ma la
+scheda `Ordini` e l'account tecnico cucina/ordini non vedono gli item che la
+tabella routing classifica come `bar`. Il frontend etichetta correttamente
+`cucina` come coda unica `Ordini`, ma il filtro SQL dei reparti continua a
+usare `restaurant_category_routing.staff_role`.
+
+## Checklist
+
+- [x] Correggere solo il filtro backend Essential: `cucina/Ordini` include
+  tutti gli item non serviti.
+- [x] Lasciare invariato il piano Pro: reparti separati e filtro per categoria.
+- [x] Eseguire micro-test/sintassi e test backend mirati.
+- [x] Documentare risultato e lesson.
+
+## Review
+
+- Root cause: `loadRoutingMap()` gia' trattava Essential come coda unica
+  `cucina`, ma `listOrderIdsForStation()` filtrava prima in SQL su
+  `restaurant_category_routing.staff_role`. Le categorie bevande restavano
+  quindi escluse dalla vista reparto `Ordini`.
+- Fix: se l'owner non ha routing Professionale attivo e la station richiesta e'
+  `cucina`, la query reparto include tutti gli item non serviti; se un non-Pro
+  chiede altre station, ritorna vuoto. In Pro resta il join su routing.
+- Verifica: `node --check src/api/order/controllers/order.js`, `npm test`,
+  `git diff --check` passati.
+
 # Plan — Mail accessi non visibile in staging (2026-05-19)
 
 ## Problema
