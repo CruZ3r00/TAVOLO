@@ -93,3 +93,9 @@
 - Creating the owner before Stripe Checkout means browser back/cancel can leave an unpaid account that blocks retry by unique username/email. Always provide an explicit abandoned-signup cleanup path for owners without active subscription and without `stripe_subscription_id`.
 - Frontend retry should tolerate stale pending owners: if register fails because username/email already exists, try login with the just-entered credentials and reopen Checkout instead of stranding the user.
 - Checkout-cancel cleanup must clear both server cookies and local storage; otherwise the router sees an authenticated but unpaid owner and sends the user to `/renew-sub`.
+
+## 2026-05-19 — Signup side effects must be post-payment
+
+- Registration should validate and persist only the minimum owner plus pending provisioning metadata. Do not create WebsiteConfig, public site files, staff accounts, or access emails before Stripe confirms an active subscription.
+- Post-payment sync/webhook must be the single provisioning gateway: create WebsiteConfig/site first, then sync staff, then send staff access email.
+- After successful checkout sync, force a fresh login so cookies/localStorage/user payload include the newly active subscription and staff context.

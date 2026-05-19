@@ -100,6 +100,16 @@ const cleanupCancelledSignup = async () => {
     return true;
 };
 
+const forceFreshLogin = async () => {
+    try {
+        await fetch(`${API_BASE}/api/account/logout`, { method: 'POST' });
+    } catch (_err) {
+        // Logout locale comunque.
+    }
+    store.dispatch('logout');
+    router.replace({ path: '/login', query: { subscription: 'active' } });
+};
+
 // Se torniamo da Stripe Checkout con session_id, sincronizza i dati subito —
 // non aspettiamo il webhook (potrebbe non arrivare in dev senza tunnel).
 const syncIfReturningFromCheckout = async () => {
@@ -116,10 +126,9 @@ const syncIfReturningFromCheckout = async () => {
             // Riallinea con /users/me autoritativo (subscription_plan, staff payload, ecc).
             await store.dispatch('refreshUser');
         }
-        noticeMessage.value = 'Pagamento confermato. Puoi accedere all\'app.';
-        // Pulizia query string e ridirezione alla dashboard se attivo.
+        noticeMessage.value = 'Pagamento confermato. Effettua di nuovo il login per caricare la sessione aggiornata.';
         if (synced && ['active', 'trialing'].includes(synced.subscription_status)) {
-            setTimeout(() => router.replace('/dashboard'), 800);
+            setTimeout(forceFreshLogin, 800);
         }
     } catch (err) {
         errorMessage.value = err?.message || 'Sync della sessione Stripe non riuscito.';

@@ -1,3 +1,30 @@
+# Plan — Side effect signup solo dopo pagamento (2026-05-19)
+
+## Problema
+
+La registrazione stava ancora creando configurazione/sito prima del pagamento,
+mentre la mail accessi staff partiva dopo Stripe. Questo produceva stati
+intermedi confusi: account esistente senza pagamento, niente mail, sessione non
+riallineata.
+
+## Checklist
+
+- [x] Registrazione: solo validazione e salvataggio dati pending per provisioning.
+- [x] Post-pagamento: creare WebsiteConfig, sito placeholder, staff account e mail.
+- [x] Dopo pagamento: logout tecnico e redirect a `/login` per sessione pulita.
+- [x] Verificare sintassi, test backend e build frontend.
+
+## Review
+
+- Rimosso il lifecycle `afterCreate` che generava sito/email alla registrazione.
+- I dati ristorante necessari al provisioning sono salvati su owner come campi
+  pending privati e consumati dopo pagamento.
+- `syncStaffAndSendAccessEmail` ora prima fa provisioning post-pagamento, poi
+  sincronizza staff e invia la mail accessi.
+- Dopo `sync-checkout` riuscito, il frontend chiama logout e manda a `/login`.
+- Verifica: `node --check src/index.js`, `node --check src/api/billing/controllers/billing.js`,
+  `npm test`, `npm run build:modern`, `git diff --check` passati.
+
 # Plan — Signup Stripe abort non deve lasciare account bloccante (2026-05-19)
 
 ## Problema

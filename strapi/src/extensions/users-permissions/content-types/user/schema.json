@@ -106,6 +106,18 @@
       "type": "string",
       "private": true
     },
+    "signup_restaurant_name": {
+      "type": "string",
+      "private": true
+    },
+    "signup_coperti_invernali": {
+      "type": "integer",
+      "private": true
+    },
+    "signup_coperti_estivi": {
+      "type": "integer",
+      "private": true
+    },
     "end_subscription": {
       "type": "date"
     },

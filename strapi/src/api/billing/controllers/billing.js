@@ -1,8 +1,11 @@
 'use strict';
 
 const Stripe = require('stripe');
+const fs = require('fs');
+const path = require('path');
 const {
   applyStaffActiveState,
+  publicSiteSlug,
   resolveStaffContext,
   staffUserPayload,
   STAFF_ROLES,
@@ -227,6 +230,120 @@ async function restaurantNameForOwner(owner) {
   }
 }
 
+async function websiteConfigForOwner(ownerId) {
+  if (!ownerId || !strapi.db.connection) return null;
+  try {
+    return await strapi.db.connection('website_configs as config')
+      .join('website_configs_fk_user_lnk as owner_lnk', 'owner_lnk.website_config_id', 'config.id')
+      .select(['config.id', 'config.restaurant_name', 'config.site_url'])
+      .where('owner_lnk.user_id', ownerId)
+      .orderBy('config.id', 'desc')
+      .first();
+  } catch (err) {
+    strapi.log.warn(`website config lookup fallito per user ${ownerId}: ${err.message}`);
+    return null;
+  }
+}
+
+function buildPlaceholderSiteHtml(username) {
+  const safeUsername = escapeHtml(username);
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${safeUsername} - Sito in costruzione</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); }
+        .construction-card { text-align: center; max-width: 500px; padding: 3rem 2rem; }
+        .construction-icon { font-size: 4rem; color: #6c757d; margin-bottom: 1.5rem; }
+    </style>
+</head>
+<body>
+    <div class="card shadow-sm construction-card">
+        <div class="construction-icon"><i class="bi bi-tools"></i></div>
+        <h1 class="h3 mb-3">Sito in costruzione</h1>
+        <p class="text-muted mb-4">Il sito menu di <strong>${safeUsername}</strong> è in fase di preparazione. Torna a trovarci presto!</p>
+        <div class="d-flex justify-content-center gap-2">
+            <a href="/" class="btn btn-outline-secondary">Torna alla home</a>
+        </div>
+    </div>
+</body>
+</html>`;
+}
+
+async function writePlaceholderSite(owner) {
+  try {
+    const sitesDir = path.resolve(strapi.dirs.app.root, '..', 'restaurant-sites');
+    if (!fs.existsSync(sitesDir)) {
+      fs.mkdirSync(sitesDir, { recursive: true });
+    }
+    const siteSlug = publicSiteSlug(owner.username);
+    const filePath = path.resolve(sitesDir, `${siteSlug}.html`);
+    if (!filePath.startsWith(`${sitesDir}${path.sep}`)) {
+      throw new Error('Percorso sito fuori dalla directory consentita.');
+    }
+    fs.writeFileSync(filePath, buildPlaceholderSiteHtml(owner.username), 'utf-8');
+    strapi.log.info(`Sito placeholder creato per ${owner.username}: ${filePath}`);
+  } catch (err) {
+    strapi.log.warn(`Impossibile creare il file sito per ${owner.username}: ${err.message}`);
+  }
+}
+
+async function ensurePaidSignupProvisioning(userId) {
+  const owner = userId
+    ? await strapi.db.query('plugin::users-permissions.user').findOne({ where: { id: userId } })
+    : null;
+  if (!owner || !hasActiveSubscription(owner)) return null;
+
+  const existingConfig = await websiteConfigForOwner(owner.id);
+  if (existingConfig?.site_url && owner.url) return owner;
+
+  const cInv = Number.parseInt(owner.signup_coperti_invernali, 10);
+  const cEstRaw = Number.parseInt(owner.signup_coperti_estivi, 10);
+  const copertiInvernali = Number.isFinite(cInv) && cInv > 0 ? cInv : null;
+  const copertiEstivi = Number.isFinite(cEstRaw) && cEstRaw > 0 ? cEstRaw : copertiInvernali;
+
+  if (!existingConfig && !copertiInvernali) {
+    strapi.log.warn(`post-payment provisioning: dati coperti mancanti per user ${owner.id}`);
+    return owner;
+  }
+
+  const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+  const siteSlug = publicSiteSlug(owner.username);
+  const siteUrl = `${siteBaseUrl.replace(/\/+$/, '')}/sites/${siteSlug}`;
+  const restaurantName =
+    (typeof owner.signup_restaurant_name === 'string' && owner.signup_restaurant_name.trim()) ||
+    owner.username ||
+    'Ristorante';
+
+  if (!existingConfig) {
+    await strapi.documents('api::website-config.website-config').create({
+      data: {
+        restaurant_name: restaurantName,
+        site_url: siteUrl,
+        coperti_invernali: copertiInvernali,
+        coperti_estivi: copertiEstivi,
+        fk_user: { connect: [{ id: owner.id }] },
+      },
+    });
+  }
+
+  await writePlaceholderSite(owner);
+  const updated = await strapi.db.query('plugin::users-permissions.user').update({
+    where: { id: owner.id },
+    data: {
+      url: existingConfig?.site_url || siteUrl,
+      signup_restaurant_name: null,
+      signup_coperti_invernali: null,
+      signup_coperti_estivi: null,
+    },
+  });
+  return updated;
+}
+
 async function listStaffAccessAccounts(owner, plan) {
   const roles = STAFF_ACCESS_ROLES_BY_PLAN[plan] || [];
   if (!owner?.id || roles.length === 0 || !strapi.db.connection) return [];
@@ -369,6 +486,7 @@ async function sendStaffAccessEmailIfNeeded(userId) {
 }
 
 async function syncStaffAndSendAccessEmail(userId) {
+  await ensurePaidSignupProvisioning(userId);
   await syncOwnerStaffAccounts(userId);
   await sendStaffAccessEmailIfNeeded(userId);
 }
