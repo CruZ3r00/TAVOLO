@@ -35,6 +35,7 @@ const STAFF_ACCESS_DESCRIPTIONS = {
   pizzeria: 'Riceve le comande assegnate alla pizzeria.',
   cucina_sg: 'Riceve le preparazioni dedicate al senza glutine.',
 };
+const STAFF_ACCESS_EMAIL_VERSION = 'access-v2';
 
 let stripeClient = null;
 
@@ -138,6 +139,10 @@ function staffAccessRoleLabel(role, plan) {
 function staffAccessDescription(role, plan) {
   if (role === STAFF_ROLES.CUCINA && plan === 'pro') return STAFF_ACCESS_DESCRIPTIONS.cucina_pro;
   return STAFF_ACCESS_DESCRIPTIONS[role] || '';
+}
+
+function staffAccessEmailClaimKey(plan) {
+  return `${plan}:${STAFF_ACCESS_EMAIL_VERSION}`;
 }
 
 async function staffSettingsPayload(owner) {
@@ -383,6 +388,7 @@ async function listStaffAccessAccounts(owner, plan) {
 
 async function claimStaffAccessEmail(ownerId, plan) {
   if (!ownerId || !plan || !strapi.db.connection) return false;
+  const claimKey = staffAccessEmailClaimKey(plan);
   const result = await strapi.db.connection.raw(`
     update up_users
     set staff_access_email_sent_at = now(),
@@ -390,7 +396,7 @@ async function claimStaffAccessEmail(ownerId, plan) {
     where id = ?
       and coalesce(staff_access_email_sent_plan, '') <> ?
     returning id
-  `, [plan, ownerId, plan]);
+  `, [claimKey, ownerId, claimKey]);
   return (result?.rows || []).length > 0;
 }
 
@@ -563,7 +569,7 @@ async function sendStaffAccessEmailIfNeeded(userId) {
   const previousPlan = owner.staff_access_email_sent_plan || null;
   const claimed = await claimStaffAccessEmail(owner.id, plan);
   if (!claimed) {
-    strapi.log.info(`staff access email: gia inviata per user ${owner.id}, piano ${plan}.`);
+    strapi.log.info(`staff access email: gia inviata per user ${owner.id}, piano ${plan}, versione ${STAFF_ACCESS_EMAIL_VERSION}.`);
     return;
   }
 
