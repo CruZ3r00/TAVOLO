@@ -356,14 +356,29 @@ async function listStaffAccessAccounts(owner, plan) {
     .where('user.blocked', false);
 
   const byRole = new Map((rows || []).map((row) => [row.role, row.username]));
-  return roles
-    .map((role) => ({
+  return Promise.all(roles.map(async (role) => {
+    let username = byRole.get(role) || null;
+    if (!username) {
+      try {
+        const fallback = await strapi.db.connection
+          .raw('select public.staff_username_for_role(?, ?, ?) as username', [owner.id, owner.username, role]);
+        username = fallback?.rows?.[0]?.username || null;
+      } catch (err) {
+        strapi.log.warn(`staff access email: fallback username fallito per user ${owner.id}, role ${role}: ${err.message}`);
+      }
+    }
+    if (!username) {
+      const suffix = role === STAFF_ROLES.CUCINA_SG ? 'cucinasg' : role;
+      username = `${String(owner.username || 'ristorante').replace(/\s+/g, '')}.${suffix}`;
+    }
+    return {
       role,
       label: staffAccessRoleLabel(role, plan),
-      username: byRole.get(role) || null,
+      username,
       description: staffAccessDescription(role, plan),
-    }))
-    .filter((item) => item.username);
+      exists: byRole.has(role),
+    };
+  }));
 }
 
 async function claimStaffAccessEmail(ownerId, plan) {
@@ -454,7 +469,7 @@ function buildInternalNewUserEmail({ owner, restaurantName, plan }) {
   const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
   const planLabel = plan === 'pro' ? 'Professionale' : 'Essenziale';
   return {
-    subject: `Nuovo ristoratore registrato: ${owner.username}`,
+    subject: `Nuovo ristoratore attivato: ${owner.username}`,
     text: [
       'Un nuovo ristoratore ha completato registrazione e pagamento.',
       '',
@@ -537,10 +552,12 @@ async function sendStaffAccessEmailIfNeeded(userId) {
 
   const accounts = await listStaffAccessAccounts(owner, plan);
   const expectedCount = STAFF_ACCESS_ROLES_BY_PLAN[plan]?.length || 0;
-  if (accounts.length < expectedCount) {
-    const found = accounts.map((account) => account.role).join(',') || 'nessuno';
-    strapi.log.warn(`staff access email: account staff incompleti per user ${owner.id}, piano ${plan}. trovati=${found}, attesi=${expectedCount}.`);
-    return;
+  const missingRows = accounts.filter((account) => !account.exists).map((account) => account.role);
+  if (accounts.length < expectedCount || missingRows.length > 0) {
+    strapi.log.warn(
+      `staff access email: uso username previsti per user ${owner.id}, piano ${plan}. ` +
+      `account_db_mancanti=${missingRows.join(',') || 'nessuno'}, account_email=${accounts.map((a) => `${a.role}:${a.username}`).join(',')}`
+    );
   }
 
   const previousPlan = owner.staff_access_email_sent_plan || null;
