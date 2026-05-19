@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import {
     API_BASE,
+    abandonSignup,
     createBillingCheckoutSession,
     createBillingPortalSession,
     fetchBillingStatus,
@@ -55,6 +56,7 @@ const PLANS = {
 
 // L'altro piano (passa all'altro abbonamento).
 const SWITCH_TARGET = { starter: 'pro', pro: 'starter' };
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
 
 const allPlans = computed(() => Object.values(PLANS));
 
@@ -78,6 +80,24 @@ const loadBillingStatus = async () => {
     } catch (err) {
         console.error('fetchBillingStatus:', err);
     }
+};
+
+const cleanupCancelledSignup = async () => {
+    if (route.query.checkout !== 'cancelled' || !isOwnerAccount.value) return false;
+    const status = billing.value || {};
+    if (ACTIVE_SUBSCRIPTION_STATUSES.has(status.subscription_status) || status.subscription_plan) return false;
+
+    try {
+        await abandonSignup(token.value || null);
+    } catch (err) {
+        console.warn('abandonSignup:', err);
+        return false;
+    }
+    sessionStorage.removeItem('pending_registration');
+    sessionStorage.removeItem('pending_plan_after_verification');
+    store.dispatch('logout');
+    router.replace('/register');
+    return true;
 };
 
 // Se torniamo da Stripe Checkout con session_id, sincronizza i dati subito —
@@ -166,6 +186,7 @@ onMounted(async () => {
     nextTick(() => { document.title = 'Rinnova abbonamento'; });
     await syncIfReturningFromCheckout();
     await loadBillingStatus();
+    if (await cleanupCancelledSignup()) return;
 
     // Retry automatico se il flusso ChoosePlan ci ha rimbalzato qui con un piano già scelto.
     const requestedPlan = typeof route.query.plan === 'string' ? route.query.plan : '';

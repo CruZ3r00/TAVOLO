@@ -1,3 +1,32 @@
+# Plan — Signup Stripe abort non deve lasciare account bloccante (2026-05-19)
+
+## Problema
+
+Se l'utente apre Stripe e torna indietro senza pagare, resta un account owner
+senza subscription attiva. Al secondo tentativo la registrazione fallisce con
+`email or username already taken` e il router lo porta su `/renew-sub`.
+
+## Checklist
+
+- [x] Aggiungere cleanup sicuro dell'owner pending non pagato su checkout annullato.
+- [x] Gestire i pending storici: secondo tentativo con stesse credenziali riapre Checkout invece di fallire.
+- [x] Evitare redirect confuso a `/renew-sub` dopo back da Stripe senza pagamento.
+- [x] Verificare build frontend e test Strapi.
+
+## Review
+
+- Nuovo endpoint autenticato `POST /api/billing/abandon-signup`: elimina solo
+  owner senza subscription attiva e senza `stripe_subscription_id`, poi pulisce
+  cookie auth.
+- Se Stripe ritorna `checkout=cancelled` per un signup non pagato, il frontend
+  chiama il cleanup, svuota la sessione locale e torna a `/register`.
+- Se esiste gia' un owner pending storico, ChoosePlan prova il login con le
+  stesse credenziali e riapre Checkout invece di mostrare `email or username
+  already taken`.
+- Verifica: `node --check src/api/billing/controllers/billing.js`,
+  `npm test`, `npm run build:modern`, `git diff --check` passati.
+
+
 # Plan — Email accessi staff post-attivazione piano (2026-05-19)
 
 ## Obiettivo

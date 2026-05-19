@@ -39,6 +39,11 @@ module.exports = {
     },
     {
       method: 'POST',
+      path: '/billing/abandon-signup',
+      handler: 'billing.abandonSignup',
+    },
+    {
+      method: 'POST',
       path: '/billing/webhook',
       handler: 'billing.webhook',
       config: { auth: false, policies: [], middlewares: [] },

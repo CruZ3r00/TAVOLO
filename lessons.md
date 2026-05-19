@@ -87,3 +87,9 @@
 - Do not send staff access instructions from the raw registration lifecycle: before Stripe activation the plan may be pending and staff accounts may not exist yet.
 - Staff access emails should be triggered after subscription sync/webhook, after `sync_owner_staff_accounts`, and guarded by a DB flag so Stripe webhook + frontend return cannot send duplicates.
 - Until per-staff password reset/change exists, do not invent temporary passwords in email. State that staff profiles use the same password chosen during registration and include only account usernames.
+
+## 2026-05-19 — Stripe-aborted signup must not become a dead account
+
+- Creating the owner before Stripe Checkout means browser back/cancel can leave an unpaid account that blocks retry by unique username/email. Always provide an explicit abandoned-signup cleanup path for owners without active subscription and without `stripe_subscription_id`.
+- Frontend retry should tolerate stale pending owners: if register fails because username/email already exists, try login with the just-entered credentials and reopen Checkout instead of stranding the user.
+- Checkout-cancel cleanup must clear both server cookies and local storage; otherwise the router sees an authenticated but unpaid owner and sends the user to `/renew-sub`.

@@ -76,3 +76,13 @@ export const reactivateBillingSubscription = async (token) => {
   if (!resp.ok) throw buildApiError(resp, payload);
   return payload.data;
 };
+
+export const abandonSignup = async (token) => {
+  const resp = await fetch(`${API_BASE}/api/billing/abandon-signup`, {
+    method: 'POST',
+    headers: jsonHeaders(token),
+  });
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw buildApiError(resp, payload);
+  return payload.data;
+};

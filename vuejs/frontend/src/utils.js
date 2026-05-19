@@ -21,6 +21,7 @@ export {
   changeBillingPlan,
   cancelBillingSubscription,
   reactivateBillingSubscription,
+  abandonSignup,
 } from './lib/api/billing.js';
 export {
   fetchStaffSettings,

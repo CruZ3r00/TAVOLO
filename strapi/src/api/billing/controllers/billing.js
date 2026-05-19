@@ -7,6 +7,7 @@ const {
   staffUserPayload,
   STAFF_ROLES,
 } = require('../../../utils/staff-access');
+const { clearAuthCookies } = require('../../../utils/auth-cookies');
 
 const PLAN_CONFIG = {
   starter: { name: 'Starter', priceEnv: 'STRIPE_PRICE_STARTER' },
@@ -101,6 +102,12 @@ function hasActiveSubscription(user) {
   if (!periodEnd) return true;
   const periodEndDate = new Date(periodEnd);
   return !Number.isNaN(periodEndDate.getTime()) && periodEndDate.getTime() >= Date.now();
+}
+
+function isUnpaidSignupOwner(user) {
+  if (!user || (user.staff_role && user.staff_role !== STAFF_ROLES.OWNER)) return false;
+  if (hasActiveSubscription(user)) return false;
+  return !user.stripe_subscription_id;
 }
 
 function planAllowsStaffRole(user, role) {
@@ -364,6 +371,43 @@ async function sendStaffAccessEmailIfNeeded(userId) {
 async function syncStaffAndSendAccessEmail(userId) {
   await syncOwnerStaffAccounts(userId);
   await sendStaffAccessEmailIfNeeded(userId);
+}
+
+async function cleanupSignupArtifacts(ownerId) {
+  if (!ownerId || !strapi.db.connection) return;
+  const knex = strapi.db.connection;
+
+  const staffRows = await knex('restaurant_staff as staff')
+    .join('up_users as user', 'user.id', 'staff.user_id')
+    .select(['staff.user_id'])
+    .where('staff.owner_id', ownerId)
+    .where('user.email', 'like', `staff+${ownerId}.%@staff.local.tavolo`);
+  const staffIds = [...new Set((staffRows || []).map((row) => row.user_id).filter(Boolean))];
+
+  if (staffIds.length > 0) {
+    await knex('restaurant_staff').where('owner_id', ownerId).whereIn('user_id', staffIds).delete();
+    if (await knex.schema.hasTable('up_users_fk_owner_lnk')) {
+      await knex('up_users_fk_owner_lnk').whereIn('user_id', staffIds).delete();
+    }
+    if (await knex.schema.hasTable('up_users_role_lnk')) {
+      await knex('up_users_role_lnk').whereIn('user_id', staffIds).delete();
+    }
+    await knex('up_users').whereIn('id', staffIds).delete();
+  }
+
+  if (
+    await knex.schema.hasTable('website_configs') &&
+    await knex.schema.hasTable('website_configs_fk_user_lnk')
+  ) {
+    const configRows = await knex('website_configs_fk_user_lnk')
+      .select(['website_config_id'])
+      .where('user_id', ownerId);
+    const configIds = [...new Set((configRows || []).map((row) => row.website_config_id).filter(Boolean))];
+    if (configIds.length > 0) {
+      await knex('website_configs_fk_user_lnk').where('user_id', ownerId).delete();
+      await knex('website_configs').whereIn('id', configIds).delete();
+    }
+  }
 }
 
 async function findUserByStripe({ customerId, subscriptionId }) {
@@ -693,6 +737,34 @@ module.exports = {
       return ctx.send({
         error: { message: err.message || 'Riattivazione non riuscita.' },
       });
+    }
+  },
+
+  async abandonSignup(ctx) {
+    const user = await requireBillingUser(ctx);
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+    const actor = await resolveStaffContext(strapi, user);
+    if (actor && ![STAFF_ROLES.OWNER].includes(actor.role)) {
+      return ctx.forbidden('Solo il titolare puo annullare la registrazione.');
+    }
+
+    const owner = actor && actor.owner ? actor.owner : user;
+    const fresh = await strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: owner.id },
+    });
+    if (!isUnpaidSignupOwner(fresh)) {
+      return ctx.badRequest('Registrazione non annullabile: account gia attivo o associato a Stripe.');
+    }
+
+    try {
+      await cleanupSignupArtifacts(fresh.id);
+      await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: fresh.id } });
+      clearAuthCookies(ctx);
+      return ctx.send({ data: { abandoned: true } });
+    } catch (err) {
+      strapi.log.error(`abandonSignup failed for user ${fresh.id}: ${err.message}`);
+      ctx.status = 500;
+      return ctx.send({ error: { message: 'Annullamento registrazione non riuscito.' } });
     }
   },
 

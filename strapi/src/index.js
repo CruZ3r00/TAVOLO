@@ -515,6 +515,7 @@ async function grantImportPermissions(strapi) {
       'api::billing.billing.changePlan',
       'api::billing.billing.cancelSubscription',
       'api::billing.billing.reactivateSubscription',
+      'api::billing.billing.abandonSignup',
       'api::ingredient.ingredient.list',
       'api::ingredient.ingredient.toggle',
       'api::ingredient.ingredient.listAdvanced',

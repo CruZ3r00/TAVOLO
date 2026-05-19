@@ -2,7 +2,7 @@
 import { onMounted, nextTick, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
-import { API_BASE, createBillingCheckoutSession } from '@/utils';
+import { API_BASE, abandonSignup, createBillingCheckoutSession } from '@/utils';
 
 const router = useRouter();
 const store = useStore();
@@ -63,6 +63,15 @@ onMounted(() => {
     document.title = 'Scegli il piano';
     const stored = sessionStorage.getItem('pending_registration');
     if (!stored) {
+        if (store.getters.isAuthenticated) {
+            abandonSignup(store.getters.getToken || null)
+                .catch(() => null)
+                .finally(() => {
+                    store.dispatch('logout');
+                    router.replace('/register');
+                });
+            return;
+        }
         router.replace('/register');
         return;
     }
@@ -87,6 +96,31 @@ onMounted(() => {
     });
 });
 
+const startCheckoutForExistingPendingUser = async (planKey) => {
+    const response = await fetch(`${API_BASE}/api/auth/local`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            identifier: pending.value.email || pending.value.username,
+            password: pending.value.password,
+        }),
+    });
+    if (!response.ok) return false;
+
+    const data = await response.json().catch(() => ({}));
+    if (!data?.user) return false;
+    store.dispatch('login', { user: data.user, token: data.jwt || null });
+
+    const session = await createBillingCheckoutSession(planKey, data.jwt || null);
+    if (session?.url) {
+        sessionStorage.removeItem('pending_registration');
+        window.location.href = session.url;
+        return true;
+    }
+    throw new Error('Sessione Stripe non disponibile.');
+};
+
 const registerThenCheckout = async (planKey) => {
     if (!pending.value || submitting.value) return;
     submitting.value = true;
@@ -100,7 +134,12 @@ const registerThenCheckout = async (planKey) => {
         });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            errorMessage.value = errorData?.error?.message || 'Errore durante la registrazione.';
+            const message = errorData?.error?.message || 'Errore durante la registrazione.';
+            if (/already taken|gi[aà].*uso|esiste gi[aà]|email.*taken|username.*taken/i.test(message)) {
+                const resumed = await startCheckoutForExistingPendingUser(planKey);
+                if (resumed) return;
+            }
+            errorMessage.value = message;
             return;
         }
         const data = await response.json();
