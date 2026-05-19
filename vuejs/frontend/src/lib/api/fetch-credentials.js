@@ -2,6 +2,8 @@ import { API_BASE } from './_base';
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const CSRF_COOKIE_NAME = import.meta.env.VITE_CSRF_COOKIE_NAME || 'ct_csrf';
+const CSRF_STORAGE_KEY = 'tavolo_csrf_token';
+let cachedCsrfToken = '';
 
 function cookieValue(name) {
   const encoded = `${encodeURIComponent(name)}=`;
@@ -13,6 +15,25 @@ function cookieValue(name) {
     }
   }
   return '';
+}
+
+function storedCsrfToken() {
+  if (cachedCsrfToken) return cachedCsrfToken;
+  try {
+    cachedCsrfToken = sessionStorage.getItem(CSRF_STORAGE_KEY) || '';
+  } catch (_err) {
+    cachedCsrfToken = '';
+  }
+  return cachedCsrfToken;
+}
+
+function rememberCsrfToken(token) {
+  const value = String(token || '').trim();
+  if (!value) return;
+  cachedCsrfToken = value;
+  try {
+    sessionStorage.setItem(CSRF_STORAGE_KEY, value);
+  } catch (_err) { /* storage can be unavailable in private modes */ }
 }
 
 function requestUrl(input) {
@@ -35,7 +56,7 @@ function requestMethod(input, init) {
 function headersWithCsrf(input, init) {
   const headers = new Headers(init?.headers || input?.headers || undefined);
   if (!headers.has('X-CSRF-Token')) {
-    const csrf = cookieValue(CSRF_COOKIE_NAME);
+    const csrf = cookieValue(CSRF_COOKIE_NAME) || storedCsrfToken();
     if (csrf) headers.set('X-CSRF-Token', csrf);
   }
   return headers;
@@ -60,7 +81,10 @@ export function installCredentialedFetch() {
       nextInit.headers = headersWithCsrf(input, init);
     }
 
-    return nativeFetch(input, nextInit);
+    return nativeFetch(input, nextInit).then((response) => {
+      rememberCsrfToken(response.headers.get('X-CSRF-Token'));
+      return response;
+    });
   };
   window.__tavoloCredentialedFetchInstalled = true;
 }

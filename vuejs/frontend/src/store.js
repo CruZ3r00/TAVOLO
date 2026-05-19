@@ -65,6 +65,9 @@ export const store = createStore({
           headers,
         });
         if (!resp.ok) {
+          if (resp.status === 402 && state.user) {
+            return true;
+          }
           commit('logout');
           localStorage.removeItem('user');
           localStorage.removeItem('token');

@@ -184,19 +184,19 @@ const routes = [
         path: '/bar',
         name: 'Bar',
         component: () => import('../Pages/Orders.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'bar', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.BAR] },
+        meta: { requiresAuth: true, requiresSubscription: true, requiresPlan: 'pro', ordersMode: 'bar', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.BAR] },
     },
     { //protetta - Vista pizzeria
         path: '/pizzeria',
         name: 'Pizzeria',
         component: () => import('../Pages/Orders.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'pizzeria', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.PIZZERIA] },
+        meta: { requiresAuth: true, requiresSubscription: true, requiresPlan: 'pro', ordersMode: 'pizzeria', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.PIZZERIA] },
     },
     { //protetta - Vista cucina senza glutine
         path: '/kitchen-sg',
         name: 'Cucina SG',
         component: () => import('../Pages/Orders.vue'),
-        meta: { requiresAuth: true, requiresSubscription: true, ordersMode: 'cucina_sg', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CUCINA, STAFF_ROLES.CUCINA_SG] },
+        meta: { requiresAuth: true, requiresSubscription: true, requiresPlan: 'pro', ordersMode: 'cucina_sg', staffRoles: [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CUCINA_SG] },
     },
     { //protetta - Carico bar (solo staff bar pro / cucina starter)
         path: '/bar-management',

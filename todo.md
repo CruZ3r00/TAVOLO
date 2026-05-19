@@ -1,3 +1,401 @@
+# Plan — Deploy Strapi: backfill is_beverage fallisce senza colonna (2026-05-19)
+
+## Problema
+
+In deploy Strapi si ferma durante la user migration
+`202605140001_backfill_is_beverage.js` perche' la migration legge
+`elements.is_beverage` prima che la sincronizzazione schema di Strapi abbia
+creato la colonna sul database target.
+
+## Checklist
+
+- [x] Rendere la migration autosufficiente: creare `elements.is_beverage` se manca.
+- [x] Aggiungere una nuova migration idempotente per i flag Element usati a runtime.
+- [x] Mantenere la migration idempotente su staging/produzione gia' aggiornati.
+- [x] Verificare sintassi migration e diff.
+- [x] Aggiornare review e lessons se emerge un errore di codice/migration.
+
+## Review
+
+- Root cause: le user migrations Strapi girano durante `db.schema.sync`, prima
+  che il diff dei content type garantisca la presenza della nuova colonna.
+  La migration di backfill quindi non poteva selezionare `e.is_beverage` su un
+  DB target non ancora sincronizzato.
+- Fix: la migration bloccante ora crea `elements.is_beverage boolean default
+  false` solo se manca, poi esegue il backfill esistente.
+- Robustezza: aggiunta `202605190004_element_flag_columns.js` per garantire
+  anche `is_beverage_advanced`, `is_archived` e gli indici Element che una
+  migration precedente poteva aver saltato quando le colonne mancavano.
+- Verifica: `node --check` passato; test Knex in-memory senza colonna iniziale
+  passato (`before=false`, `after=true`, `updates=1`); doppia esecuzione della
+  migration nuova passata; `npm test` Strapi passato (37 test).
+
+# Plan — Deploy Strapi: cleanup ingredienti legacy senza link table (2026-05-19)
+
+## Problema
+
+Dopo il fix `is_beverage`, Strapi arriva alla migration
+`202605140003_drop_legacy_element_ingredients_json.js` e fallisce perche'
+interroga `element_ingredients_fk_element_lnk` prima che la link table esista
+nel database target.
+
+## Checklist
+
+- [x] Rendere il cleanup legacy fail-soft quando la link table non esiste.
+- [x] Preservare il dato legacy `elements.ingredients` se il backfill strutturato
+  non puo' essere verificato.
+- [ ] Verificare sintassi e deploy restart.
+
+## Review
+
+- Fix: se `element_ingredients_fk_element_lnk` non esiste, la migration fa skip
+  del cleanup distruttivo invece di crashare.
+
+# Plan — Mobile turno bar: contenuti modale devono scrollare (2026-05-19)
+
+## Problema
+
+Su mobile nel flusso `Turno bar` il modale `Carico fatto/Riepilogo turno`
+blocca lo scroll del body e rende scrollabile solo la sezione centrale. Header,
+azioni e testi di supporto restano fermi, riducendo lo spazio utile e rendendo
+difficile leggere esempio/consigli/nota.
+
+## Checklist
+
+- [x] Rendere lo scroll mobile dell'intero modale, non solo del body interno.
+- [x] Conservare il layout desktop/tablet con header/footer stabili.
+- [x] Verificare sintassi/build frontend.
+- [x] Aggiornare lessons con la regola mobile.
+
+## Review
+
+- Su mobile (`<=640px`) `.cf-overlay` diventa lo scroll container e `.cf-body`
+  torna a overflow visibile: header, testi, esempio/nota e azioni scorrono
+  insieme.
+- Desktop/tablet resta invariato: card a flex column con body interno
+  scrollabile e footer stabile.
+- Verifica: `npm run build:modern` e `git diff --check` passati. `node --check`
+  non e' applicabile ai file `.vue`.
+
+# Plan — Essential nav: solo Ordini e Carico bar (2026-05-19)
+
+## Problema
+
+Nell'account staff del piano Essenziale compaiono sia `Ordini` sia `Cucina SG`.
+Dato che in Essenziale tutta la produzione arriva nella coda unica `Ordini`,
+`Cucina SG` e' un duplicato inutile e puo' portare a una vista vuota/confusa.
+
+## Checklist
+
+- [x] Nascondere `Cucina SG` dalla navigazione staff `cucina` Essential.
+- [x] Lasciare visibili solo `Ordini` e `Carico bar` per lo staff ordini
+  Essential.
+- [x] Bloccare accesso diretto alle route reparto Pro per account non-Pro.
+- [x] Verificare build frontend e diff.
+
+## Review
+
+- `canSeeNavItem()` ora per staff `cucina` mostra `cucina`, `bar-management`
+  e `logout`: quindi in Essential restano `Ordini` e `Carico bar`.
+- Le route `/bar`, `/pizzeria` e `/kitchen-sg` hanno `requiresPlan: 'pro'`;
+  `/kitchen-sg` non accetta piu' il ruolo tecnico `cucina`.
+- `canAccessRoute()` blocca le route Pro se `subscription_plan !== 'pro'`.
+- Verifica: `node --check` su `staffAccess.js` e `router/index.js`,
+  `npm run build:modern`, `git diff --check` passati.
+
+# Plan — Essential Ordini deve mostrare tutte le categorie (2026-05-19)
+
+## Problema
+
+Nel piano Essenziale l'owner vede le comande nella scheda `Tutti`, ma la
+scheda `Ordini` e l'account tecnico cucina/ordini non vedono gli item che la
+tabella routing classifica come `bar`. Il frontend etichetta correttamente
+`cucina` come coda unica `Ordini`, ma il filtro SQL dei reparti continua a
+usare `restaurant_category_routing.staff_role`.
+
+## Checklist
+
+- [x] Correggere solo il filtro backend Essential: `cucina/Ordini` include
+  tutti gli item non serviti.
+- [x] Lasciare invariato il piano Pro: reparti separati e filtro per categoria.
+- [x] Eseguire micro-test/sintassi e test backend mirati.
+- [x] Documentare risultato e lesson.
+
+## Review
+
+- Root cause: `loadRoutingMap()` gia' trattava Essential come coda unica
+  `cucina`, ma `listOrderIdsForStation()` filtrava prima in SQL su
+  `restaurant_category_routing.staff_role`. Le categorie bevande restavano
+  quindi escluse dalla vista reparto `Ordini`.
+- Fix: se l'owner non ha routing Professionale attivo e la station richiesta e'
+  `cucina`, la query reparto include tutti gli item non serviti; se un non-Pro
+  chiede altre station, ritorna vuoto. In Pro resta il join su routing.
+- Verifica: `node --check src/api/order/controllers/order.js`, `npm test`,
+  `git diff --check` passati.
+
+# Plan — Mail accessi non visibile in staging (2026-05-19)
+
+## Problema
+
+Il provider mostra ancora la vecchia notifica interna
+`Nuovo ristoratore registrato` inviata a `support@comfortables.eu`, mentre la
+mail accessi al titolare non compare. Inoltre i campi pending erano stati
+aggiunti in una migration gia' usata, quindi staging poteva non riceverli.
+
+## Checklist
+
+- [x] Confermare che la vecchia notifica interna non esiste piu' nel codice.
+- [x] Creare una nuova migration idempotente per i campi provisioning signup.
+- [x] Aggiungere log diagnostici per ogni motivo di skip/invio della mail accessi.
+- [x] Verificare sintassi, test Strapi e diff.
+
+## Review
+
+- `rg` non trova piu' `Nuovo ristoratore` o `NEW_USER_NOTIFICATION_EMAIL` in
+  `strapi/src`: dopo deploy non deve piu' partire la mail interna a support.
+- Aggiunta `202605190003_signup_provisioning_fields.js` per garantire i campi
+  pending anche su DB dove la migration precedente e' gia' registrata.
+- Log attesi: `staff access email: invio a ...` prima dell'invio e
+  `Email accessi staff inviata a ...` dopo successo; se viene saltata, ora il
+  log dice se mancano owner/email/piano/subscription/staff.
+- Verifica: `node --check`, `npm test`, `git diff --check` passati.
+
+# Plan — Side effect signup solo dopo pagamento (2026-05-19)
+
+## Problema
+
+La registrazione stava ancora creando configurazione/sito prima del pagamento,
+mentre la mail accessi staff partiva dopo Stripe. Questo produceva stati
+intermedi confusi: account esistente senza pagamento, niente mail, sessione non
+riallineata.
+
+## Checklist
+
+- [x] Registrazione: solo validazione e salvataggio dati pending per provisioning.
+- [x] Post-pagamento: creare WebsiteConfig, sito placeholder, staff account e mail.
+- [x] Dopo pagamento: logout tecnico e redirect a `/login` per sessione pulita.
+- [x] Verificare sintassi, test backend e build frontend.
+
+## Review
+
+- Rimosso il lifecycle `afterCreate` che generava sito/email alla registrazione.
+- I dati ristorante necessari al provisioning sono salvati su owner come campi
+  pending privati e consumati dopo pagamento.
+- `syncStaffAndSendAccessEmail` ora prima fa provisioning post-pagamento, poi
+  sincronizza staff e invia la mail accessi.
+- Dopo `sync-checkout` riuscito, il frontend chiama logout e manda a `/login`.
+- Verifica: `node --check src/index.js`, `node --check src/api/billing/controllers/billing.js`,
+  `npm test`, `npm run build:modern`, `git diff --check` passati.
+
+# Plan — Signup Stripe abort non deve lasciare account bloccante (2026-05-19)
+
+## Problema
+
+Se l'utente apre Stripe e torna indietro senza pagare, resta un account owner
+senza subscription attiva. Al secondo tentativo la registrazione fallisce con
+`email or username already taken` e il router lo porta su `/renew-sub`.
+
+## Checklist
+
+- [x] Aggiungere cleanup sicuro dell'owner pending non pagato su checkout annullato.
+- [x] Gestire i pending storici: secondo tentativo con stesse credenziali riapre Checkout invece di fallire.
+- [x] Evitare redirect confuso a `/renew-sub` dopo back da Stripe senza pagamento.
+- [x] Verificare build frontend e test Strapi.
+
+## Review
+
+- Nuovo endpoint autenticato `POST /api/billing/abandon-signup`: elimina solo
+  owner senza subscription attiva e senza `stripe_subscription_id`, poi pulisce
+  cookie auth.
+- Se Stripe ritorna `checkout=cancelled` per un signup non pagato, il frontend
+  chiama il cleanup, svuota la sessione locale e torna a `/register`.
+- Se esiste gia' un owner pending storico, ChoosePlan prova il login con le
+  stesse credenziali e riapre Checkout invece di mostrare `email or username
+  already taken`.
+- Verifica: `node --check src/api/billing/controllers/billing.js`,
+  `npm test`, `npm run build:modern`, `git diff --check` passati.
+
+
+# Plan — Email accessi staff post-attivazione piano (2026-05-19)
+
+## Obiettivo
+
+Quando Stripe attiva il piano, inviare al titolare una mail semplice con gli
+account inclusi nel piano scelto. La mail non deve contenere password: deve
+dire che la password e' la stessa usata in registrazione e che potra' essere
+cambiata piu' avanti.
+
+## Checklist
+
+- [x] Preparare template testo/html per Essenziale e Professionale.
+- [x] Inviare la mail solo dopo subscription attiva e sync staff completato.
+- [x] Evitare invii duplicati tra return da Stripe e webhook.
+- [x] Verificare test Strapi.
+
+## Review
+
+- La mail parte da `billing` dopo checkout sync/webhook/cambio piano, quindi
+  solo quando la subscription e' attiva e gli account staff sono sincronizzati.
+- Essenziale invia `Sala` e `Ordini`; Professionale invia `Sala`, `Cucina`,
+  `Bar`, `Pizzeria`, `Cucina SG`.
+- La mail contiene solo username e specifica che la password e' quella scelta
+  in registrazione.
+- Aggiunti `staff_access_email_sent_at` e `staff_access_email_sent_plan` per
+  evitare duplicati tra webhook Stripe e ritorno frontend.
+- Verifica: `node --check src/api/billing/controllers/billing.js`,
+  `npm test`, `git diff --check` passati.
+
+
+# Plan — Essenziale: coda unica "Ordini" invece di "Cucina" (2026-05-19)
+
+## Obiettivo
+
+Per il piano Essenziale non cambiare login/ruoli tecnici: lo staff continua a
+usare il ruolo `cucina`, ma l'esperienza utente deve presentarlo come coda unica
+`Ordini`. Questo evita che un locale beverage-only pensi che gli ordini bar
+finiscano in una cucina inesistente.
+
+## Checklist
+
+- [x] Confermare che il routing backend Essenziale mandi tutte le categorie al
+  ruolo tecnico `cucina`.
+- [x] Rinominare le label visibili da `Cucina` a `Ordini` solo quando il piano
+  utente e' `starter`.
+- [x] Lasciare invariato il piano Professionale: reparti separati Cucina, Bar,
+  Pizzeria, Cucina SG.
+- [x] Eseguire un micro test/build mirato dopo la patch.
+
+## Review
+
+- Routing invariato: su Essenziale `stationForCategory` continua a restituire
+  il ruolo tecnico `cucina` per tutte le categorie; su Professionale resta lo
+  smistamento per reparti.
+- Frontend: navigazione desktop/mobile, pagina comande, profilo reparti e
+  stampanti mostrano `Ordini` per il reparto unico Essenziale.
+- Backend: `/account/staff` e `/billing/status` restituiscono label `Ordini`
+  per `cucina` solo quando il piano owner e' `starter`.
+- Verifica: `npm run build:modern`, `npm test`, `git diff --check` passati.
+
+# Plan — Fix staging authenticated API 500 after deploy (2026-05-18)
+
+## Problema
+
+- Frontend staging risponde 200.
+- Login API staging risponde 200.
+- API autenticate (`/api/users/me`, `/api/tables`, `/api/orders`) rispondono 500.
+- API anonime sugli stessi path rispondono 403 correttamente.
+
+## Ipotesi tecnica
+
+Il middleware `subscription-gate` chiama `resolveStaffContext()` prima dei controller.
+Se il contesto staff fallisce per drift schema/DB/relazioni in staging, il middleware
+propaga l'errore e trasforma tutta l'API autenticata in 500.
+
+## Checklist
+
+- [x] Rendere `resolveStaffContext()` resiliente: se il refresh completo dell'utente fallisce, usare il payload JWT come fallback.
+- [x] Rendere `subscription-gate` resiliente: se la risoluzione staff fallisce, loggare warning e applicare fallback owner invece di 500.
+- [x] Verificare sintassi Node.
+- [x] Verificare test Strapi.
+- [x] Aggiornare lessons con la regola di prevenzione.
+- [ ] Attendere deploy prima di rifare qualunque test live/carico.
+
+# Plan — Fix staging login/register secure-cookie failure (2026-05-19)
+
+## Problema
+
+- In staging la registrazione crea l'utente e il sito placeholder, poi risponde:
+  `Registrazione annullata: impossibile configurare la capacità del ristorante`.
+- I log mostrano la vera causa:
+  `Cannot send secure cookie over unencrypted connection`.
+- Il frontend vede un errore di capacità perché il middleware di registrazione
+  include `setAuthCookies()` nello stesso `try/catch` della `WebsiteConfig` e
+  quindi fa rollback anche quando fallisce solo il cookie.
+
+## Ipotesi tecnica
+
+Strapi gira dietro reverse proxy HTTPS -> HTTP. In produzione i cookie auth sono
+`secure`, ma Koa non sta fidandosi di `X-Forwarded-Proto: https`, quindi considera
+la request non sicura e rifiuta il cookie.
+
+## Checklist
+
+- [x] Configurare Koa proxy trust via `TRUST_PROXY=true`.
+- [x] Rendere il post-register robusto: un errore cookie non deve rollbackare
+  utente e `WebsiteConfig`.
+- [x] Verificare sintassi/test Strapi mirati.
+- [x] Aggiornare `lessons.md` con la diagnosi.
+- [x] Documentare risultato e nota deploy.
+
+## Review
+
+- Root cause: cookie auth `secure` scritto su request vista da Koa come HTTP
+  dietro reverse proxy. Questo rompe login e registrazione cookie-only.
+- Fix codice: `strapi/config/server.js` abilita `server.proxy.koa` da
+  `TRUST_PROXY`; `strapi/src/index.js` non fa piu' rollback di user/config se
+  fallisce solo il cookie post-register.
+- Verifica: `cd strapi && npm test` passa con 37/37 test.
+- Deploy: staging deve avere `TRUST_PROXY=true` e Nginx deve inviare
+  `X-Forwarded-Proto https`.
+
+# Plan — Fix landing legacy search, staff rollback, checkout redirect (2026-05-19)
+
+## Problema
+
+- Nel build legacy della landing compare la ricerca interna del gestionale.
+- Se una registrazione fallisce, possono restare account staff sintetici creati
+  dal trigger DB su `up_users`.
+- Dopo registrazione/verifica, il piano Essenziale finisce su `/renew-sub`
+  invece di aprire Stripe Checkout.
+
+## Checklist
+
+- [x] Rimuovere `CommandPalette` dal layout pubblico; resta solo nel layout app.
+- [x] Evitare la creazione staff finche' l'owner non ha una subscription attiva.
+- [x] Pulire gli staff sintetici durante rollback registrazione.
+- [x] Sostituire i redirect post-login/post-2FA a `/renew-sub` con Stripe Checkout diretto.
+- [x] Eseguire test Strapi e build frontend modern/legacy.
+- [x] Verificare runtime landing legacy senza ricerca interna.
+- [x] Documentare risultato.
+
+## Review
+
+- Landing legacy: verificata su `http://127.0.0.1:5175/landing`, nessun
+  `.app-top-search`, `.cp-backdrop` o `.cp-panel` nel DOM pubblico.
+- Staff: nuova migration rende `sync_owner_staff_accounts` no-op creativo senza
+  subscription attiva e ripulisce staff sintetici orfani; il rollback registrazione
+  pulisce anche gli staff generati prima di cancellare l'owner.
+- Checkout: scelta piano, login post-verifica e 2FA usano Stripe Checkout diretto
+  per `starter`/`pro`; niente redirect a `/renew-sub` come fallback signup.
+- Verifica: `cd strapi && npm test`, `npm run build:modern`, `npm run build:legacy`.
+
+## Pro Check
+
+- Frontend: `pro` usa lo stesso percorso corretto di `starter` (`createBillingCheckoutSession(planKey)`) sia da scelta piano sia dopo login/2FA con piano pendente. Non ci sono piu' redirect signup a `/renew-sub?plan=...`.
+- Backend billing: `PLAN_CONFIG.pro` punta a `STRIPE_PRICE_PRO`; i controlli produzione richiedono `STRIPE_PRICE_STARTER` e `STRIPE_PRICE_PRO` distinti.
+- Staff DB: con subscription `pro` attiva, la nuova `sync_owner_staff_accounts` crea/abilita `cameriere`, `cucina`, `bar`, `pizzeria`, `cucina_sg`; senza subscription attiva non crea staff.
+- Gating: il middleware permette i reparti pro quando l'owner ha `subscription_plan='pro'` e subscription attiva; su starter restano ammessi solo sala/cucina.
+
+## CSRF Follow-up
+
+- Problema: checkout post-register cookie-only puo' inviare `/api/billing/checkout`
+  prima di riuscire a leggere il cookie `ct_csrf`, causando
+  `CSRF_TOKEN_INVALID`.
+- Fix: Strapi espone `X-CSRF-Token` in CORS; il wrapper fetch frontend memorizza
+  quel token e lo usa come fallback su richieste unsafe.
+- Verifica: `cd strapi && npm test`, `npm run build:modern`.
+
+## Stripe Return Follow-up
+
+- Problema: durante signup cookie-only, `/api/users/me` risponde 402 prima della
+  subscription attiva e `refreshSession` faceva logout locale. Al ritorno Stripe
+  `/renew-sub?checkout=success&session_id=...` non chiamava `sync-checkout`
+  perche' richiedeva un bearer token.
+- Fix: 402 su `/users/me` conserva la sessione locale se esiste un user; `RenewSub`
+  sincronizza `session_id`, billing status, checkout e portale anche con cookie auth
+  senza token JWT.
+- Verifica: `npm run build:modern`.
+
 # Plan — Element.ingredients legacy JSON cleanup (2026-05-14)
 
 ## Problema riportato dall'utente

@@ -20,6 +20,40 @@ export const fetchOrders = async (params = {}, token) => {
 };
 
 /**
+ * Lista leggera per board operative (owner/reparti).
+ */
+export const fetchOrdersBoard = async (params = {}, token) => {
+  const query = qs.stringify(params, { skipNulls: true });
+  const url = query
+    ? `${API_BASE}/api/orders/board?${query}`
+    : `${API_BASE}/api/orders/board`;
+  const resp = await fetch(url, {
+    method: 'GET',
+    headers: jsonHeaders(token),
+  });
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw buildApiError(resp, payload);
+  return payload;
+};
+
+/**
+ * Stato leggero per griglia sala/cameriere.
+ */
+export const fetchOrdersSala = async (params = {}, token) => {
+  const query = qs.stringify(params, { skipNulls: true });
+  const url = query
+    ? `${API_BASE}/api/orders/sala?${query}`
+    : `${API_BASE}/api/orders/sala`;
+  const resp = await fetch(url, {
+    method: 'GET',
+    headers: jsonHeaders(token),
+  });
+  const payload = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw buildApiError(resp, payload);
+  return payload;
+};
+
+/**
  * Apre un ordine su un tavolo. body: { table_id (documentId), covers? }
  */
 export const openOrder = async (body, token) => {

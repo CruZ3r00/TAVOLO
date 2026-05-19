@@ -3,7 +3,7 @@ import { useHead } from '@/lib/compat/head.js';
 import { useRouter, useRoute } from 'vue-router';
 import { ref, computed } from 'vue';
 import { useStore } from 'vuex';
-import { API_BASE } from '@/utils';
+import { API_BASE, createBillingCheckoutSession } from '@/utils';
 import { defaultRouteForUser } from '@/staffAccess';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 
@@ -27,6 +27,14 @@ const justRegistered = computed(() => route.query.registered === '1');
 const registrationNeedsVerification = computed(() => route.query.registered === 'verify');
 const emailConfirmed = computed(() => route.query.confirmed === '1');
 const passwordReset = computed(() => route.query.passwordReset === '1');
+
+const startPendingCheckout = async (planKey, token) => {
+  const session = await createBillingCheckoutSession(planKey, token || null);
+  if (!session?.url) {
+    throw new Error('Sessione Stripe non disponibile.');
+  }
+  window.location.href = session.url;
+};
 
 const submit = async () => {
   isLoading.value = true;
@@ -66,7 +74,11 @@ const submit = async () => {
       const pendingPlan = route.query.plan || sessionStorage.getItem('pending_plan_after_verification');
       if (['starter', 'pro'].includes(pendingPlan)) {
         sessionStorage.removeItem('pending_plan_after_verification');
-        router.push({ path: '/renew-sub', query: { checkout: 'retry', plan: pendingPlan } });
+        try {
+          await startPendingCheckout(pendingPlan, data.jwt || null);
+        } catch (err) {
+          errorMessage.value = err?.message || 'Accesso riuscito, ma il checkout Stripe non si è avviato.';
+        }
         return;
       }
       router.push(defaultRouteForUser(user));

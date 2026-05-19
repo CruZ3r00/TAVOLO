@@ -8,7 +8,7 @@
 
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { STAFF_ROLES, canSeeNavItem, defaultRouteForUser, staffRole } from '@/staffAccess';
+import { STAFF_ROLES, canSeeNavItem, defaultRouteForUser, kitchenRoleLabel, staffRole } from '@/staffAccess';
 
 const props = defineProps({
   pendingCount: { type: Number, default: 0 },
@@ -50,7 +50,7 @@ const items = computed(() => {
   // la home coincide con la stessa pagina di reparto, quindi il bottone non
   // navigherebbe da nessuna parte.
   const dept = (() => {
-    if (role.value === STAFF_ROLES.CUCINA) return { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen' };
+    if (role.value === STAFF_ROLES.CUCINA) return { id: 'cucina', icon: 'bi-fire', label: kitchenRoleLabel(props.user), path: '/kitchen' };
     if (role.value === STAFF_ROLES.BAR) return { id: 'bar', icon: 'bi-cup-straw', label: 'Bar', path: '/bar' };
     if (role.value === STAFF_ROLES.PIZZERIA) return { id: 'pizzeria', icon: 'bi-record-circle', label: 'Pizza', path: '/pizzeria' };
     if (role.value === STAFF_ROLES.CUCINA_SG) return { id: 'cucina_sg', icon: 'bi-shield-check', label: 'SG', path: '/kitchen-sg' };

@@ -51,3 +51,69 @@
 - A new custom controller action (`getRecipe`, `listAdvanced`, ecc.) richiede sia il middleware di gating (`subscription-gate.js`) sia un grant in `up_permissions` per il ruolo `authenticated`. Senza il grant, lo strato users-permissions risponde 403 *prima* che la subscription-gate venga consultata, e il sintomo è che owner Pro non riescono ad usare feature progettate per il loro piano.
 - Quando aggiungi una rotta in `strapi/src/api/<x>/routes/<x>.js` senza `auth: false`, aggiungi *sempre* l'action key `api::<api>.<controller>.<method>` all'array `actions` in `grantImportPermissions` dentro `strapi/src/index.js`. Se l'utente è già in produzione, applica anche l'INSERT manuale in `up_permissions` + `up_permissions_role_lnk` perché il bootstrap concede solo al boot.
 - Debug pattern: quando il sub-gate non spiega un 403, ispeziona `SELECT p.action FROM up_permissions p JOIN up_permissions_role_lnk l ON l.permission_id=p.id JOIN up_roles r ON r.id=l.role_id WHERE r.type='authenticated'` e confronta con i routes file.
+
+## 2026-05-18 — Match live-test target with user's browser
+
+- Before running operational/realtime tests, verify the target environment the user is watching. If the user is on `staging-app.comfortables.eu`, local `localhost` load tests will not be visible and can create misleading conclusions.
+- State the active target explicitly before generating data, then use that same target for API writes and browser observation.
+
+## 2026-05-18 — Auth middleware must fail closed by policy, not by 500
+
+- Middleware that runs before every authenticated API must not let optional staff/context enrichment throw raw errors. Catch enrichment failures, log a warning, and fall back to the safest valid actor context so owner/core APIs do not become global 500s after a deploy drift.
+- When staging shows 500 only for authenticated APIs while login succeeds and anonymous requests return 403, check pre-controller auth/subscription middleware before blaming the frontend or realtime.
+
+## 2026-05-19 — Secure auth cookies behind proxy need Koa trust
+
+- If staging logs `Cannot send secure cookie over unencrypted connection` while `AUTH_COOKIE_SECURE=true`, check Strapi/Koa proxy trust before debugging frontend auth. Strapi needs `server.proxy.koa=true` and the reverse proxy must send `X-Forwarded-Proto: https`.
+- Do not wrap post-registration cookie emission in the same rollback block as durable account setup. Cookie failures may prevent auto-login, but they must not delete a correctly created user or masquerade as restaurant capacity setup failures.
+
+## 2026-05-19 — Strapi config tests must call factories with `{ env }`
+
+- Strapi config files export factories shaped like `module.exports = ({ env }) => (...)`; unit tests must pass `buildConfig({ env })`, not `buildConfig(env)`, or the mock diverges from runtime and fails before exercising the config under test.
+
+## 2026-05-19 — Registration side effects must wait for durable success
+
+- Do not create synthetic staff accounts from the raw `up_users` insert alone. Signup is not durable until WebsiteConfig setup succeeds and billing becomes active; staff sync must return early without creating rows when the owner has no active subscription.
+- Public/landing layouts must not mount internal operator tooling such as `CommandPalette`. In legacy builds, hidden teleported UI can leak visually or via keyboard shortcuts; mount it only in the authenticated app shell.
+- A pending signup plan must resume Stripe Checkout directly after login/email verification/2FA. `/renew-sub` is for expired subscriptions and Stripe return/cancel states, not as a replacement for the initial checkout session.
+
+## 2026-05-19 — Cookie-only POSTs need exposed CSRF fallback
+
+- When auth uses secure httpOnly cookies, the first unsafe API call after login/register may not have a readable CSRF cookie yet. Capture `X-CSRF-Token` from auth responses, expose it via CORS, and reuse it as a fallback header for POST/PUT/PATCH/DELETE.
+- Treat `/api/users/me` returning 402 during signup as "authenticated but unpaid", not as logout. Stripe return pages must be able to call billing sync with cookie auth even when no bearer JWT is present.
+
+## 2026-05-19 — Staff access emails belong after billing activation
+
+- Do not send staff access instructions from the raw registration lifecycle: before Stripe activation the plan may be pending and staff accounts may not exist yet.
+- Staff access emails should be triggered after subscription sync/webhook, after `sync_owner_staff_accounts`, and guarded by a DB flag so Stripe webhook + frontend return cannot send duplicates.
+- Until per-staff password reset/change exists, do not invent temporary passwords in email. State that staff profiles use the same password chosen during registration and include only account usernames.
+
+## 2026-05-19 — Stripe-aborted signup must not become a dead account
+
+- Creating the owner before Stripe Checkout means browser back/cancel can leave an unpaid account that blocks retry by unique username/email. Always provide an explicit abandoned-signup cleanup path for owners without active subscription and without `stripe_subscription_id`.
+- Frontend retry should tolerate stale pending owners: if register fails because username/email already exists, try login with the just-entered credentials and reopen Checkout instead of stranding the user.
+- Checkout-cancel cleanup must clear both server cookies and local storage; otherwise the router sees an authenticated but unpaid owner and sends the user to `/renew-sub`.
+
+## 2026-05-19 — Signup side effects must be post-payment
+
+- Registration should validate and persist only the minimum owner plus pending provisioning metadata. Do not create WebsiteConfig, public site files, staff accounts, or access emails before Stripe confirms an active subscription.
+- Post-payment sync/webhook must be the single provisioning gateway: create WebsiteConfig/site first, then sync staff, then send staff access email.
+- After successful checkout sync, force a fresh login so cookies/localStorage/user payload include the newly active subscription and staff context.
+- Never add new columns only by editing a migration that may already be recorded in staging/production. Add a new idempotent migration so deployed databases actually receive the schema change.
+- Mail flows that can silently skip must log the exact skip reason before returning; otherwise provider dashboards can make an old unrelated notification look like the current email.
+- Customer access emails must always be sent to the owner registration email (`owner.email`). Internal support notifications are separate emails and must never replace or share the customer access email path.
+
+## 2026-05-19 — Essential "Ordini" is a unified production queue
+
+- In Essential, the technical `cucina` role is displayed as `Ordini` and must behave as a unified queue. Backend station filters cannot keep using `restaurant_category_routing.staff_role`, because historical or regex-created rows may classify beverages as `bar` even though the plan has no bar staff.
+- Keep Pro routing untouched: category routing drives separate Cucina/Bar/Pizzeria/Cucina SG stations only when the owner has an active `pro` subscription.
+- Frontend navigation and route guards must match the same product rule: Essential staff `cucina/Ordini` should see only `Ordini` plus `Carico bar`; Pro-only station pages must not be reachable directly by non-Pro accounts.
+
+## 2026-05-19 — Mobile modals with dense operational text should scroll as one page
+
+- On small screens, avoid locking the viewport while only an inner panel scrolls when the modal contains examples, notes, or operational advice. Let the overlay/card scroll as a single document so explanatory text and actions move together and remain readable on iOS/Android.
+
+## 2026-05-19 — Strapi data migrations must own columns they read
+
+- Strapi user migrations can run before the content-type schema diff has created newly declared columns on a fresh deploy target. If a migration reads or backfills a new content-type field, first guard `hasTable`/`hasColumn` and add the column idempotently inside the same migration.
+- Index-only migrations should continue to skip missing columns, but data migrations must not skip silently when runtime code depends on the backfilled field existing at boot.

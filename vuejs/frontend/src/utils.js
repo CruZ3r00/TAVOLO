@@ -21,6 +21,7 @@ export {
   changeBillingPlan,
   cancelBillingSubscription,
   reactivateBillingSubscription,
+  abandonSignup,
 } from './lib/api/billing.js';
 export {
   fetchStaffSettings,
@@ -54,6 +55,8 @@ export {
 } from './lib/api/tables.js';
 export {
   fetchOrders,
+  fetchOrdersBoard,
+  fetchOrdersSala,
   openOrder,
   fetchOrder,
   addOrderItem,

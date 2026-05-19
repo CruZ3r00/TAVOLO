@@ -172,7 +172,7 @@ onMounted(async () => {
             </div>
             <h4>Disponibile con il piano Professionale</h4>
             <p>
-              Con l'Essenziale tutte le categorie arrivano in Cucina. Passa al
+              Con l'Essenziale tutte le categorie arrivano in Ordini. Passa al
               Professionale per smistare bar, pizzeria e cucina senza glutine in
               code separate.
             </p>

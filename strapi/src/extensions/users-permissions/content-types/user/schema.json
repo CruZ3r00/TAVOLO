@@ -98,6 +98,26 @@
       "type": "boolean",
       "default": false
     },
+    "staff_access_email_sent_at": {
+      "type": "datetime",
+      "private": true
+    },
+    "staff_access_email_sent_plan": {
+      "type": "string",
+      "private": true
+    },
+    "signup_restaurant_name": {
+      "type": "string",
+      "private": true
+    },
+    "signup_coperti_invernali": {
+      "type": "integer",
+      "private": true
+    },
+    "signup_coperti_estivi": {
+      "type": "integer",
+      "private": true
+    },
     "end_subscription": {
       "type": "date"
     },

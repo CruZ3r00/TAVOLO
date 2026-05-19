@@ -1,12 +1,16 @@
 'use strict';
 
 const Stripe = require('stripe');
+const fs = require('fs');
+const path = require('path');
 const {
   applyStaffActiveState,
+  publicSiteSlug,
   resolveStaffContext,
   staffUserPayload,
   STAFF_ROLES,
 } = require('../../../utils/staff-access');
+const { clearAuthCookies } = require('../../../utils/auth-cookies');
 
 const PLAN_CONFIG = {
   starter: { name: 'Starter', priceEnv: 'STRIPE_PRICE_STARTER' },
@@ -19,6 +23,19 @@ const MANAGED_STAFF_ROLES = [
   STAFF_ROLES.PIZZERIA,
   STAFF_ROLES.CUCINA_SG,
 ];
+const STAFF_ACCESS_ROLES_BY_PLAN = {
+  starter: [STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA],
+  pro: [STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA, STAFF_ROLES.BAR, STAFF_ROLES.PIZZERIA, STAFF_ROLES.CUCINA_SG],
+};
+const STAFF_ACCESS_DESCRIPTIONS = {
+  cameriere: 'Usato da chi prende ordini ai tavoli, gestisce la sala e invia le comande.',
+  cucina: 'Riceve tutte le comande inviate dalla sala. È la coda unica per cucina, bar o preparazioni operative.',
+  cucina_pro: 'Riceve le comande assegnate alla cucina.',
+  bar: 'Riceve ordini e preparazioni assegnati al bar.',
+  pizzeria: 'Riceve le comande assegnate alla pizzeria.',
+  cucina_sg: 'Riceve le preparazioni dedicate al senza glutine.',
+};
+const STAFF_ACCESS_EMAIL_VERSION = 'access-v2';
 
 let stripeClient = null;
 
@@ -61,6 +78,15 @@ function normalizePlanKey(value) {
   return PLAN_CONFIG[key] ? key : null;
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function safeUser(user) {
   if (!user) return null;
   return {
@@ -82,21 +108,41 @@ function hasActiveSubscription(user) {
   return !Number.isNaN(periodEndDate.getTime()) && periodEndDate.getTime() >= Date.now();
 }
 
+function isUnpaidSignupOwner(user) {
+  if (!user || (user.staff_role && user.staff_role !== STAFF_ROLES.OWNER)) return false;
+  if (hasActiveSubscription(user)) return false;
+  return !user.stripe_subscription_id;
+}
+
 function planAllowsStaffRole(user, role) {
   if (!hasActiveSubscription(user)) return false;
   if (user.subscription_plan === 'pro') return true;
   return user.subscription_plan === 'starter' && [STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA].includes(role);
 }
 
-function staffRoleLabel(role) {
+function staffRoleLabel(role, owner) {
   switch (role) {
     case STAFF_ROLES.CAMERIERE: return 'Sala';
-    case STAFF_ROLES.CUCINA: return 'Cucina';
+    case STAFF_ROLES.CUCINA: return owner?.subscription_plan === 'starter' ? 'Ordini' : 'Cucina';
     case STAFF_ROLES.BAR: return 'Bar';
     case STAFF_ROLES.PIZZERIA: return 'Pizzeria';
     case STAFF_ROLES.CUCINA_SG: return 'Cucina SG';
     default: return role;
   }
+}
+
+function staffAccessRoleLabel(role, plan) {
+  if (role === STAFF_ROLES.CUCINA && plan === 'starter') return 'Ordini';
+  return staffRoleLabel(role, { subscription_plan: plan });
+}
+
+function staffAccessDescription(role, plan) {
+  if (role === STAFF_ROLES.CUCINA && plan === 'pro') return STAFF_ACCESS_DESCRIPTIONS.cucina_pro;
+  return STAFF_ACCESS_DESCRIPTIONS[role] || '';
+}
+
+function staffAccessEmailClaimKey(plan) {
+  return `${plan}:${STAFF_ACCESS_EMAIL_VERSION}`;
 }
 
 async function staffSettingsPayload(owner) {
@@ -127,7 +173,7 @@ async function staffSettingsPayload(owner) {
     const isWaiter = role === STAFF_ROLES.CAMERIERE;
     return {
       role,
-      label: staffRoleLabel(role),
+      label: staffRoleLabel(role, owner),
       active: isWaiter ? true : row.active !== false,
       plan_allowed: planAllowed,
       can_toggle: !isWaiter && planAllowed,
@@ -169,6 +215,423 @@ async function syncOwnerStaffAccounts(userId) {
     await strapi.db.connection.raw('select public.sync_owner_staff_accounts(?)', [numericId]);
   } catch (err) {
     strapi.log.warn(`syncOwnerStaffAccounts fallita per user ${numericId}: ${err.message}`);
+  }
+}
+
+async function restaurantNameForOwner(owner) {
+  if (!owner) return 'ComforTables';
+  if (!strapi.db.connection) return owner.username || 'ComforTables';
+  try {
+    const row = await strapi.db.connection('website_configs as config')
+      .join('website_configs_fk_user_lnk as owner_lnk', 'owner_lnk.website_config_id', 'config.id')
+      .select(['config.restaurant_name'])
+      .where('owner_lnk.user_id', owner.id)
+      .orderBy('config.id', 'desc')
+      .first();
+    return row?.restaurant_name || owner.username || 'ComforTables';
+  } catch (err) {
+    strapi.log.warn(`staff access email: nome ristorante non disponibile per user ${owner.id}: ${err.message}`);
+    return owner.username || 'ComforTables';
+  }
+}
+
+async function websiteConfigForOwner(ownerId) {
+  if (!ownerId || !strapi.db.connection) return null;
+  try {
+    return await strapi.db.connection('website_configs as config')
+      .join('website_configs_fk_user_lnk as owner_lnk', 'owner_lnk.website_config_id', 'config.id')
+      .select(['config.id', 'config.restaurant_name', 'config.site_url'])
+      .where('owner_lnk.user_id', ownerId)
+      .orderBy('config.id', 'desc')
+      .first();
+  } catch (err) {
+    strapi.log.warn(`website config lookup fallito per user ${ownerId}: ${err.message}`);
+    return null;
+  }
+}
+
+function buildPlaceholderSiteHtml(username) {
+  const safeUsername = escapeHtml(username);
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${safeUsername} - Sito in costruzione</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); }
+        .construction-card { text-align: center; max-width: 500px; padding: 3rem 2rem; }
+        .construction-icon { font-size: 4rem; color: #6c757d; margin-bottom: 1.5rem; }
+    </style>
+</head>
+<body>
+    <div class="card shadow-sm construction-card">
+        <div class="construction-icon"><i class="bi bi-tools"></i></div>
+        <h1 class="h3 mb-3">Sito in costruzione</h1>
+        <p class="text-muted mb-4">Il sito menu di <strong>${safeUsername}</strong> è in fase di preparazione. Torna a trovarci presto!</p>
+        <div class="d-flex justify-content-center gap-2">
+            <a href="/" class="btn btn-outline-secondary">Torna alla home</a>
+        </div>
+    </div>
+</body>
+</html>`;
+}
+
+async function writePlaceholderSite(owner) {
+  try {
+    const sitesDir = path.resolve(strapi.dirs.app.root, '..', 'restaurant-sites');
+    if (!fs.existsSync(sitesDir)) {
+      fs.mkdirSync(sitesDir, { recursive: true });
+    }
+    const siteSlug = publicSiteSlug(owner.username);
+    const filePath = path.resolve(sitesDir, `${siteSlug}.html`);
+    if (!filePath.startsWith(`${sitesDir}${path.sep}`)) {
+      throw new Error('Percorso sito fuori dalla directory consentita.');
+    }
+    fs.writeFileSync(filePath, buildPlaceholderSiteHtml(owner.username), 'utf-8');
+    strapi.log.info(`Sito placeholder creato per ${owner.username}: ${filePath}`);
+  } catch (err) {
+    strapi.log.warn(`Impossibile creare il file sito per ${owner.username}: ${err.message}`);
+  }
+}
+
+async function ensurePaidSignupProvisioning(userId) {
+  const owner = userId
+    ? await strapi.db.query('plugin::users-permissions.user').findOne({ where: { id: userId } })
+    : null;
+  if (!owner || !hasActiveSubscription(owner)) return null;
+
+  const existingConfig = await websiteConfigForOwner(owner.id);
+  if (existingConfig?.site_url && owner.url) return owner;
+
+  const cInv = Number.parseInt(owner.signup_coperti_invernali, 10);
+  const cEstRaw = Number.parseInt(owner.signup_coperti_estivi, 10);
+  const copertiInvernali = Number.isFinite(cInv) && cInv > 0 ? cInv : null;
+  const copertiEstivi = Number.isFinite(cEstRaw) && cEstRaw > 0 ? cEstRaw : copertiInvernali;
+
+  if (!existingConfig && !copertiInvernali) {
+    strapi.log.warn(`post-payment provisioning: dati coperti mancanti per user ${owner.id}`);
+    return owner;
+  }
+
+  const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+  const siteSlug = publicSiteSlug(owner.username);
+  const siteUrl = `${siteBaseUrl.replace(/\/+$/, '')}/sites/${siteSlug}`;
+  const restaurantName =
+    (typeof owner.signup_restaurant_name === 'string' && owner.signup_restaurant_name.trim()) ||
+    owner.username ||
+    'Ristorante';
+
+  if (!existingConfig) {
+    await strapi.documents('api::website-config.website-config').create({
+      data: {
+        restaurant_name: restaurantName,
+        site_url: siteUrl,
+        coperti_invernali: copertiInvernali,
+        coperti_estivi: copertiEstivi,
+        fk_user: { connect: [{ id: owner.id }] },
+      },
+    });
+  }
+
+  await writePlaceholderSite(owner);
+  const updated = await strapi.db.query('plugin::users-permissions.user').update({
+    where: { id: owner.id },
+    data: {
+      url: existingConfig?.site_url || siteUrl,
+      signup_restaurant_name: null,
+      signup_coperti_invernali: null,
+      signup_coperti_estivi: null,
+    },
+  });
+  return updated;
+}
+
+async function listStaffAccessAccounts(owner, plan) {
+  const roles = STAFF_ACCESS_ROLES_BY_PLAN[plan] || [];
+  if (!owner?.id || roles.length === 0 || !strapi.db.connection) return [];
+
+  const rows = await strapi.db.connection('restaurant_staff as staff')
+    .join('up_users as user', 'user.id', 'staff.user_id')
+    .select(['staff.role', 'user.username'])
+    .where('staff.owner_id', owner.id)
+    .whereIn('staff.role', roles)
+    .where('user.blocked', false);
+
+  const byRole = new Map((rows || []).map((row) => [row.role, row.username]));
+  return Promise.all(roles.map(async (role) => {
+    let username = byRole.get(role) || null;
+    if (!username) {
+      try {
+        const fallback = await strapi.db.connection
+          .raw('select public.staff_username_for_role(?, ?, ?) as username', [owner.id, owner.username, role]);
+        username = fallback?.rows?.[0]?.username || null;
+      } catch (err) {
+        strapi.log.warn(`staff access email: fallback username fallito per user ${owner.id}, role ${role}: ${err.message}`);
+      }
+    }
+    if (!username) {
+      const suffix = role === STAFF_ROLES.CUCINA_SG ? 'cucinasg' : role;
+      username = `${String(owner.username || 'ristorante').replace(/\s+/g, '')}.${suffix}`;
+    }
+    return {
+      role,
+      label: staffAccessRoleLabel(role, plan),
+      username,
+      description: staffAccessDescription(role, plan),
+      exists: byRole.has(role),
+    };
+  }));
+}
+
+async function claimStaffAccessEmail(ownerId, plan) {
+  if (!ownerId || !plan || !strapi.db.connection) return false;
+  const claimKey = staffAccessEmailClaimKey(plan);
+  const result = await strapi.db.connection.raw(`
+    update up_users
+    set staff_access_email_sent_at = now(),
+        staff_access_email_sent_plan = ?
+    where id = ?
+      and coalesce(staff_access_email_sent_plan, '') <> ?
+    returning id
+  `, [claimKey, ownerId, claimKey]);
+  return (result?.rows || []).length > 0;
+}
+
+async function resetStaffAccessEmailClaim(ownerId, previousPlan) {
+  if (!ownerId || !strapi.db.connection) return;
+  try {
+    await strapi.db.connection('up_users')
+      .where('id', ownerId)
+      .update({
+        staff_access_email_sent_at: null,
+        staff_access_email_sent_plan: previousPlan || null,
+      });
+  } catch (err) {
+    strapi.log.warn(`staff access email: reset claim fallito per user ${ownerId}: ${err.message}`);
+  }
+}
+
+function buildStaffAccessEmail({ owner, restaurantName, plan, accounts }) {
+  const planLabel = plan === 'pro' ? 'Professionale' : 'Essenziale';
+  const loginUrl = `${getFrontendUrl()}/login`;
+  const ownerUsername = owner.username || owner.email || 'titolare';
+  const textLines = [
+    `Ciao ${restaurantName},`,
+    '',
+    'la registrazione è completata e il tuo gestionale ComforTables è pronto.',
+    '',
+    `Per accedere usa questo link: ${loginUrl}`,
+    '',
+    'La password è la stessa scelta durante la registrazione. Potrai modificarla in seguito quando la gestione password staff sarà disponibile.',
+    '',
+    'Account titolare',
+    ownerUsername,
+    '',
+    `Profili inclusi nel piano ${planLabel}`,
+    '',
+  ];
+
+  for (const account of accounts) {
+    textLines.push(account.label);
+    textLines.push(`Account: ${account.username}`);
+    textLines.push(account.description);
+    textLines.push('');
+  }
+
+  textLines.push('Grazie,');
+  textLines.push('ComforTables');
+
+  const staffHtml = accounts.map((account) => `
+    <div style="margin:18px 0;padding:14px 16px;border:1px solid #e5e7eb;border-radius:8px;">
+      <h3 style="margin:0 0 8px;font-size:16px;color:#111827;">${escapeHtml(account.label)}</h3>
+      <p style="margin:0 0 6px;color:#374151;"><strong>Account:</strong> ${escapeHtml(account.username)}</p>
+      <p style="margin:0;color:#4b5563;">${escapeHtml(account.description)}</p>
+    </div>
+  `).join('');
+
+  return {
+    subject: 'Accessi ComforTables attivati',
+    text: textLines.join('\n'),
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:640px;">
+        <p>Ciao ${escapeHtml(restaurantName)},</p>
+        <p>la registrazione è completata e il tuo gestionale ComforTables è pronto.</p>
+        <p>Per accedere usa questo link:<br><a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a></p>
+        <p>La password è la stessa scelta durante la registrazione. Potrai modificarla in seguito quando la gestione password staff sarà disponibile.</p>
+        <h2 style="font-size:18px;margin:24px 0 8px;">Account titolare</h2>
+        <p style="margin:0 0 18px;"><strong>${escapeHtml(ownerUsername)}</strong></p>
+        <h2 style="font-size:18px;margin:24px 0 8px;">Profili inclusi nel piano ${escapeHtml(planLabel)}</h2>
+        ${staffHtml}
+        <p style="margin-top:24px;">Grazie,<br>ComforTables</p>
+      </div>
+    `,
+  };
+}
+
+function buildInternalNewUserEmail({ owner, restaurantName, plan }) {
+  const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+  const planLabel = plan === 'pro' ? 'Professionale' : 'Essenziale';
+  return {
+    subject: `Nuovo ristoratore attivato: ${owner.username}`,
+    text: [
+      'Un nuovo ristoratore ha completato registrazione e pagamento.',
+      '',
+      '--- Informazioni ---',
+      `Username: ${owner.username}`,
+      `Email: ${owner.email}`,
+      `Ristorante: ${restaurantName}`,
+      `Piano: ${planLabel}`,
+      `Nome: ${owner.name || 'Non specificato'}`,
+      `Cognome: ${owner.surname || 'Non specificato'}`,
+      `Data attivazione: ${new Date().toLocaleString('it-IT')}`,
+      '',
+      `Pannello admin: ${siteBaseUrl}/admin`,
+      '',
+      '---',
+      'ComforTables - Notifica automatica',
+    ].join('\n'),
+    html: `
+      <h2>Nuovo ristoratore attivato</h2>
+      <p>Un nuovo ristoratore ha completato registrazione e pagamento.</p>
+      <table style="border-collapse:collapse;width:100%;max-width:560px;">
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Username</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(owner.username)}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Email registrazione</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(owner.email)}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Ristorante</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(restaurantName)}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Piano</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(planLabel)}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Nome</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(owner.name || 'Non specificato')}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Cognome</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(owner.surname || 'Non specificato')}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Data attivazione</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(new Date().toLocaleString('it-IT'))}</td></tr>
+      </table>
+      <p style="margin-top:20px;"><a href="${escapeHtml(siteBaseUrl)}/admin">Vai al pannello admin</a></p>
+      <hr><p style="color:#999;font-size:12px;">ComforTables - Notifica automatica</p>
+    `,
+  };
+}
+
+async function sendInternalNewUserEmail(owner, restaurantName, plan) {
+  const notificationEmail = process.env.NEW_USER_NOTIFICATION_EMAIL || '';
+  if (!notificationEmail) {
+    strapi.log.info('internal signup email: NEW_USER_NOTIFICATION_EMAIL non configurata, skip.');
+    return;
+  }
+
+  try {
+    const email = buildInternalNewUserEmail({ owner, restaurantName, plan });
+    strapi.log.info(`internal signup email: invio a ${notificationEmail} per user ${owner.username}, cliente=${owner.email}, piano ${plan}.`);
+    await strapi.plugin('email').service('email').send({
+      to: notificationEmail,
+      from: process.env.SMTP_DEFAULT_FROM || 'no-reply@example.com',
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+    });
+    strapi.log.info(`internal signup email: inviata a ${notificationEmail} per user ${owner.username}.`);
+  } catch (err) {
+    strapi.log.warn(`internal signup email: invio fallito per user ${owner.username}: ${err.message}`);
+  }
+}
+
+async function sendStaffAccessEmailIfNeeded(userId) {
+  const owner = userId
+    ? await strapi.db.query('plugin::users-permissions.user').findOne({ where: { id: userId } })
+    : null;
+  const plan = normalizePlanKey(owner?.subscription_plan);
+  if (!owner) {
+    strapi.log.warn(`staff access email: owner non trovato per userId=${userId || 'vuoto'}.`);
+    return;
+  }
+  if (!owner.email) {
+    strapi.log.warn(`staff access email: email titolare mancante per user ${owner.id}.`);
+    return;
+  }
+  if (!plan) {
+    strapi.log.warn(`staff access email: piano non valido per user ${owner.id}, subscription_plan=${owner.subscription_plan || 'vuoto'}.`);
+    return;
+  }
+  if (!hasActiveSubscription(owner)) {
+    strapi.log.warn(`staff access email: subscription non attiva per user ${owner.id}, status=${owner.subscription_status || 'vuoto'}.`);
+    return;
+  }
+
+  const accounts = await listStaffAccessAccounts(owner, plan);
+  const expectedCount = STAFF_ACCESS_ROLES_BY_PLAN[plan]?.length || 0;
+  const missingRows = accounts.filter((account) => !account.exists).map((account) => account.role);
+  if (accounts.length < expectedCount || missingRows.length > 0) {
+    strapi.log.warn(
+      `staff access email: uso username previsti per user ${owner.id}, piano ${plan}. ` +
+      `account_db_mancanti=${missingRows.join(',') || 'nessuno'}, account_email=${accounts.map((a) => `${a.role}:${a.username}`).join(',')}`
+    );
+  }
+
+  const previousPlan = owner.staff_access_email_sent_plan || null;
+  const claimed = await claimStaffAccessEmail(owner.id, plan);
+  if (!claimed) {
+    strapi.log.info(`staff access email: gia inviata per user ${owner.id}, piano ${plan}, versione ${STAFF_ACCESS_EMAIL_VERSION}.`);
+    return;
+  }
+
+  try {
+    const restaurantName = await restaurantNameForOwner(owner);
+    const email = buildStaffAccessEmail({ owner, restaurantName, plan, accounts });
+    strapi.log.info(`staff access email: invio a email registrazione ${owner.email} per user ${owner.username}, piano ${plan}.`);
+    await strapi.plugin('email').service('email').send({
+      to: owner.email,
+      from: process.env.SMTP_DEFAULT_FROM || 'no-reply@example.com',
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+    });
+    strapi.log.info(`Email accessi staff inviata a email registrazione ${owner.email} per user ${owner.username}, piano ${plan}.`);
+    await sendInternalNewUserEmail(owner, restaurantName, plan);
+  } catch (err) {
+    await resetStaffAccessEmailClaim(owner.id, previousPlan);
+    strapi.log.warn(`Impossibile inviare email accessi staff per ${owner.username}: ${err.message}`);
+  }
+}
+
+async function syncStaffAndSendAccessEmail(userId) {
+  await ensurePaidSignupProvisioning(userId);
+  await syncOwnerStaffAccounts(userId);
+  await sendStaffAccessEmailIfNeeded(userId);
+}
+
+async function cleanupSignupArtifacts(ownerId) {
+  if (!ownerId || !strapi.db.connection) return;
+  const knex = strapi.db.connection;
+
+  const staffRows = await knex('restaurant_staff as staff')
+    .join('up_users as user', 'user.id', 'staff.user_id')
+    .select(['staff.user_id'])
+    .where('staff.owner_id', ownerId)
+    .where('user.email', 'like', `staff+${ownerId}.%@staff.local.tavolo`);
+  const staffIds = [...new Set((staffRows || []).map((row) => row.user_id).filter(Boolean))];
+
+  if (staffIds.length > 0) {
+    await knex('restaurant_staff').where('owner_id', ownerId).whereIn('user_id', staffIds).delete();
+    if (await knex.schema.hasTable('up_users_fk_owner_lnk')) {
+      await knex('up_users_fk_owner_lnk').whereIn('user_id', staffIds).delete();
+    }
+    if (await knex.schema.hasTable('up_users_role_lnk')) {
+      await knex('up_users_role_lnk').whereIn('user_id', staffIds).delete();
+    }
+    await knex('up_users').whereIn('id', staffIds).delete();
+  }
+
+  if (
+    await knex.schema.hasTable('website_configs') &&
+    await knex.schema.hasTable('website_configs_fk_user_lnk')
+  ) {
+    const configRows = await knex('website_configs_fk_user_lnk')
+      .select(['website_config_id'])
+      .where('user_id', ownerId);
+    const configIds = [...new Set((configRows || []).map((row) => row.website_config_id).filter(Boolean))];
+    if (configIds.length > 0) {
+      await knex('website_configs_fk_user_lnk').where('user_id', ownerId).delete();
+      await knex('website_configs').whereIn('id', configIds).delete();
+    }
   }
 }
 
@@ -337,7 +800,7 @@ module.exports = {
         ...snapshot,
         subscription_plan: normalizePlanKey(session.metadata?.plan) || snapshot.subscription_plan,
       });
-      await syncOwnerStaffAccounts(user.id);
+      await syncStaffAndSendAccessEmail(user.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: user.id },
@@ -399,7 +862,7 @@ module.exports = {
 
       const snapshot = await subscriptionSnapshot(stripe, updated);
       await updateUserSubscription(billingUser.id, { ...snapshot, subscription_plan: plan.key });
-      await syncOwnerStaffAccounts(billingUser.id);
+      await syncStaffAndSendAccessEmail(billingUser.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: billingUser.id },
@@ -434,7 +897,7 @@ module.exports = {
       });
       const snapshot = await subscriptionSnapshot(stripe, updated);
       await updateUserSubscription(billingUser.id, snapshot);
-      await syncOwnerStaffAccounts(billingUser.id);
+      await syncStaffAndSendAccessEmail(billingUser.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: billingUser.id },
@@ -487,7 +950,7 @@ module.exports = {
       });
       const snapshot = await subscriptionSnapshot(stripe, updated);
       await updateUserSubscription(billingUser.id, snapshot);
-      await syncOwnerStaffAccounts(billingUser.id);
+      await syncStaffAndSendAccessEmail(billingUser.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: billingUser.id },
@@ -499,6 +962,34 @@ module.exports = {
       return ctx.send({
         error: { message: err.message || 'Riattivazione non riuscita.' },
       });
+    }
+  },
+
+  async abandonSignup(ctx) {
+    const user = await requireBillingUser(ctx);
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+    const actor = await resolveStaffContext(strapi, user);
+    if (actor && ![STAFF_ROLES.OWNER].includes(actor.role)) {
+      return ctx.forbidden('Solo il titolare puo annullare la registrazione.');
+    }
+
+    const owner = actor && actor.owner ? actor.owner : user;
+    const fresh = await strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: owner.id },
+    });
+    if (!isUnpaidSignupOwner(fresh)) {
+      return ctx.badRequest('Registrazione non annullabile: account gia attivo o associato a Stripe.');
+    }
+
+    try {
+      await cleanupSignupArtifacts(fresh.id);
+      await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: fresh.id } });
+      clearAuthCookies(ctx);
+      return ctx.send({ data: { abandoned: true } });
+    } catch (err) {
+      strapi.log.error(`abandonSignup failed for user ${fresh.id}: ${err.message}`);
+      ctx.status = 500;
+      return ctx.send({ error: { message: 'Annullamento registrazione non riuscito.' } });
     }
   },
 
@@ -549,7 +1040,7 @@ module.exports = {
             ...snapshot,
             subscription_plan: normalizePlanKey(session.metadata?.plan) || snapshot.subscription_plan,
           });
-          await syncOwnerStaffAccounts(userId);
+          await syncStaffAndSendAccessEmail(userId);
         }
       }
 
@@ -571,7 +1062,7 @@ module.exports = {
             stripe_customer_id: subscription.customer,
             ...(await subscriptionSnapshot(stripe, subscription)),
           });
-          await syncOwnerStaffAccounts(user?.id);
+          await syncStaffAndSendAccessEmail(user?.id);
         }
       }
     } catch (err) {

@@ -1,23 +1,46 @@
 'use strict';
 
 const bcrypt = require('bcryptjs');
-const path = require('path');
-const fs = require('fs');
 const { validateProductionConfig } = require('./utils/production-checks');
 const { sweepDueTakeaways } = require('./utils/takeaway-lifecycle');
-const { isReservedStaffUsername, publicSiteSlug } = require('./utils/staff-access');
+const { isReservedStaffUsername } = require('./utils/staff-access');
 const { setAuthCookies, stripJwtFromBodyIfCookieOnly } = require('./utils/auth-cookies');
 const posBridge = require('./services/pos-bridge');
 const inventoryAlerts = require('./services/inventory-alerts');
 console.log("STARTING STRAPI...");
 console.log("PORT:", process.env.PORT);
-function escapeHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+
+async function cleanupGeneratedStaffAccounts(strapi, ownerId) {
+  if (!ownerId || !strapi.db.connection) return;
+  const knex = strapi.db.connection;
+  const rows = await knex('restaurant_staff as staff')
+    .join('up_users as user', 'user.id', 'staff.user_id')
+    .select(['staff.user_id'])
+    .where('staff.owner_id', ownerId)
+    .whereIn('staff.role', ['cameriere', 'cucina', 'bar', 'pizzeria', 'cucina_sg'])
+    .where('user.email', 'like', `staff+${ownerId}.%@staff.local.tavolo`);
+
+  const staffIds = [...new Set((rows || []).map((row) => row.user_id).filter(Boolean))];
+  if (staffIds.length === 0) return;
+
+  await knex('restaurant_staff').where('owner_id', ownerId).whereIn('user_id', staffIds).delete();
+  if (await knex.schema.hasTable('up_users_fk_owner_lnk')) {
+    await knex('up_users_fk_owner_lnk').whereIn('user_id', staffIds).delete();
+  }
+  if (await knex.schema.hasTable('up_users_role_lnk')) {
+    await knex('up_users_role_lnk').whereIn('user_id', staffIds).delete();
+  }
+  await knex('up_users').whereIn('id', staffIds).delete();
+}
+
+async function rollbackCreatedUser(strapi, userId) {
+  if (!userId) return;
+  try {
+    await cleanupGeneratedStaffAccounts(strapi, userId);
+  } catch (cleanupStaffErr) {
+    strapi.log.warn(`register middleware: cleanup staff rollback fallito per user ${userId}: ${cleanupStaffErr.message}`);
+  }
+  await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: userId } });
 }
 
 module.exports = {
@@ -28,7 +51,7 @@ module.exports = {
    * This gives you an opportunity to extend code.
    */
   register({ strapi }) {
-    // ── WebsiteConfig creation on registration ──
+    // ── Signup metadata capture ──
     // The plugin extension at src/extensions/users-permissions/strapi-server.js
     // doesn't load without a build step (Strapi v5 reads from dist/). Instead,
     // we use a Koa middleware that intercepts POST /api/auth/local/register,
@@ -66,7 +89,7 @@ module.exports = {
 
       if (isReservedStaffUsername(username)) {
         try {
-          await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+          await rollbackCreatedUser(strapi, createdUser.id);
         } catch (_) { /* best effort */ }
         ctx.status = 400;
         ctx.body = {
@@ -85,7 +108,7 @@ module.exports = {
       if (!cInv || cInv < 1 || cInv > 10000) {
         // Invalid capacity — rollback the created user
         try {
-          await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+          await rollbackCreatedUser(strapi, createdUser.id);
         } catch (_) { /* best effort */ }
         ctx.status = 400;
         ctx.body = {
@@ -100,7 +123,7 @@ module.exports = {
         cEst = Number.isFinite(Number(rawEst)) ? parseInt(rawEst, 10) : null;
         if (!cEst || cEst < 1 || cEst > 10000) {
           try {
-            await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+            await rollbackCreatedUser(strapi, createdUser.id);
           } catch (_) { /* best effort */ }
           ctx.status = 400;
           ctx.body = {
@@ -118,162 +141,48 @@ module.exports = {
         'Ristorante';
 
       try {
-        const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
-        const siteSlug = publicSiteSlug(createdUser.username);
-        const siteUrl = `${siteBaseUrl.replace(/\/+$/, '')}/sites/${siteSlug}`;
-        await strapi.documents('api::website-config.website-config').create({
-          data: {
-            restaurant_name: restaurantName,
-            site_url: siteUrl,
-            coperti_invernali: cInv,
-            coperti_estivi: copertiEstivi,
-            fk_user: { connect: [{ id: createdUser.id }] },
-          },
-        });
         await strapi.db.query('plugin::users-permissions.user').update({
           where: { id: createdUser.id },
-          data: { url: siteUrl },
+          data: {
+            signup_restaurant_name: restaurantName,
+            signup_coperti_invernali: cInv,
+            signup_coperti_estivi: copertiEstivi,
+          },
         });
-        if (strapi.db.connection) {
-          try {
-            await strapi.db.connection.raw('select public.sync_owner_staff_accounts(?)', [createdUser.id]);
-          } catch (syncErr) {
-            strapi.log.warn(`register middleware: sync staff DB fallita per user ${createdUser.id}: ${syncErr.message}`);
-          }
-        }
-        if (ctx.body && ctx.body.user) {
-          ctx.body.user.url = siteUrl;
-        }
         if (ctx.body && ctx.body.jwt) {
-          setAuthCookies(ctx, ctx.body.jwt);
-          stripJwtFromBodyIfCookieOnly(ctx);
+          try {
+            setAuthCookies(ctx, ctx.body.jwt);
+            stripJwtFromBodyIfCookieOnly(ctx);
+          } catch (cookieError) {
+            strapi.log.error(
+              `register middleware: dati signup salvati per user ${createdUser.username}, ma cookie auth fallito: ${cookieError.message}`
+            );
+            ctx.status = 500;
+            ctx.body = {
+              error: {
+                code: 'REGISTER_AUTH_COOKIE_FAILED',
+                message: 'Registrazione completata, ma accesso automatico non riuscito. Riprova il login.',
+              },
+            };
+          }
         }
       } catch (error) {
         strapi.log.error(
-          `register middleware: creazione WebsiteConfig fallita per user ${createdUser.username}, rollback utente: ${error.message}`
+          `register middleware: salvataggio dati signup fallito per user ${createdUser.username}, rollback utente: ${error.message}`
         );
         try {
-          await strapi.db
-            .query('plugin::users-permissions.user')
-            .delete({ where: { id: createdUser.id } });
+          await rollbackCreatedUser(strapi, createdUser.id);
         } catch (cleanupErr) {
           strapi.log.error(`register middleware: rollback utente fallito: ${cleanupErr.message}`);
         }
         ctx.status = 500;
         ctx.body = {
           error: {
-            code: 'REGISTER_CAPACITY_FAILED',
-            message: 'Registrazione annullata: impossibile configurare la capacità del ristorante.',
+            code: 'REGISTER_SIGNUP_DATA_FAILED',
+            message: 'Registrazione annullata: impossibile salvare i dati del ristorante.',
           },
         };
       }
-    });
-
-    // Lifecycle hook: invia email di notifica quando un nuovo utente si registra
-    strapi.db.lifecycles.subscribe({
-      models: ['plugin::users-permissions.user'],
-      async afterCreate(event) {
-        const { result } = event;
-        if (result && result.staff_role && result.staff_role !== 'owner') {
-          strapi.log.info(`Staff user creato (${result.staff_role}), skip sito/email: ${result.username}`);
-          return;
-        }
-        if (isReservedStaffUsername(result && result.username)) {
-          strapi.log.warn(`Username riservato rilevato, skip sito/email: ${result.username}`);
-          return;
-        }
-
-        // Genera il file HTML del sito in restaurant-sites/
-        try {
-          const sitesDir = path.resolve(strapi.dirs.app.root, '..', 'restaurant-sites');
-          if (!fs.existsSync(sitesDir)) {
-            fs.mkdirSync(sitesDir, { recursive: true });
-          }
-          const siteSlug = publicSiteSlug(result.username);
-          const safeUsername = escapeHtml(result.username);
-          const filePath = path.resolve(sitesDir, `${siteSlug}.html`);
-          if (!filePath.startsWith(`${sitesDir}${path.sep}`)) {
-            throw new Error('Percorso sito fuori dalla directory consentita.');
-          }
-          const htmlContent = `<!DOCTYPE html>
-<html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${safeUsername} - Sito in costruzione</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        body { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); }
-        .construction-card { text-align: center; max-width: 500px; padding: 3rem 2rem; }
-        .construction-icon { font-size: 4rem; color: #6c757d; margin-bottom: 1.5rem; }
-    </style>
-</head>
-<body>
-    <div class="card shadow-sm construction-card">
-        <div class="construction-icon"><i class="bi bi-tools"></i></div>
-        <h1 class="h3 mb-3">Sito in costruzione</h1>
-        <p class="text-muted mb-4">Il sito menu di <strong>${safeUsername}</strong> è in fase di preparazione. Torna a trovarci presto!</p>
-        <div class="d-flex justify-content-center gap-2">
-            <a href="/" class="btn btn-outline-secondary">Torna alla home</a>
-        </div>
-    </div>
-</body>
-</html>`;
-          fs.writeFileSync(filePath, htmlContent, 'utf-8');
-          strapi.log.info(`Sito placeholder creato per ${result.username}: ${filePath}`);
-        } catch (fileError) {
-          strapi.log.warn(`Impossibile creare il file sito per ${result.username}: ${fileError.message}`);
-        }
-
-        try {
-          const notificationEmail = process.env.NEW_USER_NOTIFICATION_EMAIL || '';
-          const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
-
-          if (!notificationEmail) {
-            strapi.log.info('Email di notifica nuovo utente non configurata, skip.');
-            return;
-          }
-
-          await strapi.plugin('email').service('email').send({
-            to: notificationEmail,
-            from: process.env.SMTP_DEFAULT_FROM || 'no-reply@example.com',
-            subject: `Nuovo ristoratore registrato: ${result.username}`,
-            text: [
-              'Un nuovo ristoratore si e\' registrato sul CMS!',
-              '',
-              '--- Informazioni ---',
-              `Username: ${result.username}`,
-              `Email: ${result.email}`,
-              `Nome: ${result.name || 'Non specificato'}`,
-              `Cognome: ${result.surname || 'Non specificato'}`,
-              `Data registrazione: ${new Date().toLocaleString('it-IT')}`,
-              '',
-              `Pannello admin: ${siteBaseUrl}/admin`,
-              '',
-              '---',
-              'CMS Restaurant - Notifica automatica',
-            ].join('\n'),
-            html: `
-              <h2>Nuovo ristoratore registrato</h2>
-              <p>Un nuovo ristoratore si e' registrato sul CMS!</p>
-              <table style="border-collapse:collapse;width:100%;max-width:500px;">
-                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Username</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(result.username)}</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Email</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(result.email)}</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Nome</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(result.name || 'Non specificato')}</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Cognome</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(result.surname || 'Non specificato')}</td></tr>
-                <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Data registrazione</td><td style="padding:8px;border:1px solid #ddd;">${new Date().toLocaleString('it-IT')}</td></tr>
-              </table>
-              <p style="margin-top:20px;"><a href="${siteBaseUrl}/admin">Vai al pannello admin</a></p>
-              <hr><p style="color:#999;font-size:12px;">CMS Restaurant - Notifica automatica</p>
-            `,
-          });
-          strapi.log.info(`Email di notifica inviata per nuovo utente: ${result.username}`);
-        } catch (error) {
-          // Non bloccare la registrazione se l'email fallisce
-          strapi.log.warn(`Impossibile inviare email di notifica per ${result.username}: ${error.message}`);
-        }
-      },
     });
   },
 
@@ -471,6 +380,7 @@ async function grantImportPermissions(strapi) {
       'api::billing.billing.changePlan',
       'api::billing.billing.cancelSubscription',
       'api::billing.billing.reactivateSubscription',
+      'api::billing.billing.abandonSignup',
       'api::ingredient.ingredient.list',
       'api::ingredient.ingredient.toggle',
       'api::ingredient.ingredient.listAdvanced',
@@ -511,6 +421,8 @@ async function grantImportPermissions(strapi) {
       'api::table.table.remove',
       'api::order.order.create',
       'api::order.order.list',
+      'api::order.order.board',
+      'api::order.order.sala',
       'api::order.order.findOne',
       'api::order.order.getTotal',
       'api::order.order.addItem',

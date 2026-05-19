@@ -47,6 +47,7 @@ function defaultConfig() {
 // Computed
 const isPro = computed(() => isProPlan(props.currentUser));
 const serverPlan = ref('starter');
+const kitchenPrinterLabel = computed(() => (isPro.value || serverPlan.value === 'pro' ? 'Cucina' : 'Ordini'));
 
 // --- Costanti driver ---
 const STATION_DRIVERS = [
@@ -68,14 +69,16 @@ const CASH_DRIVERS = [
 
 // Stazioni
 const ALL_STATIONS = [
-  { key: 'cucina', label: 'Cucina', icon: 'bi-fire', proOnly: false },
+  { key: 'cucina', label: 'Ordini', icon: 'bi-fire', proOnly: false },
   { key: 'bar', label: 'Bar', icon: 'bi-cup-straw', proOnly: true },
   { key: 'pizzeria', label: 'Pizzeria', icon: 'bi-record-circle', proOnly: true },
   { key: 'cucina_sg', label: 'Cucina senza glutine', icon: 'bi-shield-check', proOnly: true },
 ];
 
 const visibleStations = computed(() =>
-  ALL_STATIONS.filter((s) => !s.proOnly || isPro.value)
+  ALL_STATIONS
+    .filter((s) => !s.proOnly || isPro.value)
+    .map((s) => (s.key === 'cucina' ? { ...s, label: kitchenPrinterLabel.value } : s))
 );
 
 // Metodi pagamento
@@ -259,10 +262,10 @@ onMounted(loadConfig);
             :checked="config.auto_print_kitchen_enabled"
             @change="config.auto_print_kitchen_enabled = $event.target.checked"
           />
-          <span class="toggle-label">Abilita stampa automatica delle comande in cucina</span>
+          <span class="toggle-label">Abilita stampa automatica delle comande operative</span>
         </label>
         <p class="hint">
-          Quando attiva, ogni "Invia in cucina" genera la comanda sulla stampante della stazione corrispondente.
+          Quando attiva, ogni invio ordine genera la comanda sulla stampante della stazione corrispondente.
         </p>
       </section>
 
@@ -375,7 +378,7 @@ onMounted(loadConfig);
             <h4>Stampanti per Bar, Pizzeria e Cucina senza glutine</h4>
             <p>
               Aggiorna al piano Professionale per configurare stampanti dedicate per ogni reparto.
-              Con il piano Essenziale puoi configurare solo la stampante Cucina.
+              Con il piano Essenziale puoi configurare solo la stampante Ordini.
             </p>
             <router-link to="/renew-sub" class="btn btn-accent btn-sm">
               Scopri il piano Professionale <i class="bi bi-arrow-right"></i>

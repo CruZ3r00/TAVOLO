@@ -9,7 +9,7 @@ echo "== Rebuild staging =="
 
 echo "1) Build frontend"
 cd "$FRONTEND"
-npm run build
+npm run build:prod
 
 echo "2) Assicuro uploads"
 mkdir -p "$STRAPI/public/uploads"

@@ -37,6 +37,7 @@ const {
   normalizeStation,
   ensureCategoryRouting,
   loadRoutingMap,
+  ownerHasProfessionalRouting,
 } = require('../../../utils/category-routing');
 const {
   sendTakeawayEmail,
@@ -189,6 +190,81 @@ function serializeOrder(order, includeItems, routingLookup) {
     result.items = (order.fk_items || []).map((item) => serializeItem(item, routingLookup));
   }
   return result;
+}
+
+function serializeBoardItem(item, routingLookup) {
+  if (!item) return null;
+  const category = item.category || (item.fk_element ? item.fk_element.category : null) || null;
+  return {
+    documentId: item.documentId,
+    name: item.name,
+    quantity: item.quantity,
+    category,
+    course: parseInt(item.course, 10) || 1,
+    notes: item.notes || null,
+    status: item.status,
+    station: routingLookup ? routingLookup(category) : null,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  };
+}
+
+function serializeBoardOrder(order, routingLookup) {
+  if (!order) return null;
+  const items = Array.isArray(order.fk_items) ? order.fk_items : [];
+  return {
+    documentId: order.documentId,
+    status: order.status,
+    service_type: order.service_type || 'table',
+    takeaway_status: order.takeaway_status || null,
+    customer_name: order.customer_name || null,
+    pickup_at: order.pickup_at || null,
+    sent_to_departments_at: order.sent_to_departments_at || null,
+    opened_at: order.opened_at,
+    total_amount: order.total_amount,
+    lock_version: order.lock_version,
+    covers: order.covers || null,
+    table: order.fk_table ? {
+      documentId: order.fk_table.documentId,
+      number: order.fk_table.number,
+      seats: order.fk_table.seats,
+      area: order.fk_table.area,
+      status: order.fk_table.status,
+    } : null,
+    items: items.map((item) => serializeBoardItem(item, routingLookup)),
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+  };
+}
+
+function serializeSalaOrder(order) {
+  const items = Array.isArray(order && order.fk_items) ? order.fk_items : [];
+  return {
+    documentId: order.documentId,
+    status: order.status,
+    service_type: order.service_type || 'table',
+    opened_at: order.opened_at,
+    total_amount: order.total_amount,
+    lock_version: order.lock_version,
+    covers: order.covers || null,
+    table: order.fk_table ? {
+      documentId: order.fk_table.documentId,
+      number: order.fk_table.number,
+      seats: order.fk_table.seats,
+      area: order.fk_table.area,
+      status: order.fk_table.status,
+    } : null,
+    items: items.map((item) => ({
+      documentId: item.documentId,
+      status: item.status,
+      quantity: item.quantity,
+      course: parseInt(item.course, 10) || 1,
+    })),
+    item_count: items.length,
+    ready_count: items.filter((item) => item.status === 'ready').length,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -773,6 +849,7 @@ function filterOrdersForStation(orders, routingLookup, station) {
 async function listOrderIdsForStation(strapi, params) {
   const {
     ownerId,
+    owner,
     station,
     statusFilter,
     serviceTypeFilter,
@@ -786,16 +863,15 @@ async function listOrderIdsForStation(strapi, params) {
     pageSize,
   } = params;
   const conn = strapi.db.connection;
+  const usesProfessionalRouting = ownerHasProfessionalRouting(owner);
+  const usesUnifiedStarterQueue = !usesProfessionalRouting && station === STAFF_ROLES.CUCINA;
 
   const applyFilters = (q) => {
     let query = q
       .innerJoin('orders_fk_user_lnk as ul', 'ul.order_id', 'o.id')
       .innerJoin('order_items_fk_order_lnk as il', 'il.order_id', 'o.id')
       .innerJoin('order_items as oi', 'oi.id', 'il.order_item_id')
-      .innerJoin('restaurant_category_routing as rcr', 'rcr.owner_id', 'ul.user_id')
-      .whereRaw('rcr.category_key = LOWER(TRIM(oi.category))')
       .where('ul.user_id', ownerId)
-      .where('rcr.staff_role', station)
       .where('oi.status', '<>', 'served')
       .andWhere(function () {
         this.where(function () {
@@ -808,6 +884,15 @@ async function listOrderIdsForStation(strapi, params) {
             .whereIn('o.takeaway_status', ['sent_to_departments', 'ready']);
         });
       });
+
+    if (usesProfessionalRouting) {
+      query = query
+        .innerJoin('restaurant_category_routing as rcr', 'rcr.owner_id', 'ul.user_id')
+        .whereRaw('rcr.category_key = LOWER(TRIM(oi.category))')
+        .where('rcr.staff_role', station);
+    } else if (!usesUnifiedStarterQueue) {
+      query = query.whereRaw('1 = 0');
+    }
 
     if (statusFilter && statusFilter.length) {
       query = query.whereIn('o.status', statusFilter);
@@ -1142,6 +1227,7 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
         // in JS contava il subset di una pagina invece del totale filtrato.
         const { ids, total: filteredTotal } = await listOrderIdsForStation(strapi, {
           ownerId,
+          owner: actor.owner,
           station,
           statusFilter,
           serviceTypeFilter,
@@ -1199,6 +1285,206 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
             total,
             pageCount: Math.ceil(total / pageSize),
           },
+        },
+      };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  /**
+   * GET /api/orders/board
+   * Payload leggero per board operative owner/reparti.
+   */
+  async board(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [
+        STAFF_ROLES.OWNER,
+        STAFF_ROLES.GESTIONE,
+        STAFF_ROLES.CUCINA,
+        STAFF_ROLES.BAR,
+        STAFF_ROLES.PIZZERIA,
+        STAFF_ROLES.CUCINA_SG,
+      ]);
+      const ownerId = actor.ownerId;
+      const q = ctx.request.query || {};
+      const station = stationForActor(actor, q);
+      const statusFilter = typeof q.status === 'string' && q.status.trim()
+        ? q.status.split(',').map((s) => s.trim()).filter((s) => ORDER_STATUS_ENUM.includes(s))
+        : ['active'];
+      const serviceTypeFilter = typeof q.service_type === 'string' && SERVICE_TYPE_ENUM.includes(q.service_type.trim())
+        ? q.service_type.trim()
+        : null;
+      const pageRaw = parseInt(q.page, 10);
+      const pageSizeRaw = parseInt(q.pageSize, 10);
+      const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+      const pageSize = Math.min(
+        Number.isFinite(pageSizeRaw) && pageSizeRaw > 0 ? pageSizeRaw : DEFAULT_PAGE_SIZE,
+        MAX_PAGE_SIZE
+      );
+
+      const routingLookup = await loadRoutingMap(strapi, actor.owner);
+      let results = [];
+      let total = 0;
+
+      if (station) {
+        const { ids, total: filteredTotal } = await listOrderIdsForStation(strapi, {
+          ownerId,
+          owner: actor.owner,
+          station,
+          statusFilter,
+          serviceTypeFilter,
+          tableFilter: null,
+          from: null,
+          to: null,
+          pickupFrom: null,
+          pickupTo: null,
+          linkedFilter: null,
+          page,
+          pageSize,
+        });
+        total = filteredTotal;
+        if (ids.length > 0) {
+          const populated = await strapi.documents('api::order.order').findMany({
+            filters: { id: { $in: ids } },
+            populate: {
+              fk_table: true,
+              fk_items: { populate: { fk_element: true } },
+            },
+            sort: ['opened_at:desc'],
+            pagination: { page: 1, pageSize: ids.length },
+          });
+          results = (populated || []).map((o) => filterItemsForStation(o, routingLookup, station));
+        }
+      } else {
+        const filters = { fk_user: { id: { $eq: ownerId } } };
+        if (statusFilter && statusFilter.length) filters.status = { $in: statusFilter };
+        if (serviceTypeFilter) filters.service_type = { $eq: serviceTypeFilter };
+        const [findResults, countTotal] = await Promise.all([
+          strapi.documents('api::order.order').findMany({
+            filters,
+            populate: {
+              fk_table: true,
+              fk_items: { populate: { fk_element: true } },
+            },
+            sort: ['opened_at:desc'],
+            pagination: { page, pageSize },
+          }),
+          strapi.documents('api::order.order').count({ filters }),
+        ]);
+        results = findResults || [];
+        total = countTotal;
+      }
+
+      ctx.body = {
+        data: results.map((o) => serializeBoardOrder(o, routingLookup)),
+        meta: {
+          pagination: {
+            page,
+            pageSize,
+            total,
+            pageCount: Math.ceil(total / pageSize),
+          },
+        },
+      };
+    } catch (err) {
+      sendError(ctx, err);
+    }
+  },
+
+  /**
+   * GET /api/orders/sala
+   * Payload leggero per griglia sala/cameriere.
+   */
+  async sala(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.unauthorized('Autenticazione richiesta.');
+
+    try {
+      const actor = await resolveStaffContext(strapi, user);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      const ownerId = actor.ownerId;
+
+      const [tables, orders, readyTakeaways] = await Promise.all([
+        strapi.documents('api::table.table').findMany({
+          filters: { fk_user: { id: { $eq: ownerId } } },
+          sort: ['number:asc'],
+        }),
+        strapi.documents('api::order.order').findMany({
+          filters: {
+            fk_user: { id: { $eq: ownerId } },
+            status: { $eq: 'active' },
+            service_type: { $eq: 'table' },
+          },
+          populate: {
+            fk_table: true,
+            fk_items: { fields: ['documentId', 'status', 'quantity', 'course'] },
+          },
+          sort: ['opened_at:desc'],
+          pagination: { page: 1, pageSize: MAX_PAGE_SIZE },
+        }),
+        strapi.documents('api::order.order').findMany({
+          filters: {
+            fk_user: { id: { $eq: ownerId } },
+            status: { $eq: 'active' },
+            service_type: { $eq: 'takeaway' },
+            takeaway_status: { $eq: 'ready' },
+          },
+          fields: [
+            'documentId',
+            'status',
+            'service_type',
+            'takeaway_status',
+            'customer_name',
+            'customer_phone',
+            'pickup_at',
+            'opened_at',
+            'total_amount',
+            'lock_version',
+          ],
+          sort: ['pickup_at:asc'],
+          pagination: { page: 1, pageSize: MAX_PAGE_SIZE },
+        }),
+      ]);
+
+      ctx.body = {
+        data: {
+          tables: (tables || []).map((table) => ({
+            documentId: table.documentId,
+            number: table.number,
+            seats: table.seats,
+            area: table.area || 'interno',
+            status: table.status || 'free',
+            createdAt: table.createdAt,
+            updatedAt: table.updatedAt,
+          })),
+          orders: [
+            ...(orders || []).map(serializeSalaOrder),
+            ...(readyTakeaways || []).map((order) => ({
+              documentId: order.documentId,
+              status: order.status,
+              service_type: order.service_type || 'takeaway',
+              takeaway_status: order.takeaway_status || null,
+              customer_name: order.customer_name || null,
+              customer_phone: order.customer_phone || null,
+              pickup_at: order.pickup_at || null,
+              opened_at: order.opened_at,
+              total_amount: order.total_amount,
+              lock_version: order.lock_version,
+              items: [],
+              createdAt: order.createdAt,
+              updatedAt: order.updatedAt,
+            })),
+          ],
+        },
+        meta: {
+          tables: (tables || []).length,
+          orders: (orders || []).length,
+          readyTakeaways: (readyTakeaways || []).length,
         },
       };
     } catch (err) {

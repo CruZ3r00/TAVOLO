@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import {
     API_BASE,
+    abandonSignup,
     createBillingCheckoutSession,
     createBillingPortalSession,
     fetchBillingStatus,
@@ -55,6 +56,7 @@ const PLANS = {
 
 // L'altro piano (passa all'altro abbonamento).
 const SWITCH_TARGET = { starter: 'pro', pro: 'starter' };
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
 
 const allPlans = computed(() => Object.values(PLANS));
 
@@ -73,22 +75,49 @@ const switchPlan = computed(() => {
 });
 
 const loadBillingStatus = async () => {
-    if (!token.value) return;
     try {
-        billing.value = await fetchBillingStatus(token.value);
+        billing.value = await fetchBillingStatus(token.value || null);
     } catch (err) {
         console.error('fetchBillingStatus:', err);
     }
+};
+
+const cleanupCancelledSignup = async () => {
+    if (route.query.checkout !== 'cancelled' || !isOwnerAccount.value) return false;
+    const status = billing.value || {};
+    if (ACTIVE_SUBSCRIPTION_STATUSES.has(status.subscription_status) || status.subscription_plan) return false;
+
+    try {
+        await abandonSignup(token.value || null);
+    } catch (err) {
+        console.warn('abandonSignup:', err);
+        return false;
+    }
+    sessionStorage.removeItem('pending_registration');
+    sessionStorage.removeItem('pending_plan_after_verification');
+    store.dispatch('logout');
+    router.replace('/register');
+    return true;
+};
+
+const forceFreshLogin = async () => {
+    try {
+        await fetch(`${API_BASE}/api/account/logout`, { method: 'POST' });
+    } catch (_err) {
+        // Logout locale comunque.
+    }
+    store.dispatch('logout');
+    router.replace({ path: '/login', query: { subscription: 'active' } });
 };
 
 // Se torniamo da Stripe Checkout con session_id, sincronizza i dati subito —
 // non aspettiamo il webhook (potrebbe non arrivare in dev senza tunnel).
 const syncIfReturningFromCheckout = async () => {
     const sessionId = typeof route.query.session_id === 'string' ? route.query.session_id : '';
-    if (route.query.checkout !== 'success' || !sessionId || !token.value) return;
+    if (route.query.checkout !== 'success' || !sessionId) return;
     syncing.value = true;
     try {
-        const synced = await syncBillingCheckout(sessionId, token.value);
+        const synced = await syncBillingCheckout(sessionId, token.value || null);
         if (synced) {
             billing.value = synced;
             const user = { ...(store.getters.getUser || {}), ...synced };
@@ -97,10 +126,9 @@ const syncIfReturningFromCheckout = async () => {
             // Riallinea con /users/me autoritativo (subscription_plan, staff payload, ecc).
             await store.dispatch('refreshUser');
         }
-        noticeMessage.value = 'Pagamento confermato. Puoi accedere all\'app.';
-        // Pulizia query string e ridirezione alla dashboard se attivo.
+        noticeMessage.value = 'Pagamento confermato. Effettua di nuovo il login per caricare la sessione aggiornata.';
         if (synced && ['active', 'trialing'].includes(synced.subscription_status)) {
-            setTimeout(() => router.replace('/dashboard'), 800);
+            setTimeout(forceFreshLogin, 800);
         }
     } catch (err) {
         errorMessage.value = err?.message || 'Sync della sessione Stripe non riuscito.';
@@ -110,11 +138,10 @@ const syncIfReturningFromCheckout = async () => {
 };
 
 const subscribe = async (planKey) => {
-    if (!token.value) return;
     errorMessage.value = '';
     loadingPlan.value = planKey;
     try {
-        const session = await createBillingCheckoutSession(planKey, token.value);
+        const session = await createBillingCheckoutSession(planKey, token.value || null);
         if (session?.url) window.location.href = session.url;
         else errorMessage.value = 'Sessione Stripe non valida.';
     } catch (err) {
@@ -125,11 +152,10 @@ const subscribe = async (planKey) => {
 };
 
 const openPortal = async () => {
-    if (!token.value) return;
     errorMessage.value = '';
     portalLoading.value = true;
     try {
-        const session = await createBillingPortalSession(token.value);
+        const session = await createBillingPortalSession(token.value || null);
         if (session?.url) window.location.href = session.url;
         else errorMessage.value = 'Sessione portale non valida.';
     } catch (err) {
@@ -167,8 +193,9 @@ const checkoutNotice = computed(() => {
 
 onMounted(async () => {
     nextTick(() => { document.title = 'Rinnova abbonamento'; });
-    await loadBillingStatus();
     await syncIfReturningFromCheckout();
+    await loadBillingStatus();
+    if (await cleanupCancelledSignup()) return;
 
     // Retry automatico se il flusso ChoosePlan ci ha rimbalzato qui con un piano già scelto.
     const requestedPlan = typeof route.query.plan === 'string' ? route.query.plan : '';
