@@ -455,22 +455,42 @@ async function sendStaffAccessEmailIfNeeded(userId) {
     ? await strapi.db.query('plugin::users-permissions.user').findOne({ where: { id: userId } })
     : null;
   const plan = normalizePlanKey(owner?.subscription_plan);
-  if (!owner || !owner.email || !plan || !hasActiveSubscription(owner)) return;
+  if (!owner) {
+    strapi.log.warn(`staff access email: owner non trovato per userId=${userId || 'vuoto'}.`);
+    return;
+  }
+  if (!owner.email) {
+    strapi.log.warn(`staff access email: email titolare mancante per user ${owner.id}.`);
+    return;
+  }
+  if (!plan) {
+    strapi.log.warn(`staff access email: piano non valido per user ${owner.id}, subscription_plan=${owner.subscription_plan || 'vuoto'}.`);
+    return;
+  }
+  if (!hasActiveSubscription(owner)) {
+    strapi.log.warn(`staff access email: subscription non attiva per user ${owner.id}, status=${owner.subscription_status || 'vuoto'}.`);
+    return;
+  }
 
   const accounts = await listStaffAccessAccounts(owner, plan);
   const expectedCount = STAFF_ACCESS_ROLES_BY_PLAN[plan]?.length || 0;
   if (accounts.length < expectedCount) {
-    strapi.log.warn(`staff access email: account staff incompleti per user ${owner.id}, piano ${plan}.`);
+    const found = accounts.map((account) => account.role).join(',') || 'nessuno';
+    strapi.log.warn(`staff access email: account staff incompleti per user ${owner.id}, piano ${plan}. trovati=${found}, attesi=${expectedCount}.`);
     return;
   }
 
   const previousPlan = owner.staff_access_email_sent_plan || null;
   const claimed = await claimStaffAccessEmail(owner.id, plan);
-  if (!claimed) return;
+  if (!claimed) {
+    strapi.log.info(`staff access email: gia inviata per user ${owner.id}, piano ${plan}.`);
+    return;
+  }
 
   try {
     const restaurantName = await restaurantNameForOwner(owner);
     const email = buildStaffAccessEmail({ owner, restaurantName, plan, accounts });
+    strapi.log.info(`staff access email: invio a ${owner.email} per user ${owner.username}, piano ${plan}.`);
     await strapi.plugin('email').service('email').send({
       to: owner.email,
       from: process.env.SMTP_DEFAULT_FROM || 'no-reply@example.com',

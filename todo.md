@@ -1,3 +1,30 @@
+# Plan — Mail accessi non visibile in staging (2026-05-19)
+
+## Problema
+
+Il provider mostra ancora la vecchia notifica interna
+`Nuovo ristoratore registrato` inviata a `support@comfortables.eu`, mentre la
+mail accessi al titolare non compare. Inoltre i campi pending erano stati
+aggiunti in una migration gia' usata, quindi staging poteva non riceverli.
+
+## Checklist
+
+- [x] Confermare che la vecchia notifica interna non esiste piu' nel codice.
+- [x] Creare una nuova migration idempotente per i campi provisioning signup.
+- [x] Aggiungere log diagnostici per ogni motivo di skip/invio della mail accessi.
+- [x] Verificare sintassi, test Strapi e diff.
+
+## Review
+
+- `rg` non trova piu' `Nuovo ristoratore` o `NEW_USER_NOTIFICATION_EMAIL` in
+  `strapi/src`: dopo deploy non deve piu' partire la mail interna a support.
+- Aggiunta `202605190003_signup_provisioning_fields.js` per garantire i campi
+  pending anche su DB dove la migration precedente e' gia' registrata.
+- Log attesi: `staff access email: invio a ...` prima dell'invio e
+  `Email accessi staff inviata a ...` dopo successo; se viene saltata, ora il
+  log dice se mancano owner/email/piano/subscription/staff.
+- Verifica: `node --check`, `npm test`, `git diff --check` passati.
+
 # Plan — Side effect signup solo dopo pagamento (2026-05-19)
 
 ## Problema

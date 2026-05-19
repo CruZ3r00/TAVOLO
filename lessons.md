@@ -99,3 +99,5 @@
 - Registration should validate and persist only the minimum owner plus pending provisioning metadata. Do not create WebsiteConfig, public site files, staff accounts, or access emails before Stripe confirms an active subscription.
 - Post-payment sync/webhook must be the single provisioning gateway: create WebsiteConfig/site first, then sync staff, then send staff access email.
 - After successful checkout sync, force a fresh login so cookies/localStorage/user payload include the newly active subscription and staff context.
+- Never add new columns only by editing a migration that may already be recorded in staging/production. Add a new idempotent migration so deployed databases actually receive the schema change.
+- Mail flows that can silently skip must log the exact skip reason before returning; otherwise provider dashboards can make an old unrelated notification look like the current email.
