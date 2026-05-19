@@ -450,6 +450,69 @@ function buildStaffAccessEmail({ owner, restaurantName, plan, accounts }) {
   };
 }
 
+function buildInternalNewUserEmail({ owner, restaurantName, plan }) {
+  const siteBaseUrl = process.env.SITE_BASE_URL || 'http://localhost:1337';
+  const planLabel = plan === 'pro' ? 'Professionale' : 'Essenziale';
+  return {
+    subject: `Nuovo ristoratore registrato: ${owner.username}`,
+    text: [
+      'Un nuovo ristoratore ha completato registrazione e pagamento.',
+      '',
+      '--- Informazioni ---',
+      `Username: ${owner.username}`,
+      `Email: ${owner.email}`,
+      `Ristorante: ${restaurantName}`,
+      `Piano: ${planLabel}`,
+      `Nome: ${owner.name || 'Non specificato'}`,
+      `Cognome: ${owner.surname || 'Non specificato'}`,
+      `Data attivazione: ${new Date().toLocaleString('it-IT')}`,
+      '',
+      `Pannello admin: ${siteBaseUrl}/admin`,
+      '',
+      '---',
+      'ComforTables - Notifica automatica',
+    ].join('\n'),
+    html: `
+      <h2>Nuovo ristoratore attivato</h2>
+      <p>Un nuovo ristoratore ha completato registrazione e pagamento.</p>
+      <table style="border-collapse:collapse;width:100%;max-width:560px;">
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Username</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(owner.username)}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Email registrazione</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(owner.email)}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Ristorante</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(restaurantName)}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Piano</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(planLabel)}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Nome</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(owner.name || 'Non specificato')}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Cognome</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(owner.surname || 'Non specificato')}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd;font-weight:bold;">Data attivazione</td><td style="padding:8px;border:1px solid #ddd;">${escapeHtml(new Date().toLocaleString('it-IT'))}</td></tr>
+      </table>
+      <p style="margin-top:20px;"><a href="${escapeHtml(siteBaseUrl)}/admin">Vai al pannello admin</a></p>
+      <hr><p style="color:#999;font-size:12px;">ComforTables - Notifica automatica</p>
+    `,
+  };
+}
+
+async function sendInternalNewUserEmail(owner, restaurantName, plan) {
+  const notificationEmail = process.env.NEW_USER_NOTIFICATION_EMAIL || '';
+  if (!notificationEmail) {
+    strapi.log.info('internal signup email: NEW_USER_NOTIFICATION_EMAIL non configurata, skip.');
+    return;
+  }
+
+  try {
+    const email = buildInternalNewUserEmail({ owner, restaurantName, plan });
+    strapi.log.info(`internal signup email: invio a ${notificationEmail} per user ${owner.username}, cliente=${owner.email}, piano ${plan}.`);
+    await strapi.plugin('email').service('email').send({
+      to: notificationEmail,
+      from: process.env.SMTP_DEFAULT_FROM || 'no-reply@example.com',
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+    });
+    strapi.log.info(`internal signup email: inviata a ${notificationEmail} per user ${owner.username}.`);
+  } catch (err) {
+    strapi.log.warn(`internal signup email: invio fallito per user ${owner.username}: ${err.message}`);
+  }
+}
+
 async function sendStaffAccessEmailIfNeeded(userId) {
   const owner = userId
     ? await strapi.db.query('plugin::users-permissions.user').findOne({ where: { id: userId } })
@@ -490,7 +553,7 @@ async function sendStaffAccessEmailIfNeeded(userId) {
   try {
     const restaurantName = await restaurantNameForOwner(owner);
     const email = buildStaffAccessEmail({ owner, restaurantName, plan, accounts });
-    strapi.log.info(`staff access email: invio a ${owner.email} per user ${owner.username}, piano ${plan}.`);
+    strapi.log.info(`staff access email: invio a email registrazione ${owner.email} per user ${owner.username}, piano ${plan}.`);
     await strapi.plugin('email').service('email').send({
       to: owner.email,
       from: process.env.SMTP_DEFAULT_FROM || 'no-reply@example.com',
@@ -498,7 +561,8 @@ async function sendStaffAccessEmailIfNeeded(userId) {
       text: email.text,
       html: email.html,
     });
-    strapi.log.info(`Email accessi staff inviata a ${owner.email} per user ${owner.username}, piano ${plan}.`);
+    strapi.log.info(`Email accessi staff inviata a email registrazione ${owner.email} per user ${owner.username}, piano ${plan}.`);
+    await sendInternalNewUserEmail(owner, restaurantName, plan);
   } catch (err) {
     await resetStaffAccessEmailClaim(owner.id, previousPlan);
     strapi.log.warn(`Impossibile inviare email accessi staff per ${owner.username}: ${err.message}`);

@@ -101,3 +101,4 @@
 - After successful checkout sync, force a fresh login so cookies/localStorage/user payload include the newly active subscription and staff context.
 - Never add new columns only by editing a migration that may already be recorded in staging/production. Add a new idempotent migration so deployed databases actually receive the schema change.
 - Mail flows that can silently skip must log the exact skip reason before returning; otherwise provider dashboards can make an old unrelated notification look like the current email.
+- Customer access emails must always be sent to the owner registration email (`owner.email`). Internal support notifications are separate emails and must never replace or share the customer access email path.
