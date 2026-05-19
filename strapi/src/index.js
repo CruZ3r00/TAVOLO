@@ -20,6 +20,39 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+async function cleanupGeneratedStaffAccounts(strapi, ownerId) {
+  if (!ownerId || !strapi.db.connection) return;
+  const knex = strapi.db.connection;
+  const rows = await knex('restaurant_staff as staff')
+    .join('up_users as user', 'user.id', 'staff.user_id')
+    .select(['staff.user_id'])
+    .where('staff.owner_id', ownerId)
+    .whereIn('staff.role', ['cameriere', 'cucina', 'bar', 'pizzeria', 'cucina_sg'])
+    .where('user.email', 'like', `staff+${ownerId}.%@staff.local.tavolo`);
+
+  const staffIds = [...new Set((rows || []).map((row) => row.user_id).filter(Boolean))];
+  if (staffIds.length === 0) return;
+
+  await knex('restaurant_staff').where('owner_id', ownerId).whereIn('user_id', staffIds).delete();
+  if (await knex.schema.hasTable('up_users_fk_owner_lnk')) {
+    await knex('up_users_fk_owner_lnk').whereIn('user_id', staffIds).delete();
+  }
+  if (await knex.schema.hasTable('up_users_role_lnk')) {
+    await knex('up_users_role_lnk').whereIn('user_id', staffIds).delete();
+  }
+  await knex('up_users').whereIn('id', staffIds).delete();
+}
+
+async function rollbackCreatedUser(strapi, userId) {
+  if (!userId) return;
+  try {
+    await cleanupGeneratedStaffAccounts(strapi, userId);
+  } catch (cleanupStaffErr) {
+    strapi.log.warn(`register middleware: cleanup staff rollback fallito per user ${userId}: ${cleanupStaffErr.message}`);
+  }
+  await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: userId } });
+}
+
 module.exports = {
   /**
    * An asynchronous register function that runs before
@@ -66,7 +99,7 @@ module.exports = {
 
       if (isReservedStaffUsername(username)) {
         try {
-          await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+          await rollbackCreatedUser(strapi, createdUser.id);
         } catch (_) { /* best effort */ }
         ctx.status = 400;
         ctx.body = {
@@ -85,7 +118,7 @@ module.exports = {
       if (!cInv || cInv < 1 || cInv > 10000) {
         // Invalid capacity — rollback the created user
         try {
-          await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+          await rollbackCreatedUser(strapi, createdUser.id);
         } catch (_) { /* best effort */ }
         ctx.status = 400;
         ctx.body = {
@@ -100,7 +133,7 @@ module.exports = {
         cEst = Number.isFinite(Number(rawEst)) ? parseInt(rawEst, 10) : null;
         if (!cEst || cEst < 1 || cEst > 10000) {
           try {
-            await strapi.db.query('plugin::users-permissions.user').delete({ where: { id: createdUser.id } });
+            await rollbackCreatedUser(strapi, createdUser.id);
           } catch (_) { /* best effort */ }
           ctx.status = 400;
           ctx.body = {
@@ -166,9 +199,7 @@ module.exports = {
           `register middleware: creazione WebsiteConfig fallita per user ${createdUser.username}, rollback utente: ${error.message}`
         );
         try {
-          await strapi.db
-            .query('plugin::users-permissions.user')
-            .delete({ where: { id: createdUser.id } });
+          await rollbackCreatedUser(strapi, createdUser.id);
         } catch (cleanupErr) {
           strapi.log.error(`register middleware: rollback utente fallito: ${cleanupErr.message}`);
         }

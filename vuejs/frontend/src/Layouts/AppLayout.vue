@@ -424,10 +424,6 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
       </Transition>
     </nav>
 
-    <TeleportCompat to="body">
-      <CommandPalette />
-    </TeleportCompat>
-
     <main class="main-content">
       <slot />
     </main>

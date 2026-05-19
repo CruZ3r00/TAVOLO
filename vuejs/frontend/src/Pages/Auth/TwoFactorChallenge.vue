@@ -9,7 +9,7 @@
     import InputError from '@/components/InputError.vue';
     import InputLabel from '@/components/InputLabel.vue';
     import TextInput from '@/components/TextInput.vue';
-    import { API_BASE } from '@/utils';
+    import { API_BASE, createBillingCheckoutSession } from '@/utils';
     import { defaultRouteForUser } from '@/staffAccess';
 
     useHead({
@@ -30,6 +30,14 @@
     const emailHint = ref(sessionStorage.getItem('two_factor_email_hint') || '');
     const emailMode = ref(methods.value.includes('email') && !methods.value.includes('totp'));
     const recoveryAvailable = ref(methods.value.includes('recovery'));
+
+    const startPendingCheckout = async (planKey, token) => {
+        const session = await createBillingCheckoutSession(planKey, token || null);
+        if (!session?.url) {
+            throw new Error('Sessione Stripe non disponibile.');
+        }
+        window.location.href = session.url;
+    };
 
     // Schema dinamico: in modalita' "code" valida `code`, in modalita' "recovery"
     // valida `recovery_code`. Ricostruisco la useFormState ad ogni toggle non e'
@@ -101,7 +109,11 @@
                 const pendingPlan = sessionStorage.getItem('pending_plan_after_verification');
                 if (['starter', 'pro'].includes(pendingPlan)) {
                     sessionStorage.removeItem('pending_plan_after_verification');
-                    router.push({ path: '/renew-sub', query: { checkout: 'retry', plan: pendingPlan } });
+                    try {
+                        await startPendingCheckout(pendingPlan, data.jwt || null);
+                    } catch (err) {
+                        errorMessage.value = err?.message || 'Accesso riuscito, ma il checkout Stripe non si è avviato.';
+                    }
                     return;
                 }
                 router.push(defaultRouteForUser(data.user));

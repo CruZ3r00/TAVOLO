@@ -60,6 +60,44 @@ la request non sicura e rifiuta il cookie.
 - Deploy: staging deve avere `TRUST_PROXY=true` e Nginx deve inviare
   `X-Forwarded-Proto https`.
 
+# Plan — Fix landing legacy search, staff rollback, checkout redirect (2026-05-19)
+
+## Problema
+
+- Nel build legacy della landing compare la ricerca interna del gestionale.
+- Se una registrazione fallisce, possono restare account staff sintetici creati
+  dal trigger DB su `up_users`.
+- Dopo registrazione/verifica, il piano Essenziale finisce su `/renew-sub`
+  invece di aprire Stripe Checkout.
+
+## Checklist
+
+- [x] Rimuovere `CommandPalette` dal layout pubblico; resta solo nel layout app.
+- [x] Evitare la creazione staff finche' l'owner non ha una subscription attiva.
+- [x] Pulire gli staff sintetici durante rollback registrazione.
+- [x] Sostituire i redirect post-login/post-2FA a `/renew-sub` con Stripe Checkout diretto.
+- [x] Eseguire test Strapi e build frontend modern/legacy.
+- [x] Verificare runtime landing legacy senza ricerca interna.
+- [x] Documentare risultato.
+
+## Review
+
+- Landing legacy: verificata su `http://127.0.0.1:5175/landing`, nessun
+  `.app-top-search`, `.cp-backdrop` o `.cp-panel` nel DOM pubblico.
+- Staff: nuova migration rende `sync_owner_staff_accounts` no-op creativo senza
+  subscription attiva e ripulisce staff sintetici orfani; il rollback registrazione
+  pulisce anche gli staff generati prima di cancellare l'owner.
+- Checkout: scelta piano, login post-verifica e 2FA usano Stripe Checkout diretto
+  per `starter`/`pro`; niente redirect a `/renew-sub` come fallback signup.
+- Verifica: `cd strapi && npm test`, `npm run build:modern`, `npm run build:legacy`.
+
+## Pro Check
+
+- Frontend: `pro` usa lo stesso percorso corretto di `starter` (`createBillingCheckoutSession(planKey)`) sia da scelta piano sia dopo login/2FA con piano pendente. Non ci sono piu' redirect signup a `/renew-sub?plan=...`.
+- Backend billing: `PLAN_CONFIG.pro` punta a `STRIPE_PRICE_PRO`; i controlli produzione richiedono `STRIPE_PRICE_STARTER` e `STRIPE_PRICE_PRO` distinti.
+- Staff DB: con subscription `pro` attiva, la nuova `sync_owner_staff_accounts` crea/abilita `cameriere`, `cucina`, `bar`, `pizzeria`, `cucina_sg`; senza subscription attiva non crea staff.
+- Gating: il middleware permette i reparti pro quando l'owner ha `subscription_plan='pro'` e subscription attiva; su starter restano ammessi solo sala/cucina.
+
 # Plan — Element.ingredients legacy JSON cleanup (2026-05-14)
 
 ## Problema riportato dall'utente

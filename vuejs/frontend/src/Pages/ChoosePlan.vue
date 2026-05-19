@@ -118,6 +118,9 @@ const registerThenCheckout = async (planKey) => {
         // 2) Login locale (token + user nello store/localStorage).
         store.dispatch('login', { user: data.user, token: data.jwt || null });
         sessionStorage.removeItem('pending_registration');
+        if (!data.jwt) {
+            await store.dispatch('refreshSession');
+        }
 
         // 3) Stripe Checkout — il backend redirige a success_url (/renew-sub?checkout=success).
         try {
@@ -127,10 +130,8 @@ const registerThenCheckout = async (planKey) => {
                 return;
             }
             errorMessage.value = 'Sessione Stripe non disponibile.';
-            router.push({ path: '/renew-sub', query: { checkout: 'retry', plan: planKey } });
         } catch (err) {
             errorMessage.value = err?.message || 'Account creato, ma il checkout Stripe non si è avviato.';
-            router.push({ path: '/renew-sub', query: { checkout: 'retry', plan: planKey } });
         }
     } catch (_err) {
         errorMessage.value = 'Errore di rete. Riprova.';
