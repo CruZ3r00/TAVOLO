@@ -107,3 +107,8 @@
 
 - In Essential, the technical `cucina` role is displayed as `Ordini` and must behave as a unified queue. Backend station filters cannot keep using `restaurant_category_routing.staff_role`, because historical or regex-created rows may classify beverages as `bar` even though the plan has no bar staff.
 - Keep Pro routing untouched: category routing drives separate Cucina/Bar/Pizzeria/Cucina SG stations only when the owner has an active `pro` subscription.
+- Frontend navigation and route guards must match the same product rule: Essential staff `cucina/Ordini` should see only `Ordini` plus `Carico bar`; Pro-only station pages must not be reachable directly by non-Pro accounts.
+
+## 2026-05-19 — Mobile modals with dense operational text should scroll as one page
+
+- On small screens, avoid locking the viewport while only an inner panel scrolls when the modal contains examples, notes, or operational advice. Let the overlay/card scroll as a single document so explanatory text and actions move together and remain readable on iOS/Android.

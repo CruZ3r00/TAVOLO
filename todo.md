@@ -1,3 +1,55 @@
+# Plan — Mobile turno bar: contenuti modale devono scrollare (2026-05-19)
+
+## Problema
+
+Su mobile nel flusso `Turno bar` il modale `Carico fatto/Riepilogo turno`
+blocca lo scroll del body e rende scrollabile solo la sezione centrale. Header,
+azioni e testi di supporto restano fermi, riducendo lo spazio utile e rendendo
+difficile leggere esempio/consigli/nota.
+
+## Checklist
+
+- [x] Rendere lo scroll mobile dell'intero modale, non solo del body interno.
+- [x] Conservare il layout desktop/tablet con header/footer stabili.
+- [x] Verificare sintassi/build frontend.
+- [x] Aggiornare lessons con la regola mobile.
+
+## Review
+
+- Su mobile (`<=640px`) `.cf-overlay` diventa lo scroll container e `.cf-body`
+  torna a overflow visibile: header, testi, esempio/nota e azioni scorrono
+  insieme.
+- Desktop/tablet resta invariato: card a flex column con body interno
+  scrollabile e footer stabile.
+- Verifica: `npm run build:modern` e `git diff --check` passati. `node --check`
+  non e' applicabile ai file `.vue`.
+
+# Plan — Essential nav: solo Ordini e Carico bar (2026-05-19)
+
+## Problema
+
+Nell'account staff del piano Essenziale compaiono sia `Ordini` sia `Cucina SG`.
+Dato che in Essenziale tutta la produzione arriva nella coda unica `Ordini`,
+`Cucina SG` e' un duplicato inutile e puo' portare a una vista vuota/confusa.
+
+## Checklist
+
+- [x] Nascondere `Cucina SG` dalla navigazione staff `cucina` Essential.
+- [x] Lasciare visibili solo `Ordini` e `Carico bar` per lo staff ordini
+  Essential.
+- [x] Bloccare accesso diretto alle route reparto Pro per account non-Pro.
+- [x] Verificare build frontend e diff.
+
+## Review
+
+- `canSeeNavItem()` ora per staff `cucina` mostra `cucina`, `bar-management`
+  e `logout`: quindi in Essential restano `Ordini` e `Carico bar`.
+- Le route `/bar`, `/pizzeria` e `/kitchen-sg` hanno `requiresPlan: 'pro'`;
+  `/kitchen-sg` non accetta piu' il ruolo tecnico `cucina`.
+- `canAccessRoute()` blocca le route Pro se `subscription_plan !== 'pro'`.
+- Verifica: `node --check` su `staffAccess.js` e `router/index.js`,
+  `npm run build:modern`, `git diff --check` passati.
+
 # Plan — Essential Ordini deve mostrare tutte le categorie (2026-05-19)
 
 ## Problema

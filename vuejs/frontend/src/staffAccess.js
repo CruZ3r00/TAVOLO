@@ -42,6 +42,7 @@ export const defaultRouteForUser = (user) => {
 };
 
 export const canAccessRoute = (user, route) => {
+  if (route?.meta?.requiresPlan === 'pro' && String(user?.subscription_plan || '').toLowerCase() !== 'pro') return false;
   const allowed = route?.meta?.staffRoles;
   if (!allowed || allowed.length === 0) return true;
   return allowed.includes(staffRole(user));
@@ -72,7 +73,7 @@ export const canSeeNavItem = (user, id) => {
   const role = staffRole(user);
   if (id === 'bar-management') return canSeeBarManagement(user);
   if (role === STAFF_ROLES.CAMERIERE) return ['sala', 'prenotazioni', 'logout'].includes(id);
-  if (role === STAFF_ROLES.CUCINA) return ['cucina', 'cucina_sg', 'logout'].includes(id);
+  if (role === STAFF_ROLES.CUCINA) return ['cucina', 'bar-management', 'logout'].includes(id);
   if (role === STAFF_ROLES.BAR) return ['bar', 'logout'].includes(id);
   if (role === STAFF_ROLES.PIZZERIA) return ['pizzeria', 'logout'].includes(id);
   if (role === STAFF_ROLES.CUCINA_SG) return ['cucina_sg', 'logout'].includes(id);

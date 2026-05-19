@@ -401,11 +401,34 @@ onBeforeUnmount(() => {
 @keyframes cf-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 @media (max-width: 640px) {
+  .cf-overlay {
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px;
+  }
+  .cf-card {
+    max-height: none;
+    min-height: auto;
+    overflow: visible;
+  }
   .cf-head { padding: 16px; }
   .cf-head h2 { font-size: 18px; }
-  .cf-body { padding: 12px 16px; }
+  .cf-head-meta { width: 100%; }
+  .cf-meta-block { flex: 1; }
+  .cf-body {
+    padding: 12px 16px;
+    overflow: visible;
+    flex: none;
+    min-height: auto;
+  }
   .cf-foot { padding: 12px 16px; flex-direction: column; align-items: stretch; }
   .cf-foot-actions { width: 100%; justify-content: flex-end; }
+  .cf-foot .ds-btn { width: 100%; justify-content: center; }
+  .cf-foot-actions { flex-direction: column-reverse; }
+  .cf-row { align-items: flex-start; }
+  .cf-row-vals { flex-direction: column; align-items: flex-end; gap: 2px; }
 }
 
 /* Le regole @media print vivono in un <style> non-scoped sotto, perche
