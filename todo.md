@@ -107,6 +107,17 @@ la request non sicura e rifiuta il cookie.
   quel token e lo usa come fallback su richieste unsafe.
 - Verifica: `cd strapi && npm test`, `npm run build:modern`.
 
+## Stripe Return Follow-up
+
+- Problema: durante signup cookie-only, `/api/users/me` risponde 402 prima della
+  subscription attiva e `refreshSession` faceva logout locale. Al ritorno Stripe
+  `/renew-sub?checkout=success&session_id=...` non chiamava `sync-checkout`
+  perche' richiedeva un bearer token.
+- Fix: 402 su `/users/me` conserva la sessione locale se esiste un user; `RenewSub`
+  sincronizza `session_id`, billing status, checkout e portale anche con cookie auth
+  senza token JWT.
+- Verifica: `npm run build:modern`.
+
 # Plan — Element.ingredients legacy JSON cleanup (2026-05-14)
 
 ## Problema riportato dall'utente

@@ -80,3 +80,4 @@
 ## 2026-05-19 — Cookie-only POSTs need exposed CSRF fallback
 
 - When auth uses secure httpOnly cookies, the first unsafe API call after login/register may not have a readable CSRF cookie yet. Capture `X-CSRF-Token` from auth responses, expose it via CORS, and reuse it as a fallback header for POST/PUT/PATCH/DELETE.
+- Treat `/api/users/me` returning 402 during signup as "authenticated but unpaid", not as logout. Stripe return pages must be able to call billing sync with cookie auth even when no bearer JWT is present.

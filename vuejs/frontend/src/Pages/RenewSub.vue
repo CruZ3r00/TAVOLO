@@ -73,9 +73,8 @@ const switchPlan = computed(() => {
 });
 
 const loadBillingStatus = async () => {
-    if (!token.value) return;
     try {
-        billing.value = await fetchBillingStatus(token.value);
+        billing.value = await fetchBillingStatus(token.value || null);
     } catch (err) {
         console.error('fetchBillingStatus:', err);
     }
@@ -85,10 +84,10 @@ const loadBillingStatus = async () => {
 // non aspettiamo il webhook (potrebbe non arrivare in dev senza tunnel).
 const syncIfReturningFromCheckout = async () => {
     const sessionId = typeof route.query.session_id === 'string' ? route.query.session_id : '';
-    if (route.query.checkout !== 'success' || !sessionId || !token.value) return;
+    if (route.query.checkout !== 'success' || !sessionId) return;
     syncing.value = true;
     try {
-        const synced = await syncBillingCheckout(sessionId, token.value);
+        const synced = await syncBillingCheckout(sessionId, token.value || null);
         if (synced) {
             billing.value = synced;
             const user = { ...(store.getters.getUser || {}), ...synced };
@@ -110,11 +109,10 @@ const syncIfReturningFromCheckout = async () => {
 };
 
 const subscribe = async (planKey) => {
-    if (!token.value) return;
     errorMessage.value = '';
     loadingPlan.value = planKey;
     try {
-        const session = await createBillingCheckoutSession(planKey, token.value);
+        const session = await createBillingCheckoutSession(planKey, token.value || null);
         if (session?.url) window.location.href = session.url;
         else errorMessage.value = 'Sessione Stripe non valida.';
     } catch (err) {
@@ -125,11 +123,10 @@ const subscribe = async (planKey) => {
 };
 
 const openPortal = async () => {
-    if (!token.value) return;
     errorMessage.value = '';
     portalLoading.value = true;
     try {
-        const session = await createBillingPortalSession(token.value);
+        const session = await createBillingPortalSession(token.value || null);
         if (session?.url) window.location.href = session.url;
         else errorMessage.value = 'Sessione portale non valida.';
     } catch (err) {
@@ -167,8 +164,8 @@ const checkoutNotice = computed(() => {
 
 onMounted(async () => {
     nextTick(() => { document.title = 'Rinnova abbonamento'; });
-    await loadBillingStatus();
     await syncIfReturningFromCheckout();
+    await loadBillingStatus();
 
     // Retry automatico se il flusso ChoosePlan ci ha rimbalzato qui con un piano già scelto.
     const requestedPlan = typeof route.query.plan === 'string' ? route.query.plan : '';
