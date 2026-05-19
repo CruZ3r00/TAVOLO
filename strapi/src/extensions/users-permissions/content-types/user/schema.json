@@ -98,6 +98,14 @@
       "type": "boolean",
       "default": false
     },
+    "staff_access_email_sent_at": {
+      "type": "datetime",
+      "private": true
+    },
+    "staff_access_email_sent_plan": {
+      "type": "string",
+      "private": true
+    },
     "end_subscription": {
       "type": "date"
     },

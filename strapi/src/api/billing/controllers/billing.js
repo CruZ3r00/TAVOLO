@@ -19,6 +19,18 @@ const MANAGED_STAFF_ROLES = [
   STAFF_ROLES.PIZZERIA,
   STAFF_ROLES.CUCINA_SG,
 ];
+const STAFF_ACCESS_ROLES_BY_PLAN = {
+  starter: [STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA],
+  pro: [STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA, STAFF_ROLES.BAR, STAFF_ROLES.PIZZERIA, STAFF_ROLES.CUCINA_SG],
+};
+const STAFF_ACCESS_DESCRIPTIONS = {
+  cameriere: 'Usato da chi prende ordini ai tavoli, gestisce la sala e invia le comande.',
+  cucina: 'Riceve tutte le comande inviate dalla sala. È la coda unica per cucina, bar o preparazioni operative.',
+  cucina_pro: 'Riceve le comande assegnate alla cucina.',
+  bar: 'Riceve ordini e preparazioni assegnati al bar.',
+  pizzeria: 'Riceve le comande assegnate alla pizzeria.',
+  cucina_sg: 'Riceve le preparazioni dedicate al senza glutine.',
+};
 
 let stripeClient = null;
 
@@ -61,6 +73,15 @@ function normalizePlanKey(value) {
   return PLAN_CONFIG[key] ? key : null;
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function safeUser(user) {
   if (!user) return null;
   return {
@@ -97,6 +118,16 @@ function staffRoleLabel(role, owner) {
     case STAFF_ROLES.CUCINA_SG: return 'Cucina SG';
     default: return role;
   }
+}
+
+function staffAccessRoleLabel(role, plan) {
+  if (role === STAFF_ROLES.CUCINA && plan === 'starter') return 'Ordini';
+  return staffRoleLabel(role, { subscription_plan: plan });
+}
+
+function staffAccessDescription(role, plan) {
+  if (role === STAFF_ROLES.CUCINA && plan === 'pro') return STAFF_ACCESS_DESCRIPTIONS.cucina_pro;
+  return STAFF_ACCESS_DESCRIPTIONS[role] || '';
 }
 
 async function staffSettingsPayload(owner) {
@@ -170,6 +201,169 @@ async function syncOwnerStaffAccounts(userId) {
   } catch (err) {
     strapi.log.warn(`syncOwnerStaffAccounts fallita per user ${numericId}: ${err.message}`);
   }
+}
+
+async function restaurantNameForOwner(owner) {
+  if (!owner) return 'ComforTables';
+  if (!strapi.db.connection) return owner.username || 'ComforTables';
+  try {
+    const row = await strapi.db.connection('website_configs as config')
+      .join('website_configs_fk_user_lnk as owner_lnk', 'owner_lnk.website_config_id', 'config.id')
+      .select(['config.restaurant_name'])
+      .where('owner_lnk.user_id', owner.id)
+      .orderBy('config.id', 'desc')
+      .first();
+    return row?.restaurant_name || owner.username || 'ComforTables';
+  } catch (err) {
+    strapi.log.warn(`staff access email: nome ristorante non disponibile per user ${owner.id}: ${err.message}`);
+    return owner.username || 'ComforTables';
+  }
+}
+
+async function listStaffAccessAccounts(owner, plan) {
+  const roles = STAFF_ACCESS_ROLES_BY_PLAN[plan] || [];
+  if (!owner?.id || roles.length === 0 || !strapi.db.connection) return [];
+
+  const rows = await strapi.db.connection('restaurant_staff as staff')
+    .join('up_users as user', 'user.id', 'staff.user_id')
+    .select(['staff.role', 'user.username'])
+    .where('staff.owner_id', owner.id)
+    .whereIn('staff.role', roles)
+    .where('user.blocked', false);
+
+  const byRole = new Map((rows || []).map((row) => [row.role, row.username]));
+  return roles
+    .map((role) => ({
+      role,
+      label: staffAccessRoleLabel(role, plan),
+      username: byRole.get(role) || null,
+      description: staffAccessDescription(role, plan),
+    }))
+    .filter((item) => item.username);
+}
+
+async function claimStaffAccessEmail(ownerId, plan) {
+  if (!ownerId || !plan || !strapi.db.connection) return false;
+  const result = await strapi.db.connection.raw(`
+    update up_users
+    set staff_access_email_sent_at = now(),
+        staff_access_email_sent_plan = ?
+    where id = ?
+      and coalesce(staff_access_email_sent_plan, '') <> ?
+    returning id
+  `, [plan, ownerId, plan]);
+  return (result?.rows || []).length > 0;
+}
+
+async function resetStaffAccessEmailClaim(ownerId, previousPlan) {
+  if (!ownerId || !strapi.db.connection) return;
+  try {
+    await strapi.db.connection('up_users')
+      .where('id', ownerId)
+      .update({
+        staff_access_email_sent_at: null,
+        staff_access_email_sent_plan: previousPlan || null,
+      });
+  } catch (err) {
+    strapi.log.warn(`staff access email: reset claim fallito per user ${ownerId}: ${err.message}`);
+  }
+}
+
+function buildStaffAccessEmail({ owner, restaurantName, plan, accounts }) {
+  const planLabel = plan === 'pro' ? 'Professionale' : 'Essenziale';
+  const loginUrl = `${getFrontendUrl()}/login`;
+  const ownerUsername = owner.username || owner.email || 'titolare';
+  const textLines = [
+    `Ciao ${restaurantName},`,
+    '',
+    'la registrazione è completata e il tuo gestionale ComforTables è pronto.',
+    '',
+    `Per accedere usa questo link: ${loginUrl}`,
+    '',
+    'La password è la stessa scelta durante la registrazione. Potrai modificarla in seguito quando la gestione password staff sarà disponibile.',
+    '',
+    'Account titolare',
+    ownerUsername,
+    '',
+    `Profili inclusi nel piano ${planLabel}`,
+    '',
+  ];
+
+  for (const account of accounts) {
+    textLines.push(account.label);
+    textLines.push(`Account: ${account.username}`);
+    textLines.push(account.description);
+    textLines.push('');
+  }
+
+  textLines.push('Grazie,');
+  textLines.push('ComforTables');
+
+  const staffHtml = accounts.map((account) => `
+    <div style="margin:18px 0;padding:14px 16px;border:1px solid #e5e7eb;border-radius:8px;">
+      <h3 style="margin:0 0 8px;font-size:16px;color:#111827;">${escapeHtml(account.label)}</h3>
+      <p style="margin:0 0 6px;color:#374151;"><strong>Account:</strong> ${escapeHtml(account.username)}</p>
+      <p style="margin:0;color:#4b5563;">${escapeHtml(account.description)}</p>
+    </div>
+  `).join('');
+
+  return {
+    subject: 'Accessi ComforTables attivati',
+    text: textLines.join('\n'),
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:640px;">
+        <p>Ciao ${escapeHtml(restaurantName)},</p>
+        <p>la registrazione è completata e il tuo gestionale ComforTables è pronto.</p>
+        <p>Per accedere usa questo link:<br><a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a></p>
+        <p>La password è la stessa scelta durante la registrazione. Potrai modificarla in seguito quando la gestione password staff sarà disponibile.</p>
+        <h2 style="font-size:18px;margin:24px 0 8px;">Account titolare</h2>
+        <p style="margin:0 0 18px;"><strong>${escapeHtml(ownerUsername)}</strong></p>
+        <h2 style="font-size:18px;margin:24px 0 8px;">Profili inclusi nel piano ${escapeHtml(planLabel)}</h2>
+        ${staffHtml}
+        <p style="margin-top:24px;">Grazie,<br>ComforTables</p>
+      </div>
+    `,
+  };
+}
+
+async function sendStaffAccessEmailIfNeeded(userId) {
+  const owner = userId
+    ? await strapi.db.query('plugin::users-permissions.user').findOne({ where: { id: userId } })
+    : null;
+  const plan = normalizePlanKey(owner?.subscription_plan);
+  if (!owner || !owner.email || !plan || !hasActiveSubscription(owner)) return;
+
+  const accounts = await listStaffAccessAccounts(owner, plan);
+  const expectedCount = STAFF_ACCESS_ROLES_BY_PLAN[plan]?.length || 0;
+  if (accounts.length < expectedCount) {
+    strapi.log.warn(`staff access email: account staff incompleti per user ${owner.id}, piano ${plan}.`);
+    return;
+  }
+
+  const previousPlan = owner.staff_access_email_sent_plan || null;
+  const claimed = await claimStaffAccessEmail(owner.id, plan);
+  if (!claimed) return;
+
+  try {
+    const restaurantName = await restaurantNameForOwner(owner);
+    const email = buildStaffAccessEmail({ owner, restaurantName, plan, accounts });
+    await strapi.plugin('email').service('email').send({
+      to: owner.email,
+      from: process.env.SMTP_DEFAULT_FROM || 'no-reply@example.com',
+      subject: email.subject,
+      text: email.text,
+      html: email.html,
+    });
+    strapi.log.info(`Email accessi staff inviata a ${owner.email} per user ${owner.username}, piano ${plan}.`);
+  } catch (err) {
+    await resetStaffAccessEmailClaim(owner.id, previousPlan);
+    strapi.log.warn(`Impossibile inviare email accessi staff per ${owner.username}: ${err.message}`);
+  }
+}
+
+async function syncStaffAndSendAccessEmail(userId) {
+  await syncOwnerStaffAccounts(userId);
+  await sendStaffAccessEmailIfNeeded(userId);
 }
 
 async function findUserByStripe({ customerId, subscriptionId }) {
@@ -337,7 +531,7 @@ module.exports = {
         ...snapshot,
         subscription_plan: normalizePlanKey(session.metadata?.plan) || snapshot.subscription_plan,
       });
-      await syncOwnerStaffAccounts(user.id);
+      await syncStaffAndSendAccessEmail(user.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: user.id },
@@ -399,7 +593,7 @@ module.exports = {
 
       const snapshot = await subscriptionSnapshot(stripe, updated);
       await updateUserSubscription(billingUser.id, { ...snapshot, subscription_plan: plan.key });
-      await syncOwnerStaffAccounts(billingUser.id);
+      await syncStaffAndSendAccessEmail(billingUser.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: billingUser.id },
@@ -434,7 +628,7 @@ module.exports = {
       });
       const snapshot = await subscriptionSnapshot(stripe, updated);
       await updateUserSubscription(billingUser.id, snapshot);
-      await syncOwnerStaffAccounts(billingUser.id);
+      await syncStaffAndSendAccessEmail(billingUser.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: billingUser.id },
@@ -487,7 +681,7 @@ module.exports = {
       });
       const snapshot = await subscriptionSnapshot(stripe, updated);
       await updateUserSubscription(billingUser.id, snapshot);
-      await syncOwnerStaffAccounts(billingUser.id);
+      await syncStaffAndSendAccessEmail(billingUser.id);
 
       const refreshed = await strapi.db.query('plugin::users-permissions.user').findOne({
         where: { id: billingUser.id },
@@ -549,7 +743,7 @@ module.exports = {
             ...snapshot,
             subscription_plan: normalizePlanKey(session.metadata?.plan) || snapshot.subscription_plan,
           });
-          await syncOwnerStaffAccounts(userId);
+          await syncStaffAndSendAccessEmail(userId);
         }
       }
 
@@ -571,7 +765,7 @@ module.exports = {
             stripe_customer_id: subscription.customer,
             ...(await subscriptionSnapshot(stripe, subscription)),
           });
-          await syncOwnerStaffAccounts(user?.id);
+          await syncStaffAndSendAccessEmail(user?.id);
         }
       }
     } catch (err) {

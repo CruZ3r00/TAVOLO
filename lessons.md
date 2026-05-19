@@ -81,3 +81,9 @@
 
 - When auth uses secure httpOnly cookies, the first unsafe API call after login/register may not have a readable CSRF cookie yet. Capture `X-CSRF-Token` from auth responses, expose it via CORS, and reuse it as a fallback header for POST/PUT/PATCH/DELETE.
 - Treat `/api/users/me` returning 402 during signup as "authenticated but unpaid", not as logout. Stripe return pages must be able to call billing sync with cookie auth even when no bearer JWT is present.
+
+## 2026-05-19 — Staff access emails belong after billing activation
+
+- Do not send staff access instructions from the raw registration lifecycle: before Stripe activation the plan may be pending and staff accounts may not exist yet.
+- Staff access emails should be triggered after subscription sync/webhook, after `sync_owner_staff_accounts`, and guarded by a DB flag so Stripe webhook + frontend return cannot send duplicates.
+- Until per-staff password reset/change exists, do not invent temporary passwords in email. State that staff profiles use the same password chosen during registration and include only account usernames.

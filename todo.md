@@ -1,3 +1,33 @@
+# Plan — Email accessi staff post-attivazione piano (2026-05-19)
+
+## Obiettivo
+
+Quando Stripe attiva il piano, inviare al titolare una mail semplice con gli
+account inclusi nel piano scelto. La mail non deve contenere password: deve
+dire che la password e' la stessa usata in registrazione e che potra' essere
+cambiata piu' avanti.
+
+## Checklist
+
+- [x] Preparare template testo/html per Essenziale e Professionale.
+- [x] Inviare la mail solo dopo subscription attiva e sync staff completato.
+- [x] Evitare invii duplicati tra return da Stripe e webhook.
+- [x] Verificare test Strapi.
+
+## Review
+
+- La mail parte da `billing` dopo checkout sync/webhook/cambio piano, quindi
+  solo quando la subscription e' attiva e gli account staff sono sincronizzati.
+- Essenziale invia `Sala` e `Ordini`; Professionale invia `Sala`, `Cucina`,
+  `Bar`, `Pizzeria`, `Cucina SG`.
+- La mail contiene solo username e specifica che la password e' quella scelta
+  in registrazione.
+- Aggiunti `staff_access_email_sent_at` e `staff_access_email_sent_plan` per
+  evitare duplicati tra webhook Stripe e ritorno frontend.
+- Verifica: `node --check src/api/billing/controllers/billing.js`,
+  `npm test`, `git diff --check` passati.
+
+
 # Plan — Essenziale: coda unica "Ordini" invece di "Cucina" (2026-05-19)
 
 ## Obiettivo
