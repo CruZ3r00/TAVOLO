@@ -5,18 +5,18 @@ import { useRoute, useRouter } from 'vue-router';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import OrdersTableGrid from '@/components/OrdersTableGrid.vue';
 import KitchenBoard from '@/components/KitchenBoard.vue';
-import OrderDetailModal from '@/components/OrderDetailModal.vue';
-import AddItemModal from '@/components/AddItemModal.vue';
-import CheckoutModal from '@/components/CheckoutModal.vue';
+import OrderDetailPage from '@/components/OrderDetailPage.vue';
 import Modal from '@/components/Modal.vue';
 import Skeleton from '@/components/Skeleton.vue';
+import WalkinModal from '@/components/WalkinModal.vue';
+import TableManagerModal from '@/components/TableManagerModal.vue';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
 import { STAFF_ROLES, effectiveUserId, staffRole } from '@/staffAccess';
 import {
-  fetchTables, fetchOrders, closeOrder,
-  addOrderItem, updateItemStatus, orderErrorMessage,
+  fetchTables, fetchOrders, updateItemStatus, orderErrorMessage,
   pickupTakeaway,
   createWalkin, reservationErrorMessage,
+  deleteTable,
 } from '@/utils';
 
 const store = useStore();
@@ -25,6 +25,7 @@ const router = useRouter();
 const token = computed(() => store.getters.getToken);
 const currentUser = computed(() => store.getters.getUser || null);
 const isOwnerView = computed(() => staffRole(currentUser.value) === STAFF_ROLES.OWNER);
+const canManageTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE].includes(staffRole(currentUser.value)));
 
 const tables = ref([]);
 const orders = ref([]);
@@ -86,21 +87,38 @@ const headerOverline = computed(() => {
   return `${modeInfo.value.overline} · ${now.value}`;
 });
 
-const showOrderDetail = ref(false);
 const currentOrderDocId = ref(null);
-const showAddItem = ref(false);
-const addItemOrderDocId = ref(null);
-const addItemLockVersion = ref(0);
-const showCheckout = ref(false);
-const checkoutOrder = ref(null);
 const busyItemIds = ref(new Set());
 const showWalkin = ref(false);
 const walkinTable = ref(null);
 const walkinSaving = ref(false);
 const walkinForm = ref({ number_of_people: 2, customer_name: 'Walk-in', phone: '', notes: '' });
 const walkinErrors = ref({});
+// Strumenti sidebar (mirror della pagina Prenotazioni): walk-in libero (con
+// scelta del tavolo o auto) + gestione tavoli (CRUD).
+const showWalkinModal = ref(false);
+const showTableManager = ref(false);
 
-const orderDetailRef = ref(null);
+// View interna della pagina Sala (cameriere): 'grid' (lista tavoli, default)
+// vs 'order-detail' (vista full-page del tavolo con add cumulative + invio
+// in cucina). Pattern MenuSetter -> MenuAdder.
+// La chiusura del conto NON e' qui: avviene esclusivamente dalla Dashboard.
+const salaView = ref('grid');
+
+// Filtro tavoli (modalità cameriere): controllato dalla sidebar laterale
+// della pagina. Sostituisce l'ex SalaFiltersBar interna a OrdersTableGrid.
+const tableFilter = ref('all');
+const tableCounts = ref({ all: 0, free: 0, busy: 0, ready: 0, res: 0 });
+const onTableCountsChanged = (next) => {
+  tableCounts.value = { all: 0, free: 0, busy: 0, ready: 0, res: 0, ...(next || {}) };
+};
+const tableFilterPills = computed(() => ([
+  { key: 'all',   label: 'Tutti',       icon: 'bi-grid-3x3-gap',     count: tableCounts.value.all },
+  { key: 'free',  label: 'Liberi',      icon: 'bi-circle',           count: tableCounts.value.free },
+  { key: 'busy',  label: 'Occupati',    icon: 'bi-people-fill',      count: tableCounts.value.busy },
+  { key: 'ready', label: 'Da chiudere', icon: 'bi-check-circle',     count: tableCounts.value.ready },
+  { key: 'res',   label: 'Prenotati',   icon: 'bi-calendar-check',   count: tableCounts.value.res },
+]));
 
 const stats = computed(() => {
   const tableOrders = orders.value.filter(o => o.service_type !== 'takeaway');
@@ -124,6 +142,8 @@ const kitchenStats = computed(() => {
     if (o.status !== 'active' || !o.items) continue;
     for (const it of o.items) {
       if (it.status === 'served') continue;
+      // pending = ancora nelle mani del cameriere (non inviato in cucina).
+      if (it.status === 'pending') continue;
       total += 1;
       if (it.status === 'ready') ready += 1;
     }
@@ -148,7 +168,8 @@ const formatElapsed = (ts) => {
   return `${m}'`;
 };
 const orderTopStatus = (order) => {
-  const items = (order.items || []).filter(i => i.status !== 'served' && i.status !== 'cancelled');
+  // pending = cameriere only, non rilevante per il monitor cucina/owner.
+  const items = (order.items || []).filter(i => i.status !== 'served' && i.status !== 'cancelled' && i.status !== 'pending');
   if (items.length === 0) return 'consegnato';
   if (items.every(i => i.status === 'ready')) return 'pronto';
   if (items.some(i => i.status === 'preparing' || i.status === 'taken')) return 'lavorazione';
@@ -159,7 +180,8 @@ const filteredMonitorOrders = computed(() => {
   return orders.value
     .filter(o => o.status === 'active' && Array.isArray(o.items))
     .map(o => {
-      const items = dept === 'all' ? o.items : o.items.filter(i => itemStation(i) === dept);
+      const base = o.items.filter(i => i.status !== 'pending');
+      const items = dept === 'all' ? base : base.filter(i => itemStation(i) === dept);
       return { ...o, items };
     })
     .filter(o => o.items.length > 0)
@@ -256,11 +278,34 @@ const showToast = (type, message) => {
   setTimeout(() => { toast.value = null; }, 3500);
 };
 
+// Click su un tavolo occupato: apre la vista full-page del dettaglio ordine
+// (sostituisce la grid). La pagina permette aggiunta cumulative dei piatti
+// per portata + invio in cucina finale. Pattern MenuSetter -> MenuAdder.
 const handleViewOrder = (order) => {
   if (!order?.documentId) return;
   currentOrderDocId.value = order.documentId;
-  showOrderDetail.value = true;
+  salaView.value = 'order-detail';
 };
+
+const onOrderDetailBack = () => {
+  salaView.value = 'grid';
+  currentOrderDocId.value = null;
+};
+
+const onOrderSent = async ({ sent, printDispatched }) => {
+  await loadData({ silent: true });
+  salaView.value = 'grid';
+  currentOrderDocId.value = null;
+  showToast('success', sent > 0
+    ? `Comanda inviata in cucina (${sent} ${sent === 1 ? 'piatto' : 'piatti'}).`
+    : 'Tutto già in cucina.');
+  // Toast informativo se la stampante di cucina non e' raggiungibile
+  if (printDispatched && printDispatched.no_device === true) {
+    showToast('warning', 'Stampa cucina non disponibile, postazione offline.');
+  }
+};
+
+const onOrderDetailUpdated = async () => { await loadData({ silent: true }); };
 
 const handleOpenTable = async (table) => {
   if (!table?.documentId || !token.value) return;
@@ -273,6 +318,20 @@ const handleOpenTable = async (table) => {
   };
   walkinErrors.value = {};
   showWalkin.value = true;
+};
+
+const handleRemoveTable = async (table) => {
+  if (!canManageTables.value || !table?.documentId) return;
+  const ok = window.confirm(`Rimuovere il tavolo ${table.number}?`);
+  if (!ok) return;
+  try {
+    await deleteTable(table.documentId, token.value);
+    showToast('success', `Tavolo ${table.number} rimosso.`);
+    await loadData({ silent: true });
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
+    await loadData({ silent: true });
+  }
 };
 
 const validateWalkin = () => {
@@ -302,8 +361,10 @@ const confirmWalkin = async () => {
     showWalkin.value = false;
     await loadData({ silent: true });
     if (result?.order?.documentId) {
+      // Apri direttamente la vista dettaglio del nuovo ordine: cosi' il
+      // cameriere puo' iniziare ad aggiungere piatti subito dopo il walk-in.
       currentOrderDocId.value = result.order.documentId;
-      showOrderDetail.value = true;
+      salaView.value = 'order-detail';
     }
     showToast('success', `Walk-in aperto al tavolo ${walkinTable.value.number}.`);
   } catch (err) {
@@ -311,60 +372,6 @@ const confirmWalkin = async () => {
     await loadData({ silent: true });
   } finally {
     walkinSaving.value = false;
-  }
-};
-
-const onOrderUpdated = async () => { await loadData({ silent: true }); };
-
-const onOpenAddItem = ({ orderDocumentId, lockVersion }) => {
-  addItemOrderDocId.value = orderDocumentId;
-  addItemLockVersion.value = lockVersion;
-  showAddItem.value = true;
-};
-
-const onAddItem = async (payload) => {
-  try {
-    await addOrderItem(addItemOrderDocId.value, payload, token.value);
-    showAddItem.value = false;
-    if (orderDetailRef.value) await orderDetailRef.value.onItemAdded();
-    await loadData({ silent: true });
-  } catch (err) {
-    if (err?.code === 'STALE_ORDER') {
-      showAddItem.value = false;
-      if (orderDetailRef.value) await orderDetailRef.value.silentReload();
-      showToast('error', 'Dati obsoleti, aggiornati. Riprova.');
-    } else {
-      showToast('error', orderErrorMessage(err));
-    }
-  }
-};
-
-const onOpenCheckout = (order) => {
-  checkoutOrder.value = order;
-  showCheckout.value = true;
-};
-
-const onConfirmCheckout = async (payload) => {
-  if (!checkoutOrder.value) return;
-  try {
-    const result = await closeOrder(checkoutOrder.value.documentId, payload, token.value);
-    showCheckout.value = false;
-    if (result.queued) {
-      showToast('success', `Richiesta inviata al dispositivo POS/RT. Rif: ${result.event_id || 'OK'}`);
-    } else {
-      showOrderDetail.value = false;
-      currentOrderDocId.value = null;
-      showToast('success', `Conto chiuso. Rif: ${result.payment?.transactionId || 'OK'}`);
-    }
-    await loadData({ silent: true });
-  } catch (err) {
-    if (err?.code === 'STALE_ORDER') {
-      showCheckout.value = false;
-      if (orderDetailRef.value) await orderDetailRef.value.silentReload();
-      showToast('error', 'Dati obsoleti, aggiornati. Riprova il pagamento.');
-    } else {
-      showToast('error', orderErrorMessage(err));
-    }
   }
 };
 
@@ -395,6 +402,65 @@ const handleKitchenAdvance = async ({ item, next, orderDocumentId }) => {
   }
 };
 
+// Bulk serve dei piatti ready di un tavolo: shortcut dalla card SalaTableCard
+// senza dover entrare nel dettaglio. Cameriere/owner/gestione possono fare
+// ready→served (vedi canTransitionItem).
+const handleServeReady = async (order) => {
+  if (!order?.documentId) return;
+  const ready = (order.items || []).filter(i => i.status === 'ready');
+  if (ready.length === 0) return;
+
+  const s = new Set(busyItemIds.value);
+  ready.forEach(i => s.add(i.documentId));
+  busyItemIds.value = s;
+
+  let ok = 0;
+  let fail = 0;
+  await Promise.all(ready.map(async (item) => {
+    try {
+      await updateItemStatus(order.documentId, item.documentId, 'served', token.value);
+      ok += 1;
+    } catch (err) {
+      fail += 1;
+      // eslint-disable-next-line no-console
+      console.error(`serve-ready: ${item.documentId} fallito`, err);
+    }
+  }));
+
+  const s2 = new Set(busyItemIds.value);
+  ready.forEach(i => s2.delete(i.documentId));
+  busyItemIds.value = s2;
+
+  if (ok > 0) {
+    showToast('success', `${ok} ${ok === 1 ? 'piatto servito' : 'piatti serviti'}.`);
+    await loadData({ silent: true });
+  }
+  if (fail > 0) {
+    showToast('error', `${fail} ${fail === 1 ? 'piatto non' : 'piatti non'} aggiornati.`);
+  }
+};
+
+// Handler dei modali "Strumenti" della sidebar (mirror Prenotazioni).
+const onWalkinModalCreated = async () => {
+  showToast('success', 'Walk-in registrato.');
+  await loadData({ silent: true });
+};
+const onTableManagerUpdated = async (payload = null) => {
+  if (payload?.table?.documentId) {
+    if (payload.action === 'created') {
+      tables.value = [...tables.value, payload.table].sort((a, b) => (a.number || 0) - (b.number || 0));
+    } else if (payload.action === 'updated') {
+      tables.value = tables.value.map((t) => (
+        t.documentId === payload.table.documentId ? { ...t, ...payload.table } : t
+      ));
+    } else if (payload.action === 'deleted') {
+      tables.value = tables.value.filter((t) => t.documentId !== payload.table.documentId);
+    }
+    return;
+  }
+  await loadData({ silent: true });
+};
+
 const handleTakeawayPickupFromSala = async (order) => {
   if (!order?.documentId) return;
   try {
@@ -417,13 +483,19 @@ function statusLabel(status) {
 
 let realtimeChannel = null;
 let realtimeRefreshHandle = null;
+// Tick incrementato a ogni evento realtime: OrderDetailPage lo osserva come
+// prop per ricaricare il proprio ordine quando la KitchenBoard avanza un item
+// (e.g. taken→preparing→ready), cosi' il cameriere vede il bottone "Servito"
+// senza dover chiudere/riaprire la pagina dettaglio.
+const realtimeTick = ref(0);
 
 const scheduleRealtimeRefresh = () => {
   if (document.visibilityState !== 'visible') return;
   if (realtimeRefreshHandle) clearTimeout(realtimeRefreshHandle);
-  realtimeRefreshHandle = setTimeout(() => {
+  realtimeRefreshHandle = setTimeout(async () => {
     realtimeRefreshHandle = null;
-    loadData({ silent: true });
+    realtimeTick.value += 1;
+    await loadData({ silent: true });
   }, 250);
 };
 
@@ -464,14 +536,16 @@ const subscribeRealtime = async (userId) => {
   }
 };
 const onVisibilityChange = () => {
-  if (document.visibilityState === 'visible') loadData({ silent: true });
+  if (document.visibilityState === 'visible') {
+    loadData({ silent: true });
+  }
 };
 
 const openOrderFromQuery = () => {
   const docId = typeof route.query?.order === 'string' ? route.query.order : null;
   if (!docId) return;
   currentOrderDocId.value = docId;
-  showOrderDetail.value = true;
+  salaView.value = 'order-detail';
 };
 
 const updateDocumentTitle = () => {
@@ -516,8 +590,76 @@ watch(() => route.path, async () => {
 
 <template>
   <AppLayout :page-title="pageTitle">
-    <div class="md-main" :class="{ 'kt-main': isKitchenMode }">
-      <header class="md-top">
+    <div class="ord-layout">
+      <!-- Sidebar laterale dedicata alla pagina (stile MenuSetter):
+           - Modalità produzione (owner/gestione su /kitchen, /bar, …):
+             switcher di reparto.
+           - Modalità cameriere: filtro stato tavoli (Tutti/Liberi/Occupati/
+             Da chiudere/Prenotati). Sostituisce l'ex SalaFiltersBar.
+           Su mobile diventa una row orizzontale scrollabile. -->
+      <aside
+        v-if="(isOwnerProductionMode || mode === 'cameriere') && !(mode === 'cameriere' && salaView !== 'grid')"
+        class="ord-sidebar"
+      >
+        <div v-if="isOwnerProductionMode" class="ord-sidebar-section">
+          <div class="ord-sidebar-label">Reparto</div>
+          <nav class="ord-sidebar-nav">
+            <button
+              v-for="pill in departmentPills"
+              :key="pill.key"
+              type="button"
+              class="ord-nav-item"
+              :class="{ 'ord-nav-item--active': monitorDept === pill.key }"
+              :disabled="!pill.allowed"
+              :title="pill.allowed ? '' : 'Disponibile con il piano Professionale'"
+              @click="setMonitorDept(pill.key, pill.allowed)"
+            >
+              <i :class="['bi', pill.icon]" aria-hidden="true"></i>
+              <span>{{ pill.label }}</span>
+              <span v-if="!pill.allowed" class="ord-pro-badge">PRO</span>
+            </button>
+          </nav>
+        </div>
+        <div v-if="isOwnerProductionMode && !isPro" class="ord-sidebar-note">
+          <i class="bi bi-info-circle" aria-hidden="true"></i>
+          <span>Piano Essenziale: solo Cucina disponibile.</span>
+        </div>
+
+        <div v-if="mode === 'cameriere'" class="ord-sidebar-section">
+          <div class="ord-sidebar-label">Filtra tavoli</div>
+          <nav class="ord-sidebar-nav">
+            <button
+              v-for="pill in tableFilterPills"
+              :key="pill.key"
+              type="button"
+              class="ord-nav-item"
+              :class="{ 'ord-nav-item--active': tableFilter === pill.key }"
+              @click="tableFilter = pill.key"
+            >
+              <i :class="['bi', pill.icon]" aria-hidden="true"></i>
+              <span>{{ pill.label }}</span>
+              <span v-if="pill.count > 0" class="ord-nav-count">{{ pill.count }}</span>
+            </button>
+          </nav>
+        </div>
+
+        <div v-if="mode === 'cameriere'" class="ord-sidebar-section">
+          <div class="ord-sidebar-label">Strumenti</div>
+          <nav class="ord-sidebar-nav">
+            <button type="button" class="ord-nav-item" @click="showTableManager = true">
+              <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+              <span>Tavoli</span>
+            </button>
+            <button type="button" class="ord-nav-item" @click="showWalkinModal = true">
+              <i class="bi bi-person-plus" aria-hidden="true"></i>
+              <span>Walk-in</span>
+            </button>
+          </nav>
+        </div>
+      </aside>
+
+      <div class="md-main ord-main" :class="{ 'kt-main': isKitchenMode }">
+      <header v-if="!(mode === 'cameriere' && salaView !== 'grid')" class="md-top">
         <div>
           <div class="overline">{{ headerOverline }}</div>
           <h1>{{ headerTitle }}</h1>
@@ -544,28 +686,6 @@ watch(() => route.path, async () => {
         </div>
       </header>
 
-      <!-- ===== OWNER · monitor toolbar ===== -->
-      <div v-if="isOwnerProductionMode" class="ct-dept-bar" aria-label="Reparto monitorato">
-        <button
-          v-for="pill in departmentPills"
-          :key="pill.key"
-          type="button"
-          class="ct-dept-pill"
-          :class="{ active: monitorDept === pill.key }"
-          :disabled="!pill.allowed"
-          :title="pill.allowed ? '' : 'Disponibile con il piano Professionale'"
-          @click="setMonitorDept(pill.key, pill.allowed)"
-        >
-          <i :class="['bi', pill.icon]" aria-hidden="true"></i>
-          <span>{{ pill.label }}</span>
-          <span v-if="!pill.allowed" class="lock-pill">PRO</span>
-        </button>
-        <span v-if="!isPro" class="ct-dept-bar__note">
-          <i class="bi bi-info-circle" style="color: var(--ac);"></i>
-          Piano Essenziale: solo Cucina
-        </span>
-      </div>
-
       <Transition name="fade">
         <div v-if="errorMessage" class="md-card" style="border-color: var(--danger); background: var(--danger-bg); padding: 12px 16px; color: var(--danger);">
           <i class="bi bi-exclamation-circle"></i>
@@ -575,7 +695,7 @@ watch(() => route.path, async () => {
 
       <Transition name="fade">
         <div v-if="toast" :class="['md-toast', `md-toast-${toast.type}`]" role="status">
-          <i :class="['bi', toast.type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle']"></i>
+          <i :class="['bi', toast.type === 'success' ? 'bi-check-circle' : toast.type === 'warning' ? 'bi-exclamation-triangle' : 'bi-exclamation-circle']"></i>
           <span>{{ toast.message }}</span>
         </div>
       </Transition>
@@ -719,7 +839,7 @@ watch(() => route.path, async () => {
 
         <!-- ===== Cameriere (sala) ===== -->
         <template v-else-if="mode === 'cameriere'">
-          <section v-if="readyTakeaways.length" class="takeaway-ready-alert">
+          <section v-if="readyTakeaways.length && salaView === 'grid'" class="takeaway-ready-alert">
             <header>
               <i class="bi bi-bag-check"></i>
               <strong>Asporto pronto da ritirare</strong>
@@ -739,10 +859,26 @@ watch(() => route.path, async () => {
             </div>
           </section>
           <OrdersTableGrid
+            v-if="salaView === 'grid'"
             :tables="tables"
             :orders="orders"
+            :can-remove-tables="canManageTables"
+            :filter="tableFilter"
+            @update:filter="tableFilter = $event"
+            @counts-changed="onTableCountsChanged"
             @view-order="handleViewOrder"
             @open-table="handleOpenTable"
+            @remove-table="handleRemoveTable"
+            @serve-ready="handleServeReady"
+          />
+          <OrderDetailPage
+            v-else-if="salaView === 'order-detail' && currentOrderDocId"
+            :order-document-id="currentOrderDocId"
+            :token="token"
+            :refresh-tick="realtimeTick"
+            @back="onOrderDetailBack"
+            @sent="onOrderSent"
+            @order-updated="onOrderDetailUpdated"
           />
         </template>
 
@@ -754,33 +890,8 @@ watch(() => route.path, async () => {
           @advance="handleKitchenAdvance"
         />
       </template>
+      </div>
     </div>
-
-    <OrderDetailModal
-      ref="orderDetailRef"
-      :show="showOrderDetail"
-      :order-document-id="currentOrderDocId"
-      :token="token"
-      @close="showOrderDetail = false"
-      @order-updated="onOrderUpdated"
-      @open-add-item="onOpenAddItem"
-      @open-checkout="onOpenCheckout"
-    />
-
-    <AddItemModal
-      :show="showAddItem"
-      :order-document-id="addItemOrderDocId"
-      :lock-version="addItemLockVersion"
-      @close="showAddItem = false"
-      @add="onAddItem"
-    />
-
-    <CheckoutModal
-      :show="showCheckout"
-      :order="checkoutOrder"
-      @close="showCheckout = false"
-      @confirm="onConfirmCheckout"
-    />
 
     <Modal :show="showWalkin" slim @close="showWalkin = false">
       <template #title>
@@ -830,10 +941,138 @@ watch(() => route.path, async () => {
         </form>
       </template>
     </Modal>
+
+    <WalkinModal
+      :show="showWalkinModal"
+      :tables="tables"
+      :token="token"
+      @close="showWalkinModal = false"
+      @created="onWalkinModalCreated"
+    />
+    <TableManagerModal
+      :show="showTableManager"
+      :token="token"
+      :tables="tables"
+      :editing-table="null"
+      @close="showTableManager = false"
+      @updated="onTableManagerUpdated"
+    />
   </AppLayout>
 </template>
 
 <style scoped>
+/* ── Layout sidebar pagina (stesso pattern di MenuSetter) ── */
+.ord-layout {
+  display: flex;
+  min-height: calc(100vh - 0px);
+  position: relative;
+}
+
+.ord-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg-sunk);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ord-sidebar-section { display: flex; flex-direction: column; gap: 2px; }
+.ord-sidebar-label {
+  padding: 0 8px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+.ord-sidebar-nav { display: flex; flex-direction: column; gap: 1px; }
+.ord-sidebar-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.45;
+}
+.ord-sidebar-note i { color: var(--ac); flex-shrink: 0; margin-top: 1px; }
+
+.ord-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--f-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.ord-nav-item:hover:not(:disabled) { background: var(--bg-hover); color: var(--ink); }
+.ord-nav-item:disabled { opacity: 0.55; cursor: not-allowed; }
+.ord-nav-item--active {
+  background: var(--bg-elev);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+.ord-nav-item--active i { color: var(--ac); }
+.ord-nav-item i { font-size: 14px; opacity: 0.8; flex-shrink: 0; }
+.ord-nav-item span:nth-child(2) { flex: 1; }
+
+.ord-pro-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--ac-soft);
+  color: var(--ac-ink);
+  font-family: var(--f-mono);
+  flex-shrink: 0;
+}
+
+.ord-nav-count {
+  font-size: 11px;
+  color: var(--ink-3);
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.ord-nav-item--active .ord-nav-count { color: var(--ink); font-weight: 700; }
+
+.ord-main { flex: 1; min-width: 0; }
+
+@media (max-width: 860px) {
+  .ord-layout { flex-direction: column; }
+  .ord-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 10px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    gap: 6px;
+  }
+  .ord-sidebar-section { flex-direction: row; flex-wrap: nowrap; gap: 4px; }
+  .ord-sidebar-label { display: none; }
+  .ord-sidebar-note { display: none; }
+  .ord-nav-item { white-space: nowrap; padding: 7px 12px; }
+}
+
 .md-loading {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 12px; padding: 56px 16px;
@@ -868,6 +1107,7 @@ watch(() => route.path, async () => {
 }
 .md-toast i { font-size: 16px; flex-shrink: 0; }
 .md-toast-success { background: color-mix(in oklab, var(--ok) 10%, var(--paper)); color: var(--ok-ink); border-color: color-mix(in oklab, var(--ok) 30%, transparent); }
+.md-toast-warning { background: color-mix(in oklab, var(--warn, #e6a817) 10%, var(--paper)); color: var(--warn, #b38600); border-color: color-mix(in oklab, var(--warn, #e6a817) 30%, transparent); }
 .md-toast-error { background: color-mix(in oklab, var(--danger) 10%, var(--paper)); color: var(--danger); border-color: color-mix(in oklab, var(--danger) 30%, transparent); }
 
 .ord-skel-grid {

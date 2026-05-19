@@ -1,17 +1,11 @@
 'use strict';
 
 /**
- * reservation router (core, used solo in admin).
+ * Core Content API disabled.
+ *
+ * Reservations are exposed only through custom tenant-aware routes in
+ * custom-reservation.js. The Strapi admin/content-manager uses its own admin
+ * API, so the generic public Content API router is not needed here.
  */
 
-const { createCoreRouter } = require('@strapi/strapi').factories;
-
-module.exports = createCoreRouter('api::reservation.reservation', {
-  config: {
-    find:    { auth: false, policies: ['admin::isAuthenticatedAdmin'] },
-    findOne: { auth: false, policies: ['admin::isAuthenticatedAdmin'] },
-    create:  { auth: false, policies: ['admin::isAuthenticatedAdmin'] },
-    update:  { auth: false, policies: ['admin::isAuthenticatedAdmin'] },
-    delete:  { auth: false, policies: ['admin::isAuthenticatedAdmin'] },
-  },
-});
+module.exports = { routes: [] };

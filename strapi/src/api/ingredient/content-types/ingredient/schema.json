@@ -1,0 +1,108 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ingredients",
+  "info": {
+    "singularName": "ingredient",
+    "pluralName": "ingredients",
+    "displayName": "Ingredient",
+    "description": "Ingrediente nominale (starter) o tracciato a magazzino (pro). Univoco per (fk_user, name_normalized)."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "maxLength": 200
+    },
+    "name_normalized": {
+      "type": "string",
+      "required": true,
+      "maxLength": 200
+    },
+    "unit": {
+      "type": "enumeration",
+      "enum": ["g", "kg", "ml", "l", "pz", "mazzo"],
+      "default": "pz",
+      "required": true
+    },
+    "unit_size": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "stock_qty": {
+      "type": "decimal",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "low_stock_threshold": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "reorder_lead_days": {
+      "type": "decimal",
+      "default": 3,
+      "required": true,
+      "min": 0
+    },
+    "is_unavailable": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "required": true
+    },
+    "is_addon": {
+      "type": "boolean",
+      "default": false,
+      "required": true
+    },
+    "addon_price": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "addon_avg_qty": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "supplier_name": {
+      "type": "string",
+      "required": false,
+      "maxLength": 200
+    },
+    "supplier_email": {
+      "type": "string",
+      "required": false,
+      "maxLength": 200
+    },
+    "notes": {
+      "type": "text",
+      "required": false,
+      "maxLength": 1000
+    },
+    "allergens": {
+      "type": "json",
+      "required": false
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "fk_element_ingredients": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::element-ingredient.element-ingredient",
+      "mappedBy": "fk_ingredient"
+    }
+  }
+}

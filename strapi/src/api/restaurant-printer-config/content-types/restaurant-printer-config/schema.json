@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "restaurant_printer_configs",
+  "info": {
+    "singularName": "restaurant-printer-config",
+    "pluralName": "restaurant-printer-configs",
+    "displayName": "RestaurantPrinterConfig",
+    "description": "Configurazione stampanti di stazione e dispositivi cassa per il ristorante"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": {
+      "visible": false
+    }
+  },
+  "attributes": {
+    "auto_print_kitchen_enabled": {
+      "type": "boolean",
+      "default": true,
+      "required": false
+    },
+    "stations_json": {
+      "type": "json",
+      "required": false
+    },
+    "cash_devices_json": {
+      "type": "json",
+      "required": false
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

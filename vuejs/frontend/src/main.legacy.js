@@ -22,6 +22,7 @@ import Vuex from 'vuex';
 import App from './App.vue';
 import router from './router';
 import { store } from './store';
+import { installCredentialedFetch } from './lib/api/fetch-credentials';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
@@ -31,6 +32,8 @@ import './assets/comfortables.css';
 // IMPORTANTE: legacy-fallbacks.css va caricato DOPO gli altri CSS per avere
 // la priorita' di cascade quando i `@supports not (...)` matchano.
 import './assets/legacy-fallbacks.css';
+
+installCredentialedFetch();
 
 Vue.config.productionTip = false;
 Vue.use(VueRouter);

@@ -19,6 +19,8 @@ const { DriverRegistry } = require('./drivers/registry');
 const { buildApp } = require('./api');
 const { createOrderCloseHandler } = require('./modules/payment');
 const { createPrintReceiptHandler } = require('./modules/print');
+const { createPrintKitchenTicketHandler } = require('./modules/kitchen-print');
+const printerTargetsRepo = require('./storage/repositories/printerTargetsRepo');
 const { ensureClaimCode, getClaimCodePath } = require('./utils/claim-code');
 const keystore = require('./utils/keystore');
 
@@ -62,10 +64,21 @@ class Application {
     });
     await this.driverRegistry.loadAll();
 
+    // 3b. Carica printer targets (se esistono gia in DB da precedente sync)
+    try {
+      const existingTargets = printerTargetsRepo.list();
+      if (existingTargets.length > 0) {
+        await this.driverRegistry.loadFromTargets(existingTargets);
+      }
+    } catch (err) {
+      log.warn({ err: err.message }, 'loadFromTargets: skip (tabella potrebbe non esistere ancora)');
+    }
+
     // 4. Handler + QueueManager
     const handlers = {
       'order.close': createOrderCloseHandler({ driverRegistry: this.driverRegistry }),
       'print.receipt': createPrintReceiptHandler({ driverRegistry: this.driverRegistry }),
+      'print.kitchen_ticket': createPrintKitchenTicketHandler({ driverRegistry: this.driverRegistry }),
     };
 
     // 5. HTTP + WS clients (lazy — richiedono pairing)
@@ -173,7 +186,31 @@ class Application {
       const accepted = [];
       const rejected = [];
       for (const [k, v] of Object.entries(msg.config)) {
-        if (isRemoteModifiable(k)) {
+        if (k === 'printer_targets' || k === 'auto_print_kitchen_enabled') {
+          // Gestione speciale per printer_targets e auto_print_kitchen_enabled
+          if (k === 'printer_targets' && Array.isArray(v)) {
+            try {
+              printerTargetsRepo.upsertMany(v.map((t) => ({
+                role: t.role,
+                key: t.key,
+                driver: t.driver,
+                host: t.host,
+                port: t.port,
+                options_json: t.options ? JSON.stringify(t.options) : null,
+                capabilities_json: t.capabilities ? JSON.stringify(t.capabilities) : null,
+                enabled: t.enabled !== false,
+              })));
+              printerTargetsRepo.removeMissing(v.map((t) => ({ role: t.role, key: t.key })));
+              await this.driverRegistry.reload(printerTargetsRepo.list());
+              log.info({ count: v.length }, 'printer_targets aggiornati da WS');
+            } catch (err) {
+              log.warn({ err: err.message }, 'printer_targets: errore applicazione');
+            }
+          } else if (k === 'auto_print_kitchen_enabled') {
+            configRepo.set(k, v);
+          }
+          accepted.push(k);
+        } else if (isRemoteModifiable(k)) {
           configRepo.set(k, v);
           accepted.push(k);
         } else {
@@ -207,6 +244,8 @@ class Application {
       wsClient: this.wsClient,
       config: this.config,
       driverRegistry: this.driverRegistry,
+      printerTargetsRepo,
+      configRepo,
     });
     this.scheduler.start();
     this.wsClient.start();

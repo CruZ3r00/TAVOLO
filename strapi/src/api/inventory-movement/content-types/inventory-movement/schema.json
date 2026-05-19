@@ -1,0 +1,74 @@
+{
+  "kind": "collectionType",
+  "collectionName": "inventory_movements",
+  "info": {
+    "singularName": "inventory-movement",
+    "pluralName": "inventory-movements",
+    "displayName": "InventoryMovement",
+    "description": "Audit trail append-only: ogni variazione di stock di un Ingredient (carico, scarico, scarto, adjustment, initial)."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "kind": {
+      "type": "enumeration",
+      "enum": ["initial", "restock", "consumption", "waste", "adjustment"],
+      "required": true
+    },
+    "qty_delta": {
+      "type": "decimal",
+      "required": true
+    },
+    "qty_after": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
+    },
+    "cost": {
+      "type": "decimal",
+      "required": false,
+      "min": 0
+    },
+    "reason": {
+      "type": "string",
+      "required": false,
+      "maxLength": 100
+    },
+    "note": {
+      "type": "text",
+      "required": false,
+      "maxLength": 1000
+    },
+    "fk_ingredient": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ingredient.ingredient"
+    },
+    "fk_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "fk_order": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::order.order"
+    },
+    "fk_order_item": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::order-item.order-item"
+    },
+    "fk_restock_order": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::restock-order.restock-order"
+    },
+    "fk_bar_shift": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::bar-shift.bar-shift"
+    }
+  }
+}

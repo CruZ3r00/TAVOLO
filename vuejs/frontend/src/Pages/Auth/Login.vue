@@ -34,23 +34,35 @@ const submit = async () => {
   try {
     const response = await fetch(`${API_BASE}/api/auth/local`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: identifier.value, password: password.value }),
     });
     if (response.ok) {
       const data = await response.json();
+      if (data.two_factor_required || data.twoFactorRequired) {
+        sessionStorage.setItem('two_factor_challenge_token', data.challenge_token || '');
+        sessionStorage.setItem('two_factor_pending_user', JSON.stringify(data.user || {}));
+        sessionStorage.setItem('two_factor_methods', JSON.stringify(data.methods || []));
+        sessionStorage.setItem('two_factor_email_hint', data.email_hint || '');
+        if (route.query.plan) {
+          sessionStorage.setItem('pending_plan_after_verification', route.query.plan);
+        }
+        router.push('/two-factor-challenge');
+        return;
+      }
+
       let user = data.user;
       try {
         const meResponse = await fetch(`${API_BASE}/api/users/me`, {
-          headers: { Authorization: `Bearer ${data.jwt}` },
+          credentials: 'include',
+          headers: data.jwt ? { Authorization: `Bearer ${data.jwt}` } : {},
         });
         if (meResponse.ok) {
           user = await meResponse.json();
         }
       } catch (_err) { /* login resta valido anche se /me non risponde */ }
-      store.dispatch('login', { user, token: data.jwt });
-      localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('token', data.jwt);
+      store.dispatch('login', { user, token: data.jwt || null, remember: remember.value });
       const pendingPlan = route.query.plan || sessionStorage.getItem('pending_plan_after_verification');
       if (['starter', 'pro'].includes(pendingPlan)) {
         sessionStorage.removeItem('pending_plan_after_verification');

@@ -4,9 +4,10 @@ import { computed } from 'vue';
 const props = defineProps({
   table: { type: Object, required: true },
   activeOrder: { type: Object, default: null },
+  canRemove: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['view-order', 'open-table']);
+const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'serve-ready']);
 
 const isOccupied = computed(() => props.table.status === 'occupied');
 const isReserved = computed(() => props.table.status === 'reserved');
@@ -38,6 +39,8 @@ const cardState = computed(() => {
   return 'busy';
 });
 
+const canRemoveTable = computed(() => props.canRemove && cardState.value === 'free' && !props.activeOrder);
+
 const areaLabel = computed(() => {
   return props.table.area === 'esterno' ? 'Esterno' : 'Interno';
 });
@@ -49,16 +52,40 @@ const handleClick = () => {
     emit('open-table', props.table);
   }
 };
+
+const handleRemove = () => {
+  if (!canRemoveTable.value) return;
+  emit('remove-table', props.table);
+};
+
+const handleServeReady = () => {
+  if (!props.activeOrder || readyCount.value === 0) return;
+  emit('serve-ready', props.activeOrder);
+};
 </script>
 
 <template>
-  <button
-    type="button"
+  <article
+    role="button"
+    tabindex="0"
     class="sl-card"
     :class="[cardState, { alert: isAlert }]"
     @click="handleClick"
+    @keydown.enter.prevent="handleClick"
+    @keydown.space.prevent="handleClick"
     :aria-label="`Tavolo ${table.number} - ${cardState}`"
   >
+    <button
+      v-if="canRemoveTable"
+      type="button"
+      class="sl-card-remove"
+      :aria-label="`Rimuovi tavolo ${table.number}`"
+      title="Rimuovi tavolo"
+      @click.stop="handleRemove"
+    >
+      <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+
     <div class="sl-card-head">
       <span class="sl-card-n">{{ String(table.number).padStart(2, '0') }}</span>
       <div class="sl-card-meta">
@@ -110,10 +137,18 @@ const handleClick = () => {
         <span class="sl-card-action">
           <i class="bi bi-eye"></i>Dettagli
         </span>
-        <span v-if="readyCount > 0" class="sl-card-action ok">
-          <i class="bi bi-check2-circle"></i>Servi
-        </span>
+        <button
+          v-if="readyCount > 0"
+          type="button"
+          class="sl-card-action sl-card-action-btn ok"
+          :aria-label="`Segna come servito tutti i ${readyCount} piatti pronti del tavolo ${table.number}`"
+          @click.stop="handleServeReady"
+          @keydown.enter.stop="handleServeReady"
+          @keydown.space.stop="handleServeReady"
+        >
+          <i class="bi bi-check2-circle"></i>Servi {{ readyCount }}
+        </button>
       </template>
     </div>
-  </button>
+  </article>
 </template>

@@ -40,11 +40,39 @@ function isHttpsUrl(value) {
   }
 }
 
+function isEmailLike(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function parseEmailAddress(value) {
+    const raw = String(value || '').trim();
+    const match = raw.match(/^\s*.*?<([^>]+)>\s*$/);
+    return match ? match[1].trim() : raw;
+}
+
 function parseCsv(value) {
   return String(value || '')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function parseDurationSeconds(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return null;
+  const match = raw.match(/^(\d+)(ms|s|m|h|d)?$/);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (!Number.isSafeInteger(amount) || amount <= 0) return null;
+  const unit = match[2] || 's';
+  const multipliers = {
+    ms: 1 / 1000,
+    s: 1,
+    m: 60,
+    h: 60 * 60,
+    d: 24 * 60 * 60,
+  };
+  return amount * multipliers[unit];
 }
 
 function isLocalOrigin(value) {
@@ -57,6 +85,28 @@ function validateProductionConfig(strapi) {
     const errors = [];
 
     ['APP_KEYS', 'API_TOKEN_SALT', 'ADMIN_JWT_SECRET', 'TRANSFER_TOKEN_SALT', 'JWT_SECRET'].forEach((name) => requireEnv(name, errors));
+
+    if (process.env.AUTH_COOKIE_SECURE === 'false') {
+        errors.push("Environment variable 'AUTH_COOKIE_SECURE' must not be 'false' in production.");
+    }
+    if (process.env.AUTH_COOKIE_ONLY === 'false') {
+        errors.push("Environment variable 'AUTH_COOKIE_ONLY' must not be 'false' in production.");
+    }
+    if (process.env.CSP_ALLOW_UNSAFE_INLINE_SCRIPT === 'true') {
+        errors.push("Environment variable 'CSP_ALLOW_UNSAFE_INLINE_SCRIPT' must not be 'true' in production.");
+    }
+    if (String(process.env.AUTH_COOKIE_SAMESITE || '').toLowerCase() === 'none' && process.env.AUTH_COOKIE_SECURE !== 'true') {
+        errors.push("AUTH_COOKIE_SAMESITE='none' requires AUTH_COOKIE_SECURE='true' in production.");
+    }
+
+    const jwtExpires = parseDurationSeconds(process.env.JWT_EXPIRES_IN || '7d');
+    if (!jwtExpires || jwtExpires > 7 * 24 * 60 * 60) {
+        errors.push("Environment variable 'JWT_EXPIRES_IN' must be set to 7d or less in production.");
+    }
+    const cookieMaxAge = parseDurationSeconds(process.env.AUTH_COOKIE_MAX_AGE_SECONDS || `${7 * 24 * 60 * 60}`);
+    if (!cookieMaxAge || cookieMaxAge > 7 * 24 * 60 * 60) {
+        errors.push("Environment variable 'AUTH_COOKIE_MAX_AGE_SECONDS' must be 604800 seconds or less in production.");
+    }
 
     const publicUrl = requireEnv('PUBLIC_URL', errors);
     const frontendUrl = requireEnv('FRONTEND_URL', errors);
@@ -99,6 +149,20 @@ function validateProductionConfig(strapi) {
             errors.push("Environment variable 'OCR_SERVICE_INTERNAL_TOKEN_REQUIRED' must be 'true' in production when OCR_SERVICE_URL is set.");
         }
         requireEnv('OCR_SERVICE_INTERNAL_TOKEN', errors);
+    }
+
+    ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'SMTP_DEFAULT_FROM'].forEach((name) => requireEnv(name, errors));
+    const smtpPort = Number(envValue('SMTP_PORT') || '587');
+    if (!Number.isInteger(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
+        errors.push("Environment variable 'SMTP_PORT' must be a valid TCP port.");
+    }
+    const defaultFrom = parseEmailAddress(envValue('SMTP_DEFAULT_FROM'));
+    if (defaultFrom && !isEmailLike(defaultFrom)) {
+        errors.push("Environment variable 'SMTP_DEFAULT_FROM' must be an email address or 'Name <email@example.com>'.");
+    }
+    const defaultReplyTo = parseEmailAddress(envValue('SMTP_DEFAULT_REPLY_TO'));
+    if (defaultReplyTo && !isEmailLike(defaultReplyTo)) {
+        errors.push("Environment variable 'SMTP_DEFAULT_REPLY_TO' must be an email address or 'Name <email@example.com>'.");
     }
 
     const dbClient = envValue('DATABASE_CLIENT');

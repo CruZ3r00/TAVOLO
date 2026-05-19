@@ -36,6 +36,23 @@ async function sendToDepartments(strapi, orderOrDocumentId) {
   }
   if (order.takeaway_status !== 'confirmed') return order;
 
+  // Avanza i pending item → taken cosi' diventano visibili in KitchenBoard
+  // (colonna "Da fare"). Il gating del takeaway resta sulla
+  // takeaway_status, ma il filtro per-colonna del kanban e' sullo status item.
+  const items = Array.isArray(order.fk_items) ? order.fk_items : [];
+  for (const item of items) {
+    if (item && item.status === 'pending') {
+      try {
+        await strapi.documents('api::order-item.order-item').update({
+          documentId: item.documentId,
+          data: { status: 'taken' },
+        });
+      } catch (err) {
+        strapi.log.warn(`sendToDepartments (takeaway): item ${item.documentId} non avanzato: ${err.message}`);
+      }
+    }
+  }
+
   return strapi.documents('api::order.order').update({
     documentId: order.documentId,
     data: {

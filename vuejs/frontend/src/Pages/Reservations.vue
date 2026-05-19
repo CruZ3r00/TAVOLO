@@ -13,7 +13,6 @@ import SeatReservationModal from '@/components/SeatReservationModal.vue';
 import WalkinModal from '@/components/WalkinModal.vue';
 import TableManagerModal from '@/components/TableManagerModal.vue';
 import OrderDetailModal from '@/components/OrderDetailModal.vue';
-import AddItemModal from '@/components/AddItemModal.vue';
 import CheckoutModal from '@/components/CheckoutModal.vue';
 import Skeleton from '@/components/Skeleton.vue';
 import {
@@ -24,7 +23,6 @@ import {
   fetchTakeaways,
   fetchTables,
   closeOrder,
-  addOrderItem,
   acceptTakeaway,
   rejectTakeaway,
   sendTakeawayToDepartments,
@@ -59,11 +57,9 @@ const showTableManager = ref(false);
 
 const showOrderDetail = ref(false);
 const currentOrderDocId = ref(null);
-const showAddItem = ref(false);
-const addItemOrderDocId = ref(null);
-const addItemLockVersion = ref(0);
 const showCheckout = ref(false);
 const checkoutOrder = ref(null);
+const checkoutBusy = ref(false);
 const orderDetailRef = ref(null);
 
 const activeTab = ref('pending'); // mobile single-column view
@@ -253,7 +249,21 @@ const transitionToast = (next) => {
 const handleSeatIntent = (r) => { seatTargetReservation.value = r; showSeatModal.value = true; };
 const onSeated = async () => { showToast('success', 'Cliente accomodato.'); await loadData({ silent: true }); };
 const onWalkinCreated = async () => { showToast('success', 'Walk-in registrato.'); await loadData({ silent: true }); };
-const onTableManagerUpdated = async () => { await loadData({ silent: true }); };
+const onTableManagerUpdated = async (payload = null) => {
+  if (payload?.table?.documentId) {
+    if (payload.action === 'created') {
+      tables.value = [...tables.value, payload.table].sort((a, b) => (a.number || 0) - (b.number || 0));
+    } else if (payload.action === 'updated') {
+      tables.value = tables.value.map((t) => (
+        t.documentId === payload.table.documentId ? { ...t, ...payload.table } : t
+      ));
+    } else if (payload.action === 'deleted') {
+      tables.value = tables.value.filter((t) => t.documentId !== payload.table.documentId);
+    }
+    return;
+  }
+  await loadData({ silent: true });
+};
 const handleOpenOrder = (order) => {
   if (!order?.documentId) return;
   currentOrderDocId.value = order.documentId;
@@ -261,29 +271,15 @@ const handleOpenOrder = (order) => {
 };
 const handleCheckout = (order) => { checkoutOrder.value = order; showCheckout.value = true; };
 const onOrderUpdated = async () => { await loadData({ silent: true }); };
-const onOpenAddItem = ({ orderDocumentId, lockVersion }) => {
-  addItemOrderDocId.value = orderDocumentId;
-  addItemLockVersion.value = lockVersion;
-  showAddItem.value = true;
-};
-const onAddItem = async (payload) => {
-  try {
-    await addOrderItem(addItemOrderDocId.value, payload, token.value);
-    showAddItem.value = false;
-    if (orderDetailRef.value) await orderDetailRef.value.onItemAdded();
-    await loadData({ silent: true });
-  } catch (err) {
-    if (err?.code === 'STALE_ORDER') {
-      showAddItem.value = false;
-      if (orderDetailRef.value) await orderDetailRef.value.silentReload();
-      showToast('error', 'Dati obsoleti, aggiornati. Riprova.');
-    } else {
-      showToast('error', orderErrorMessage(err));
-    }
-  }
+// L'aggiunta piatti a un ordine NON e' piu' fatta da Reservations: passa
+// per la pagina Sala (/orders) che ha la vista full-page dedicata. Da qui
+// OrderDetailModal mostra solo lettura + chiusura conto.
+const onOpenAddItem = () => {
+  router.push('/orders');
 };
 const onConfirmCheckout = async (payload) => {
-  if (!checkoutOrder.value) return;
+  if (!checkoutOrder.value || checkoutBusy.value) return;
+  checkoutBusy.value = true;
   try {
     const result = await closeOrder(checkoutOrder.value.documentId, payload, token.value);
     showCheckout.value = false;
@@ -303,6 +299,9 @@ const onConfirmCheckout = async (payload) => {
     } else {
       showToast('error', orderErrorMessage(err));
     }
+  }
+  finally {
+    checkoutBusy.value = false;
   }
 };
 const onCreated = (created) => {
@@ -418,7 +417,59 @@ const switchSection = (section) => {
 
 <template>
   <AppLayout page-title="Prenotazioni">
-    <div class="md-main">
+    <div class="res-layout">
+      <!-- Sidebar dedicata: switch sezione + strumenti
+           (stesso pattern MenuSetter/Orders) -->
+      <aside class="res-sidebar">
+        <div class="res-sidebar-section">
+          <div class="res-sidebar-label">Sezione</div>
+          <nav class="res-sidebar-nav">
+            <button
+              type="button"
+              class="res-nav-item"
+              :class="{ 'res-nav-item--active': activeSection === 'reservations' }"
+              @click="switchSection('reservations')"
+            >
+              <i class="bi bi-calendar-check" aria-hidden="true"></i>
+              <span>Sala</span>
+              <span v-if="pendingList.length > 0" class="res-nav-count">{{ pendingList.length }}</span>
+            </button>
+            <button
+              type="button"
+              class="res-nav-item"
+              :class="{ 'res-nav-item--active': activeSection === 'takeaway' }"
+              @click="switchSection('takeaway')"
+            >
+              <i class="bi bi-bag-check" aria-hidden="true"></i>
+              <span>Asporto</span>
+              <span v-if="takeawayWaitingList.length > 0" class="res-nav-count">{{ takeawayWaitingList.length }}</span>
+            </button>
+          </nav>
+        </div>
+
+        <div class="res-sidebar-divider"></div>
+
+        <div class="res-sidebar-section">
+          <div class="res-sidebar-label">Strumenti</div>
+          <nav class="res-sidebar-nav">
+            <button type="button" class="res-nav-item" @click="showTableManager = true">
+              <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+              <span>Tavoli</span>
+            </button>
+            <button
+              v-if="activeSection === 'reservations'"
+              type="button"
+              class="res-nav-item"
+              @click="showWalkinModal = true"
+            >
+              <i class="bi bi-person-plus" aria-hidden="true"></i>
+              <span>Walk-in</span>
+            </button>
+          </nav>
+        </div>
+      </aside>
+
+      <div class="md-main res-main">
       <header class="md-top">
         <div>
           <div class="overline">{{ activeSection === 'takeaway' ? 'Asporto · oggi' : 'Prenotazioni · oggi' }}</div>
@@ -433,24 +484,10 @@ const switchSection = (section) => {
           </p>
         </div>
         <div class="md-top-tools">
-          <div class="res-section-toggle" aria-label="Sezione prenotazioni">
-            <button type="button" :class="{ active: activeSection === 'reservations' }" @click="switchSection('reservations')">
-              <i class="bi bi-calendar-check"></i><span>Prenotazioni</span>
-            </button>
-            <button type="button" :class="{ active: activeSection === 'takeaway' }" @click="switchSection('takeaway')">
-              <i class="bi bi-bag-check"></i><span>Asporto</span>
-            </button>
-          </div>
           <button type="button" class="btn btn-sm" @click="loadData({ silent: true })" :disabled="loading || refreshing">
             <span v-if="refreshing" class="spin-icon"></span>
             <i v-else class="bi bi-arrow-clockwise"></i>
             <span>Aggiorna</span>
-          </button>
-          <button type="button" class="btn btn-sm" @click="showTableManager = true">
-            <i class="bi bi-grid-3x3-gap"></i><span>Tavoli</span>
-          </button>
-          <button v-if="activeSection === 'reservations'" type="button" class="btn btn-sm" @click="showWalkinModal = true">
-            <i class="bi bi-person-plus"></i><span>Walk-in</span>
           </button>
           <button v-if="activeSection === 'reservations'" type="button" class="btn btn-sm btn-primary" @click="showCreateModal = true">
             <i class="bi bi-plus-lg"></i><span>Nuova prenotazione</span>
@@ -765,6 +802,7 @@ const switchSection = (section) => {
           </div>
         </section>
       </div>
+      </div>
     </div>
 
     <!-- Modals -->
@@ -775,40 +813,99 @@ const switchSection = (section) => {
     <WalkinModal :show="showWalkinModal" :tables="tables" :token="token" @close="showWalkinModal = false" @created="onWalkinCreated" />
     <TableManagerModal :show="showTableManager" :token="token" :tables="tables" :editing-table="null" @close="showTableManager = false" @updated="onTableManagerUpdated" />
     <OrderDetailModal ref="orderDetailRef" :show="showOrderDetail" :order-document-id="currentOrderDocId" :token="token" @close="showOrderDetail = false" @order-updated="onOrderUpdated" @open-add-item="onOpenAddItem" @open-checkout="(o) => { checkoutOrder = o; showCheckout = true; }" />
-    <AddItemModal :show="showAddItem" :order-document-id="addItemOrderDocId" :lock-version="addItemLockVersion" @close="showAddItem = false" @add="onAddItem" />
-    <CheckoutModal :show="showCheckout" :order="checkoutOrder" @close="showCheckout = false" @confirm="onConfirmCheckout" />
+    <CheckoutModal :show="showCheckout" :order="checkoutOrder" :busy="checkoutBusy" @close="showCheckout = false" @confirm="onConfirmCheckout" />
   </AppLayout>
 </template>
 
 <style scoped>
-.res-section-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  min-height: 34px;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--bg-2);
+/* ── Layout sidebar pagina (stesso pattern di MenuSetter/Orders) ── */
+.res-layout {
+  display: flex;
+  min-height: calc(100vh - 0px);
+  position: relative;
 }
-.res-section-toggle button {
-  min-height: 28px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--r-sm);
+
+.res-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg-sunk);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.res-sidebar-section { display: flex; flex-direction: column; gap: 2px; }
+.res-sidebar-label {
+  padding: 0 8px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+.res-sidebar-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 10px 8px;
+}
+.res-sidebar-nav { display: flex; flex-direction: column; gap: 1px; }
+
+.res-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
   background: transparent;
   color: var(--ink-2);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 700;
+  font-family: var(--f-sans);
+  font-size: 13.5px;
+  font-weight: 500;
   cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
 }
-.res-section-toggle button.active {
-  background: var(--paper);
+.res-nav-item:hover { background: var(--bg-hover); color: var(--ink); }
+.res-nav-item--active {
+  background: var(--bg-elev);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  font-weight: 600;
+  box-shadow: var(--shadow-xs);
+}
+.res-nav-item--active i { color: var(--ac); }
+.res-nav-item i { font-size: 14px; opacity: 0.8; flex-shrink: 0; }
+.res-nav-item span:nth-child(2) { flex: 1; }
+
+.res-nav-count {
+  font-size: 11px;
+  color: var(--ink-3);
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.res-main { flex: 1; min-width: 0; }
+
+@media (max-width: 860px) {
+  .res-layout { flex-direction: column; }
+  .res-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 10px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    gap: 6px;
+  }
+  .res-sidebar-section { flex-direction: row; flex-wrap: nowrap; gap: 4px; }
+  .res-sidebar-label { display: none; }
+  .res-sidebar-divider { width: 1px; height: auto; margin: 0 6px; }
+  .res-nav-item { white-space: nowrap; padding: 7px 12px; }
 }
 
 .kr-week-bar {

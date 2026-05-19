@@ -50,6 +50,8 @@ class JobHandlers {
         return this.handleOrderClose(job);
       case 'print.receipt':
         return this.handlePrintReceipt(job);
+      case 'print.kitchen_ticket':
+        return this.handlePrintKitchenTicket(job);
       default:
         throw new Error(`Job kind non supportato: ${job.kind}`);
     }
@@ -150,6 +152,33 @@ class JobHandlers {
     return {
       receipt_no: r?.receipt_no,
       driver_printer: r?.driver,
+      completed_at: new Date().toISOString(),
+    };
+  }
+
+  private async handlePrintKitchenTicket(job: Job): Promise<JobOutcome> {
+    const printer = await driverRegistry.getPrinter();
+    const data = (job.payload || {}) as any;
+    const r = typeof printer.printKitchenTicket === 'function'
+      ? await printer.printKitchenTicket({
+          action: data.action || 'add',
+          station: data.station || null,
+          title: data.title,
+          table: data.table || null,
+          takeaway: data.takeaway || null,
+          order: data.order || null,
+          items: Array.isArray(data.items) ? data.items : [],
+          printed_at: data.printed_at,
+        })
+      : await printer.printReceipt({
+          header: data.title || `COMANDA ${String(data.station || '').toUpperCase()}`,
+          items: Array.isArray(data.items) ? data.items : [],
+          footer: data.table?.number ? `Tavolo ${data.table.number}` : undefined,
+        });
+    return {
+      receipt_no: r?.receipt_no,
+      driver_printer: r?.driver,
+      station: data.station || null,
       completed_at: new Date().toISOString(),
     };
   }

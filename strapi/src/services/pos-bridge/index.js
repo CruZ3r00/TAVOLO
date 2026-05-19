@@ -86,7 +86,7 @@ class WsHub {
 
 /**
  * Inizializza server WebSocket su strapi.server.httpServer.
- * Route: /ws/pos  (auth: device_token via header Authorization: Bearer oppure query ?token=)
+ * Route: /ws/pos  (auth: device_token via header Authorization: Bearer)
  */
 function setupWebSocketServer(strapi) {
   if (strapi.__posWsHub) return strapi.__posWsHub;
@@ -116,8 +116,6 @@ function setupWebSocketServer(strapi) {
       let token = null;
       if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
         token = authHeader.slice(7).trim();
-      } else if (parsed.query && parsed.query.token) {
-        token = String(parsed.query.token);
       }
 
       if (!token) {
@@ -317,8 +315,39 @@ async function dispatchJob(strapi, { device, user, kind, payload, orderId, prior
   return { job, delivered_via_ws: delivered > 0, apns_pushed: apnsPushed, event_id: eventId };
 }
 
+/**
+ * Invia la config stampanti aggiornata al device dell'utente via WS.
+ * Best-effort: non lancia eccezioni. Usata dopo upsertMe della config
+ * stampanti per garantire che il daemon riceva subito la nuova configurazione.
+ */
+async function pushPrinterConfigToDevice(strapi, userId) {
+  try {
+    const device = await findActiveDeviceForUser(strapi, userId);
+    if (!device) return;
+    const hub = strapi.__posWsHub;
+    if (!hub || !hub.isConnected(device.id)) return;
+
+    const printerConfigService = require('../../api/restaurant-printer-config/services/restaurant-printer-config');
+    const record = await printerConfigService.loadForUser(userId);
+    const defaults = printerConfigService.defaultConfig();
+    const cfg = record || defaults;
+    const printerTargets = printerConfigService.serializeForDevice(cfg);
+
+    hub.push(device.id, {
+      type: 'config.update',
+      config: {
+        printer_targets: printerTargets,
+        auto_print_kitchen_enabled: cfg.auto_print_kitchen_enabled !== false,
+      },
+    });
+  } catch (err) {
+    strapi.log.warn(`pushPrinterConfigToDevice: push fallito per user ${userId}: ${err.message}`);
+  }
+}
+
 module.exports = {
   setupWebSocketServer,
   findActiveDeviceForUser,
   dispatchJob,
+  pushPrinterConfigToDevice,
 };

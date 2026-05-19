@@ -32,10 +32,6 @@
       "type": "string",
       "required": true
     },
-    "ingredients": {
-      "type": "json",
-      "required": true
-    },
     "allergens": {
       "type": "json",
       "required": true
@@ -45,10 +41,31 @@
       "default": true,
       "required": false
     },
+    "is_beverage": {
+      "type": "boolean",
+      "default": false,
+      "required": false
+    },
+    "is_beverage_advanced": {
+      "type": "boolean",
+      "default": false,
+      "required": false
+    },
+    "is_archived": {
+      "type": "boolean",
+      "default": false,
+      "required": false
+    },
     "fk_user": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "plugin::users-permissions.user"
+    },
+    "fk_element_ingredients": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::element-ingredient.element-ingredient",
+      "mappedBy": "fk_element"
     }
   }
 }

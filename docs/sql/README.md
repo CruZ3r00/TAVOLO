@@ -22,6 +22,7 @@ sul DB target.
 |---|---|
 | `realtime_order_events.sql` | Crea `public.order_realtime_events` (event bus minimo per il FE), abilita RLS, crea funzione `emit_order_realtime_event` (PL/pgSQL con `$$` quoting), crea 8 trigger su `orders`/`order_items`/`tables`/`reservations` + relative link tables, aggiunge la tabella alla publication `supabase_realtime`. Variante "moderna" con `$$`. |
 | `realtime_relation_link_patch.sql` | Variante alternativa per SQL Editor con limitazioni sul `$$`-quoting: stessa tabella, stesso set di trigger, ma function body in stringa singola con escape. Logica leggermente più compatta (ottimizzata per inserimento batch via SELECT). |
+| `harden_supabase_grants.sql` | Revoca i grant larghi da `anon`/`authenticated`, revoca anche i default privileges futuri, e lascia solo `SELECT` su `order_realtime_events` con una policy RLS esplicita. Applicare dopo aver verificato che non esistano altri accessi diretti via Supabase client. |
 
 > **Quale dei due usare?** Se l'SQL Editor di Supabase accetta `$$` (caso
 > standard nel 2025+), usare `realtime_order_events.sql`. Se l'editor lamenta
@@ -46,6 +47,42 @@ sul DB target.
 3. **Solo su Supabase**: applicare `realtime_order_events.sql`
    (oppure `realtime_relation_link_patch.sql` se l'editor non supporta `$$`)
    dall'SQL Editor della dashboard Supabase.
+
+## Hardening grant/RLS Supabase
+
+`harden_supabase_grants.sql` e' pensato per DB gia' inizializzato. Non cambia
+le tabelle Strapi e non crea una RLS tenant-scoped completa: restringe i grant
+dei ruoli Supabase client.
+
+In pratica:
+- revoca da `anon` e `authenticated` ogni privilegio diretto su tabelle,
+  sequence e funzioni dello schema `public`;
+- revoca anche i default privileges futuri, cosi' nuove tabelle/funzioni non
+  ereditano automaticamente permessi larghi;
+- abilita RLS su `public.order_realtime_events`;
+- sostituisce la vecchia policy con una policy `SELECT` esplicita per
+  `anon`/`authenticated`;
+- ridà solo `SELECT` su `order_realtime_events`, che resta l'event bus minimo
+  letto dal frontend Supabase Realtime.
+
+Da applicare solo dopo aver confermato che il frontend non legge direttamente
+tabelle applicative Supabase diverse da `order_realtime_events`. I dettagli
+ordine/prenotazioni/menu devono continuare a passare da Strapi.
+
+Verifica rapida dopo l'applicazione:
+
+```sql
+select grantee, table_name, privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and grantee in ('anon', 'authenticated')
+order by table_name, grantee, privilege_type;
+
+select schemaname, tablename, policyname, roles, cmd, qual
+from pg_policies
+where schemaname = 'public'
+order by tablename, policyname;
+```
 
 ## Storico
 

@@ -1,0 +1,95 @@
+'use strict';
+
+/**
+ * FASE 7 cleanup — drop colonne JSON legacy su Element.
+ *
+ * Storia: prima della FASE 3 gli ingredienti erano un campo JSON su Element
+ * (`ingredients`, `allergens`). Dopo la FASE 3 li abbiamo migrati al modello
+ * relazionale (`Ingredient` + `ElementIngredient` via link table).
+ *
+ * La migrazione 202605130002 esegue il backfill JSON -> relation; durante
+ * FASE 4/5 il codice scrive in dual-write (JSON legacy + relation) per
+ * consentire rollback safe.
+ *
+ * Questa migrazione e' lo step finale del piano: dopo 1-2 settimane di
+ * monitor in produzione senza regressioni, droppiamo le colonne JSON e
+ * la sorgente di verita' diventa esclusivamente relazionale.
+ *
+ * **DISABILITATA DI DEFAULT (extension `.disabled`).** Knex carica TUTTI i
+ * `.js` della cartella migrations: l'extension `.disabled` lo nasconde dal
+ * loader senza creare side-effects sul tracker.
+ *
+ * Per attivarla:
+ *   1. Rinominare `202605300001_drop_legacy_element_json.js.disabled` ->
+ *      `202605300001_drop_legacy_element_json.js`
+ *   2. Settare `ENABLE_LEGACY_JSON_DROP=true` nell'env del processo Strapi
+ *      (guardia ridondante difensiva)
+ *   3. Restart Strapi: la migrazione gira e droppa le colonne legacy.
+ *
+ * Pre-condizioni (verificare a mano prima di attivare):
+ *   1. `grep -rn "element\.ingredients\b" strapi/src/ vuejs/frontend/src/` non
+ *      ritorna nessun write code-path attivo.
+ *   2. `SELECT COUNT(*) FROM element_ingredients` >> 0 (backfill applicato).
+ *   3. Snapshot Supabase recente disponibile.
+ */
+
+async function hasTable(knex, tableName) {
+  return knex.schema.hasTable(tableName);
+}
+
+async function hasColumn(knex, tableName, columnName) {
+  if (!(await hasTable(knex, tableName))) return false;
+  return knex.schema.hasColumn(tableName, columnName);
+}
+
+async function dropColumnIfExists(knex, tableName, columnName) {
+  if (!(await hasColumn(knex, tableName, columnName))) return;
+  try {
+    await knex.schema.alterTable(tableName, (table) => {
+      table.dropColumn(columnName);
+    });
+  } catch (error) {
+    const msg = String(error && error.message ? error.message : error).toLowerCase();
+    if (msg.includes('does not exist') || msg.includes('unknown column')) return;
+    throw error;
+  }
+}
+
+module.exports = {
+  async up(knex) {
+    const enabled = String(process.env.ENABLE_LEGACY_JSON_DROP || '').toLowerCase() === 'true';
+    if (!enabled) {
+      // Lascia un breadcrumb nei log per renderne evidente la skip.
+      // Quando knex registra la migrazione come "applied" senza errori,
+      // un eventuale re-enable richiede di unregisterla a mano dal
+      // tracker (DELETE FROM knex_migrations WHERE name = ...).
+      // eslint-disable-next-line no-console
+      console.log('[migration 202605300001] skipped: set ENABLE_LEGACY_JSON_DROP=true to drop legacy JSON columns on Element');
+      return;
+    }
+
+    // Sanity check: ci sono ElementIngredient gia' backfillati?
+    try {
+      const cnt = await knex('element_ingredients').count({ c: '*' }).first();
+      const total = Number((cnt && cnt.c) || 0);
+      if (total === 0) {
+        throw new Error('Refuse to drop: element_ingredients table is empty. Run backfill (202605130002) first.');
+      }
+    } catch (err) {
+      const msg = String(err && err.message ? err.message : err).toLowerCase();
+      // Se la tabella non esiste, e' uno scenario non previsto: aborta.
+      if (msg.includes('relation') && msg.includes('does not exist')) {
+        throw new Error('Refuse to drop: element_ingredients table missing.');
+      }
+      throw err;
+    }
+
+    await dropColumnIfExists(knex, 'elements', 'ingredients');
+    await dropColumnIfExists(knex, 'elements', 'allergens');
+  },
+
+  async down() {
+    // Il rollback richiede un re-backfill da audit/snapshot esterno.
+    // Lasciato no-op intenzionalmente.
+  },
+};

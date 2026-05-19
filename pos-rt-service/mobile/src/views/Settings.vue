@@ -9,6 +9,7 @@ const router = useRouter();
 
 const PRINTER_OPTIONS = [
   { value: 'stub', label: 'Stub (test)' },
+  { value: 'escpos-network', label: 'ESC/POS rete comande (Epson TM, porta 9100)' },
   { value: 'italretail', label: 'Italretail (Italstart / Nice / Big)' },
   { value: 'epson-fpmate', label: 'Epson FPMate (FP-90III, FP-81II)' },
   { value: 'custom-xon', label: 'Custom XON (Q3X, Big, K3)' },
@@ -32,7 +33,7 @@ const message = ref<string | null>(null);
 const error = ref<string | null>(null);
 
 const printerNeedsHost = computed(() =>
-  ['epson-fpmate', 'custom-xon', 'escpos-fiscal', 'italretail'].includes(cfg.value.printer.name),
+  ['escpos-network', 'epson-fpmate', 'custom-xon', 'escpos-fiscal', 'italretail'].includes(cfg.value.printer.name),
 );
 const paymentNeedsHost = computed(() =>
   ['generic-ecr', 'jpos', 'nexi-p17'].includes(cfg.value.payment.name),
@@ -40,6 +41,7 @@ const paymentNeedsHost = computed(() =>
 const requiresTcp = computed(
   () =>
     ['custom-xon', 'escpos-fiscal', 'italretail'].includes(cfg.value.printer.name) ||
+    cfg.value.printer.name === 'escpos-network' ||
     ['generic-ecr', 'jpos', 'nexi-p17'].includes(cfg.value.payment.name),
 );
 const defaultPaymentPort = computed(() => {
@@ -77,6 +79,13 @@ function goDiscovery(): void {
 
 function setOpt(target: 'printer' | 'payment', key: string, value: any) {
   cfg.value[target].options = { ...cfg.value[target].options, [key]: value };
+}
+
+function setStationPrinter(station: string, key: 'host' | 'port', value: any) {
+  const options = cfg.value.printer.options as any;
+  const stations = { ...(options.stations || {}) };
+  stations[station] = { ...(stations[station] || {}), [key]: value };
+  setOpt('printer', 'stations', stations);
 }
 
 async function save() {
@@ -155,6 +164,41 @@ async function save() {
           :value="(cfg.printer.options as any).port || (cfg.printer.name === 'epson-fpmate' ? 80 : 9100)"
           @input="setOpt('printer', 'port', Number(($event.target as HTMLInputElement).value))"
         />
+
+        <template v-if="cfg.printer.name === 'escpos-network'">
+          <p class="muted">
+            IP default usato se non configuri una stampante specifica per reparto.
+            Per Epson TM LAN/WiFi usa normalmente porta 9100.
+          </p>
+
+          <label>IP Bar (opzionale)</label>
+          <input
+            type="text"
+            :value="((cfg.printer.options as any).stations?.bar?.host) || ''"
+            @input="setStationPrinter('bar', 'host', ($event.target as HTMLInputElement).value)"
+            placeholder="192.168.1.80"
+          />
+          <label>Porta Bar</label>
+          <input
+            type="number"
+            :value="((cfg.printer.options as any).stations?.bar?.port) || 9100"
+            @input="setStationPrinter('bar', 'port', Number(($event.target as HTMLInputElement).value))"
+          />
+
+          <label>IP Cucina (opzionale)</label>
+          <input
+            type="text"
+            :value="((cfg.printer.options as any).stations?.cucina?.host) || ''"
+            @input="setStationPrinter('cucina', 'host', ($event.target as HTMLInputElement).value)"
+            placeholder="192.168.1.81"
+          />
+          <label>Porta Cucina</label>
+          <input
+            type="number"
+            :value="((cfg.printer.options as any).stations?.cucina?.port) || 9100"
+            @input="setStationPrinter('cucina', 'port', Number(($event.target as HTMLInputElement).value))"
+          />
+        </template>
 
         <template v-if="cfg.printer.name === 'epson-fpmate'">
           <label>Username (opzionale)</label>

@@ -41,16 +41,20 @@ function roleFromStaffUsername(username) {
   return role ? { ownerUsername: match[1], role } : null;
 }
 
-async function inferOwnerFromStaffUsername(strapi, actor) {
-  const inferred = roleFromStaffUsername(actor && actor.username);
-  if (!inferred) return null;
+function isReservedStaffUsername(username) {
+  return !!roleFromStaffUsername(username);
+}
 
-  const owner = await strapi.db.query('plugin::users-permissions.user').findOne({
-    where: { username: { $eqi: inferred.ownerUsername } },
-  });
-
-  if (!owner || owner.id === actor.id) return null;
-  return { owner, role: inferred.role };
+function validatePublicUsername(username) {
+  const value = String(username || '').trim();
+  if (!value) return { ok: false, message: 'Username obbligatorio.' };
+  if (isReservedStaffUsername(value)) {
+    return {
+      ok: false,
+      message: 'Username riservato agli account staff gestiti dal sistema.',
+    };
+  }
+  return { ok: true, value };
 }
 
 async function resolveRestaurantStaffRecord(strapi, actor) {
@@ -156,18 +160,15 @@ async function resolveStaffContext(strapi, user) {
 
   const actor = fresh || user;
   const staffRecord = await resolveRestaurantStaffRecord(strapi, actor);
-  const fallbackStaff = await inferOwnerFromStaffUsername(strapi, actor);
   const explicitRole = normalizeStaffRole(actor.staff_role);
   const role = staffRecord
     ? staffRecord.role
-    : (actor.fk_owner && actor.fk_owner.id
-      ? explicitRole
-      : (fallbackStaff ? fallbackStaff.role : explicitRole));
+    : explicitRole;
   const owner = staffRecord
     ? staffRecord.owner
     : (actor.fk_owner && actor.fk_owner.id
       ? actor.fk_owner
-      : (fallbackStaff ? fallbackStaff.owner : actor));
+      : actor);
   const ownerId = owner.id || actor.id;
   const actorWithRole = { ...actor, staff_role: role };
 
@@ -196,7 +197,12 @@ function canTransitionItem(actor, fromStatus, toStatus) {
       (fromStatus === 'preparing' && toStatus === 'ready');
   }
   if (role === STAFF_ROLES.CAMERIERE) {
-    return fromStatus === 'ready' && toStatus === 'served';
+    // pending → taken e' il "Invia in cucina" del cameriere (anche se nel
+    // dine-in il path passa per sendDineInToDepartments e non per
+    // updateItemStatus, ammettere la transizione qui mantiene la FSM
+    // coerente per eventuali tool batch).
+    return (fromStatus === 'pending' && toStatus === 'taken') ||
+      (fromStatus === 'ready' && toStatus === 'served');
   }
   return false;
 }
@@ -215,6 +221,8 @@ function staffUserPayload(user, owner) {
     effective_user_id: effectiveOwner ? effectiveOwner.id : user.id,
     effective_user_documentId: effectiveOwner ? effectiveOwner.documentId : user.documentId,
     restaurant_name: effectiveOwner ? (effectiveOwner.restaurant_name || effectiveOwner.username) : user.username,
+    subscription_plan: effectiveOwner ? (effectiveOwner.subscription_plan || null) : (user && user.subscription_plan) || null,
+    subscription_status: effectiveOwner ? (effectiveOwner.subscription_status || null) : (user && user.subscription_status) || null,
   };
 }
 
@@ -235,14 +243,21 @@ function compactRestaurantSlug(value, fallback = 'Ristorante') {
   return /^[0-9]/.test(clean) ? `${fallback}${clean}` : clean;
 }
 
+function publicSiteSlug(value, fallback = 'Ristorante') {
+  return compactRestaurantSlug(value, fallback).replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
 module.exports = {
   STAFF_ROLES,
   KITCHEN_LIKE_ROLES,
   normalizeStaffRole,
+  isReservedStaffUsername,
+  validatePublicUsername,
   resolveStaffContext,
   assertStaffRole,
   canTransitionItem,
   staffUserPayload,
   compactRestaurantSlug,
+  publicSiteSlug,
   applyStaffActiveState,
 };

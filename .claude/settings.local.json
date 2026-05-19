@@ -9,7 +9,9 @@
       "Bash(cp *)",
       "Bash(npm run *)",
       "mcp__playwright__browser_navigate",
-      "mcp__playwright__browser_evaluate"
+      "mcp__playwright__browser_evaluate",
+      "Bash(node -e \"require\\('./src/services/bar-shift/index.js'\\); console.log\\('bar-shift module loads OK'\\);\")",
+      "Bash(npx --no-install vite build --mode development)"
     ]
   },
   "enableAllProjectMcpServers": true,

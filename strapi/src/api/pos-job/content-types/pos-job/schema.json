@@ -17,7 +17,7 @@
     },
     "kind": {
       "type": "enumeration",
-      "enum": ["order.close", "print.receipt", "payment.charge", "payment.refund"],
+      "enum": ["order.close", "print.receipt", "print.kitchen_ticket", "payment.charge", "payment.refund"],
       "required": true
     },
     "payload": {

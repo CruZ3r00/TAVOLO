@@ -3,9 +3,10 @@ import { computed, ref, watch } from 'vue';
 import Modal from '@/components/Modal.vue';
 import OrderItemRow from '@/components/OrderItemRow.vue';
 import OrderStatusBadge from '@/components/OrderStatusBadge.vue';
+import VoidItemModal from '@/components/VoidItemModal.vue';
 import {
     fetchOrder, addOrderItem, updateOrderItem, deleteOrderItem,
-    updateItemStatus, orderErrorMessage,
+    updateItemStatus, voidOrderItem, sendOrderToProduction, orderErrorMessage,
 } from '@/utils';
 
 const props = defineProps({
@@ -14,13 +15,19 @@ const props = defineProps({
     token: { type: String, default: null },
 });
 
-const emit = defineEmits(['close', 'order-updated', 'open-add-item', 'open-checkout']);
+const emit = defineEmits(['close', 'order-updated', 'open-add-item']);
+const sendingToCucina = ref(false);
 
 const order = ref(null);
 const loading = ref(false);
 const errorMessage = ref('');
 const toast = ref(null);
 const busyItemIds = ref(new Set());
+
+// Void item modal state
+const voidModalShow = ref(false);
+const voidTargetItem = ref(null);
+const voidSubmitting = ref(false);
 
 watch(() => props.show, async (v) => {
     if (v && props.orderDocumentId) {
@@ -56,6 +63,13 @@ const isActive = computed(() => order.value?.status === 'active');
 const isTakeaway = computed(() => order.value?.service_type === 'takeaway');
 const canEditItems = computed(() => isActive.value && (!isTakeaway.value || !order.value?.sent_to_departments_at));
 const canCheckout = computed(() => isActive.value && (!isTakeaway.value || order.value?.takeaway_status === 'picked_up'));
+const itemsTakenCount = computed(() => {
+    const items = order.value?.items || order.value?.fk_items;
+    if (!Array.isArray(items)) return 0;
+    // pending = ancora nelle mani del cameriere, pronti per "Invia in cucina".
+    return items.filter((it) => it && it.status === 'pending').length;
+});
+const canSendToCucina = computed(() => isActive.value && !isTakeaway.value && itemsTakenCount.value > 0);
 const totalAmount = computed(() => parseFloat(order.value?.total_amount || 0).toFixed(2));
 const tableNumber = computed(() => order.value?.table?.number ?? '?');
 const itemsSorted = computed(() => {
@@ -201,6 +215,54 @@ const handleServe = async (item) => {
     }
 };
 
+const handleOpenVoid = (item) => {
+    if (!item || item.voided) return;
+    if (!isActive.value) return;
+    voidTargetItem.value = item;
+    voidModalShow.value = true;
+};
+
+const handleVoidCancel = () => {
+    if (voidSubmitting.value) return;
+    voidModalShow.value = false;
+    voidTargetItem.value = null;
+};
+
+const handleVoidConfirm = async (reason) => {
+    const item = voidTargetItem.value;
+    if (!item) return;
+    voidSubmitting.value = true;
+    setBusy(item.documentId, true);
+    try {
+        const result = await voidOrderItem(
+            props.orderDocumentId,
+            item.documentId,
+            { reason, lock_version: order.value.lock_version },
+            props.token,
+        );
+        // Aggiorna localmente l'item voided + il totale.
+        const idx = order.value.items.findIndex((i) => i.documentId === item.documentId);
+        if (idx !== -1 && result.item) {
+            order.value.items.splice(idx, 1, { ...order.value.items[idx], ...result.item });
+        }
+        if (result.order) {
+            order.value.total_amount = result.order.total_amount;
+            order.value.lock_version = result.order.lock_version;
+        }
+        showToast('success', 'Elemento annullato.');
+        emit('order-updated');
+        voidModalShow.value = false;
+        voidTargetItem.value = null;
+    } catch (err) {
+        if (!(await handleStaleError(err))) {
+            showToast('error', orderErrorMessage(err));
+        }
+    } finally {
+        voidSubmitting.value = false;
+        setBusy(item.documentId, false);
+    }
+};
+
 const openAddItem = () => {
     if (!canEditItems.value) return;
     emit('open-add-item', {
@@ -209,9 +271,28 @@ const openAddItem = () => {
     });
 };
 
-const openCheckout = () => {
-    if (!canCheckout.value) return;
-    emit('open-checkout', order.value);
+// "Invia alla cucina": avanza tutti gli items con status='pending' a 'taken'
+// in unica chiamata atomica al backend (la cucina li vedra' nella colonna
+// "Da fare" e potra' poi avanzarli a preparing/ready). La chiusura del conto
+// NON e' qui: avviene esclusivamente dalla Dashboard (vista monitoring).
+// Tipico flow: il cameriere prende l'ordine completo del tavolo poi invia
+// in produzione, non un piatto alla volta.
+const sendToCucina = async () => {
+    if (!canSendToCucina.value || sendingToCucina.value) return;
+    sendingToCucina.value = true;
+    try {
+        const resp = await sendOrderToProduction(props.orderDocumentId, props.token);
+        const sent = resp?.meta?.sent ?? 0;
+        await silentReload();
+        emit('order-updated');
+        showToast('success', sent > 0
+            ? `${sent} ${sent === 1 ? 'piatto inviato' : 'piatti inviati'} in cucina.`
+            : 'Tutto già in cucina.');
+    } catch (err) {
+        showToast('error', orderErrorMessage(err));
+    } finally {
+        sendingToCucina.value = false;
+    }
 };
 
 const onClose = () => {
@@ -231,7 +312,15 @@ defineExpose({ onItemAdded, silentReload });
 </script>
 
 <template>
-    <Modal :show="show" @close="onClose">
+    <div class="odm-host">
+        <VoidItemModal
+            :show="voidModalShow"
+            :item="voidTargetItem"
+            :busy="voidSubmitting"
+            @confirm="handleVoidConfirm"
+            @cancel="handleVoidCancel"
+        />
+        <Modal :show="show" @close="onClose">
         <template #title>
             <div class="modal-title-wrap">
                 <i class="bi bi-receipt" aria-hidden="true"></i>
@@ -320,11 +409,13 @@ defineExpose({ onItemAdded, silentReload });
                                 :key="item.documentId"
                                 :item="item"
                                 :order-active="canEditItems"
+                                :can-void="isActive"
                                 :busy="busyItemIds.has(item.documentId)"
                                 @increment="handleIncrement"
                                 @decrement="handleDecrement"
                                 @delete="handleDelete"
                                 @serve="handleServe"
+                                @void="handleOpenVoid"
                             />
                         </section>
                     </div>
@@ -354,13 +445,19 @@ defineExpose({ onItemAdded, silentReload });
                                 <span>Aggiungi</span>
                             </button>
                             <button
+                                v-if="!isTakeaway"
                                 type="button"
                                 class="ds-btn ds-btn-primary"
-                                :disabled="!canCheckout"
-                                @click="openCheckout"
+                                :disabled="!canSendToCucina || sendingToCucina"
+                                :title="canSendToCucina
+                                    ? 'Manda in produzione tutti i piatti appena ordinati'
+                                    : 'Aggiungi prima dei piatti per poterli inviare in cucina'"
+                                @click="sendToCucina"
                             >
-                                <i class="bi bi-receipt-cutoff" aria-hidden="true"></i>
-                                <span>Chiudi conto</span>
+                                <i v-if="sendingToCucina" class="bi bi-arrow-repeat odm-spin" aria-hidden="true"></i>
+                                <i v-else class="bi bi-send-check" aria-hidden="true"></i>
+                                <span>Invia alla cucina</span>
+                                <span v-if="itemsTakenCount > 0" class="odm-send-count">{{ itemsTakenCount }}</span>
                             </button>
                         </div>
                         <div v-else class="odm-closed-info">
@@ -374,10 +471,14 @@ defineExpose({ onItemAdded, silentReload });
                 </template>
             </div>
         </template>
-    </Modal>
+        </Modal>
+    </div>
 </template>
 
 <style scoped>
+/* Wrapper invisibile: i due modali (Modal + VoidItemModal) sono teleport-to-body */
+.odm-host { display: contents; }
+
 .modal-title-wrap {
     display: flex;
     align-items: center;
@@ -572,6 +673,23 @@ defineExpose({ onItemAdded, silentReload });
 }
 .odm-actions :deep(.ds-btn) {
     flex: 1;
+}
+.odm-spin { animation: odm-spin-anim 0.8s linear infinite; display: inline-block; }
+@keyframes odm-spin-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.odm-send-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    margin-left: 6px;
+    border-radius: 999px;
+    background: color-mix(in oklab, white 25%, transparent);
+    color: var(--bg);
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
 
 .odm-closed-info {

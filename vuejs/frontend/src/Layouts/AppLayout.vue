@@ -2,14 +2,15 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useStore } from 'vuex';
-import { API_BASE, fetchReservations, fetchOrders } from '@/utils';
+import { fetchReservations, fetchOrders } from '@/utils';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
-import { canSeeNavItem, defaultRouteForUser, effectiveUserId } from '@/staffAccess';
-import AppSidebar from '@/components/AppSidebar.vue';
+import { STAFF_ROLES, canSeeNavItem, defaultRouteForUser, effectiveUserId, staffRole } from '@/staffAccess';
 import MobileBottomNav from '@/components/MobileBottomNav.vue';
 import MobileTopBar from '@/components/MobileTopBar.vue';
+import AlertHeaderBar from '@/components/AlertHeaderBar.vue';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 import TeleportCompat from '@/lib/compat/teleport.js';
+import CommandPalette from '@/components/CommandPalette.vue';
 
 const props = defineProps({
   // 'app' = sidebar + bottom nav, 'public' = top nav, 'auto' = decide da auth + path
@@ -23,31 +24,41 @@ const restaurantSub = ref('');
 const store = useStore();
 const route = useRoute();
 const isLoggedIn = computed(() => store.getters.isAuthenticated);
-const mobileMenuOpen = ref(false);
+const mobileMenuOpen = ref(false); // mobile-nav-panel del public variant (landing/auth hamburger). L'app variant non usa più drawer.
 const userMenuOpen = ref(false);
 const pendingCount = ref(0);
 const activeOrdersCount = ref(0);
+const paletteRef = ref(null);
 let pollId = null;
 let realtimeChannel = null;
 let realtimeRefreshHandle = null;
 
+const notificationCount = computed(() => Number(pendingCount.value || 0) + Number(activeOrdersCount.value || 0));
+const hasNotifications = computed(() => notificationCount.value > 0);
+const formatNotificationBadge = (n) => (n > 9 ? '9+' : String(n));
+
+const openPalette = () => {
+  // CommandPalette espone `open` via defineExpose. È mounted via TeleportCompat
+  // a body, quindi il ref è valido subito.
+  paletteRef.value?.open?.();
+};
+
+const applyUserToDisplay = (userData) => {
+  if (!userData) return;
+  username.value = userData.username || '';
+  restaurantName.value = userData.restaurant_name || userData.username || 'ComforTables';
+  const city = userData.city || userData.address || '';
+  const tables = userData.coperti_invernali ? `${userData.coperti_invernali} coperti` : '';
+  restaurantSub.value = [city, tables].filter(Boolean).join(' · ') || 'Gestionale';
+};
+
 const checkLog = async () => {
   if (!isLoggedIn.value) return;
-  const token = store.getters.getToken;
-  try {
-    const response = await fetch(`${API_BASE}/api/users/me`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (response.ok) {
-      const userData = await response.json();
-      username.value = userData.username;
-      restaurantName.value = userData.restaurant_name || userData.username || 'ComforTables';
-      const city = userData.city || userData.address || '';
-      const tables = userData.coperti_invernali ? `${userData.coperti_invernali} coperti` : '';
-      restaurantSub.value = [city, tables].filter(Boolean).join(' · ') || 'Gestionale';
-    }
-  } catch (_err) { /* silent */ }
+  // refreshUser fa fetch /api/users/me e committa al store cosi' campi come
+  // subscription_plan restano allineati al backend (fix: pro che vedeva il
+  // Magazzino bloccato perche' lo user in localStorage era pre-upgrade).
+  await store.dispatch('refreshUser');
+  applyUserToDisplay(store.getters.getUser);
 };
 
 const refreshCounts = async () => {
@@ -128,6 +139,54 @@ const defaultAppRoute = computed(() => defaultRouteForUser(currentUser.value));
 const showNav = (id) => canSeeNavItem(currentUser.value, id);
 const showMobileProfile = computed(() => showNav('profilo'));
 
+// Global navigation items mostrati come pills nella sub-navbar orizzontale
+// (desktop). Su mobile la stessa nav è disponibile via drawer (AppSidebar).
+const userRole = computed(() => staffRole(currentUser.value));
+const isOwnerOrGestione = computed(
+  () => userRole.value === STAFF_ROLES.OWNER || userRole.value === STAFF_ROLES.GESTIONE,
+);
+
+const globalNavItems = computed(() => {
+  if (isOwnerOrGestione.value) {
+    return [
+      { id: 'manager', icon: 'bi-speedometer2', label: 'Dashboard', path: '/dashboard' },
+      { id: 'sala', icon: 'bi-grid-3x3-gap', label: 'Sala', path: '/orders', badge: pendingCount.value },
+      { id: 'ordini', icon: 'bi-receipt', label: 'Ordini', path: '/kitchen', badge: activeOrdersCount.value, badgeAccent: true },
+      { id: 'menu', icon: 'bi-journal-text', label: 'Menu', path: '/menu-handler' },
+      { id: 'prenotazioni', icon: 'bi-calendar-check', label: 'Prenotazioni', path: '/reservations', badge: pendingCount.value },
+    ].filter((it) => showNav(it.id));
+  }
+
+  // Staff (cameriere / cucina / bar / pizzeria / cucina_sg): vedono solo
+  // le voci legate al loro ruolo + carico bar quando applicabile.
+  return [
+    { id: 'sala', icon: 'bi-grid-3x3-gap', label: 'Sala', path: '/orders', badge: pendingCount.value },
+    { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen' },
+    { id: 'bar', icon: 'bi-cup-straw', label: 'Bar', path: '/bar' },
+    { id: 'pizzeria', icon: 'bi-record-circle', label: 'Pizzeria', path: '/pizzeria' },
+    { id: 'cucina_sg', icon: 'bi-shield-check', label: 'Cucina SG', path: '/kitchen-sg' },
+    { id: 'bar-management', icon: 'bi-cup-hot', label: 'Carico bar', path: '/bar-management' },
+    { id: 'prenotazioni', icon: 'bi-calendar-check', label: 'Prenotazioni', path: '/reservations', badge: pendingCount.value },
+  ].filter((it) => showNav(it.id));
+});
+
+const activeNavKey = computed(() => {
+  const p = route.path;
+  if (p.startsWith('/bar-management')) return 'bar-management';
+  if (p.startsWith('/kitchen-sg')) return isOwnerOrGestione.value ? 'ordini' : 'cucina_sg';
+  if (p.startsWith('/kitchen')) return isOwnerOrGestione.value ? 'ordini' : 'cucina';
+  if (p === '/bar' || p.startsWith('/bar/')) return 'bar';
+  if (p.startsWith('/pizzeria')) return 'pizzeria';
+  if (p.startsWith('/orders')) return 'sala';
+  if (p.startsWith('/reservations')) return 'prenotazioni';
+  if (p.startsWith('/menu-handler')) return 'menu';
+  if (p.startsWith('/dashboard')) return 'manager';
+  return '';
+});
+
+const showBadge = (n) => Number.isFinite(Number(n)) && Number(n) > 0;
+const formatBadge = (n) => (Number(n) > 9 ? '9+' : String(n));
+
 const handleClickOutside = (e) => {
   const target = e.target;
   if (!(target instanceof Element)) return;
@@ -162,28 +221,127 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 </script>
 
 <template>
-  <!-- ============== APP variant: sidebar + bottom nav ============== -->
+  <!-- ============== APP variant: top nav + sidebar + bottom nav ============== -->
   <div v-if="variantResolved === 'app'" class="app-shell-app">
+    <!-- Top nav globale (desktop) -->
+    <header class="app-top-nav">
+      <div class="app-top-inner">
+        <router-link :to="defaultAppRoute" class="app-top-brand" aria-label="Home">
+          <span class="tv-brand-mark sm">C</span>
+          <span class="app-top-brand-text">comforTables</span>
+        </router-link>
+
+        <button
+          type="button"
+          class="app-top-search"
+          @click="openPalette"
+          aria-label="Cerca, naviga, esegui un'azione"
+        >
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <span class="app-top-search-text">Cerca, naviga, esegui un'azione…</span>
+          <span class="app-top-search-kbds">
+            <kbd>⌘</kbd><kbd>K</kbd>
+          </span>
+        </button>
+
+        <div class="app-top-tools">
+          <ThemeToggle compact class="app-top-theme" />
+          <router-link
+            v-if="hasNotifications"
+            to="/reservations"
+            class="app-top-icon-btn app-top-icon-btn--badged"
+            :aria-label="`Notifiche (${notificationCount})`"
+          >
+            <i class="bi bi-bell" aria-hidden="true"></i>
+            <span class="app-top-bell-badge">{{ formatNotificationBadge(notificationCount) }}</span>
+          </router-link>
+          <button
+            v-else
+            type="button"
+            class="app-top-icon-btn"
+            aria-label="Notifiche"
+            disabled
+          >
+            <i class="bi bi-bell" aria-hidden="true"></i>
+          </button>
+
+          <div class="user-menu">
+            <button
+              type="button"
+              class="app-top-avatar"
+              :aria-expanded="userMenuOpen"
+              aria-label="Menu utente"
+              @click.stop="toggleUserMenu"
+            >
+              <span>{{ userInitial }}</span>
+            </button>
+            <Transition name="fade">
+              <ul v-if="userMenuOpen" class="user-dropdown" role="menu">
+                <li class="user-dropdown-header">
+                  <div class="user-dropdown-name">{{ username || 'Utente' }}</div>
+                  <div class="user-dropdown-role">{{ restaurantName }}</div>
+                </li>
+                <li v-if="showMobileProfile">
+                  <router-link to="/profile/show" class="user-dropdown-item" @click="closeUserMenu">
+                    <i class="bi bi-person"></i><span>Profilo</span>
+                  </router-link>
+                </li>
+                <li v-if="showNav('impostazioni') || isOwnerOrGestione">
+                  <router-link to="/profile/show" class="user-dropdown-item" @click="closeUserMenu">
+                    <i class="bi bi-gear"></i><span>Impostazioni</span>
+                  </router-link>
+                </li>
+                <li><hr class="user-dropdown-sep"></li>
+                <li>
+                  <router-link to="/logout" class="user-dropdown-item user-dropdown-item--danger" @click="closeUserMenu">
+                    <i class="bi bi-box-arrow-right"></i><span>Esci</span>
+                  </router-link>
+                </li>
+              </ul>
+            </Transition>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sub-navbar orizzontale (sostituisce la sidebar globale su desktop) -->
+    <nav
+      v-if="globalNavItems.length > 0"
+      class="app-subnav"
+      role="navigation"
+      aria-label="Navigazione principale"
+    >
+      <div class="app-subnav-inner">
+        <router-link
+          v-for="it in globalNavItems"
+          :key="it.id"
+          :to="it.path"
+          class="app-subnav-item"
+          :class="{ 'is-active': activeNavKey === it.id }"
+          :aria-current="activeNavKey === it.id ? 'page' : null"
+        >
+          <i :class="['bi', it.icon]" aria-hidden="true"></i>
+          <span>{{ it.label }}</span>
+          <span
+            v-if="showBadge(it.badge)"
+            class="app-subnav-badge"
+            :class="{ 'app-subnav-badge--accent': it.badgeAccent }"
+          >{{ formatBadge(it.badge) }}</span>
+        </router-link>
+      </div>
+    </nav>
+
+    <!-- Mobile top bar (visibile solo <= 860px tramite media query interna) -->
     <MobileTopBar
       :title="pageTitle || 'ComforTables'"
       :username="username"
       :restaurant-name="restaurantName"
-      :show-menu-button="false"
       :show-profile="showMobileProfile"
-      @menu="toggleMobileMenu"
-    />
-
-    <AppSidebar
-      class="app-shell-sidebar"
-      :username="username"
-      :restaurant-name="restaurantName"
-      :restaurant-sub="restaurantSub"
-      :pending-count="pendingCount"
-      :active-orders-count="activeOrdersCount"
-      :user="currentUser"
+      @open-palette="openPalette"
     />
 
     <main class="app-shell-main">
+      <AlertHeaderBar />
       <slot />
     </main>
 
@@ -194,31 +352,7 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
     />
 
     <TeleportCompat to="body">
-      <Transition name="drawer">
-        <div v-if="mobileMenuOpen" class="mobile-drawer-backdrop" @click="closeMobileMenu">
-          <aside class="mobile-drawer" @click.stop>
-            <header class="mobile-drawer-h">
-              <span class="tv-brand-mark">C</span>
-              <div>
-                <div class="md-side-name">{{ restaurantName }}</div>
-                <div class="md-side-sub">{{ restaurantSub }}</div>
-              </div>
-              <button class="fm-close" @click="closeMobileMenu" aria-label="Chiudi"><i class="bi bi-x-lg"></i></button>
-            </header>
-            <nav class="mobile-drawer-nav">
-              <router-link v-if="showNav('manager')" to="/dashboard" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-speedometer2"></i> Manager</router-link>
-              <router-link v-if="showNav('sala')" to="/orders" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-grid-3x3-gap"></i> Sala</router-link>
-              <router-link v-if="showNav('cucina')" to="/kitchen" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-fire"></i> Cucina</router-link>
-              <router-link v-if="showNav('prenotazioni')" to="/reservations" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-calendar-check"></i> Prenotazioni</router-link>
-              <router-link v-if="showNav('menu')" to="/menu-handler" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-journal-text"></i> Menu</router-link>
-              <hr v-if="showNav('sito') || showNav('profilo')" class="mobile-drawer-sep">
-              <router-link v-if="showNav('sito')" to="/profile/show?section=sito" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-globe2"></i> Sito pubblico</router-link>
-              <router-link v-if="showNav('profilo')" to="/profile/show" class="md-side-item" @click="closeMobileMenu"><i class="bi bi-person"></i> Profilo</router-link>
-              <router-link to="/logout" class="md-side-item md-side-item--danger" @click="closeMobileMenu"><i class="bi bi-box-arrow-right"></i> Esci</router-link>
-            </nav>
-          </aside>
-        </div>
-      </Transition>
+      <CommandPalette ref="paletteRef" />
     </TeleportCompat>
   </div>
 
@@ -290,6 +424,10 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
       </Transition>
     </nav>
 
+    <TeleportCompat to="body">
+      <CommandPalette />
+    </TeleportCompat>
+
     <main class="main-content">
       <slot />
     </main>
@@ -315,64 +453,223 @@ const closeUserMenu = () => { userMenuOpen.value = false; };
 <style scoped>
 /* ============== APP variant — workspace shell ============== */
 .app-shell-app {
-  display: grid;
-  grid-template-columns: 240px 1fr;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  background: var(--bg-sunk, var(--bg-2));
+  background: var(--bg);
   color: var(--ink);
   font-family: var(--f-sans);
 }
-.app-shell-sidebar { grid-column: 1; grid-row: 1; }
+
+/* ── Top nav ── */
+.app-top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  backdrop-filter: saturate(1.2) blur(10px);
+  -webkit-backdrop-filter: saturate(1.2) blur(10px);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.app-top-inner {
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  align-items: center;
+  gap: var(--s-4, 16px);
+  height: 56px;
+  padding: 0 var(--s-5, 20px);
+  max-width: none;
+}
+.app-top-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+.app-top-brand-text {
+  font-family: var(--f-sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app-top-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  color: var(--ink-3);
+  font-family: var(--f-sans);
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 540px;
+  margin: 0 auto;
+  width: 100%;
+  transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.app-top-search:hover { border-color: var(--line-strong); background: var(--paper); }
+.app-top-search i { font-size: 14px; }
+.app-top-search-text { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-top-search-kbds { display: inline-flex; gap: 2px; flex-shrink: 0; }
+.app-top-search-kbds kbd {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-3);
+}
+
+.app-top-tools { display: flex; align-items: center; gap: 6px; }
+.app-top-theme {}
+
+.app-top-icon-btn {
+  appearance: none;
+  width: 34px; height: 34px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--ink-2);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.app-top-icon-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--ink); }
+.app-top-icon-btn:disabled { color: var(--ink-3); cursor: default; opacity: 0.7; }
+.app-top-icon-btn i { font-size: 16px; line-height: 1; }
+.app-top-bell-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ac);
+  color: var(--ac-contrast, var(--bg));
+  font-family: var(--f-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: inline-grid;
+  place-items: center;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.app-top-icon-btn--badged i { color: var(--ink); }
+
+.app-top-avatar {
+  appearance: none;
+  width: 32px; height: 32px;
+  border: 1px solid var(--line);
+  background: var(--ac-soft);
+  color: var(--ac-ink);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--f-mono);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.app-top-avatar:hover { background: var(--ac); color: var(--bg); }
+
+/* ── Sub-navbar orizzontale (sostituisce la sidebar globale su desktop) ── */
+.app-subnav {
+  position: sticky;
+  top: 56px; /* sotto al top-nav */
+  z-index: 35;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.app-subnav-inner {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0 var(--s-5, 20px);
+  height: 44px;
+  max-width: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.app-subnav-inner::-webkit-scrollbar { height: 4px; }
+.app-subnav-inner::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+.app-subnav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--f-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  position: relative;
+  transition: color var(--dur-fast), background var(--dur-fast);
+}
+.app-subnav-item:hover { color: var(--ink); background: var(--bg-hover); }
+.app-subnav-item i { font-size: 14px; opacity: 0.85; }
+.app-subnav-item.is-active { color: var(--ink); font-weight: 600; }
+.app-subnav-item.is-active i { opacity: 1; color: var(--ac); }
+.app-subnav-item.is-active::after {
+  content: "";
+  position: absolute;
+  left: 8px; right: 8px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--ink);
+  border-radius: 2px 2px 0 0;
+}
+
+.app-subnav-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: inline-grid;
+  place-items: center;
+}
+.app-subnav-badge--accent { background: var(--ac); color: var(--ac-contrast, var(--bg)); }
+
+/* ── Main content area ── */
 .app-shell-main {
-  grid-column: 2;
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-.mobile-drawer-backdrop {
-  position: fixed; inset: 0;
-  background: color-mix(in oklab, black 35%, transparent);
-  z-index: 300;
-  display: flex;
-}
-.mobile-drawer {
-  width: 280px; max-width: 86%;
-  background: var(--paper);
-  height: 100%;
-  display: flex; flex-direction: column;
-  box-shadow: 4px 0 24px rgb(0 0 0 / 0.16);
-  overflow-y: auto;
-}
-.mobile-drawer-h {
-  display: flex; align-items: center; gap: 10px;
-  padding: 16px;
-  border-bottom: 1px solid var(--line);
-}
-.mobile-drawer-h > div:first-of-type { flex: 1; min-width: 0; }
-.mobile-drawer-nav { padding: 12px; display: flex; flex-direction: column; gap: 2px; }
-.mobile-drawer-sep { border: none; border-top: 1px solid var(--line); margin: 8px 4px; }
-.mobile-drawer .md-side-item { color: var(--ink-2); padding: 12px 14px; }
-.mobile-drawer .md-side-item--danger { color: var(--danger); }
-.mobile-drawer .md-side-item--danger i { color: var(--danger); }
-
-.drawer-enter-active, .drawer-leave-active { transition: opacity 200ms ease; }
-.drawer-enter-active .mobile-drawer, .drawer-leave-active .mobile-drawer {
-  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-.drawer-enter-from, .drawer-leave-to { opacity: 0; }
-.drawer-enter-from .mobile-drawer, .drawer-leave-to .mobile-drawer { transform: translateX(-100%); }
-
-/* Tablet — narrower sidebar */
-@media (min-width: 861px) and (max-width: 1199px) {
-  .app-shell-app { grid-template-columns: 64px 1fr; }
-}
-
-/* Mobile — sidebar completamente nascosta, nessuno spazio riservato */
+/* Mobile: top-nav desktop e sub-navbar nascoste, MobileTopBar+BottomNav prendono il posto. */
 @media (max-width: 860px) {
-  .app-shell-app { grid-template-columns: 1fr !important; }
-  .app-shell-sidebar { display: none !important; }
-  .app-shell-main { grid-column: 1; }
+  .app-top-nav,
+  .app-subnav { display: none; }
+  .app-shell-main { padding-bottom: 96px; /* spazio per bottom nav */ }
 }
 
 /* ============== PUBLIC variant — landing/auth nav ============== */

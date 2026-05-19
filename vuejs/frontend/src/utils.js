@@ -26,6 +26,8 @@ export {
   fetchStaffSettings,
   updateStaffSetting,
   updateCategoryRouting,
+  fetchWebsiteConfig,
+  updateCoverCharge,
 } from './lib/api/account.js';
 export {
   fetchReservations,
@@ -58,7 +60,9 @@ export {
   updateOrderItem,
   deleteOrderItem,
   updateItemStatus,
+  voidOrderItem,
   closeOrder,
+  sendOrderToProduction,
   orderErrorMessage,
 } from './lib/api/orders.js';
 export {
@@ -67,3 +71,44 @@ export {
   revokePosDevice,
   fetchPosInstallers,
 } from './lib/api/pos.js';
+export {
+  fetchBarShiftCurrent,
+  fetchBarShiftCurrentReport,
+  openBarShift,
+  closeBarShift,
+  caricoFatto,
+  fetchBarShiftHistory,
+  fetchBarShiftById,
+  fetchBarShiftReport,
+  barShiftErrorMessage,
+} from './lib/api/bar-shift.js';
+export { fetchOrdersHistory } from './lib/api/orders-history.js';
+export {
+  fetchIngredientsAdvanced,
+  createIngredient,
+  updateIngredient,
+  deleteIngredient,
+  restockIngredient,
+  restockBatch,
+  wasteIngredient,
+  confirmDepletedIngredient,
+  fetchIngredientMovements,
+  createRestockOrders,
+  fetchRestockOrders,
+  receiveRestock,
+  cancelRestock,
+  fetchInventoryAlerts,
+  acknowledgeAlert,
+  fetchElementRecipe,
+  setElementRecipe,
+  inventoryErrorMessage,
+} from './lib/api/inventory.js';
+export {
+  getPrinterConfig,
+  savePrinterConfig,
+  testPrint,
+} from './lib/api/printers.js';
+export {
+  fetchAddons,
+  setIngredientAddonConfig,
+} from './lib/api/addons.js';

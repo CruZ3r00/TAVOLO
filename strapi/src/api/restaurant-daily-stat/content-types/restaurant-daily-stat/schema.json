@@ -56,6 +56,17 @@
       "required": true,
       "min": 0
     },
+    "voided_count": {
+      "type": "integer",
+      "default": 0,
+      "required": true,
+      "min": 0
+    },
+    "voided_revenue_lost": {
+      "type": "decimal",
+      "default": 0,
+      "required": true
+    },
     "fk_user": {
       "type": "relation",
       "relation": "manyToOne",

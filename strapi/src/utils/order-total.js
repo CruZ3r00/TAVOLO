@@ -24,9 +24,14 @@
  */
 function computeTotal({ items, taxRate, discounts }) {
   const subtotal = (items || []).reduce((sum, item) => {
+    if (item && item.voided) return sum;
     const p = parseFloat(item.price) || 0;
     const q = parseInt(item.quantity, 10) || 0;
-    return sum + p * q;
+    // Addon prices: ogni addon.price * quantita item
+    const addonTotal = Array.isArray(item.fk_addons)
+      ? item.fk_addons.reduce((s, a) => s + (parseFloat(a.price) || 0), 0)
+      : 0;
+    return sum + (p + addonTotal) * q;
   }, 0);
 
   const roundedSubtotal = Math.round(subtotal * 100) / 100;

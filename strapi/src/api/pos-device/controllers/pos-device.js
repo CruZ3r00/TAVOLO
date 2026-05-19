@@ -513,6 +513,22 @@ module.exports = {
   async myConfig(ctx) {
     const device = ctx.state.device;
     if (!device) return ctx.unauthorized();
+
+    // Carica config stampanti per il ristoratore proprietario del device
+    const printerConfigService = require('../../restaurant-printer-config/services/restaurant-printer-config');
+    const userId = device.fk_user?.id || device.fk_user;
+    let printerTargets = [];
+    let autoPrintKitchen = true;
+    try {
+      const record = await printerConfigService.loadForUser(userId);
+      if (record) {
+        printerTargets = printerConfigService.serializeForDevice(record);
+        autoPrintKitchen = record.auto_print_kitchen_enabled !== false;
+      }
+    } catch (err) {
+      strapi.log.warn(`myConfig: caricamento config stampanti fallito: ${err.message}`);
+    }
+
     ctx.body = {
       data: {
         polling_interval_connected_s: parseInt(process.env.POS_POLL_INTERVAL_CONNECTED_S, 10) || 60,
@@ -521,7 +537,10 @@ module.exports = {
         heartbeat_interval_s: parseInt(process.env.POS_HEARTBEAT_INTERVAL_S, 10) || 30,
         features: {
           fiscal_receipt_enabled: false,
+          kitchen_print_supported: true,
         },
+        printer_targets: printerTargets,
+        auto_print_kitchen_enabled: autoPrintKitchen,
       },
     };
   },
@@ -638,6 +657,25 @@ module.exports = {
       }
 
       const userId = tokenRow.fk_user.id;
+      const consumedAt = new Date();
+      let consumedRows = 0;
+      if (strapi.db.connection) {
+        consumedRows = await strapi.db.connection('pos_pairing_tokens')
+          .where({ id: tokenRow.id })
+          .whereNull('consumed_at')
+          .update({ consumed_at: consumedAt });
+      } else {
+        const consumed = await strapi.db.query('api::pos-pairing-token.pos-pairing-token').update({
+          where: { id: tokenRow.id, consumed_at: null },
+          data: { consumed_at: consumedAt },
+        });
+        consumedRows = consumed ? 1 : 0;
+      }
+      if (consumedRows !== 1) {
+        const err = appError('ALREADY_EXISTS', 'Token già utilizzato');
+        err._resCode = 'ALREADY_EXISTS';
+        throw err;
+      }
 
       // Reuse logica di register: revoca eventuale device pre-esistente con
       // stesso fingerprint per re-pairing dopo reinstall.
@@ -664,12 +702,6 @@ module.exports = {
           platform,
           fk_user: { connect: [{ id: userId }] },
         },
-      });
-
-      // Marca token consumato (single-use)
-      await strapi.db.query('api::pos-pairing-token.pos-pairing-token').update({
-        where: { id: tokenRow.id },
-        data: { consumed_at: new Date() },
       });
 
       strapi.log.info(

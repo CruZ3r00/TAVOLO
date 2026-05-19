@@ -1,5 +1,12 @@
 'use strict';
 
 module.exports = {
-  routes: [],
+  routes: [
+    {
+      method: 'GET',
+      path: '/order-archives/history',
+      handler: 'order-archive.history',
+      config: { policies: [] },
+    },
+  ],
 };

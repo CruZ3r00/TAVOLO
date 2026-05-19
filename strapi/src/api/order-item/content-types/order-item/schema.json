@@ -46,9 +46,27 @@
     },
     "status": {
       "type": "enumeration",
-      "enum": ["taken", "preparing", "ready", "served"],
-      "default": "taken",
+      "enum": ["pending", "taken", "preparing", "ready", "served"],
+      "default": "pending",
       "required": true
+    },
+    "voided": {
+      "type": "boolean",
+      "default": false,
+      "required": false
+    },
+    "voided_reason": {
+      "type": "text",
+      "required": false,
+      "maxLength": 500
+    },
+    "voided_at": {
+      "type": "datetime",
+      "required": false
+    },
+    "served_at": {
+      "type": "datetime",
+      "required": false
     },
     "fk_order": {
       "type": "relation",
@@ -60,6 +78,12 @@
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::element.element"
+    },
+    "fk_addons": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::order-item-addon.order-item-addon",
+      "mappedBy": "fk_order_item"
     }
   }
 }
