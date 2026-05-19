@@ -61,3 +61,12 @@
 
 - Middleware that runs before every authenticated API must not let optional staff/context enrichment throw raw errors. Catch enrichment failures, log a warning, and fall back to the safest valid actor context so owner/core APIs do not become global 500s after a deploy drift.
 - When staging shows 500 only for authenticated APIs while login succeeds and anonymous requests return 403, check pre-controller auth/subscription middleware before blaming the frontend or realtime.
+
+## 2026-05-19 — Secure auth cookies behind proxy need Koa trust
+
+- If staging logs `Cannot send secure cookie over unencrypted connection` while `AUTH_COOKIE_SECURE=true`, check Strapi/Koa proxy trust before debugging frontend auth. Strapi needs `server.proxy.koa=true` and the reverse proxy must send `X-Forwarded-Proto: https`.
+- Do not wrap post-registration cookie emission in the same rollback block as durable account setup. Cookie failures may prevent auto-login, but they must not delete a correctly created user or masquerade as restaurant capacity setup failures.
+
+## 2026-05-19 — Strapi config tests must call factories with `{ env }`
+
+- Strapi config files export factories shaped like `module.exports = ({ env }) => (...)`; unit tests must pass `buildConfig({ env })`, not `buildConfig(env)`, or the mock diverges from runtime and fails before exercising the config under test.

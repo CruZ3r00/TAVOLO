@@ -25,6 +25,7 @@ const {
 const { setAuthCookies, stripJwtFromBodyIfCookieOnly } = require('../src/utils/auth-cookies');
 const authCookieMiddleware = require('../src/middlewares/auth-cookie');
 const publicTakeawayGuard = require('../src/api/order/middlewares/public-takeaway-guard');
+const buildServerConfig = require('../config/server');
 
 const testStrapi = {
   config: {
@@ -57,6 +58,22 @@ test('computeTotal rounds subtotal and total', () => {
   assert.equal(result.tax, 0);
   assert.equal(result.discount, 0);
   assert.equal(result.total, 23);
+});
+
+test('server config enables Koa proxy trust from TRUST_PROXY', () => {
+  withEnv({ TRUST_PROXY: 'true' }, () => {
+    const env = (name, fallback) => process.env[name] || fallback;
+    env.int = (name) => Number(process.env[name] || 0);
+    env.bool = (name, fallback) => {
+      const value = process.env[name];
+      if (value === undefined || value === '') return fallback;
+      return value === 'true' || value === '1';
+    };
+    env.array = (name) => (process.env[name] ? process.env[name].split(',') : []);
+    const config = buildServerConfig({ env });
+
+    assert.equal(config.proxy.koa, true);
+  });
 });
 
 test('computeTotal esclude items voided dal subtotal', () => {

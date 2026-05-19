@@ -145,8 +145,21 @@ module.exports = {
           ctx.body.user.url = siteUrl;
         }
         if (ctx.body && ctx.body.jwt) {
-          setAuthCookies(ctx, ctx.body.jwt);
-          stripJwtFromBodyIfCookieOnly(ctx);
+          try {
+            setAuthCookies(ctx, ctx.body.jwt);
+            stripJwtFromBodyIfCookieOnly(ctx);
+          } catch (cookieError) {
+            strapi.log.error(
+              `register middleware: WebsiteConfig creata per user ${createdUser.username}, ma cookie auth fallito: ${cookieError.message}`
+            );
+            ctx.status = 500;
+            ctx.body = {
+              error: {
+                code: 'REGISTER_AUTH_COOKIE_FAILED',
+                message: 'Registrazione completata, ma accesso automatico non riuscito. Riprova il login.',
+              },
+            };
+          }
         }
       } catch (error) {
         strapi.log.error(

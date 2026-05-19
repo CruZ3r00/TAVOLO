@@ -22,6 +22,44 @@ propaga l'errore e trasforma tutta l'API autenticata in 500.
 - [x] Aggiornare lessons con la regola di prevenzione.
 - [ ] Attendere deploy prima di rifare qualunque test live/carico.
 
+# Plan — Fix staging login/register secure-cookie failure (2026-05-19)
+
+## Problema
+
+- In staging la registrazione crea l'utente e il sito placeholder, poi risponde:
+  `Registrazione annullata: impossibile configurare la capacità del ristorante`.
+- I log mostrano la vera causa:
+  `Cannot send secure cookie over unencrypted connection`.
+- Il frontend vede un errore di capacità perché il middleware di registrazione
+  include `setAuthCookies()` nello stesso `try/catch` della `WebsiteConfig` e
+  quindi fa rollback anche quando fallisce solo il cookie.
+
+## Ipotesi tecnica
+
+Strapi gira dietro reverse proxy HTTPS -> HTTP. In produzione i cookie auth sono
+`secure`, ma Koa non sta fidandosi di `X-Forwarded-Proto: https`, quindi considera
+la request non sicura e rifiuta il cookie.
+
+## Checklist
+
+- [x] Configurare Koa proxy trust via `TRUST_PROXY=true`.
+- [x] Rendere il post-register robusto: un errore cookie non deve rollbackare
+  utente e `WebsiteConfig`.
+- [x] Verificare sintassi/test Strapi mirati.
+- [x] Aggiornare `lessons.md` con la diagnosi.
+- [x] Documentare risultato e nota deploy.
+
+## Review
+
+- Root cause: cookie auth `secure` scritto su request vista da Koa come HTTP
+  dietro reverse proxy. Questo rompe login e registrazione cookie-only.
+- Fix codice: `strapi/config/server.js` abilita `server.proxy.koa` da
+  `TRUST_PROXY`; `strapi/src/index.js` non fa piu' rollback di user/config se
+  fallisce solo il cookie post-register.
+- Verifica: `cd strapi && npm test` passa con 37/37 test.
+- Deploy: staging deve avere `TRUST_PROXY=true` e Nginx deve inviare
+  `X-Forwarded-Proto https`.
+
 # Plan — Element.ingredients legacy JSON cleanup (2026-05-14)
 
 ## Problema riportato dall'utente
