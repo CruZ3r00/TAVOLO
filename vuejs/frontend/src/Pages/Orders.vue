@@ -11,7 +11,7 @@ import Skeleton from '@/components/Skeleton.vue';
 import WalkinModal from '@/components/WalkinModal.vue';
 import TableManagerModal from '@/components/TableManagerModal.vue';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
-import { STAFF_ROLES, effectiveUserId, staffRole } from '@/staffAccess';
+import { STAFF_ROLES, effectiveUserId, kitchenRoleLabel, staffRole } from '@/staffAccess';
 import {
   fetchTables, fetchOrders, fetchOrdersBoard, fetchOrdersSala, updateItemStatus, orderErrorMessage,
   pickupTakeaway,
@@ -49,15 +49,15 @@ const kitchenModes = {
   pizzeria: { title: 'Pizzeria', overline: 'Pizzeria', station: 'pizzeria' },
   cucina_sg: { title: 'Cucina SG', overline: 'Senza glutine', station: 'cucina_sg' },
 };
-const ownerOrderTabs = [
-  { mode: 'cucina', label: 'Cucina', icon: 'bi-fire', path: '/kitchen' },
-  { mode: 'bar', label: 'Bar', icon: 'bi-cup-straw', path: '/bar' },
-  { mode: 'pizzeria', label: 'Pizzeria', icon: 'bi-record-circle', path: '/pizzeria' },
-  { mode: 'cucina_sg', label: 'Cucina SG', icon: 'bi-shield-check', path: '/kitchen-sg' },
-];
 const mode = computed(() => (route.meta?.ordersMode && kitchenModes[route.meta.ordersMode] ? route.meta.ordersMode : 'cameriere'));
 const isKitchenMode = computed(() => mode.value !== 'cameriere');
-const modeInfo = computed(() => kitchenModes[mode.value] || { title: 'Sala', overline: 'Sala', station: null });
+const kitchenLabel = computed(() => kitchenRoleLabel(currentUser.value));
+const modeInfo = computed(() => {
+  const info = kitchenModes[mode.value];
+  if (!info) return { title: 'Sala', overline: 'Sala', station: null };
+  if (mode.value === 'cucina') return { ...info, title: kitchenLabel.value, overline: kitchenLabel.value };
+  return info;
+});
 const isOwnerProductionMode = computed(() => isOwnerView.value && isKitchenMode.value);
 const isPro = computed(() => currentUser.value?.subscription_plan === 'pro');
 
@@ -68,12 +68,14 @@ const initialMonitorDept = (() => {
 })();
 const monitorDept = ref(initialMonitorDept);
 const COURSE_LABELS = { 1: 'Prima portata', 2: 'Seconda portata', 3: 'Terza portata', 4: 'Altro' };
-const ROLE_LABELS = { cucina: 'Cucina', bar: 'Bar', pizzeria: 'Pizzeria', cucina_sg: 'Cucina SG' };
+const ROLE_LABELS = { bar: 'Bar', pizzeria: 'Pizzeria', cucina_sg: 'Cucina SG' };
 const ROLE_ICONS = { cucina: 'bi-fire', bar: 'bi-cup-straw', pizzeria: 'bi-record-circle', cucina_sg: 'bi-shield-check' };
+const roleLabel = (role) => (role === 'cucina' ? kitchenLabel.value : (ROLE_LABELS[role] || role));
+const productionDestinationLabel = computed(() => (isPro.value ? 'ai reparti' : `a ${kitchenLabel.value}`));
 
 const departmentPills = computed(() => ([
   { key: 'all',       label: 'Tutti',     icon: 'bi-grid-3x3-gap', allowed: true },
-  { key: 'cucina',    label: 'Cucina',    icon: 'bi-fire',          allowed: true },
+  { key: 'cucina',    label: kitchenLabel.value, icon: 'bi-fire',          allowed: true },
   { key: 'bar',       label: 'Bar',       icon: 'bi-cup-straw',     allowed: isPro.value },
   { key: 'pizzeria',  label: 'Pizzeria',  icon: 'bi-record-circle', allowed: isPro.value },
   { key: 'cucina_sg', label: 'Cucina SG', icon: 'bi-shield-check',  allowed: isPro.value },
@@ -216,7 +218,7 @@ const monitorStats = computed(() => {
   return { total: list.length, inLav, pronti, consegnati };
 });
 const monitorActiveTitle = computed(() => (
-  monitorDept.value === 'all' ? 'Tutti i reparti' : (ROLE_LABELS[monitorDept.value] || 'Reparto')
+  monitorDept.value === 'all' ? 'Tutti i reparti' : roleLabel(monitorDept.value)
 ));
 const monitorActiveIcon = computed(() => (
   monitorDept.value === 'all' ? 'bi-grid-3x3-gap' : (ROLE_ICONS[monitorDept.value] || 'bi-grid-3x3-gap')
@@ -337,11 +339,11 @@ const onOrderSent = async ({ sent, printDispatched }) => {
   salaView.value = 'grid';
   currentOrderDocId.value = null;
   showToast('success', sent > 0
-    ? `Comanda inviata in cucina (${sent} ${sent === 1 ? 'piatto' : 'piatti'}).`
-    : 'Tutto già in cucina.');
+    ? `Comanda inviata ${productionDestinationLabel.value} (${sent} ${sent === 1 ? 'piatto' : 'piatti'}).`
+    : `Tutto già inviato ${productionDestinationLabel.value}.`);
   // Toast informativo se la stampante di cucina non e' raggiungibile
   if (printDispatched && printDispatched.no_device === true) {
-    showToast('warning', 'Stampa cucina non disponibile, postazione offline.');
+    showToast('warning', `Stampa ${kitchenLabel.value} non disponibile, postazione offline.`);
   }
 };
 
@@ -534,7 +536,7 @@ const handleTakeawayPickupFromSala = async (order) => {
   if (!order?.documentId) return;
   try {
     await pickupTakeaway(order.documentId, token.value);
-    showToast('success', `Asporto ${order.customer_name || ''} ritirato dalla cucina.`);
+    showToast('success', `Asporto ${order.customer_name || ''} ritirato da ${kitchenLabel.value}.`);
     await loadData({ silent: true });
   } catch (err) {
     showToast('error', orderErrorMessage(err));
@@ -712,7 +714,7 @@ watch(() => route.path, async () => {
         </div>
         <div v-if="isOwnerProductionMode && !isPro" class="ord-sidebar-note">
           <i class="bi bi-info-circle" aria-hidden="true"></i>
-          <span>Piano Essenziale: solo Cucina disponibile.</span>
+          <span>Piano Essenziale: reparto unico Ordini disponibile.</span>
         </div>
 
         <div v-if="mode === 'cameriere'" class="ord-sidebar-section">
@@ -911,7 +913,7 @@ watch(() => route.path, async () => {
                           v-if="monitorDept === 'all' && itemStation(it)"
                           class="ct-order-course__station"
                         >
-                          {{ ROLE_LABELS[itemStation(it)] || itemStation(it) }}
+                          {{ roleLabel(itemStation(it)) }}
                         </span>
                         <button
                           v-if="monitorNextStatus(it)"
@@ -954,7 +956,7 @@ watch(() => route.path, async () => {
                 </div>
                 <button type="button" class="ds-btn ds-btn-primary ds-btn-sm" @click="handleTakeawayPickupFromSala(o)">
                   <i class="bi bi-box-arrow-up"></i>
-                  <span>Preso dalla cucina</span>
+                  <span>Preso da {{ kitchenLabel }}</span>
                 </button>
               </article>
             </div>

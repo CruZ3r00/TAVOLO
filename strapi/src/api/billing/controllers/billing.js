@@ -88,10 +88,10 @@ function planAllowsStaffRole(user, role) {
   return user.subscription_plan === 'starter' && [STAFF_ROLES.CAMERIERE, STAFF_ROLES.CUCINA].includes(role);
 }
 
-function staffRoleLabel(role) {
+function staffRoleLabel(role, owner) {
   switch (role) {
     case STAFF_ROLES.CAMERIERE: return 'Sala';
-    case STAFF_ROLES.CUCINA: return 'Cucina';
+    case STAFF_ROLES.CUCINA: return owner?.subscription_plan === 'starter' ? 'Ordini' : 'Cucina';
     case STAFF_ROLES.BAR: return 'Bar';
     case STAFF_ROLES.PIZZERIA: return 'Pizzeria';
     case STAFF_ROLES.CUCINA_SG: return 'Cucina SG';
@@ -127,7 +127,7 @@ async function staffSettingsPayload(owner) {
     const isWaiter = role === STAFF_ROLES.CAMERIERE;
     return {
       role,
-      label: staffRoleLabel(role),
+      label: staffRoleLabel(role, owner),
       active: isWaiter ? true : row.active !== false,
       plan_allowed: planAllowed,
       can_toggle: !isWaiter && planAllowed,

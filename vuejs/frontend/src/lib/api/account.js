@@ -22,9 +22,10 @@ export const fetchStaffSettings = async (token) => {
   const billing = await fetchBillingStatus(token);
   const starterAllowed = billing?.subscription_plan === 'starter' || billing?.subscription_plan === 'pro';
   const proAllowed = billing?.subscription_plan === 'pro';
+  const kitchenLabel = billing?.subscription_plan === 'starter' ? 'Ordini' : 'Cucina';
   return [
     { role: 'cameriere', label: 'Sala', active: true, plan_allowed: starterAllowed, can_toggle: false, blocked: !starterAllowed, username: null, pending_backend: true, routing_allowed: false, routing_blocked_reason: 'backend_pending', subscription_plan: billing?.subscription_plan || null, categories: [] },
-    { role: 'cucina', label: 'Cucina', active: true, plan_allowed: starterAllowed, can_toggle: starterAllowed, blocked: !starterAllowed, username: null, pending_backend: true, routing_allowed: false, routing_blocked_reason: 'backend_pending', subscription_plan: billing?.subscription_plan || null, categories: [] },
+    { role: 'cucina', label: kitchenLabel, active: true, plan_allowed: starterAllowed, can_toggle: starterAllowed, blocked: !starterAllowed, username: null, pending_backend: true, routing_allowed: false, routing_blocked_reason: 'backend_pending', subscription_plan: billing?.subscription_plan || null, categories: [] },
     { role: 'bar', label: 'Bar', active: true, plan_allowed: proAllowed, can_toggle: proAllowed, blocked: !proAllowed, username: null, pending_backend: true, routing_allowed: false, routing_blocked_reason: 'backend_pending', subscription_plan: billing?.subscription_plan || null, categories: [] },
     { role: 'pizzeria', label: 'Pizzeria', active: true, plan_allowed: proAllowed, can_toggle: proAllowed, blocked: !proAllowed, username: null, pending_backend: true, routing_allowed: false, routing_blocked_reason: 'backend_pending', subscription_plan: billing?.subscription_plan || null, categories: [] },
     { role: 'cucina_sg', label: 'Cucina SG', active: true, plan_allowed: proAllowed, can_toggle: proAllowed, blocked: !proAllowed, username: null, pending_backend: true, routing_allowed: false, routing_blocked_reason: 'backend_pending', subscription_plan: billing?.subscription_plan || null, categories: [] },

@@ -1,3 +1,33 @@
+# Plan — Essenziale: coda unica "Ordini" invece di "Cucina" (2026-05-19)
+
+## Obiettivo
+
+Per il piano Essenziale non cambiare login/ruoli tecnici: lo staff continua a
+usare il ruolo `cucina`, ma l'esperienza utente deve presentarlo come coda unica
+`Ordini`. Questo evita che un locale beverage-only pensi che gli ordini bar
+finiscano in una cucina inesistente.
+
+## Checklist
+
+- [x] Confermare che il routing backend Essenziale mandi tutte le categorie al
+  ruolo tecnico `cucina`.
+- [x] Rinominare le label visibili da `Cucina` a `Ordini` solo quando il piano
+  utente e' `starter`.
+- [x] Lasciare invariato il piano Professionale: reparti separati Cucina, Bar,
+  Pizzeria, Cucina SG.
+- [x] Eseguire un micro test/build mirato dopo la patch.
+
+## Review
+
+- Routing invariato: su Essenziale `stationForCategory` continua a restituire
+  il ruolo tecnico `cucina` per tutte le categorie; su Professionale resta lo
+  smistamento per reparti.
+- Frontend: navigazione desktop/mobile, pagina comande, profilo reparti e
+  stampanti mostrano `Ordini` per il reparto unico Essenziale.
+- Backend: `/account/staff` e `/billing/status` restituiscono label `Ordini`
+  per `cucina` solo quando il piano owner e' `starter`.
+- Verifica: `npm run build:modern`, `npm test`, `git diff --check` passati.
+
 # Plan — Fix staging authenticated API 500 after deploy (2026-05-18)
 
 ## Problema

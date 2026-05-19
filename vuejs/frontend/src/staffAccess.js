@@ -10,6 +10,10 @@ export const STAFF_ROLES = {
 
 const knownRoles = new Set(Object.values(STAFF_ROLES));
 
+export const isStarterPlan = (user) => String(user?.subscription_plan || '').toLowerCase() === 'starter';
+
+export const kitchenRoleLabel = (user) => (isStarterPlan(user) ? 'Ordini' : 'Cucina');
+
 export const staffRole = (user) => {
   const value = String(user?.staff_role || '').trim().toLowerCase();
   return knownRoles.has(value) ? value : STAFF_ROLES.OWNER;
@@ -59,8 +63,7 @@ const canSeeBarManagement = (user) => {
   const role = staffRole(user);
   if (role === STAFF_ROLES.BAR) return true;
   if (role === STAFF_ROLES.CUCINA) {
-    const plan = String(user?.subscription_plan || '').toLowerCase();
-    return plan === 'starter';
+    return isStarterPlan(user);
   }
   return false;
 };

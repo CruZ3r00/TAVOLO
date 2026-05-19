@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router';
 import { useStore } from 'vuex';
 import { fetchReservations, fetchOrders } from '@/utils';
 import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
-import { STAFF_ROLES, canSeeNavItem, defaultRouteForUser, effectiveUserId, staffRole } from '@/staffAccess';
+import { STAFF_ROLES, canSeeNavItem, defaultRouteForUser, effectiveUserId, kitchenRoleLabel, staffRole } from '@/staffAccess';
 import MobileBottomNav from '@/components/MobileBottomNav.vue';
 import MobileTopBar from '@/components/MobileTopBar.vue';
 import AlertHeaderBar from '@/components/AlertHeaderBar.vue';
@@ -161,7 +161,7 @@ const globalNavItems = computed(() => {
   // le voci legate al loro ruolo + carico bar quando applicabile.
   return [
     { id: 'sala', icon: 'bi-grid-3x3-gap', label: 'Sala', path: '/orders', badge: pendingCount.value },
-    { id: 'cucina', icon: 'bi-fire', label: 'Cucina', path: '/kitchen' },
+    { id: 'cucina', icon: 'bi-fire', label: kitchenRoleLabel(currentUser.value), path: '/kitchen' },
     { id: 'bar', icon: 'bi-cup-straw', label: 'Bar', path: '/bar' },
     { id: 'pizzeria', icon: 'bi-record-circle', label: 'Pizzeria', path: '/pizzeria' },
     { id: 'cucina_sg', icon: 'bi-shield-check', label: 'Cucina SG', path: '/kitchen-sg' },

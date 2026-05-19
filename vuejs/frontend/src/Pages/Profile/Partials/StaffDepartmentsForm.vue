@@ -70,7 +70,7 @@ const routingNotice = computed(() => {
         if (routingBlockedReason.value === 'subscription_required') {
             return 'Le categorie sono presenti, ma la modifica delle assegnazioni richiede un abbonamento attivo al piano Professionale.';
         }
-        return `Le categorie sono presenti, ma la modifica delle assegnazioni richiede il piano Professionale. Piano rilevato: ${subscriptionPlanLabel.value}. Con il piano Essenziale tutte le portate arrivano in Cucina.`;
+        return `Le categorie sono presenti, ma la modifica delle assegnazioni richiede il piano Professionale. Piano rilevato: ${subscriptionPlanLabel.value}. Con il piano Essenziale tutte le portate arrivano in Ordini.`;
     }
     return '';
 });
@@ -198,7 +198,7 @@ onMounted(loadDepartments);
                 </div>
                 <h4>Disponibile con il piano Professionale</h4>
                 <p>
-                    Con l'Essenziale tutte le categorie arrivano in Cucina. Passa al
+                    Con l'Essenziale tutte le categorie arrivano in Ordini. Passa al
                     Professionale per smistare bar, pizzeria e cucina senza glutine in
                     code separate.
                 </p>
