@@ -41,6 +41,9 @@ const corsAllowedHeaders = [
   'Cache-Control',
   'Pragma',
 ];
+const corsExposedHeaders = [
+  'X-CSRF-Token',
+];
 
 if (process.env.NODE_ENV !== 'production' || process.env.CSP_ALLOW_UNSAFE_INLINE_SCRIPT === 'true') {
   scriptSrc.splice(1, 0, "'unsafe-inline'");
@@ -83,6 +86,7 @@ module.exports = [
     config: {
       origin: frontendOrigins,
       headers: corsAllowedHeaders,
+      expose: corsExposedHeaders,
       credentials: true,
     },
   },

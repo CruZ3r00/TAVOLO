@@ -98,6 +98,15 @@ la request non sicura e rifiuta il cookie.
 - Staff DB: con subscription `pro` attiva, la nuova `sync_owner_staff_accounts` crea/abilita `cameriere`, `cucina`, `bar`, `pizzeria`, `cucina_sg`; senza subscription attiva non crea staff.
 - Gating: il middleware permette i reparti pro quando l'owner ha `subscription_plan='pro'` e subscription attiva; su starter restano ammessi solo sala/cucina.
 
+## CSRF Follow-up
+
+- Problema: checkout post-register cookie-only puo' inviare `/api/billing/checkout`
+  prima di riuscire a leggere il cookie `ct_csrf`, causando
+  `CSRF_TOKEN_INVALID`.
+- Fix: Strapi espone `X-CSRF-Token` in CORS; il wrapper fetch frontend memorizza
+  quel token e lo usa come fallback su richieste unsafe.
+- Verifica: `cd strapi && npm test`, `npm run build:modern`.
+
 # Plan — Element.ingredients legacy JSON cleanup (2026-05-14)
 
 ## Problema riportato dall'utente

@@ -76,3 +76,7 @@
 - Do not create synthetic staff accounts from the raw `up_users` insert alone. Signup is not durable until WebsiteConfig setup succeeds and billing becomes active; staff sync must return early without creating rows when the owner has no active subscription.
 - Public/landing layouts must not mount internal operator tooling such as `CommandPalette`. In legacy builds, hidden teleported UI can leak visually or via keyboard shortcuts; mount it only in the authenticated app shell.
 - A pending signup plan must resume Stripe Checkout directly after login/email verification/2FA. `/renew-sub` is for expired subscriptions and Stripe return/cancel states, not as a replacement for the initial checkout session.
+
+## 2026-05-19 — Cookie-only POSTs need exposed CSRF fallback
+
+- When auth uses secure httpOnly cookies, the first unsafe API call after login/register may not have a readable CSRF cookie yet. Capture `X-CSRF-Token` from auth responses, expose it via CORS, and reuse it as a fallback header for POST/PUT/PATCH/DELETE.
