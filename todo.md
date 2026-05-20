@@ -1,3 +1,52 @@
+# Plan — Review funzionale produzione locale test (2026-05-20)
+
+## Obiettivo
+
+Testare `https://app.comfortables.eu` con account owner e sotto-account prima
+dell'installazione in un locale reale. La review deve coprire pulsanti,
+richieste API e operazioni operative critiche, segnando blocchi reali per il
+test sul campo.
+
+## Checklist
+
+- [x] Login owner e mappa navigazione/pagine disponibili.
+- [x] Menu: lista, create, edit, duplica, archivia/elimina, categorie, bevande.
+- [ ] Import/OCR: upload, conferma, salvataggio, gestione errori.
+- [x] Ordini/tavoli: crea ordine, aggiungi item, invia reparti, stati.
+- [ ] Ordini/tavoli: chiusura conto non testata per non alterare dati reali.
+- [x] Reparti/staff: cucina, bar, pizzeria, sala/cameriere, sotto-account.
+- [x] Profilo/config: account, staff, reparti, sito, POS/cassa, abbonamento.
+- [ ] Mobile viewport: flussi minimi su telefono.
+- [x] Network: registrare 4xx/5xx, URL, payload non sensibili, schermata.
+
+## Review
+
+- Owner: login, dashboard, sala, menu, profilo e prenotazioni si aprono in
+  produzione.
+- Menu: create/edit/duplica/elimina manuale verificati. L'elemento QA e' stato
+  poi rimosso dal menu; resta solo la riga storica nell'ordine tavolo usato per
+  testare il flusso.
+- Ordini: aggiunta portata da sala, invio reparto e stati reparto verificati.
+  La categoria `Pizze classiche` e' instradata correttamente a Pizzeria.
+- Reparti: `cameriere` vede sala/prenotazioni; `cucina`, `bar`, `pizzeria` e
+  `cucinasg` vengono confinati alla rispettiva postazione anche provando URL
+  non autorizzati.
+- Prenotazioni: lista e apertura modale `Nuova prenotazione` verificati. Non e'
+  stata salvata una prenotazione test per evitare dati sporchi.
+- Blocker installazione: tab `Stampanti` mostra `Forbidden` e la rete conferma
+  `403` su `GET /api/restaurant-printer-config/me`.
+- Blocker installazione: URL sito pubblico dell'account punta ancora a un
+  indirizzo LAN `192.168.1.63`; QR e link pubblico non sono pronti per uso reale.
+- Warning operativo: dopo `Prepara/Pronto` in Pizzeria la vista reparto puo'
+  nascondere temporaneamente l'item finche' si cambia filtro o si aggiorna.
+- Warning operativo: all'invio comanda compare avviso stampante offline, atteso
+  se il pos-rt/printer non e' installato ma da risolvere per la prova nel locale.
+- Warning dati test: ci sono tavoli aperti da molte ore/minuti; prima del test
+  reale conviene pulire o chiudere i tavoli demo.
+- Evidenze screenshot: `/private/tmp/comfortables-sito-web.png`,
+  `/private/tmp/comfortables-stampanti-forbidden.png`,
+  `/private/tmp/comfortables-nuova-prenotazione.png`.
+
 # Plan — Deploy: POST /api/elements 500 su account legacy (2026-05-20)
 
 ## Problema
