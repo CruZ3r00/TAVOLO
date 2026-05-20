@@ -23,6 +23,7 @@ const {
   verifyTwoFactorChallenge,
 } = require('../src/utils/two-factor-auth');
 const { setAuthCookies, stripJwtFromBodyIfCookieOnly } = require('../src/utils/auth-cookies');
+const { pairMenuRowsToElementRows } = require('../src/utils/menu-element-links');
 const authCookieMiddleware = require('../src/middlewares/auth-cookie');
 const publicTakeawayGuard = require('../src/api/order/middlewares/public-takeaway-guard');
 const buildServerConfig = require('../config/server');
@@ -58,6 +59,37 @@ test('computeTotal rounds subtotal and total', () => {
   assert.equal(result.tax, 0);
   assert.equal(result.discount, 0);
   assert.equal(result.total, 23);
+});
+
+test('menu-element direct link pairs draft rows with draft rows and published rows with published rows', () => {
+  const menuRows = [
+    { id: 1, document_id: 'menu-doc', published_at: null },
+    { id: 2, document_id: 'menu-doc', published_at: '2026-05-20T09:00:00.000Z' },
+  ];
+  const elementRows = [
+    { id: 10, document_id: 'element-doc', published_at: null },
+    { id: 11, document_id: 'element-doc', published_at: '2026-05-20T09:00:00.000Z' },
+  ];
+
+  assert.deepEqual(
+    pairMenuRowsToElementRows(menuRows, elementRows).map(({ menuRow, elementRow }) => [menuRow.id, elementRow.id]),
+    [[1, 10], [2, 11]],
+  );
+});
+
+test('menu-element direct link falls back when element has no same-status row', () => {
+  const menuRows = [
+    { id: 1, document_id: 'menu-doc', published_at: null },
+    { id: 2, document_id: 'menu-doc', published_at: '2026-05-20T09:00:00.000Z' },
+  ];
+  const elementRows = [
+    { id: 11, document_id: 'element-doc', published_at: '2026-05-20T09:00:00.000Z' },
+  ];
+
+  assert.deepEqual(
+    pairMenuRowsToElementRows(menuRows, elementRows).map(({ menuRow, elementRow }) => [menuRow.id, elementRow.id]),
+    [[1, 11], [2, 11]],
+  );
 });
 
 test('server config enables Koa proxy trust from TRUST_PROXY', () => {

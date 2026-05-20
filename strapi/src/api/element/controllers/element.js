@@ -6,6 +6,7 @@
 
 const { createCoreController } = require('@strapi/strapi').factories;
 const { ensureCategoryRouting, isBarRoutedCategory } = require('../../../utils/category-routing');
+const { linkMenuElementsByDocumentId } = require('../../../utils/menu-element-links');
 const ingredientsService = require('../../../services/ingredients');
 
 const trimString = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -64,7 +65,10 @@ function buildElementData(raw, { partial = false } = {}) {
   }
 
   if (raw.image !== undefined) {
-    data.image = parseImageId(raw.image);
+    const imageId = parseImageId(raw.image);
+    if (partial || imageId !== null) {
+      data.image = imageId;
+    }
   }
 
   // Flag bevanda: se il client lo passa esplicito, rispettiamo il valore.
@@ -145,6 +149,10 @@ async function ensureUserMenu(strapi, userId) {
   });
 }
 
+async function connectElementToMenu(strapi, menu, element) {
+  await linkMenuElementsByDocumentId(strapi, menu.documentId, [element.documentId]);
+}
+
 async function userOwnsElement(strapi, userId, documentId) {
   if (!userId || !documentId) return false;
   const rows = await strapi.documents('api::element.element').findMany({
@@ -209,21 +217,8 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
       }
 
       const menu = await ensureUserMenu(strapi, user.id);
-      const existingConn = Array.isArray(menu.fk_elements)
-        ? menu.fk_elements
-            .map((item) => item && item.documentId ? { documentId: item.documentId } : null)
-            .filter(Boolean)
-        : [];
 
-      await strapi.documents('api::menu.menu').update({
-        documentId: menu.documentId,
-        data: {
-          fk_elements: {
-            connect: [...existingConn, { documentId: created.documentId }],
-          },
-        },
-        status: 'published',
-      });
+      await connectElementToMenu(strapi, menu, created);
 
       // Risposta: legge i nomi dalla relazione appena scritta.
       let namesOut = [];

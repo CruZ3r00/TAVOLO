@@ -1,3 +1,48 @@
+# Plan — Deploy: POST /api/elements 500 su account legacy (2026-05-20)
+
+## Problema
+
+In produzione `POST /api/elements` puo' fallire con:
+`Document with id "...", locale "null" not found`. Il DB online sembra avere
+stati draft/published Strapi v5 validi, ma il collegamento Document Service
+`menu.fk_elements.connect` e' fragile su alcuni account legacy o build non
+allineate.
+
+## Checklist
+
+- [x] Non fare push e non scrivere sul DB: analisi locale/read-only.
+- [x] Audit schema/dati owner attivi: menu, elementi, link table, vecchia colonna
+  `elements.ingredients`.
+- [x] Isolare il punto esatto del 500 tra create Element, recipe sync e connect
+  Menu-Element.
+- [x] Proporre fix elegante e minimale, valido per manual create e bulk/OCR.
+- [x] Aggiungere repair idempotente per vecchi utenti con elementi attivi non
+  collegati al menu.
+- [x] Verificare sintassi/test locali prima di qualsiasi push.
+- [x] Documentare risultato e lesson.
+
+## Review
+
+- Root cause probabile: `strapi.documents('api::menu.menu').update(... fk_elements.connect ...)`
+  puo' fallire su relazioni draft/published con `Document with id ..., locale
+  "null" not found`, mentre le righe fisiche DB sono presenti e linkabili.
+- Fix locale: utility unica `menu-element-links` che collega direttamente la
+  link table, rispettando la coppia draft->draft e published->published, e
+  valorizzando `element_ord` quando la colonna esiste.
+- Copertura: usata sia da `POST /api/elements` sia da `menu.bulkImport`, cosi'
+  create manuale e import/OCR non divergono.
+- Verifica locale: `node --check` sui file modificati, `npm test` Strapi
+  passato (39/39), `git diff --check` passato.
+- Audit produzione con `strapi/.env.prod`: owner 29, 51, 65 coerenti; owner 1
+  ha 8 documenti Element non archiviati, collegati all'owner ma non al menu.
+  Gli elementi mancanti sono stati creati il 2026-05-20 durante i tentativi
+  falliti: `Salamino Piccante` x4, `mar`, `marg`, `marr`, `mmmm`.
+- Conclusione DB: non manca una colonna legacy e non e' un problema abbonamento;
+  il create persiste l'elemento, poi fallisce solo il link menu-element.
+- Repair locale: migration `202605200002_repair_menu_element_links.js`, one-way
+  e conservativa. Non cancella dati, ignora archiviati, ripara solo owner con
+  un solo menu document e collega rispettando draft/published.
+
 # Plan — Deploy Strapi: backfill is_beverage fallisce senza colonna (2026-05-19)
 
 ## Problema

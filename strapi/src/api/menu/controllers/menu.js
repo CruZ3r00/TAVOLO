@@ -13,6 +13,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { createCoreController } = require('@strapi/strapi').factories;
 const { ensureCategoryRouting, isBarRoutedCategory } = require('../../../utils/category-routing');
+const { linkMenuElementsByDocumentId } = require('../../../utils/menu-element-links');
 const ingredientsService = require('../../../services/ingredients');
 
 const ALLOWED_MIME = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
@@ -649,18 +650,14 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
           createdDocs.push(doc);
         }
 
-        const createdConn = createdDocs.map((c) => ({ documentId: c.documentId }));
+        const createdDocIds = createdDocs.map((c) => c.documentId);
 
         if (mode === 'replace') {
           if (menu) {
             const oldElements = Array.isArray(menu.fk_elements) ? menu.fk_elements : [];
             const oldDocIds = oldElements.map((e) => e.documentId).filter(Boolean);
 
-            await strapi.documents('api::menu.menu').update({
-              documentId: menu.documentId,
-              data: { fk_elements: { set: createdConn } },
-              status: 'published',
-            });
+            await linkMenuElementsByDocumentId(strapi, menu.documentId, createdDocIds, { replace: true });
 
             for (const oid of oldDocIds) {
               await strapi.documents('api::element.element').delete({ documentId: oid });
@@ -670,34 +667,27 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
           }
 
           // Nessun menu esistente: replace = creazione nuovo menu.
-          await strapi.documents('api::menu.menu').create({
+          const createdMenu = await strapi.documents('api::menu.menu').create({
             data: {
               fk_user: { connect: [{ id: user.id }] },
-              fk_elements: { connect: createdConn },
             },
             status: 'published',
           });
+          await linkMenuElementsByDocumentId(strapi, createdMenu.documentId, createdDocIds);
           return { created_count: createdDocs.length, deleted_count: 0 };
         }
 
         // mode === 'append'
         if (menu) {
-          const existingConn = (Array.isArray(menu.fk_elements) ? menu.fk_elements : [])
-            .map((e) => ({ documentId: e.documentId }))
-            .filter((c) => c.documentId);
-          await strapi.documents('api::menu.menu').update({
-            documentId: menu.documentId,
-            data: { fk_elements: { connect: [...existingConn, ...createdConn] } },
-            status: 'published',
-          });
+          await linkMenuElementsByDocumentId(strapi, menu.documentId, createdDocIds);
         } else {
-          await strapi.documents('api::menu.menu').create({
+          const createdMenu = await strapi.documents('api::menu.menu').create({
             data: {
               fk_user: { connect: [{ id: user.id }] },
-              fk_elements: { connect: createdConn },
             },
             status: 'published',
           });
+          await linkMenuElementsByDocumentId(strapi, createdMenu.documentId, createdDocIds);
         }
         return { created_count: createdDocs.length, deleted_count: 0 };
       });
