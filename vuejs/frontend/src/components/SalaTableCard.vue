@@ -5,9 +5,10 @@ const props = defineProps({
   table: { type: Object, required: true },
   activeOrder: { type: Object, default: null },
   canRemove: { type: Boolean, default: false },
+  canCheckout: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'serve-ready']);
+const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'serve-ready', 'checkout']);
 
 const isOccupied = computed(() => props.table.status === 'occupied');
 const isReserved = computed(() => props.table.status === 'reserved');
@@ -61,6 +62,11 @@ const handleRemove = () => {
 const handleServeReady = () => {
   if (!props.activeOrder || readyCount.value === 0) return;
   emit('serve-ready', props.activeOrder);
+};
+
+const handleCheckout = () => {
+  if (!props.canCheckout || !props.activeOrder) return;
+  emit('checkout', props.activeOrder);
 };
 </script>
 
@@ -137,6 +143,17 @@ const handleServeReady = () => {
         <span class="sl-card-action">
           <i class="bi bi-eye"></i>Dettagli
         </span>
+        <button
+          v-if="canCheckout"
+          type="button"
+          class="sl-card-action sl-card-action-btn"
+          :aria-label="`Chiudi conto tavolo ${table.number}`"
+          @click.stop="handleCheckout"
+          @keydown.enter.stop="handleCheckout"
+          @keydown.space.stop="handleCheckout"
+        >
+          <i class="bi bi-receipt-cutoff"></i>Chiudi conto
+        </button>
         <button
           v-if="readyCount > 0"
           type="button"

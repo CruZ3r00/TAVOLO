@@ -6,6 +6,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import OrdersTableGrid from '@/components/OrdersTableGrid.vue';
 import KitchenBoard from '@/components/KitchenBoard.vue';
 import OrderDetailPage from '@/components/OrderDetailPage.vue';
+import CheckoutModal from '@/components/CheckoutModal.vue';
 import Modal from '@/components/Modal.vue';
 import Skeleton from '@/components/Skeleton.vue';
 import WalkinModal from '@/components/WalkinModal.vue';
@@ -14,9 +15,11 @@ import { isSupabaseRealtimeConfigured, supabase } from '@/supabase';
 import { STAFF_ROLES, effectiveUserId, kitchenRoleLabel, staffRole } from '@/staffAccess';
 import {
   fetchTables, fetchOrders, fetchOrdersBoard, fetchOrdersSala, updateItemStatus, orderErrorMessage,
+  closeOrder,
   pickupTakeaway,
   createWalkin, reservationErrorMessage,
   deleteTable,
+  fetchWebsiteConfig, updateCoverCharge,
 } from '@/utils';
 
 const store = useStore();
@@ -26,6 +29,8 @@ const token = computed(() => store.getters.getToken);
 const currentUser = computed(() => store.getters.getUser || null);
 const isOwnerView = computed(() => staffRole(currentUser.value) === STAFF_ROLES.OWNER);
 const canManageTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE].includes(staffRole(currentUser.value)));
+const canCheckoutTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE].includes(staffRole(currentUser.value)));
+const coverCharge = ref(0);
 
 const tables = ref([]);
 const orders = ref([]);
@@ -109,11 +114,14 @@ const walkinErrors = ref({});
 // scelta del tavolo o auto) + gestione tavoli (CRUD).
 const showWalkinModal = ref(false);
 const showTableManager = ref(false);
+const showCheckout = ref(false);
+const checkoutOrder = ref(null);
+const checkoutBusy = ref(false);
+const checkoutPersons = ref(0);
 
 // View interna della pagina Sala (cameriere): 'grid' (lista tavoli, default)
 // vs 'order-detail' (vista full-page del tavolo con add cumulative + invio
 // in cucina). Pattern MenuSetter -> MenuAdder.
-// La chiusura del conto NON e' qui: avviene esclusivamente dalla Dashboard.
 const salaView = ref('grid');
 
 // Filtro tavoli (modalità cameriere): controllato dalla sidebar laterale
@@ -315,6 +323,16 @@ const loadData = async ({ silent = false } = {}) => {
   }
 };
 
+const loadCoverCharge = async () => {
+  if (!token.value) return;
+  try {
+    const wc = await fetchWebsiteConfig(token.value);
+    coverCharge.value = Number(wc?.cover_charge) || 0;
+  } catch (_err) {
+    coverCharge.value = 0;
+  }
+};
+
 const showToast = (type, message) => {
   toast.value = { type, message };
   setTimeout(() => { toast.value = null; }, 3500);
@@ -327,6 +345,44 @@ const handleViewOrder = (order) => {
   if (!order?.documentId) return;
   currentOrderDocId.value = order.documentId;
   salaView.value = 'order-detail';
+};
+
+const handleCheckout = (order) => {
+  if (!canCheckoutTables.value || !order?.documentId) return;
+  checkoutOrder.value = order;
+  checkoutPersons.value = Number(order.covers) || 1;
+  showCheckout.value = true;
+};
+
+const onConfirmCheckout = async (payload) => {
+  if (!checkoutOrder.value || checkoutBusy.value) return;
+  checkoutBusy.value = true;
+  try {
+    const result = await closeOrder(checkoutOrder.value.documentId, payload, token.value);
+    showCheckout.value = false;
+    checkoutOrder.value = null;
+    if (result?.queued) {
+      showToast('success', `Richiesta inviata al POS/RT. Rif: ${result.event_id || 'OK'}`);
+    } else {
+      showToast('success', `Conto chiuso. Rif: ${result?.payment?.transactionId || 'OK'}`);
+    }
+    await loadData({ silent: true });
+  } catch (err) {
+    showToast('error', orderErrorMessage(err));
+  } finally {
+    checkoutBusy.value = false;
+  }
+};
+
+const onSaveCoverDefault = async (value) => {
+  if (!token.value) return;
+  try {
+    const updated = await updateCoverCharge(value, token.value);
+    coverCharge.value = Number(updated?.cover_charge) || Number(value) || 0;
+    showToast('success', `Coperto di default impostato a € ${(Number(value) || 0).toFixed(2)}.`);
+  } catch (err) {
+    showToast('error', orderErrorMessage(err) || 'Errore nel salvataggio del coperto.');
+  }
 };
 
 const onOrderDetailBack = () => {
@@ -648,6 +704,7 @@ const switchOwnerOrderMode = (tab) => {
 
 onMounted(async () => {
   updateDocumentTitle();
+  await loadCoverCharge();
   await loadData();
   await subscribeRealtime(effectiveUserId(store.getters.getUser));
   startPollingRefresh();
@@ -967,6 +1024,7 @@ watch(() => route.path, async () => {
             :orders="orders"
             :orders-by-table-id="activeOrdersByTableId"
             :can-remove-tables="canManageTables"
+            :can-checkout-tables="canCheckoutTables"
             :filter="tableFilter"
             @update:filter="tableFilter = $event"
             @counts-changed="onTableCountsChanged"
@@ -974,6 +1032,7 @@ watch(() => route.path, async () => {
             @open-table="handleOpenTable"
             @remove-table="handleRemoveTable"
             @serve-ready="handleServeReady"
+            @checkout="handleCheckout"
           />
           <OrderDetailPage
             v-else-if="salaView === 'order-detail' && currentOrderDocId"
@@ -1058,8 +1117,19 @@ watch(() => route.path, async () => {
       :token="token"
       :tables="tables"
       :editing-table="null"
+      :can-delete-tables="canManageTables"
       @close="showTableManager = false"
       @updated="onTableManagerUpdated"
+    />
+    <CheckoutModal
+      :show="showCheckout"
+      :order="checkoutOrder"
+      :busy="checkoutBusy"
+      :cover-charge="coverCharge"
+      :default-persons="checkoutPersons"
+      @close="showCheckout = false"
+      @confirm="onConfirmCheckout"
+      @save-cover-default="onSaveCoverDefault"
     />
   </AppLayout>
 </template>

@@ -132,3 +132,16 @@
 
 - Do not infer production state from the local/staging `.env` database when the user says there are multiple databases. State exactly which DB was queried and ask for exported read-only diagnostics/logs from the other DB before calling a data issue solved.
 - For Strapi v5 draft/published relations, direct link-table repair must preserve row status pairing: draft menu row links draft element row; published menu row links published element row. Avoid all-by-all document row linking unless the target relation is known to be status-agnostic.
+
+## 2026-05-20 — Vue conditional branches must preserve directive pairing
+
+- When tightening permissions in templates, do not add `v-if` next to an
+  existing `v-else` on the same element. Convert the branch to `v-else-if` or
+  split the markup first, then run the frontend build before considering the UI
+  change complete.
+
+## 2026-05-20 — Sala checkout permissions are product decisions
+
+- Do not assume that waiter accounts are excluded from payment/checkout flows.
+  When the user asks for an operational Sala action, mirror the requested roles
+  explicitly in both frontend affordances and backend guards.

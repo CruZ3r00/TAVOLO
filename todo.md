@@ -1,3 +1,59 @@
+# Plan — Chiudi conto dalla Sala per owner e cameriere (2026-05-20)
+
+## Problema
+
+Owner e cameriere devono poter chiudere il conto direttamente dalla visione
+Sala, senza passare da Dashboard o Prenotazioni.
+
+## Checklist
+
+- [x] Riutilizzare `CheckoutModal` in `Orders.vue`.
+- [x] Aggiungere azione `Chiudi conto` sulle card tavolo occupato.
+- [x] Consentire al cameriere la chiusura di ordini tavolo lato backend.
+- [x] Verificare build/test e documentare risultato.
+
+## Review
+
+- `Orders.vue` ora monta `CheckoutModal`, carica il coperto configurato e
+  chiama `closeOrder` dopo conferma.
+- `SalaTableCard` mostra `Chiudi conto` sui tavoli occupati quando il parent
+  abilita il checkout; click isolato con `.stop` per non aprire il dettaglio.
+- `OrdersTableGrid` propaga `checkout` al parent.
+- Backend: rimosso il blocco che impediva al `cameriere` di chiudere ordini
+  tavolo. Restano validi lock version, ordine attivo e vincoli asporto.
+- Verifica: `node --check` su controller order/table passato; `npm test` Strapi
+  passato (39/39); `npm run build` frontend passato con soli warning
+  preesistenti.
+
+
+# Plan — Cameriere puo' creare tavolo (2026-05-20)
+
+## Problema
+
+Da account `cameriere` la pagina Sala mostra lo strumento `Tavoli`, ma la
+creazione fallisce perche' `POST /api/tables` accetta solo owner/gestione.
+Il cameriere deve poter creare un nuovo tavolo operativo, senza ottenere anche
+permessi distruttivi su modifica/eliminazione tavoli.
+
+## Checklist
+
+- [x] Isolare il blocco fra frontend, route grant e controller backend.
+- [x] Consentire a `cameriere` solo `create` tavolo lato backend.
+- [x] Nascondere azioni distruttive nel modal tavoli per chi non gestisce tavoli.
+- [x] Verificare sintassi/build/test mirati.
+
+## Review
+
+- Fix backend: `table.create` ora ammette `owner`, `gestione` e `cameriere`.
+  `table.update` e `table.remove` restano limitati a owner/gestione.
+- Fix frontend: `TableManagerModal` continua a permettere l'aggiunta tavolo,
+  ma mostra `Elimina` solo quando la pagina passa `canDeleteTables=true`.
+- Verifica: `node --check strapi/src/api/table/controllers/table.js` passato;
+  `npm test` in `strapi/` passato (39/39); `npm run build` in
+  `vuejs/frontend/` passato. La build mantiene warning preesistenti sugli
+  import legacy/chunk size, senza errori.
+
+
 # Plan — Review funzionale produzione locale test (2026-05-20)
 
 ## Obiettivo

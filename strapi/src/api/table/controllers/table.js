@@ -98,7 +98,7 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
       const body = ctx.request.body || {};
 
       const number = parseInt(body.number, 10);

@@ -15,12 +15,13 @@ const props = defineProps({
   orders: { type: Array, default: () => [] },
   ordersByTableId: { default: null },
   canRemoveTables: { type: Boolean, default: false },
+  canCheckoutTables: { type: Boolean, default: false },
   // Stato filtro corrente (controllato dal parent). Vue 2.7 dual-build:
   // niente v-model:filter — il parent fa :filter + @update:filter.
   filter: { type: String, default: 'all' },
 });
 
-const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'serve-ready', 'counts-changed']);
+const emit = defineEmits(['view-order', 'open-table', 'remove-table', 'serve-ready', 'checkout', 'counts-changed']);
 
 function activeOrderForTable(table) {
   if (props.ordersByTableId && typeof props.ordersByTableId.get === 'function') {
@@ -76,10 +77,12 @@ const filtered = computed(() => {
         :table="t"
         :active-order="activeOrderForTable(t)"
         :can-remove="canRemoveTables"
+        :can-checkout="canCheckoutTables"
         @view-order="(ord) => emit('view-order', ord)"
         @open-table="(table) => emit('open-table', table)"
         @remove-table="(table) => emit('remove-table', table)"
         @serve-ready="(ord) => emit('serve-ready', ord)"
+        @checkout="(ord) => emit('checkout', ord)"
       />
     </div>
     <div v-else class="kt-empty" style="padding: 40px 16px;">

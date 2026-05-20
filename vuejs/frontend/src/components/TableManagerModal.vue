@@ -8,6 +8,7 @@ const props = defineProps({
     token: { type: String, default: null },
     tables: { type: Array, default: () => [] },
     editingTable: { type: Object, default: null },
+    canDeleteTables: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['close', 'updated']);
@@ -200,7 +201,7 @@ const onClose = () => {
                                     Occupato
                                 </span>
                                 <button
-                                    v-else
+                                    v-else-if="canDeleteTables"
                                     type="button"
                                     class="ds-btn ds-btn-ghost ds-btn-sm"
                                     :class="{ 'ds-btn-destructive-ghost': deleteConfirm === t.documentId }"

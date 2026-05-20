@@ -2442,9 +2442,6 @@ module.exports = createCoreController('api::order.order', ({ strapi }) => ({
       if (order.status !== 'active') {
         throw appError('ORDER_NOT_ACTIVE', 'Ordine gia chiuso.');
       }
-      if (actor.role === STAFF_ROLES.CAMERIERE && order.service_type !== 'takeaway') {
-        throw appError('NOT_OWNER', 'Il cameriere puo chiudere solo ordini asporto.');
-      }
       if (order.service_type === 'takeaway' && order.takeaway_status !== 'picked_up') {
         throw appError('ORDER_NOT_ACTIVE', 'Prima segnala che l\'asporto e stato preso dalla cucina.');
       }
