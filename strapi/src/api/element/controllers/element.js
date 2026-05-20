@@ -64,7 +64,10 @@ function buildElementData(raw, { partial = false } = {}) {
   }
 
   if (raw.image !== undefined) {
-    data.image = parseImageId(raw.image);
+    const imageId = parseImageId(raw.image);
+    if (partial || imageId !== null) {
+      data.image = imageId;
+    }
   }
 
   // Flag bevanda: se il client lo passa esplicito, rispettiamo il valore.
@@ -209,17 +212,12 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
       }
 
       const menu = await ensureUserMenu(strapi, user.id);
-      const existingConn = Array.isArray(menu.fk_elements)
-        ? menu.fk_elements
-            .map((item) => item && item.documentId ? { documentId: item.documentId } : null)
-            .filter(Boolean)
-        : [];
 
       await strapi.documents('api::menu.menu').update({
         documentId: menu.documentId,
         data: {
           fk_elements: {
-            connect: [...existingConn, { documentId: created.documentId }],
+            connect: [{ documentId: created.documentId }],
           },
         },
         status: 'published',

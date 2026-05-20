@@ -117,3 +117,13 @@
 
 - Strapi user migrations can run before the content-type schema diff has created newly declared columns on a fresh deploy target. If a migration reads or backfills a new content-type field, first guard `hasTable`/`hasColumn` and add the column idempotently inside the same migration.
 - Index-only migrations should continue to skip missing columns, but data migrations must not skip silently when runtime code depends on the backfilled field existing at boot.
+
+## 2026-05-20 — OCR/LLM analysis must cite the active prompt path
+
+- Before explaining OCR/LLM behavior, inspect and reference the exact prompt and call site because this service has both the main extraction prompt and a separate fast enrichment prompt.
+- Do not describe the pipeline from symptoms alone. State whether the active path is `pdf_text`, OCR, rules-based parsing, main extraction LLM, or fast enrichment LLM, with file/line evidence.
+
+## 2026-05-20 — Strapi relation connect should only include new links
+
+- For Strapi Document Service relation updates, use `connect` only for the newly added related documents. Re-sending already-linked documents can hit relation/link-table duplicate paths and turn a valid create into a 500.
+- On create payloads, omit nullable media fields when no file is selected. Reserve `image: null` for update/clear semantics, not for initial create.

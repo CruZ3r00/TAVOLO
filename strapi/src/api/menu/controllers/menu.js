@@ -682,12 +682,9 @@ module.exports = createCoreController('api::menu.menu', ({ strapi }) => ({
 
         // mode === 'append'
         if (menu) {
-          const existingConn = (Array.isArray(menu.fk_elements) ? menu.fk_elements : [])
-            .map((e) => ({ documentId: e.documentId }))
-            .filter((c) => c.documentId);
           await strapi.documents('api::menu.menu').update({
             documentId: menu.documentId,
-            data: { fk_elements: { connect: [...existingConn, ...createdConn] } },
+            data: { fk_elements: { connect: createdConn } },
             status: 'published',
           });
         } else {
