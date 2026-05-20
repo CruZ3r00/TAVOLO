@@ -27,6 +27,7 @@ const justRegistered = computed(() => route.query.registered === '1');
 const registrationNeedsVerification = computed(() => route.query.registered === 'verify');
 const emailConfirmed = computed(() => route.query.confirmed === '1');
 const passwordReset = computed(() => route.query.passwordReset === '1');
+const subscriptionActive = computed(() => route.query.subscription === 'active');
 
 const startPendingCheckout = async (planKey, token) => {
   const session = await createBillingCheckoutSession(planKey, token || null);
@@ -140,6 +141,14 @@ const submit = async () => {
           </div>
         </div>
 
+        <div v-if="subscriptionActive" class="au-trial au-trial-strong">
+          <i class="bi bi-envelope-check-fill"></i>
+          <div>
+            <strong>Abbonamento attivato</strong>
+            <span>Controlla la mail di registrazione: contiene gli accessi ComforTables e i profili staff inclusi nel piano.</span>
+          </div>
+        </div>
+
         <div v-if="errorMessage" class="au-trial" style="background: var(--danger-bg); border-color: color-mix(in oklab, var(--danger) 25%, transparent);">
           <i class="bi bi-exclamation-circle-fill" style="color: var(--danger);"></i>
           <div>
@@ -250,6 +259,14 @@ const submit = async () => {
   animation: au-spin 650ms linear infinite;
 }
 @keyframes au-spin { to { transform: rotate(360deg); } }
+
+.au-trial-strong {
+  border-color: color-mix(in oklab, var(--ok) 34%, var(--line));
+  box-shadow: 0 16px 42px -30px color-mix(in oklab, var(--ok) 55%, transparent);
+}
+.au-trial-strong i {
+  color: var(--ok);
+}
 
 @media (max-width: 720px) {
   .au-theme-toggle {

@@ -1,3 +1,31 @@
+# Plan — Avviso email accessi dopo iscrizione (2026-05-20)
+
+## Problema
+
+Dopo il pagamento Stripe l'email con gli accessi staff viene inviata, ma
+l'avviso UI e' troppo breve/poco evidente. L'utente puo' non capire che deve
+controllare la mail di registrazione prima del nuovo login.
+
+## Checklist
+
+- [x] Rendere evidente su `RenewSub.vue` che l'email accessi e' stata inviata.
+- [x] Lasciare il messaggio leggibile prima del redirect al login.
+- [x] Mostrare un richiamo anche su `Login.vue` dopo `subscription=active`.
+- [x] Verificare build frontend.
+
+## Review
+
+- `RenewSub.vue` ora mostra un box persistente e piu' evidente dopo pagamento
+  confermato, indicando che l'email accessi e' stata inviata alla mail di
+  registrazione e invitando a controllare Spam/Promozioni.
+- Il redirect automatico al login passa da 800ms a 4500ms per dare tempo di
+  leggere l'avviso.
+- `Login.vue` mostra un richiamo quando arriva da `subscription=active`, cosi'
+  l'utente vede ancora l'indicazione sugli accessi staff dopo il redirect.
+- Verifica: `npm run build` frontend passato con soli warning preesistenti su
+  import legacy/chunk size.
+
+
 # Plan — Fix reale creazione tavolo cameriere (2026-05-20)
 
 ## Problema

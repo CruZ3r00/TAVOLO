@@ -24,6 +24,10 @@ const portalLoading = ref(false);
 const syncing = ref(false);
 const token = computed(() => store.getters.getToken);
 const isOwnerAccount = computed(() => staffRole(store.getters.getUser) === STAFF_ROLES.OWNER);
+const registrationEmail = computed(() => {
+    const user = store.getters.getUser || {};
+    return billing.value?.email || user.email || '';
+});
 
 // Solo 2 piani in renew. Custom non c'è.
 const PLANS = {
@@ -107,7 +111,7 @@ const forceFreshLogin = async () => {
         // Logout locale comunque.
     }
     store.dispatch('logout');
-    router.replace({ path: '/login', query: { subscription: 'active' } });
+    router.replace({ path: '/login', query: { subscription: 'active', accessEmail: 'sent' } });
 };
 
 // Se torniamo da Stripe Checkout con session_id, sincronizza i dati subito —
@@ -126,9 +130,9 @@ const syncIfReturningFromCheckout = async () => {
             // Riallinea con /users/me autoritativo (subscription_plan, staff payload, ecc).
             await store.dispatch('refreshUser');
         }
-        noticeMessage.value = 'Pagamento confermato. Effettua di nuovo il login per caricare la sessione aggiornata.';
+        noticeMessage.value = 'Pagamento confermato. Email accessi inviata.';
         if (synced && ['active', 'trialing'].includes(synced.subscription_status)) {
-            setTimeout(forceFreshLogin, 800);
+            setTimeout(forceFreshLogin, 4500);
         }
     } catch (err) {
         errorMessage.value = err?.message || 'Sync della sessione Stripe non riuscito.';
@@ -241,9 +245,18 @@ onMounted(async () => {
                 </Transition>
 
                 <Transition name="fade">
-                    <div v-if="noticeMessage && !syncing" class="renew-status renew-status--ok">
-                        <i class="bi bi-check-circle"></i>
-                        {{ noticeMessage }}
+                    <div v-if="noticeMessage && !syncing" class="renew-mail-notice" role="status">
+                        <i class="bi bi-envelope-check-fill" aria-hidden="true"></i>
+                        <div>
+                            <strong>{{ noticeMessage }}</strong>
+                            <span>
+                                Ti abbiamo inviato una email
+                                <template v-if="registrationEmail"> a {{ registrationEmail }}</template>
+                                con gli accessi ComforTables e i profili staff inclusi nel piano.
+                                Controlla anche Spam o Promozioni.
+                            </span>
+                            <em>Tra pochi secondi ti riportiamo al login per caricare la sessione aggiornata.</em>
+                        </div>
                     </div>
                 </Transition>
 
@@ -481,6 +494,46 @@ onMounted(async () => {
     color: var(--info-ink, var(--ink));
     background: var(--info-bg, color-mix(in oklab, var(--info) 8%, var(--bg-elev)));
     border-color: color-mix(in oklab, var(--info) 30%, transparent);
+}
+.renew-mail-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    margin: var(--s-5) auto 0;
+    padding: var(--s-4);
+    max-width: 620px;
+    text-align: left;
+    border-radius: var(--r-lg);
+    border: 1px solid color-mix(in oklab, var(--ok) 36%, var(--line));
+    background: var(--ok-bg, color-mix(in oklab, var(--ok) 12%, var(--bg-elev)));
+    color: var(--ok-ink, var(--ink));
+    box-shadow: 0 18px 48px -28px color-mix(in oklab, var(--ok) 55%, transparent);
+}
+.renew-mail-notice > i {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    font-size: 22px;
+    color: var(--ok);
+}
+.renew-mail-notice div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.renew-mail-notice strong {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+}
+.renew-mail-notice span,
+.renew-mail-notice em {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink-2);
+}
+.renew-mail-notice em {
+    font-style: normal;
+    color: var(--ink-3);
 }
 .renew-status .ds-spinner {
     width: 12px; height: 12px;
