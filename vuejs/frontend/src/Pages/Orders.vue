@@ -28,7 +28,7 @@ const router = useRouter();
 const token = computed(() => store.getters.getToken);
 const currentUser = computed(() => store.getters.getUser || null);
 const isOwnerView = computed(() => staffRole(currentUser.value) === STAFF_ROLES.OWNER);
-const canManageTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE].includes(staffRole(currentUser.value)));
+const canManageTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE].includes(staffRole(currentUser.value)));
 const canCheckoutTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE].includes(staffRole(currentUser.value)));
 const coverCharge = ref(0);
 
