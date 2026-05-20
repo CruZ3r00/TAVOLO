@@ -127,3 +127,8 @@
 
 - For Strapi Document Service relation updates, use `connect` only for the newly added related documents. Re-sending already-linked documents can hit relation/link-table duplicate paths and turn a valid create into a 500.
 - On create payloads, omit nullable media fields when no file is selected. Reserve `image: null` for update/clear semantics, not for initial create.
+
+## 2026-05-20 — Diagnose deploy drift with the right database
+
+- Do not infer production state from the local/staging `.env` database when the user says there are multiple databases. State exactly which DB was queried and ask for exported read-only diagnostics/logs from the other DB before calling a data issue solved.
+- For Strapi v5 draft/published relations, direct link-table repair must preserve row status pairing: draft menu row links draft element row; published menu row links published element row. Avoid all-by-all document row linking unless the target relation is known to be status-agnostic.
