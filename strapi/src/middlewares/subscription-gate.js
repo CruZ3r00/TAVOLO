@@ -118,7 +118,7 @@ function isStaffApiAllowed(role, method, path, ownerPlan) {
   }
 
   if (role === 'cameriere') {
-    if (path === '/api/tables') return method === 'GET';
+    if (path === '/api/tables') return method === 'GET' || method === 'POST';
     if (path === '/api/ingredients/addons') return method === 'GET';
     if (path === '/api/reservations') return method === 'GET' || method === 'POST';
     if (path === '/api/reservations/walkin') return method === 'POST';
@@ -233,7 +233,7 @@ async function authContextFromBearer(strapi, authorization) {
   }
 }
 
-module.exports = (_config, { strapi }) => {
+function createSubscriptionGate(_config, { strapi }) {
   return async (ctx, next) => {
     const path = ctx.path || '';
 
@@ -314,4 +314,7 @@ module.exports = (_config, { strapi }) => {
       },
     };
   };
-};
+}
+
+module.exports = createSubscriptionGate;
+module.exports.__private = { isStaffApiAllowed };

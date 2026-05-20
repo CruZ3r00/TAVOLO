@@ -155,7 +155,7 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 
@@ -237,7 +237,7 @@ module.exports = createCoreController('api::table.table', ({ strapi }) => ({
 
     try {
       const actor = await resolveStaffContext(strapi, user);
-      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE]);
+      assertStaffRole(actor, [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE]);
       const { documentId } = ctx.params;
       if (!documentId) throw appError('INVALID_PAYLOAD', 'documentId mancante.');
 

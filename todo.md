@@ -1,3 +1,33 @@
+# Plan — Fix reale creazione tavolo cameriere (2026-05-20)
+
+## Problema
+
+Da account `cameriere`, la modale `Gestione tavoli` fallisce ancora con
+`Questo reparto non puo accedere a questa funzione.` Il controller tavoli era
+stato aperto, ma il middleware globale `subscription-gate` blocca ancora
+`POST /api/tables`. Inoltre la UI/backend non distinguono bene tra creazione
+tavolo e azioni distruttive.
+
+## Checklist
+
+- [x] Allineare `subscription-gate`: cameriere puo' fare `GET` e `POST /api/tables`.
+- [x] Limitare update/delete tavoli a owner/gestione anche lato controller.
+- [x] Separare in frontend `crea/gestisci` da `elimina`.
+- [x] Aggiungere verifica mirata sul gate e run build/test.
+
+## Review
+
+- Root cause: `subscription-gate` bloccava ancora `POST /api/tables` per il
+  ruolo `cameriere`, generando il 403 visto nello screenshot.
+- Fix backend: `cameriere` puo' fare `GET` e `POST /api/tables`; `PATCH` e
+  `DELETE` restano negati nel gate e nel controller tavoli.
+- Fix frontend: la pagina Sala distingue la creazione tavoli dalle azioni di
+  eliminazione; il cameriere mantiene la modale `Tavoli` ma non vede/riceve
+  azioni `Elimina`.
+- Verifica: `node --check` su middleware/controller passato; test mirato gate
+  aggiunto e `npm test` Strapi passato (40/40); `npm run build` frontend
+  passato con warning preesistenti su import legacy/chunk size.
+
 # Plan — Chiudi conto dalla Sala per owner e cameriere (2026-05-20)
 
 ## Problema

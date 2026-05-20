@@ -25,6 +25,7 @@ const {
 const { setAuthCookies, stripJwtFromBodyIfCookieOnly } = require('../src/utils/auth-cookies');
 const { pairMenuRowsToElementRows } = require('../src/utils/menu-element-links');
 const authCookieMiddleware = require('../src/middlewares/auth-cookie');
+const subscriptionGate = require('../src/middlewares/subscription-gate');
 const publicTakeawayGuard = require('../src/api/order/middlewares/public-takeaway-guard');
 const buildServerConfig = require('../config/server');
 
@@ -90,6 +91,15 @@ test('menu-element direct link falls back when element has no same-status row', 
     pairMenuRowsToElementRows(menuRows, elementRows).map(({ menuRow, elementRow }) => [menuRow.id, elementRow.id]),
     [[1, 11], [2, 11]],
   );
+});
+
+test('subscription gate lets waiter create but not mutate tables', () => {
+  const { isStaffApiAllowed } = subscriptionGate.__private;
+
+  assert.equal(isStaffApiAllowed('cameriere', 'GET', '/api/tables', 'starter'), true);
+  assert.equal(isStaffApiAllowed('cameriere', 'POST', '/api/tables', 'starter'), true);
+  assert.equal(isStaffApiAllowed('cameriere', 'PATCH', '/api/tables/table-doc', 'starter'), false);
+  assert.equal(isStaffApiAllowed('cameriere', 'DELETE', '/api/tables/table-doc', 'starter'), false);
 });
 
 test('server config enables Koa proxy trust from TRUST_PROXY', () => {

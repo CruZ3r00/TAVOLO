@@ -145,3 +145,13 @@
 - Do not assume that waiter accounts are excluded from payment/checkout flows.
   When the user asks for an operational Sala action, mirror the requested roles
   explicitly in both frontend affordances and backend guards.
+
+## 2026-05-20 — Staff permissions need every gate aligned
+
+- When opening a staff action, check the complete path: frontend affordance,
+  global middleware allowlist, controller role assertion, and destructive
+  sibling actions. A controller-only fix can still fail at `subscription-gate`,
+  while a gate-only fix can expose inconsistent UI/backend behavior.
+- After editing adjacent role arrays, inspect each affected action by name
+  (`create`, `update`, `remove`) before testing; repeated `assertStaffRole`
+  calls are easy to patch in the wrong method.

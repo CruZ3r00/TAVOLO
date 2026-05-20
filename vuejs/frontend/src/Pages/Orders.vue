@@ -28,7 +28,8 @@ const router = useRouter();
 const token = computed(() => store.getters.getToken);
 const currentUser = computed(() => store.getters.getUser || null);
 const isOwnerView = computed(() => staffRole(currentUser.value) === STAFF_ROLES.OWNER);
-const canManageTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE].includes(staffRole(currentUser.value)));
+const canCreateTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE].includes(staffRole(currentUser.value)));
+const canDeleteTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE].includes(staffRole(currentUser.value)));
 const canCheckoutTables = computed(() => [STAFF_ROLES.OWNER, STAFF_ROLES.GESTIONE, STAFF_ROLES.CAMERIERE].includes(staffRole(currentUser.value)));
 const coverCharge = ref(0);
 
@@ -433,7 +434,7 @@ const handleOpenTable = async (table) => {
 };
 
 const handleRemoveTable = async (table) => {
-  if (!canManageTables.value || !table?.documentId) return;
+  if (!canDeleteTables.value || !table?.documentId) return;
   const ok = window.confirm(`Rimuovere il tavolo ${table.number}?`);
   if (!ok) return;
   try {
@@ -795,7 +796,7 @@ watch(() => route.path, async () => {
         <div v-if="mode === 'cameriere'" class="ord-sidebar-section">
           <div class="ord-sidebar-label">Strumenti</div>
           <nav class="ord-sidebar-nav">
-            <button type="button" class="ord-nav-item" @click="showTableManager = true">
+            <button v-if="canCreateTables" type="button" class="ord-nav-item" @click="showTableManager = true">
               <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
               <span>Tavoli</span>
             </button>
@@ -1023,7 +1024,7 @@ watch(() => route.path, async () => {
             :tables="tables"
             :orders="orders"
             :orders-by-table-id="activeOrdersByTableId"
-            :can-remove-tables="canManageTables"
+            :can-remove-tables="canDeleteTables"
             :can-checkout-tables="canCheckoutTables"
             :filter="tableFilter"
             @update:filter="tableFilter = $event"
@@ -1117,7 +1118,7 @@ watch(() => route.path, async () => {
       :token="token"
       :tables="tables"
       :editing-table="null"
-      :can-delete-tables="canManageTables"
+      :can-delete-tables="canDeleteTables"
       @close="showTableManager = false"
       @updated="onTableManagerUpdated"
     />
