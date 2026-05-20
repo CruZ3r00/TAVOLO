@@ -148,6 +148,88 @@ async function ensureUserMenu(strapi, userId) {
   });
 }
 
+async function findMenuElementLinkTable(strapi) {
+  const knex = strapi.db.connection;
+  if (!knex) return null;
+
+  const candidates = ['menus_fk_elements_lnk', 'elements_fk_menu_lnk'];
+  for (const tableName of candidates) {
+    if (!(await knex.schema.hasTable(tableName))) continue;
+    const hasMenu = await knex.schema.hasColumn(tableName, 'menu_id');
+    const hasElement = await knex.schema.hasColumn(tableName, 'element_id');
+    if (hasMenu && hasElement) return tableName;
+  }
+
+  const rows = await knex('information_schema.columns')
+    .where('table_schema', knex.raw('current_schema()'))
+    .whereIn('column_name', ['menu_id', 'element_id'])
+    .select('table_name', 'column_name');
+  const byTable = new Map();
+  for (const row of rows || []) {
+    const cols = byTable.get(row.table_name) || new Set();
+    cols.add(row.column_name);
+    byTable.set(row.table_name, cols);
+  }
+  for (const [tableName, cols] of byTable.entries()) {
+    if (cols.has('menu_id') && cols.has('element_id')) return tableName;
+  }
+  return null;
+}
+
+async function linkElementToMenuFallback(strapi, menuDocumentId, elementDocumentId) {
+  const knex = strapi.db.connection;
+  if (!knex || !menuDocumentId || !elementDocumentId) return false;
+
+  const tableName = await findMenuElementLinkTable(strapi);
+  if (!tableName) {
+    strapi.log.warn('element.create: link table menu-element non trovata per fallback.');
+    return false;
+  }
+
+  const [menuRows, elementRows] = await Promise.all([
+    knex('menus').where('document_id', menuDocumentId).select('id'),
+    knex('elements').where('document_id', elementDocumentId).select('id'),
+  ]);
+  if (!menuRows.length || !elementRows.length) return false;
+
+  for (const menuRow of menuRows) {
+    for (const elementRow of elementRows) {
+      const exists = await knex(tableName)
+        .where({ menu_id: menuRow.id, element_id: elementRow.id })
+        .first('menu_id');
+      if (!exists) {
+        await knex(tableName).insert({
+          menu_id: menuRow.id,
+          element_id: elementRow.id,
+        });
+      }
+    }
+  }
+  return true;
+}
+
+async function connectElementToMenu(strapi, menu, element) {
+  try {
+    await strapi.documents('api::menu.menu').update({
+      documentId: menu.documentId,
+      data: {
+        fk_elements: {
+          connect: [{ documentId: element.documentId }],
+        },
+      },
+      status: 'published',
+    });
+    return;
+  } catch (err) {
+    const msg = String(err && err.message ? err.message : err);
+    if (!msg.includes('Document with id')) throw err;
+
+    strapi.log.warn(`element.create: Document Service connect fallito (${msg}); uso fallback link table.`);
+    const linked = await linkElementToMenuFallback(strapi, menu.documentId, element.documentId);
+    if (!linked) throw err;
+  }
+}
+
 async function userOwnsElement(strapi, userId, documentId) {
   if (!userId || !documentId) return false;
   const rows = await strapi.documents('api::element.element').findMany({
@@ -213,15 +295,7 @@ module.exports = createCoreController('api::element.element', ({ strapi }) => ({
 
       const menu = await ensureUserMenu(strapi, user.id);
 
-      await strapi.documents('api::menu.menu').update({
-        documentId: menu.documentId,
-        data: {
-          fk_elements: {
-            connect: [{ documentId: created.documentId }],
-          },
-        },
-        status: 'published',
-      });
+      await connectElementToMenu(strapi, menu, created);
 
       // Risposta: legge i nomi dalla relazione appena scritta.
       let namesOut = [];
